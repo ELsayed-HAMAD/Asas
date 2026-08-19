@@ -1,4 +1,2 @@
-export default function CRMOverview() {
-  return <div className='p-8 text-gray-400 text-sm'>CRMOverview — coming soon</div>
-}
-
+import ModuleRecordsPage from '../../../components/common/ModuleRecordsPage'
+export default function CRMOverview() { return <ModuleRecordsPage module="crm" title="CRM" description="Manage your customer and sales records." createLabel="Add customer record" /> }

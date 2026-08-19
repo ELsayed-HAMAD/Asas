@@ -1,4 +1,2 @@
-export default function FinanceOverview() {
-  return <div className='p-8 text-gray-400 text-sm'>FinanceOverview — coming soon</div>
-}
-
+import ModuleRecordsPage from '../../../components/common/ModuleRecordsPage'
+export default function FinanceOverview() { return <ModuleRecordsPage module="finance" title="Finance" description="Track financial items for your workspace." createLabel="Add financial item" /> }

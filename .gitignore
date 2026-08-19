@@ -22,14 +22,22 @@ env/
 .venv/
 
 # =========================
-# Environment Variables
+# Environment Variables & Secrets
+# Keep only sanitized templates under version control.
 # =========================
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+!.env.*.example
 *.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.csr
+*.der
+secrets/
 
 # =========================
 # Frontend Builds & Caches
@@ -41,6 +49,9 @@ out/
 .next/
 .nuxt/
 .cache/
+.vite/
+.eslintcache
+.stylelintcache
 .parcel-cache/
 .vuepress/dist/
 .serverless/
@@ -63,6 +74,18 @@ target/
 bin/
 obj/
 
+# Local databases, runtime data, and uploaded files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+uploads/
+storage/
+tmp/
+temp/
+.tmp/
+
 # =========================
 # Testing & Coverage
 # =========================
@@ -72,6 +95,8 @@ cypress/videos/
 cypress/screenshots/
 playwright-report/
 test-results/
+allure-results/
+allure-report/
 
 # =========================
 # Editor directories and files

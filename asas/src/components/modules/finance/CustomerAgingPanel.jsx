@@ -1,4 +1,4 @@
 export default function CustomerAgingPanel() {
-  return <div className='p-8 text-gray-400 text-sm'>CustomerAgingPanel — coming soon</div>
+  return <div className='p-8 text-gray-400 text-sm'>CustomerAgingPanel â€” coming soon</div>
 }
 
