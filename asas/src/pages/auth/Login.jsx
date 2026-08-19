@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { authService } from '../../services/auth.service'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -28,13 +29,17 @@ export default function Login() {
     // Replace this with a real API call later:
     // const res = await authService.login(form.email, form.password)
     // localStorage.setItem('asas_token', res.token)
-    await new Promise(r => setTimeout(r, 800))
-    localStorage.setItem('asas_token', 'dev_token')
-    localStorage.setItem('asas_user', JSON.stringify({ name: 'Jane Doe', email: form.email, role: 'Admin' }))
+    try {
+      const result = await authService.login(form)
+      localStorage.setItem('asas_token', result.token)
+      localStorage.setItem('asas_user', JSON.stringify(result.user))
+      navigate('/dashboard')
+    } catch (requestError) {
+      setError(requestError.response?.data?.error?.message || 'Unable to sign in. Please try again.')
+    }
     // ───────────────────────────────────────────────────────
 
     setLoading(false)
-    navigate('/dashboard')
   }
 
   return (

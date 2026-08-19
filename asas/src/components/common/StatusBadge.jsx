@@ -1,4 +1,4 @@
 export default function StatusBadge() {
-  return <div className='p-8 text-gray-400 text-sm'>StatusBadge — coming soon</div>
+  return <div className='p-8 text-gray-400 text-sm'>StatusBadge â€” coming soon</div>
 }
 

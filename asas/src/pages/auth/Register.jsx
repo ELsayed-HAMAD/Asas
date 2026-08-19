@@ -1,20 +1,30 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
+import { authService } from '../../services/auth.service'
 
 export default function Register() {
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
+  const [form, setForm] = useState({ name: '', email: '', password: '' })
+  const [error, setError] = useState('')
 
-  const handleSubmit = (e) => {
+  const handleChange = event => setForm(current => ({ ...current, [event.target.name]: event.target.value }))
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    setError('')
     setIsLoading(true)
-    
-    // Mock registration delay
-    setTimeout(() => {
-      localStorage.setItem('asas_token', 'mock_jwt_token')
+    try {
+      const result = await authService.register(form)
+      localStorage.setItem('asas_token', result.token)
+      localStorage.setItem('asas_user', JSON.stringify(result.user))
       navigate('/dashboard')
-    }, 800)
+    } catch (requestError) {
+      setError(requestError.response?.data?.error?.message || 'Unable to create your workspace.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -27,13 +37,17 @@ export default function Register() {
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
+        {error && <div className="px-3.5 py-2.5 bg-red-50 border border-red-100 rounded-lg text-sm text-red-600">{error}</div>}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5" htmlFor="name">
             Full Name
           </label>
           <input
             id="name"
+            name="name"
             type="text"
+            value={form.name}
+            onChange={handleChange}
             placeholder="Jane Doe"
             required
             className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-gray-100 focus:border-gray-300 transition-all placeholder:text-gray-400"
@@ -46,7 +60,10 @@ export default function Register() {
           </label>
           <input
             id="email"
+            name="email"
             type="email"
+            value={form.email}
+            onChange={handleChange}
             placeholder="name@company.com"
             required
             className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-gray-100 focus:border-gray-300 transition-all placeholder:text-gray-400"
@@ -59,7 +76,10 @@ export default function Register() {
           </label>
           <input
             id="password"
+            name="password"
             type="password"
+            value={form.password}
+            onChange={handleChange}
             placeholder="Create a strong password"
             required
             className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-gray-100 focus:border-gray-300 transition-all placeholder:text-gray-400"

@@ -1,4 +1,4 @@
 export default function StockAlertBanner() {
-  return <div className='p-8 text-gray-400 text-sm'>StockAlertBanner — coming soon</div>
+  return <div className='p-8 text-gray-400 text-sm'>StockAlertBanner â€” coming soon</div>
 }
 
