@@ -1,16 +1,27 @@
-# React + Vite
+# Asas Enterprise Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+This directory contains the React + Vite frontend for the Asas Enterprise platform.
 
-Currently, two official plugins are available:
+## Architecture
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+* **Framework:** React 18
+* **Build Tool:** Vite
+* **Styling:** Tailwind CSS v4 (Custom `@theme` Design System)
+* **Icons:** Lucide React
+* **Routing:** React Router v6
 
-## React Compiler
+## Running Locally
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+To run the frontend development server:
 
-## Expanding the Oxlint configuration
+```powershell
+npm install
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+The application will be available at `http://localhost:5173`. 
+Note: Ensure the backend API (located in the root `/api` directory) is also running so that data loads correctly.
+
+## Documentation
+
+For full project documentation, architecture, and setup instructions, please see the [Root README](../README.md).
