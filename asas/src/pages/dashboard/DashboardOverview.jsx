@@ -3,8 +3,18 @@ import {
   ArrowUpRight, ArrowDownRight, DollarSign, Users, 
   AlertCircle, Clock, TrendingUp, CreditCard
 } from 'lucide-react'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
-// ── Mock Data ───────────────────────────────────────────────
+// ── Mock Data ───────────────────────────────────────────────────────────
+
+const CASH_FLOW_DATA = [
+  { month: 'Jan', value: 180000 },
+  { month: 'Feb', value: 220000 },
+  { month: 'Mar', value: 195000 },
+  { month: 'Apr', value: 280000 },
+  { month: 'May', value: 250000 },
+  { month: 'Jun', value: 310000 },
+]
 
 const STATS = [
   {
@@ -92,15 +102,15 @@ function StatCard({ stat }) {
   const isDown = stat.trend === 'down'
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow">
+    <div className="bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card hover:shadow-card-hover transition-shadow">
       <div className="flex items-center justify-between mb-4">
-        <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-100">
-          <stat.icon size={18} className="text-gray-600" />
+        <div className="w-10 h-10 rounded-card-sm bg-surface-muted flex items-center justify-center border border-border-subtle">
+          <stat.icon size={18} className="text-body-light" />
         </div>
-        <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md ${
-          isUp ? 'text-emerald-700 bg-emerald-50' : 
-          isDown ? 'text-blue-700 bg-blue-50' : 
-          'text-gray-600 bg-gray-100'
+        <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-input ${
+          isUp ? 'text-success-text bg-success-light' : 
+          isDown ? 'text-info bg-info-light' : 
+          'text-body-light bg-surface-muted'
         }`}>
           {isUp && <ArrowUpRight size={14} />}
           {isDown && <ArrowDownRight size={14} />}
@@ -108,121 +118,103 @@ function StatCard({ stat }) {
         </div>
       </div>
       <div>
-        <p className="text-sm font-medium text-gray-500 mb-1">{stat.label}</p>
-        <p className="text-2xl font-bold text-gray-900 tracking-tight">{stat.value}</p>
+        <p className="text-sm font-medium text-muted mb-1">{stat.label}</p>
+        <p className="text-3xl font-bold text-heading tracking-tight">{stat.value}</p>
       </div>
     </div>
   )
 }
 
+import TopBarActions from '../../components/TopBarActions';
+
 export default function DashboardOverview() {
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+    <div className="p-page md:p-page max-w-7xl mx-auto space-y-section">
       
-      {/* ── Header ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight mb-1">
-            Overview
-          </h1>
-          <p className="text-sm text-gray-500">
-            Here is what's happening across your workspace today.
-          </p>
-        </div>
+      <TopBarActions>
         <div className="flex items-center gap-3">
-          <button className="bg-white border border-gray-200 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+          <button className="bg-surface-raised border border-border-default text-body text-sm font-medium px-4 py-2 rounded-button hover:bg-surface-muted transition-colors">
             Generate Report
           </button>
         </div>
-      </div>
+      </TopBarActions>
 
       {/* ── KPI Grid ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-grid-lg">
         {STATS.map((stat, i) => (
           <StatCard key={i} stat={stat} />
         ))}
       </div>
 
       {/* ── Main Bento Grid ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-grid-lg">
         
         {/* Left Column (Charts & Sprints) - Spans 2 cols */}
-        <div className="lg:col-span-2 space-y-4 md:space-y-6">
+        <div className="lg:col-span-2 space-y-4 md:space-y-section">
           
           {/* Revenue Chart Box */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card p-4">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-base font-semibold text-gray-900">Cash Flow Analysis</h2>
-                <p className="text-xs text-gray-500 mt-1">Year to Date</p>
+                <h2 className="text-lg font-semibold text-heading">Cash Flow Analysis</h2>
+                <p className="text-xs text-muted mt-1">Year to Date</p>
               </div>
-              <select className="bg-gray-50 border border-gray-200 text-xs font-medium text-gray-700 rounded-md px-3 py-1.5 focus:outline-none">
+              <select className="bg-surface-muted border border-border-default text-xs font-medium text-body rounded-input px-3 py-1.5 focus:outline-none">
                 <option>FY 2026</option>
                 <option>FY 2025</option>
               </select>
             </div>
             
-            {/* Mock SVG Chart */}
-            <div className="h-64 w-full relative flex items-end">
-              <div className="absolute inset-0 flex flex-col justify-between pt-2 pb-6">
-                {[1, 2, 3, 4].map(i => (
-                  <div key={i} className="w-full border-t border-gray-100 border-dashed" />
-                ))}
-              </div>
-              
-              <svg viewBox="0 0 1000 250" className="w-full h-full absolute inset-0 preserve-3d" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="blueGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#2563EB" stopOpacity="0.1" />
-                    <stop offset="100%" stopColor="#2563EB" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-                <path 
-                  d="M0 180 Q 150 150 250 100 T 500 120 T 750 80 T 1000 90" 
-                  fill="none" 
-                  stroke="#1E1B4B" 
-                  strokeWidth="4" 
-                  strokeLinecap="round" 
-                />
-              </svg>
-
-              <div className="absolute bottom-0 w-full flex justify-between text-[10px] font-medium text-gray-400 px-2">
-                <span>Jan</span>
-                <span>Feb</span>
-                <span>Mar</span>
-                <span>Apr</span>
-                <span>May</span>
-                <span>Jun</span>
-              </div>
+            {/* Recharts Area Chart */}
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={CASH_FLOW_DATA} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="cashFlowGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--color-chart-primary)" stopOpacity={0.15} />
+                      <stop offset="95%" stopColor="var(--color-chart-primary)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-caption)', fontWeight: 500 }} dy={8} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-caption)', fontWeight: 500 }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} dx={-4} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: 'var(--radius-button)', border: '1px solid var(--color-border-default)', boxShadow: 'var(--shadow-card-hover)', fontSize: 13 }}
+                    formatter={(value) => [`$${(value / 1000).toFixed(0)}k`, 'Net Cash Flow']}
+                    labelStyle={{ fontWeight: 600, color: 'var(--color-heading)' }}
+                  />
+                  <Area type="monotone" dataKey="value" stroke="var(--color-chart-primary)" strokeWidth={3} fill="url(#cashFlowGrad)" dot={false} activeDot={{ r: 5, fill: 'var(--color-chart-primary)', strokeWidth: 2, stroke: '#fff' }} animationDuration={1200} />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
           {/* Active Sprints Box */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card p-4">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-base font-semibold text-gray-900">Active Sprints</h2>
-              <Link to="/dashboard/projects" className="text-xs font-medium text-blue-600 hover:text-blue-700">
+              <h2 className="text-lg font-semibold text-heading">Active Sprints</h2>
+              <Link to="/dashboard/projects" className="text-xs font-medium text-accent hover:text-accent-hover">
                 View Board &rarr;
               </Link>
             </div>
             
             <div className="space-y-3">
-              <div className="p-4 rounded-xl border border-gray-100 bg-gray-50 flex items-center justify-between gap-4 hover:border-gray-200 transition-colors cursor-pointer">
+              <div className="p-4 rounded-card-sm border border-border-subtle bg-surface-muted flex items-center justify-between gap-4 hover:border-border-default transition-colors cursor-pointer">
                 <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-blue-500" />
+                  <div className="w-2 h-2 rounded-full bg-info-dot" />
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">Sprint 42: Warehouse Automation</p>
-                    <p className="text-xs text-gray-500 mt-0.5">3 Days Remaining • 68% Complete</p>
+                    <p className="text-sm font-semibold text-heading">Sprint 42: Warehouse Automation</p>
+                    <p className="text-xs text-muted mt-0.5">3 Days Remaining • 68% Complete</p>
                   </div>
                 </div>
               </div>
               
-              <div className="p-4 rounded-xl border border-gray-100 flex items-center justify-between gap-4 hover:border-gray-200 transition-colors cursor-pointer">
+              <div className="p-4 rounded-card-sm border border-border-subtle flex items-center justify-between gap-4 hover:border-border-default transition-colors cursor-pointer">
                 <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <div className="w-2 h-2 rounded-full bg-success-dot" />
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">Q3 Financial Audit</p>
-                    <p className="text-xs text-gray-500 mt-0.5">On Track • Operations Dept</p>
+                    <p className="text-sm font-semibold text-heading">Q3 Financial Audit</p>
+                    <p className="text-xs text-muted mt-0.5">On Track • Operations Dept</p>
                   </div>
                 </div>
               </div>
@@ -232,31 +224,31 @@ export default function DashboardOverview() {
         </div>
 
         {/* Right Column (Actions & Activity) - Spans 1 col */}
-        <div className="space-y-4 md:space-y-6">
+        <div className="space-y-4 md:space-y-section">
           
           {/* Requires Attention */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card p-4">
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-2">
-                <AlertCircle size={16} className="text-amber-500" />
-                <h2 className="text-base font-semibold text-gray-900">Requires Attention</h2>
+                <AlertCircle size={16} className="text-warning" />
+                <h2 className="text-lg font-semibold text-heading">Requires Attention</h2>
               </div>
             </div>
 
             <div className="space-y-4">
               {ACTION_ITEMS.map((item) => (
-                <div key={item.id} className="group flex items-start justify-between gap-3 border-b border-gray-50 pb-4 last:border-0 last:pb-0">
+                <div key={item.id} className="group flex items-start justify-between gap-3 border-b border-border-faint pb-4 last:border-0 last:pb-0">
                   <div>
-                    <p className="text-sm font-semibold text-gray-900 group-hover:text-blue-600 transition-colors cursor-pointer">
+                    <p className="text-sm font-semibold text-heading group-hover:text-accent transition-colors cursor-pointer">
                       {item.title}
                     </p>
-                    <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">
+                    <p className="text-[11px] text-muted mt-0.5 leading-tight">
                       {item.subtitle}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs font-semibold text-gray-900">{item.amount}</p>
-                    <button className="text-[10px] font-medium text-blue-600 hover:text-blue-800 mt-1">
+                    <p className="text-xs font-semibold text-heading">{item.amount}</p>
+                    <button className="text-[10px] font-medium text-accent hover:text-accent-hover mt-1">
                       Action
                     </button>
                   </div>
@@ -266,28 +258,28 @@ export default function DashboardOverview() {
           </div>
 
           {/* Activity Feed */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card p-4">
             <div className="flex items-center gap-2 mb-6">
-              <Clock size={16} className="text-gray-400" />
-              <h2 className="text-base font-semibold text-gray-900">Activity Feed</h2>
+              <Clock size={16} className="text-caption" />
+              <h2 className="text-lg font-semibold text-heading">Activity Feed</h2>
             </div>
 
             <div className="space-y-5">
               {RECENT_ACTIVITY.map((log, i) => (
                 <div key={log.id} className="flex gap-3">
                   <div className="relative flex flex-col items-center">
-                    <div className="w-2 h-2 rounded-full bg-gray-300 mt-1.5" />
+                    <div className="w-2 h-2 rounded-full bg-faint mt-1.5" />
                     {i !== RECENT_ACTIVITY.length - 1 && (
-                      <div className="w-px h-full bg-gray-100 absolute top-3.5" />
+                      <div className="w-px h-full bg-border-subtle absolute top-3.5" />
                     )}
                   </div>
                   <div>
-                    <p className="text-xs text-gray-600 leading-relaxed">
-                      <span className="font-semibold text-gray-900">{log.user}</span>{' '}
+                    <p className="text-xs text-body-light leading-relaxed">
+                      <span className="font-semibold text-heading">{log.user}</span>{' '}
                       {log.action}{' '}
-                      <span className="font-medium text-gray-900">{log.target}</span>
+                      <span className="font-medium text-heading">{log.target}</span>
                     </p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">{log.time}</p>
+                    <p className="text-[10px] text-caption mt-0.5">{log.time}</p>
                   </div>
                 </div>
               ))}
