@@ -48,6 +48,8 @@ import Roadmap           from './pages/dashboard/projects/Roadmap'
 import SettingsGeneral from './pages/dashboard/settings/SettingsGeneral'
 import BillingPlans    from './pages/dashboard/settings/BillingPlans'
 import Integrations    from './pages/dashboard/settings/Integrations'
+import Notifications   from './pages/dashboard/settings/Notifications'
+import DataExport      from './pages/dashboard/settings/DataExport'
 
 // ── Support ────────────────────────────────────────────────
 import HelpCenter from './pages/dashboard/support/HelpCenter'
@@ -56,9 +58,9 @@ import HelpCenter from './pages/dashboard/support/HelpCenter'
 function NotFound() {
   return (
     <div className="flex h-screen items-center justify-center flex-col gap-3">
-      <p className="text-5xl font-bold text-gray-900">404</p>
-      <p className="text-gray-500">Page not found</p>
-      <a href="/" className="text-sm text-blue-600 hover:underline">
+      <p className="text-5xl font-bold text-heading">404</p>
+      <p className="text-muted">Page not found</p>
+      <a href="/" className="text-sm text-accent hover:underline">
         Go back home
       </a>
     </div>
@@ -118,6 +120,8 @@ export default function App() {
           <Route path="/dashboard/settings"              element={<SettingsGeneral />} />
           <Route path="/dashboard/settings/billing"      element={<BillingPlans />} />
           <Route path="/dashboard/settings/integrations" element={<Integrations />} />
+          <Route path="/dashboard/settings/notifications" element={<Notifications />} />
+          <Route path="/dashboard/settings/data-export"   element={<DataExport />} />
 
           {/* Support */}
           <Route path="/dashboard/support" element={<HelpCenter />} />

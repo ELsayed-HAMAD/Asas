@@ -46,13 +46,13 @@ export default function Login() {
     <div>
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-xl font-bold text-gray-900 mb-1">Welcome back</h1>
-        <p className="text-sm text-gray-500">Sign in to your Asas workspace</p>
+        <h1 className="text-2xl font-bold text-heading mb-1">Welcome back</h1>
+        <p className="text-sm text-muted">Sign in to your Asas workspace</p>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="mb-5 px-3.5 py-2.5 bg-red-50 border border-red-100 rounded-lg text-sm text-red-600">
+        <div className="mb-5 px-3.5 py-2.5 bg-danger-light border border-danger-border rounded-button text-sm text-danger">
           {error}
         </div>
       )}
@@ -62,7 +62,7 @@ export default function Login() {
 
         {/* Email */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label className="block text-sm font-medium text-body mb-1.5">
             Work email
           </label>
           <input
@@ -72,15 +72,15 @@ export default function Login() {
             onChange={handleChange}
             placeholder="you@company.com"
             autoComplete="email"
-            className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:bg-white placeholder:text-gray-400 transition-all"
+            className="w-full px-3.5 py-2.5 text-sm border border-border-default rounded-button bg-surface-muted focus:outline-none focus:ring-2 focus:ring-border-strong focus:bg-surface-raised placeholder:text-caption transition-all"
           />
         </div>
 
         {/* Password */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-sm font-medium text-gray-700">Password</label>
-            <a href="#" className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
+            <label className="text-sm font-medium text-body">Password</label>
+            <a href="#" className="text-xs text-muted hover:text-heading transition-colors">
               Forgot password?
             </a>
           </div>
@@ -92,12 +92,12 @@ export default function Login() {
               onChange={handleChange}
               placeholder="••••••••"
               autoComplete="current-password"
-              className="w-full px-3.5 py-2.5 pr-10 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:bg-white placeholder:text-gray-400 transition-all"
+              className="w-full px-3.5 py-2.5 pr-10 text-sm border border-border-default rounded-button bg-surface-muted focus:outline-none focus:ring-2 focus:ring-border-strong focus:bg-surface-raised placeholder:text-caption transition-all"
             />
             <button
               type="button"
               onClick={() => setShowPass(p => !p)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-caption hover:text-body transition-colors"
             >
               {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
@@ -109,9 +109,9 @@ export default function Login() {
           <input
             type="checkbox"
             id="remember"
-            className="w-4 h-4 rounded border-gray-300 accent-gray-900 cursor-pointer"
+            className="w-4 h-4 rounded border-border-strong accent-primary cursor-pointer"
           />
-          <label htmlFor="remember" className="text-sm text-gray-500 cursor-pointer">
+          <label htmlFor="remember" className="text-sm text-muted cursor-pointer">
             Keep me signed in
           </label>
         </div>
@@ -120,7 +120,7 @@ export default function Login() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white text-sm font-semibold py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.99] transition-all"
+          className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary text-sm font-semibold py-2.5 rounded-button hover:bg-primary-hover disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.99] transition-all"
         >
           {loading ? (
             <>
@@ -137,17 +137,17 @@ export default function Login() {
       {/* Divider */}
       <div className="relative my-6">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-100" />
+          <div className="w-full border-t border-border-subtle" />
         </div>
         <div className="relative flex justify-center">
-          <span className="bg-white px-3 text-xs text-gray-400">or</span>
+          <span className="bg-surface-raised px-3 text-xs text-caption">or</span>
         </div>
       </div>
 
       {/* Register link */}
-      <p className="text-center text-sm text-gray-500">
+      <p className="text-center text-sm text-muted">
         Don't have an account?{' '}
-        <Link to="/register" className="text-gray-900 font-semibold hover:underline">
+        <Link to="/register" className="text-heading font-semibold hover:underline">
           Create workspace
         </Link>
       </p>

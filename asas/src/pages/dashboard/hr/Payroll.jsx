@@ -6,6 +6,7 @@ import {
   CheckSquare,
   Square
 } from 'lucide-react'
+import TopBarActions from '../../../components/TopBarActions'
 
 // ── Mock Data ────────────────────────────────────────────────
 const MOCK_PAYROLL = [
@@ -55,57 +56,60 @@ export default function Payroll() {
   const selectedRecord = MOCK_PAYROLL.find(r => r.id === selectedId)
 
   return (
-    <div className="flex h-full flex-col bg-white overflow-hidden min-w-[900px]">
+    <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-[900px]">
       
+      <TopBarActions>
+        <div className="flex gap-3">
+          <button className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card">
+            <Download size={16} /> Download ACH
+          </button>
+          <button className="bg-primary text-white px-5 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors shadow-card">
+            Approve Pay Run
+          </button>
+        </div>
+      </TopBarActions>
+
       {/* ── Toolbar & KPIs (Merged to save space) ── */}
-      <div className="px-6 py-5 flex-shrink-0 border-b border-gray-100 shadow-sm z-10 relative">
+      <div className="px-6 py-5 flex-shrink-0 border-b border-border-subtle shadow-card z-10 relative">
         
         {/* Filters & Global Actions */}
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-6">
             <div className="flex gap-3">
-              <button className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-sm hover:bg-gray-50 bg-white shadow-sm">
-                Filter: All Depts <ChevronDown size={14} className="text-gray-400" />
+              <button className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm hover:bg-surface-muted bg-surface-raised shadow-card">
+                Filter: All Depts <ChevronDown size={14} className="text-caption" />
               </button>
-              <button className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-sm hover:bg-gray-50 bg-white shadow-sm">
-                Status: Pending <ChevronDown size={14} className="text-gray-400" />
+              <button className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm hover:bg-surface-muted bg-surface-raised shadow-card">
+                Status: Pending <ChevronDown size={14} className="text-caption" />
               </button>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-5 bg-blue-600 rounded-full relative cursor-pointer flex items-center px-0.5">
-                <div className="w-4 h-4 bg-white rounded-full translate-x-5 transition-transform shadow-sm" />
+              <div className="w-10 h-5 bg-accent rounded-full relative cursor-pointer flex items-center px-0.5">
+                <div className="w-4 h-4 bg-surface-raised rounded-full translate-x-5 transition-transform shadow-card" />
               </div>
-              <span className="text-sm font-medium text-gray-700">Auto-Calculate</span>
+              <span className="text-sm font-medium text-body">Auto-Calculate</span>
             </div>
           </div>
 
-          <div className="flex gap-3">
-            <button className="flex items-center gap-2 border border-gray-200 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors bg-white shadow-sm">
-              <Download size={16} /> Download ACH
-            </button>
-            <button className="bg-black text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-gray-800 transition-colors shadow-sm">
-              Approve Pay Run
-            </button>
-          </div>
         </div>
 
         {/* KPIs Row */}
         <div className="grid grid-cols-4 gap-4">
-          <div className="border border-gray-200 rounded-lg p-4 bg-white">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Total Gross</p>
-            <p className="text-2xl font-bold text-gray-900">$342,500</p>
+          <div className="border border-border-default rounded-button p-4 bg-surface-raised">
+            <p className="text-[10px] font-bold text-caption uppercase tracking-wider mb-2">Total Gross</p>
+            <p className="text-3xl font-bold text-heading">$342,500</p>
           </div>
-          <div className="border border-gray-200 rounded-lg p-4 bg-white">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Taxes</p>
-            <p className="text-2xl font-bold text-red-600">-$68,400</p>
+          <div className="border border-border-default rounded-button p-4 bg-surface-raised">
+            <p className="text-[10px] font-bold text-caption uppercase tracking-wider mb-2">Taxes</p>
+            <p className="text-3xl font-bold text-danger">-$68,400</p>
           </div>
-          <div className="border border-gray-200 rounded-lg p-4 bg-white">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Total Net</p>
-            <p className="text-2xl font-bold text-gray-900">$274,100</p>
+          <div className="border border-border-default rounded-button p-4 bg-surface-raised">
+            <p className="text-[10px] font-bold text-caption uppercase tracking-wider mb-2">Total Net</p>
+            <p className="text-3xl font-bold text-heading">$274,100</p>
           </div>
-          <div className="border border-gray-200 rounded-lg p-4 bg-white">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Pay Date</p>
-            <p className="text-2xl font-bold text-gray-900">Jun 18</p>
+          <div className="border border-border-default rounded-button p-4 bg-surface-raised">
+            <p className="text-[10px] font-bold text-caption uppercase tracking-wider mb-2">Pay Date</p>
+            <p className="text-3xl font-bold text-heading">Jun 18</p>
           </div>
         </div>
       </div>
@@ -114,29 +118,29 @@ export default function Payroll() {
       <div className="flex-1 flex overflow-hidden">
         
         {/* Left: Table Area */}
-        <div className="flex-1 overflow-y-auto bg-white">
+        <div className="flex-1 overflow-y-auto bg-surface-raised">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-white sticky top-0 z-10 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+            <thead className="bg-surface-raised sticky top-0 z-10 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
               <tr>
-                <th className="px-4 py-3 border-b border-gray-100 w-10">
-                  <Square size={16} className="text-gray-300" />
+                <th className="px-4 py-3 border-b border-border-subtle w-10">
+                  <Square size={16} className="text-faint" />
                 </th>
-                <th className="px-2 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100 flex items-center gap-1">
+                <th className="px-2 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-subtle flex items-center gap-1">
                   Employee <ChevronDown size={12} />
                 </th>
-                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100 text-right">
+                <th className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-subtle text-right">
                   <div className="flex items-center justify-end gap-1">Gross <ChevronDown size={12} /></div>
                 </th>
-                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100 text-right">
+                <th className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-subtle text-right">
                   <div className="flex items-center justify-end gap-1">Deductions <ChevronDown size={12} /></div>
                 </th>
-                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100 text-right">
+                <th className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-subtle text-right">
                   <div className="flex items-center justify-end gap-1">Net Pay <ChevronDown size={12} /></div>
                 </th>
-                <th className="px-4 py-3 border-b border-gray-100 w-10"></th>
+                <th className="px-4 py-3 border-b border-border-subtle w-10"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-border-faint">
               {MOCK_PAYROLL.map(record => {
                 const isSelected = selectedId === record.id
 
@@ -145,29 +149,29 @@ export default function Payroll() {
                     key={record.id}
                     onClick={() => setSelectedId(record.id)}
                     className={`cursor-pointer transition-colors ${
-                      isSelected ? 'bg-blue-50/50' : 'bg-white hover:bg-gray-50'
+                      isSelected ? 'bg-accent-light/50' : 'bg-surface-raised hover:bg-surface-muted'
                     }`}
                   >
                     <td className="px-4 py-2.5">
                       {isSelected 
-                        ? <CheckSquare size={16} className="text-blue-600" fill="#2563EB" stroke="white" /> 
-                        : <Square size={16} className="text-gray-300" />
+                        ? <CheckSquare size={16} className="text-accent" fill="#2563EB" stroke="white" /> 
+                        : <Square size={16} className="text-faint" />
                       }
                     </td>
                     <td className="px-2 py-2.5">
                       <div className="flex items-center gap-3">
                         <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold ${
-                          isSelected ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'
+                          isSelected ? 'bg-accent text-white' : 'bg-surface-active text-muted'
                         }`}>
                           {record.avatar}
                         </div>
-                        <span className="text-sm text-gray-700">{record.employee}</span>
+                        <span className="text-sm text-body">{record.employee}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 text-right text-sm text-gray-700 tabular-nums">{formatCurrency(record.gross)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm text-red-500 tabular-nums">{formatCurrency(record.deductions)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-bold text-gray-900 tabular-nums">{formatCurrency(record.net)}</td>
-                    <td className="px-4 py-2.5 text-center text-gray-400">
+                    <td className="px-4 py-2.5 text-right text-sm text-body tabular-nums">{formatCurrency(record.gross)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm text-danger tabular-nums">{formatCurrency(record.deductions)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold text-heading tabular-nums">{formatCurrency(record.net)}</td>
+                    <td className="px-4 py-2.5 text-center text-caption">
                       <MoreHorizontal size={16} />
                     </td>
                   </tr>
@@ -178,22 +182,22 @@ export default function Payroll() {
         </div>
 
         {/* Right: Detail Panel */}
-        <div className="w-[440px] bg-gray-50 border-l border-gray-200 overflow-y-auto p-5 flex-shrink-0 shadow-inner">
+        <div className="w-[440px] bg-surface-muted border-l border-border-default overflow-y-auto p-4 flex-shrink-0 shadow-panel">
           {selectedRecord && selectedRecord.breakdown && (
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col min-h-full">
+            <div className="bg-surface-raised border border-border-default rounded-card-sm shadow-card overflow-hidden flex flex-col min-h-full">
               
               {/* Profile Header */}
               <div className="p-6 pb-5 flex items-start justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-sm">
+                  <div className="w-12 h-12 bg-accent rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-card">
                     {selectedRecord.avatar}
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-gray-900 leading-tight">{selectedRecord.employee}</h2>
-                    <p className="text-xs text-gray-500 mt-0.5">{selectedRecord.department} • ID: {selectedRecord.idNumber}</p>
+                    <h2 className="text-lg font-bold text-heading leading-tight">{selectedRecord.employee}</h2>
+                    <p className="text-xs text-muted mt-0.5">{selectedRecord.department} • ID: {selectedRecord.idNumber}</p>
                   </div>
                 </div>
-                <button className="bg-black text-white text-xs font-semibold px-4 py-2 rounded-md hover:bg-gray-800 transition-colors">
+                <button className="bg-primary text-white text-xs font-semibold px-4 py-2 rounded-input hover:bg-primary-hover transition-colors">
                   Recalculate
                 </button>
               </div>
@@ -203,12 +207,12 @@ export default function Payroll() {
                 
                 {/* Base Earnings */}
                 <div>
-                  <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Base Earnings</h4>
+                  <h4 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-4">Base Earnings</h4>
                   <div className="flex justify-between items-center text-sm mb-3">
-                    <span className="text-gray-700">Base Salary (Semi-Monthly)</span>
-                    <span className="font-medium text-gray-900 tabular-nums">{formatCurrency(selectedRecord.breakdown.baseSalary)}</span>
+                    <span className="text-body">Base Salary (Semi-Monthly)</span>
+                    <span className="font-medium text-heading tabular-nums">{formatCurrency(selectedRecord.breakdown.baseSalary)}</span>
                   </div>
-                  <div className="flex justify-between items-center text-sm font-semibold text-gray-900 pt-3 border-t border-gray-100">
+                  <div className="flex justify-between items-center text-sm font-semibold text-heading pt-3 border-t border-border-subtle">
                     <span>Subtotal: Gross Base</span>
                     <span className="tabular-nums">{formatCurrency(selectedRecord.breakdown.baseSalary)}</span>
                   </div>
@@ -216,55 +220,55 @@ export default function Payroll() {
 
                 {/* Manual Adjustments */}
                 <div>
-                  <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Manual Adjustments</h4>
+                  <h4 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-4">Manual Adjustments</h4>
                   <div className="flex justify-between items-center text-sm mb-3">
                     <div className="flex items-center gap-3">
-                      <span className="text-gray-700">Missed Days (1)</span>
-                      <input type="text" defaultValue={selectedRecord.breakdown.missedDays.count} className="w-10 text-center border border-gray-300 rounded text-xs py-0.5 outline-none focus:border-blue-500" />
+                      <span className="text-body">Missed Days (1)</span>
+                      <input type="text" defaultValue={selectedRecord.breakdown.missedDays.count} className="w-10 text-center border border-border-strong rounded text-xs py-0.5 outline-none focus:border-accent" />
                     </div>
-                    <span className="font-medium text-red-600 tabular-nums">{formatCurrency(selectedRecord.breakdown.missedDays.amount)}</span>
+                    <span className="font-medium text-danger tabular-nums">{formatCurrency(selectedRecord.breakdown.missedDays.amount)}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm mb-3">
                     <div className="flex items-center gap-3">
-                      <span className="text-gray-700">Ad-Hoc Bonus</span>
-                      <input type="text" defaultValue={selectedRecord.breakdown.bonus.label} className="w-14 text-center border border-gray-300 rounded text-xs py-0.5 outline-none focus:border-blue-500" />
+                      <span className="text-body">Ad-Hoc Bonus</span>
+                      <input type="text" defaultValue={selectedRecord.breakdown.bonus.label} className="w-14 text-center border border-border-strong rounded text-xs py-0.5 outline-none focus:border-accent" />
                     </div>
-                    <span className="font-medium text-emerald-600 tabular-nums">+{formatCurrency(selectedRecord.breakdown.bonus.amount)}</span>
+                    <span className="font-medium text-success tabular-nums">+{formatCurrency(selectedRecord.breakdown.bonus.amount)}</span>
                   </div>
-                  <div className="flex justify-between items-center text-sm font-semibold text-gray-900 pt-3 border-t border-gray-100">
+                  <div className="flex justify-between items-center text-sm font-semibold text-heading pt-3 border-t border-border-subtle">
                     <span>Subtotal: Adjustments</span>
-                    <span className="text-emerald-600 tabular-nums">+{formatCurrency(300)}</span>
+                    <span className="text-success tabular-nums">+{formatCurrency(300)}</span>
                   </div>
                 </div>
 
                 {/* Taxes & Deductions */}
                 <div>
-                  <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Taxes & Deductions</h4>
+                  <h4 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-4">Taxes & Deductions</h4>
                   <div className="space-y-3.5">
                     {selectedRecord.breakdown.taxes.map((tax, i) => (
                       <div key={i} className="flex justify-between items-center text-sm">
                         <div className="flex items-center gap-2">
-                          <span className="text-gray-700">{tax.label}</span>
+                          <span className="text-body">{tax.label}</span>
                           {tax.override && (
-                            <span className="text-[8px] font-bold bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded uppercase">Override</span>
+                            <span className="text-[8px] font-bold bg-surface-active text-muted px-1.5 py-0.5 rounded uppercase">Override</span>
                           )}
                         </div>
-                        <span className="font-medium text-red-600 tabular-nums">{formatCurrency(tax.amount)}</span>
+                        <span className="font-medium text-danger tabular-nums">{formatCurrency(tax.amount)}</span>
                       </div>
                     ))}
                   </div>
-                  <div className="flex justify-between items-center text-sm font-semibold text-gray-900 pt-4 mt-4 border-t border-gray-100">
+                  <div className="flex justify-between items-center text-sm font-semibold text-heading pt-4 mt-4 border-t border-border-subtle">
                     <span>Subtotal: Total Taxes</span>
-                    <span className="text-red-600 tabular-nums">{formatCurrency(-1100)}</span>
+                    <span className="text-danger tabular-nums">{formatCurrency(-1100)}</span>
                   </div>
                 </div>
 
               </div>
 
               {/* Grand Total Footer */}
-              <div className="mt-6 border-t-[3px] border-black p-6 bg-gray-50/50 flex justify-between items-center">
-                <span className="text-sm font-bold text-gray-900 uppercase">Total Net Pay</span>
-                <span className="text-3xl font-bold text-gray-900 tabular-nums">{formatCurrency(selectedRecord.net)}</span>
+              <div className="mt-6 border-t-[3px] border-black p-6 bg-surface-muted/50 flex justify-between items-center">
+                <span className="text-sm font-bold text-heading uppercase">Total Net Pay</span>
+                <span className="text-3xl font-bold text-heading tabular-nums">{formatCurrency(selectedRecord.net)}</span>
               </div>
 
             </div>
