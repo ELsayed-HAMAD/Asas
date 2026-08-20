@@ -121,3 +121,11 @@ allure-report/
 Thumbs.db
 ehthumbs.db
 desktop.ini
+
+# =========================
+# Custom Ignored Files
+# =========================
+check_errors.cjs
+lint_output.txt
+*backup*/
+*_backup_*
