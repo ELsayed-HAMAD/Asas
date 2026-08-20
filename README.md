@@ -1,28 +1,50 @@
-# Asas Enterprise
+# Asas Enterprise Platform
 
-Asas is a tenant-aware enterprise operations platform. It brings HR, Finance, CRM, Inventory, and Projects into one dashboard.
+![Asas Enterprise Platform](https://img.shields.io/badge/Status-Active_Development-success?style=flat-square)
+![React](https://img.shields.io/badge/React-18-blue?style=flat-square&logo=react)
+![TailwindCSS v4](https://img.shields.io/badge/TailwindCSS-v4-38B2AC?style=flat-square&logo=tailwind-css)
+![Fastify](https://img.shields.io/badge/Fastify-4-black?style=flat-square&logo=fastify)
 
-## Current capabilities
+**Asas** is a modern, premium, tenant-aware enterprise operations platform. It brings HR, Finance, CRM, Inventory, and Projects into one unified, visually stunning dashboard. 
 
-- React dashboard with authenticated routes and live data workspaces
-- Fastify API with JWT authentication and tenant isolation
-- Prisma database schema using SQLite for local development
-- Create, list, and delete records in HR, Finance, CRM, Inventory, Projects, and Settings
+The platform is designed with a strict focus on top-tier professional aesthetics, leveraging a bespoke design system, Tailwind CSS v4, and a highly polished user experience.
 
-> The module data model is intentionally generic at this stage. Dedicated fields and workflows, such as employee profiles, invoices, deals, stock quantities, and project tasks, are the next development milestone.
+---
 
-## Project structure
+## 🌟 Key Features
+
+* **Premium UI/UX:** Built on a custom Tailwind v4 `@theme`, featuring tailored spacing, subtle hover states, micro-animations, and a completely custom, scrollbar-free sidebar navigation.
+* **Tenant Isolation:** Fastify API with JWT authentication and strict tenant-level data boundaries.
+* **Unified Workspace:** A single-page application (React + Vite) that seamlessly routes between distinct business modules.
+* **Rapid Local Development:** Powered by Prisma and SQLite for zero-friction local setup and prototyping.
+
+## 📦 Core Modules
+
+* **HR & Payroll:** Employee directory, time & attendance tracking, payroll processing, and recruitment pipelines.
+* **Finance:** Accounts payable/receivable, detailed expense tracking, and financial overviews.
+* **CRM (Sales):** Deal pipelines, revenue forecasting, and sales performance leaderboards.
+* **Projects:** Portfolio overview, active sprints, and product roadmaps.
+* **Inventory:** Product catalogs, stock alerts, and warehouse management.
+* **Settings:** Billing, integrations, data export, and general workspace configuration.
+
+---
+
+## 🏗️ Project Structure
 
 ```text
-asas/   React + Vite frontend
-api/    Fastify + Prisma backend
+asas/   React + Vite Frontend (Tailwind v4)
+api/    Fastify + Prisma Backend
 ```
 
-## Run locally
+---
 
-Use two terminals.
+## 🚀 Getting Started
+
+To run the platform locally, you will need to start both the backend API and the frontend client.
 
 ### 1. Start the API
+
+Open a terminal and navigate to the `api` directory:
 
 ```powershell
 cd api
@@ -32,9 +54,11 @@ npm exec prisma db push
 npm run dev
 ```
 
-The API listens on `http://127.0.0.1:4000`.
+The API will start listening on `http://127.0.0.1:4000`.
 
-### 2. Start the frontend
+### 2. Start the Frontend
+
+Open a second terminal and navigate to the `asas` directory:
 
 ```powershell
 cd asas
@@ -42,21 +66,26 @@ npm install
 npm run dev
 ```
 
-Open the Vite address shown in the terminal, normally `http://localhost:5173`.
+Open the Vite address shown in the terminal (usually `http://localhost:5173`) in your browser.
 
-## Configuration and secret safety
+---
 
-Copy the template when you need to configure the API:
+## 🔐 Configuration & Secret Safety
+
+To configure the API, copy the provided environment template:
 
 ```powershell
 Copy-Item api/.env.example api/.env
 ```
 
-Never commit `api/.env` or `api/prisma/dev.db`; both are ignored by Git. `api/.env.example` and `api/prisma/schema.prisma` are safe to commit because they contain placeholders and database structure, not credentials or local data.
+**Security Rules:**
+- Never commit `api/.env` or `api/prisma/dev.db` (these are ignored by Git).
+- `api/.env.example` and `api/prisma/schema.prisma` are safe to commit as they contain placeholders and database structure, not credentials or local data.
+- Before production deployment, replace `JWT_SECRET` with a long, unique cryptographic secret and migrate from SQLite to a production-grade database like PostgreSQL.
 
-Before a production deployment, replace `JWT_SECRET` with a long, unique secret and use a production database rather than the local SQLite file.
+---
 
-## Useful commands
+## 💻 Useful Commands
 
 | Location | Command | Purpose |
 | --- | --- | --- |
@@ -66,6 +95,8 @@ Before a production deployment, replace `JWT_SECRET` with a long, unique secret 
 | `asas/` | `npm run dev` | Run the frontend locally |
 | `asas/` | `npm run build` | Build the frontend for production |
 
-## API
+---
 
-API documentation, endpoint details, and setup notes are available in [api/README.md](api/README.md).
+## 📚 Documentation
+
+API documentation, endpoint details, and detailed backend setup notes are available in [api/README.md](api/README.md).
