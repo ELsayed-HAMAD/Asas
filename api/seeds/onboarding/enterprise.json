@@ -1,0 +1,7095 @@
+{
+  "departments": [
+    {
+      "key": "engineering",
+      "name": "Engineering"
+    },
+    {
+      "key": "product",
+      "name": "Product"
+    },
+    {
+      "key": "sales",
+      "name": "Sales"
+    },
+    {
+      "key": "hr",
+      "name": "HR"
+    },
+    {
+      "key": "marketing",
+      "name": "Marketing"
+    },
+    {
+      "key": "finance",
+      "name": "Finance"
+    },
+    {
+      "key": "operations",
+      "name": "Operations"
+    }
+  ],
+  "employees": [
+    {
+      "key": "ceo",
+      "name": "Susan Robinson",
+      "title": "Chief Executive Officer",
+      "departmentKey": null,
+      "status": "ACTIVE",
+      "hiredAt": "2019-09-14T00:34:41.027Z",
+      "salary": 350000,
+      "equityOptions": 3503,
+      "band": "E9",
+      "location": "Remote",
+      "employeeNumber": "EMP-9258",
+      "email": "susan.robinson@asas-enterprise.com",
+      "managerKey": null
+    },
+    {
+      "key": "cto",
+      "name": "Robert Williams",
+      "title": "Chief Technology Officer",
+      "departmentKey": "engineering",
+      "status": "ACTIVE",
+      "hiredAt": "2022-07-27T10:14:45.673Z",
+      "salary": 280000,
+      "equityOptions": 6485,
+      "band": "E8",
+      "location": "Austin, TX",
+      "employeeNumber": "EMP-8734",
+      "email": "robert.williams@asas-enterprise.com",
+      "managerKey": "ceo"
+    },
+    {
+      "key": "cfo",
+      "name": "Anthony Hernandez",
+      "title": "Chief Financial Officer",
+      "departmentKey": "finance",
+      "status": "ACTIVE",
+      "hiredAt": "2019-12-23T22:09:32.256Z",
+      "salary": 260000,
+      "equityOptions": 5782,
+      "band": "E8",
+      "location": "Austin, TX",
+      "employeeNumber": "EMP-4978",
+      "email": "anthony.hernandez@asas-enterprise.com",
+      "managerKey": "ceo"
+    },
+    {
+      "key": "cro",
+      "name": "Thomas Williams",
+      "title": "Chief Revenue Officer",
+      "departmentKey": "sales",
+      "status": "ACTIVE",
+      "hiredAt": "2023-02-20T12:23:44.164Z",
+      "salary": 270000,
+      "equityOptions": 2532,
+      "band": "E8",
+      "location": "London, UK",
+      "employeeNumber": "EMP-3917",
+      "email": "thomas.williams@asas-enterprise.com",
+      "managerKey": "ceo"
+    },
+    {
+      "key": "eng_1",
+      "name": "Jessica Smith",
+      "title": "Software Engineer",
+      "departmentKey": "engineering",
+      "status": "ACTIVE",
+      "hiredAt": "2024-11-01T11:05:16.402Z",
+      "salary": 142734,
+      "equityOptions": 3737,
+      "band": "E4",
+      "location": "Austin, TX",
+      "employeeNumber": "EMP-5045",
+      "email": "jessica.smith@asas-enterprise.com",
+      "managerKey": "cto"
+    },
+    {
+      "key": "eng_2",
+      "name": "John Smith",
+      "title": "Software Engineer",
+      "departmentKey": "engineering",
+      "status": "ACTIVE",
+      "hiredAt": "2019-09-20T18:54:31.993Z",
+      "salary": 119921,
+      "equityOptions": 3358,
+      "band": "E4",
+      "location": "San Francisco, CA",
+      "employeeNumber": "EMP-1856",
+      "email": "john.smith@asas-enterprise.com",
+      "managerKey": "cto"
+    },
+    {
+      "key": "eng_3",
+      "name": "John Harris",
+      "title": "Software Engineer",
+      "departmentKey": "engineering",
+      "status": "ACTIVE",
+      "hiredAt": "2019-07-03T05:35:39.968Z",
+      "salary": 146943,
+      "equityOptions": 5092,
+      "band": "E4",
+      "location": "London, UK",
+      "employeeNumber": "EMP-3764",
+      "email": "john.harris@asas-enterprise.com",
+      "managerKey": "cto"
+    },
+    {
+      "key": "eng_4",
+      "name": "Thomas Anderson",
+      "title": "Software Engineer",
+      "departmentKey": "engineering",
+      "status": "ACTIVE",
+      "hiredAt": "2018-05-29T22:26:23.118Z",
+      "salary": 133202,
+      "equityOptions": 388,
+      "band": "E4",
+      "location": "London, UK",
+      "employeeNumber": "EMP-7579",
+      "email": "thomas.anderson@asas-enterprise.com",
+      "managerKey": "cto"
+    },
+    {
+      "key": "eng_5",
+      "name": "Richard Brown",
+      "title": "Software Engineer",
+      "departmentKey": "engineering",
+      "status": "ACTIVE",
+      "hiredAt": "2019-09-03T11:20:01.075Z",
+      "salary": 110707,
+      "equityOptions": 8141,
+      "band": "E4",
+      "location": "Austin, TX",
+      "employeeNumber": "EMP-1767",
+      "email": "richard.brown@asas-enterprise.com",
+      "managerKey": "cto"
+    },
+    {
+      "key": "eng_6",
+      "name": "Elizabeth Harris",
+      "title": "Software Engineer",
+      "departmentKey": "engineering",
+      "status": "ACTIVE",
+      "hiredAt": "2020-06-10T06:50:57.109Z",
+      "salary": 142483,
+      "equityOptions": 9871,
+      "band": "E4",
+      "location": "Remote",
+      "employeeNumber": "EMP-3542",
+      "email": "elizabeth.harris@asas-enterprise.com",
+      "managerKey": "cto"
+    },
+    {
+      "key": "eng_7",
+      "name": "Susan Moore",
+      "title": "Software Engineer",
+      "departmentKey": "engineering",
+      "status": "ACTIVE",
+      "hiredAt": "2025-05-26T02:22:21.996Z",
+      "salary": 146572,
+      "equityOptions": 6937,
+      "band": "E4",
+      "location": "Remote",
+      "employeeNumber": "EMP-9404",
+      "email": "susan.moore@asas-enterprise.com",
+      "managerKey": "cto"
+    },
+    {
+      "key": "eng_8",
+      "name": "William Garcia",
+      "title": "Software Engineer",
+      "departmentKey": "engineering",
+      "status": "ACTIVE",
+      "hiredAt": "2018-02-24T16:11:20.144Z",
+      "salary": 148106,
+      "equityOptions": 5659,
+      "band": "E4",
+      "location": "Remote",
+      "employeeNumber": "EMP-6669",
+      "email": "william.garcia@asas-enterprise.com",
+      "managerKey": "cto"
+    },
+    {
+      "key": "eng_9",
+      "name": "Michael Jones",
+      "title": "Software Engineer",
+      "departmentKey": "engineering",
+      "status": "ACTIVE",
+      "hiredAt": "2018-05-24T08:45:08.878Z",
+      "salary": 124919,
+      "equityOptions": 5909,
+      "band": "E4",
+      "location": "San Francisco, CA",
+      "employeeNumber": "EMP-2040",
+      "email": "michael.jones@asas-enterprise.com",
+      "managerKey": "cto"
+    },
+    {
+      "key": "eng_10",
+      "name": "John Martinez",
+      "title": "Software Engineer",
+      "departmentKey": "engineering",
+      "status": "ACTIVE",
+      "hiredAt": "2020-01-22T17:57:24.063Z",
+      "salary": 124113,
+      "equityOptions": 7740,
+      "band": "E4",
+      "location": "Austin, TX",
+      "employeeNumber": "EMP-9129",
+      "email": "john.martinez@asas-enterprise.com",
+      "managerKey": "cto"
+    },
+    {
+      "key": "eng_11",
+      "name": "Sarah Davis",
+      "title": "Software Engineer",
+      "departmentKey": "engineering",
+      "status": "ACTIVE",
+      "hiredAt": "2026-05-11T08:01:15.600Z",
+      "salary": 146200,
+      "equityOptions": 4901,
+      "band": "E4",
+      "location": "New York, NY",
+      "employeeNumber": "EMP-3128",
+      "email": "sarah.davis@asas-enterprise.com",
+      "managerKey": "cto"
+    },
+    {
+      "key": "eng_12",
+      "name": "Lisa White",
+      "title": "Software Engineer",
+      "departmentKey": "engineering",
+      "status": "ACTIVE",
+      "hiredAt": "2021-06-21T03:08:52.024Z",
+      "salary": 125168,
+      "equityOptions": 749,
+      "band": "E4",
+      "location": "San Francisco, CA",
+      "employeeNumber": "EMP-1345",
+      "email": "lisa.white@asas-enterprise.com",
+      "managerKey": "cto"
+    },
+    {
+      "key": "eng_13",
+      "name": "Betty Perez",
+      "title": "Software Engineer",
+      "departmentKey": "engineering",
+      "status": "ACTIVE",
+      "hiredAt": "2019-03-15T22:30:47.938Z",
+      "salary": 132194,
+      "equityOptions": 4463,
+      "band": "E4",
+      "location": "Remote",
+      "employeeNumber": "EMP-1946",
+      "email": "betty.perez@asas-enterprise.com",
+      "managerKey": "cto"
+    },
+    {
+      "key": "eng_14",
+      "name": "Christopher Martin",
+      "title": "Software Engineer",
+      "departmentKey": "engineering",
+      "status": "ACTIVE",
+      "hiredAt": "2022-05-02T10:17:44.748Z",
+      "salary": 148246,
+      "equityOptions": 8126,
+      "band": "E4",
+      "location": "New York, NY",
+      "employeeNumber": "EMP-3712",
+      "email": "christopher.martin@asas-enterprise.com",
+      "managerKey": "cto"
+    },
+    {
+      "key": "eng_15",
+      "name": "Michael Perez",
+      "title": "Software Engineer",
+      "departmentKey": "engineering",
+      "status": "ON_LEAVE",
+      "hiredAt": "2024-07-27T11:05:07.751Z",
+      "salary": 125126,
+      "equityOptions": 5211,
+      "band": "E4",
+      "location": "New York, NY",
+      "employeeNumber": "EMP-7164",
+      "email": "michael.perez@asas-enterprise.com",
+      "managerKey": "cto"
+    },
+    {
+      "key": "sales_1",
+      "name": "Richard Martin",
+      "title": "Account Executive",
+      "departmentKey": "sales",
+      "status": "ACTIVE",
+      "hiredAt": "2023-07-18T01:11:04.927Z",
+      "salary": 95678,
+      "equityOptions": 5203,
+      "band": "S4",
+      "location": "New York, NY",
+      "employeeNumber": "EMP-5884",
+      "email": "richard.martin@asas-enterprise.com",
+      "managerKey": "cro"
+    },
+    {
+      "key": "sales_2",
+      "name": "Daniel Thompson",
+      "title": "Account Executive",
+      "departmentKey": "sales",
+      "status": "ACTIVE",
+      "hiredAt": "2019-03-03T20:10:19.260Z",
+      "salary": 81794,
+      "equityOptions": 1612,
+      "band": "S4",
+      "location": "London, UK",
+      "employeeNumber": "EMP-2321",
+      "email": "daniel.thompson@asas-enterprise.com",
+      "managerKey": "cro"
+    },
+    {
+      "key": "sales_3",
+      "name": "James Smith",
+      "title": "Account Executive",
+      "departmentKey": "sales",
+      "status": "ACTIVE",
+      "hiredAt": "2026-04-28T13:05:18.598Z",
+      "salary": 98023,
+      "equityOptions": 8191,
+      "band": "S4",
+      "location": "New York, NY",
+      "employeeNumber": "EMP-7862",
+      "email": "james.smith@asas-enterprise.com",
+      "managerKey": "cro"
+    },
+    {
+      "key": "sales_4",
+      "name": "James Robinson",
+      "title": "Account Executive",
+      "departmentKey": "sales",
+      "status": "ON_LEAVE",
+      "hiredAt": "2026-03-04T09:14:52.866Z",
+      "salary": 117899,
+      "equityOptions": 1463,
+      "band": "S4",
+      "location": "Austin, TX",
+      "employeeNumber": "EMP-8903",
+      "email": "james.robinson@asas-enterprise.com",
+      "managerKey": "cro"
+    },
+    {
+      "key": "sales_5",
+      "name": "Susan Martinez",
+      "title": "Account Executive",
+      "departmentKey": "sales",
+      "status": "ACTIVE",
+      "hiredAt": "2025-07-20T11:59:14.847Z",
+      "salary": 99702,
+      "equityOptions": 419,
+      "band": "S4",
+      "location": "Remote",
+      "employeeNumber": "EMP-6776",
+      "email": "susan.martinez@asas-enterprise.com",
+      "managerKey": "cro"
+    },
+    {
+      "key": "sales_6",
+      "name": "Richard Lopez",
+      "title": "Account Executive",
+      "departmentKey": "sales",
+      "status": "ACTIVE",
+      "hiredAt": "2018-11-24T05:02:10.429Z",
+      "salary": 85790,
+      "equityOptions": 6093,
+      "band": "S4",
+      "location": "San Francisco, CA",
+      "employeeNumber": "EMP-7647",
+      "email": "richard.lopez@asas-enterprise.com",
+      "managerKey": "cro"
+    },
+    {
+      "key": "sales_7",
+      "name": "Linda Lopez",
+      "title": "Account Executive",
+      "departmentKey": "sales",
+      "status": "ACTIVE",
+      "hiredAt": "2019-07-19T03:40:33.709Z",
+      "salary": 110321,
+      "equityOptions": 8302,
+      "band": "S4",
+      "location": "Remote",
+      "employeeNumber": "EMP-7852",
+      "email": "linda.lopez@asas-enterprise.com",
+      "managerKey": "cro"
+    },
+    {
+      "key": "sales_8",
+      "name": "Matthew Martinez",
+      "title": "Account Executive",
+      "departmentKey": "sales",
+      "status": "ACTIVE",
+      "hiredAt": "2025-08-12T19:54:40.850Z",
+      "salary": 105769,
+      "equityOptions": 8299,
+      "band": "S4",
+      "location": "Remote",
+      "employeeNumber": "EMP-4684",
+      "email": "matthew.martinez@asas-enterprise.com",
+      "managerKey": "cro"
+    },
+    {
+      "key": "fin_1",
+      "name": "Christopher Rodriguez",
+      "title": "Financial Analyst",
+      "departmentKey": "finance",
+      "status": "ACTIVE",
+      "hiredAt": "2025-06-20T03:41:29.912Z",
+      "salary": 76215,
+      "equityOptions": 4157,
+      "band": "F3",
+      "location": "Austin, TX",
+      "employeeNumber": "EMP-2654",
+      "email": "christopher.rodriguez@asas-enterprise.com",
+      "managerKey": "cfo"
+    },
+    {
+      "key": "fin_2",
+      "name": "Robert Martinez",
+      "title": "Financial Analyst",
+      "departmentKey": "finance",
+      "status": "ACTIVE",
+      "hiredAt": "2023-09-17T19:43:51.648Z",
+      "salary": 82143,
+      "equityOptions": 7275,
+      "band": "F3",
+      "location": "Remote",
+      "employeeNumber": "EMP-9569",
+      "email": "robert.martinez@asas-enterprise.com",
+      "managerKey": "cfo"
+    },
+    {
+      "key": "fin_3",
+      "name": "Sandra Smith",
+      "title": "Financial Analyst",
+      "departmentKey": "finance",
+      "status": "ACTIVE",
+      "hiredAt": "2018-09-14T18:34:31.453Z",
+      "salary": 95153,
+      "equityOptions": 4861,
+      "band": "F3",
+      "location": "Austin, TX",
+      "employeeNumber": "EMP-4674",
+      "email": "sandra.smith@asas-enterprise.com",
+      "managerKey": "cfo"
+    },
+    {
+      "key": "fin_4",
+      "name": "Patricia Garcia",
+      "title": "Financial Analyst",
+      "departmentKey": "finance",
+      "status": "ACTIVE",
+      "hiredAt": "2024-01-06T11:43:03.603Z",
+      "salary": 73728,
+      "equityOptions": 8728,
+      "band": "F3",
+      "location": "Austin, TX",
+      "employeeNumber": "EMP-5440",
+      "email": "patricia.garcia@asas-enterprise.com",
+      "managerKey": "cfo"
+    },
+    {
+      "key": "fin_5",
+      "name": "Sarah Clark",
+      "title": "Financial Analyst",
+      "departmentKey": "finance",
+      "status": "ACTIVE",
+      "hiredAt": "2021-11-24T14:35:56.786Z",
+      "salary": 97086,
+      "equityOptions": 5300,
+      "band": "F3",
+      "location": "Remote",
+      "employeeNumber": "EMP-3840",
+      "email": "sarah.clark@asas-enterprise.com",
+      "managerKey": "cfo"
+    }
+  ],
+  "companies": [
+    {
+      "key": "comp_0",
+      "name": "Acme Corp",
+      "industry": "Technology",
+      "website": "www.acmecorp.com"
+    },
+    {
+      "key": "comp_1",
+      "name": "Globex",
+      "industry": "Manufacturing",
+      "website": "www.globex.com"
+    },
+    {
+      "key": "comp_2",
+      "name": "Soylent Corp",
+      "industry": "Technology",
+      "website": "www.soylentcorp.com"
+    },
+    {
+      "key": "comp_3",
+      "name": "Initech",
+      "industry": "Healthcare",
+      "website": "www.initech.com"
+    },
+    {
+      "key": "comp_4",
+      "name": "Umbrella Corp",
+      "industry": "Manufacturing",
+      "website": "www.umbrellacorp.com"
+    },
+    {
+      "key": "comp_5",
+      "name": "Stark Industries",
+      "industry": "Manufacturing",
+      "website": "www.starkindustries.com"
+    },
+    {
+      "key": "comp_6",
+      "name": "Wayne Enterprises",
+      "industry": "Manufacturing",
+      "website": "www.wayneenterprises.com"
+    },
+    {
+      "key": "comp_7",
+      "name": "Cyberdyne",
+      "industry": "Technology",
+      "website": "www.cyberdyne.com"
+    },
+    {
+      "key": "comp_8",
+      "name": "Massive Dynamic",
+      "industry": "Manufacturing",
+      "website": "www.massivedynamic.com"
+    },
+    {
+      "key": "comp_9",
+      "name": "Hooli",
+      "industry": "Finance",
+      "website": "www.hooli.com"
+    },
+    {
+      "key": "comp_10",
+      "name": "Pied Piper",
+      "industry": "Finance",
+      "website": "www.piedpiper.com"
+    },
+    {
+      "key": "comp_11",
+      "name": "Aviato",
+      "industry": "Technology",
+      "website": "www.aviato.com"
+    },
+    {
+      "key": "comp_12",
+      "name": "Endframe",
+      "industry": "Manufacturing",
+      "website": "www.endframe.com"
+    },
+    {
+      "key": "comp_13",
+      "name": "Raviga",
+      "industry": "Technology",
+      "website": "www.raviga.com"
+    },
+    {
+      "key": "comp_14",
+      "name": "Belson",
+      "industry": "Manufacturing",
+      "website": "www.belson.com"
+    },
+    {
+      "key": "comp_15",
+      "name": "Aperture Science",
+      "industry": "Retail",
+      "website": "www.aperturescience.com"
+    },
+    {
+      "key": "comp_16",
+      "name": "Black Mesa",
+      "industry": "Retail",
+      "website": "www.blackmesa.com"
+    }
+  ],
+  "customers": [
+    {
+      "key": "cust_0",
+      "name": "Sandra Williams",
+      "email": "contact@acmecorp.com",
+      "companyKey": "comp_0"
+    },
+    {
+      "key": "cust_1",
+      "name": "Daniel Perez",
+      "email": "contact@globex.com",
+      "companyKey": "comp_1"
+    },
+    {
+      "key": "cust_2",
+      "name": "Nancy Anderson",
+      "email": "contact@soylentcorp.com",
+      "companyKey": "comp_2"
+    },
+    {
+      "key": "cust_3",
+      "name": "Joseph Martin",
+      "email": "contact@initech.com",
+      "companyKey": "comp_3"
+    },
+    {
+      "key": "cust_4",
+      "name": "Charles Johnson",
+      "email": "contact@umbrellacorp.com",
+      "companyKey": "comp_4"
+    },
+    {
+      "key": "cust_5",
+      "name": "Joseph Miller",
+      "email": "contact@starkindustries.com",
+      "companyKey": "comp_5"
+    },
+    {
+      "key": "cust_6",
+      "name": "Anthony Smith",
+      "email": "contact@wayneenterprises.com",
+      "companyKey": "comp_6"
+    },
+    {
+      "key": "cust_7",
+      "name": "Lisa Lopez",
+      "email": "contact@cyberdyne.com",
+      "companyKey": "comp_7"
+    },
+    {
+      "key": "cust_8",
+      "name": "Barbara Hernandez",
+      "email": "contact@massivedynamic.com",
+      "companyKey": "comp_8"
+    },
+    {
+      "key": "cust_9",
+      "name": "Daniel Hernandez",
+      "email": "contact@hooli.com",
+      "companyKey": "comp_9"
+    },
+    {
+      "key": "cust_10",
+      "name": "Margaret Moore",
+      "email": "contact@piedpiper.com",
+      "companyKey": "comp_10"
+    },
+    {
+      "key": "cust_11",
+      "name": "Daniel Ramirez",
+      "email": "contact@aviato.com",
+      "companyKey": "comp_11"
+    },
+    {
+      "key": "cust_12",
+      "name": "Charles Martin",
+      "email": "contact@endframe.com",
+      "companyKey": "comp_12"
+    },
+    {
+      "key": "cust_13",
+      "name": "Matthew Taylor",
+      "email": "contact@raviga.com",
+      "companyKey": "comp_13"
+    },
+    {
+      "key": "cust_14",
+      "name": "Mary Johnson",
+      "email": "contact@belson.com",
+      "companyKey": "comp_14"
+    },
+    {
+      "key": "cust_15",
+      "name": "Barbara Sanchez",
+      "email": "contact@aperturescience.com",
+      "companyKey": "comp_15"
+    },
+    {
+      "key": "cust_16",
+      "name": "Michael Rodriguez",
+      "email": "contact@blackmesa.com",
+      "companyKey": "comp_16"
+    }
+  ],
+  "deals": [
+    {
+      "key": "deal_0",
+      "name": "Umbrella Corp - Q1 Enterprise Upgrade",
+      "companyKey": "comp_4",
+      "ownerEmployeeKey": "sales_6",
+      "stage": "PROPOSAL",
+      "value": 497336,
+      "winProbability": 0.7667143347424731,
+      "closeDate": "2026-08-06T11:36:22.173Z",
+      "createdAt": "2026-06-05T15:10:49.391Z"
+    },
+    {
+      "key": "deal_1",
+      "name": "Hooli - Q4 Expansion",
+      "companyKey": "comp_9",
+      "ownerEmployeeKey": "cro",
+      "stage": "CLOSED_LOST",
+      "value": 46875,
+      "winProbability": 0,
+      "closeDate": "2026-08-15T22:06:34.133Z",
+      "createdAt": "2026-07-27T09:02:23.680Z"
+    },
+    {
+      "key": "deal_2",
+      "name": "Acme Corp - Q2 Service Agreement",
+      "companyKey": "comp_0",
+      "ownerEmployeeKey": "sales_7",
+      "stage": "CLOSED_WON",
+      "value": 198322,
+      "winProbability": 1,
+      "closeDate": "2026-08-16T09:58:04.833Z",
+      "createdAt": "2026-07-22T21:56:36.036Z"
+    },
+    {
+      "key": "deal_3",
+      "name": "Wayne Enterprises - Q3 Expansion",
+      "companyKey": "comp_6",
+      "ownerEmployeeKey": "sales_7",
+      "stage": "CLOSED_WON",
+      "value": 367363,
+      "winProbability": 1,
+      "closeDate": "2026-08-28T03:58:17.076Z",
+      "createdAt": "2026-06-10T14:12:19.250Z"
+    },
+    {
+      "key": "deal_4",
+      "name": "Black Mesa - Q1 Service Agreement",
+      "companyKey": "comp_16",
+      "ownerEmployeeKey": "sales_2",
+      "stage": "CLOSED_WON",
+      "value": 32114,
+      "winProbability": 1,
+      "closeDate": "2026-08-27T21:47:10.202Z",
+      "createdAt": "2026-04-22T23:31:24.762Z"
+    },
+    {
+      "key": "deal_5",
+      "name": "Globex - Q3 Expansion",
+      "companyKey": "comp_1",
+      "ownerEmployeeKey": "sales_7",
+      "stage": "CLOSED_LOST",
+      "value": 402863,
+      "winProbability": 0,
+      "closeDate": "2026-08-10T03:11:59.066Z",
+      "createdAt": "2026-04-10T11:17:42.598Z"
+    },
+    {
+      "key": "deal_6",
+      "name": "Raviga - Q2 New License",
+      "companyKey": "comp_13",
+      "ownerEmployeeKey": "sales_1",
+      "stage": "PROPOSAL",
+      "value": 454420,
+      "winProbability": 0.841544645597654,
+      "closeDate": "2026-08-18T20:50:23.070Z",
+      "createdAt": "2026-01-20T06:23:33.044Z"
+    },
+    {
+      "key": "deal_7",
+      "name": "Black Mesa - Q4 Service Agreement",
+      "companyKey": "comp_16",
+      "ownerEmployeeKey": "sales_6",
+      "stage": "PROPOSAL",
+      "value": 494233,
+      "winProbability": 0.742039827627507,
+      "closeDate": "2026-07-25T00:57:06.502Z",
+      "createdAt": "2026-01-12T07:01:29.859Z"
+    },
+    {
+      "key": "deal_8",
+      "name": "Initech - Q3 New License",
+      "companyKey": "comp_3",
+      "ownerEmployeeKey": "sales_7",
+      "stage": "PROPOSAL",
+      "value": 53192,
+      "winProbability": 0.837866888384167,
+      "closeDate": "2026-08-04T00:02:39.790Z",
+      "createdAt": "2026-04-22T03:04:53.256Z"
+    },
+    {
+      "key": "deal_9",
+      "name": "Initech - Q4 Expansion",
+      "companyKey": "comp_3",
+      "ownerEmployeeKey": "sales_5",
+      "stage": "CLOSED_WON",
+      "value": 485903,
+      "winProbability": 1,
+      "closeDate": "2026-08-16T14:15:22.474Z",
+      "createdAt": "2026-05-08T07:58:53.709Z"
+    },
+    {
+      "key": "deal_10",
+      "name": "Belson - Q4 Expansion",
+      "companyKey": "comp_14",
+      "ownerEmployeeKey": "sales_5",
+      "stage": "LEADS",
+      "value": 83046,
+      "winProbability": 0.3923345522070856,
+      "closeDate": "2026-07-30T23:26:28.421Z",
+      "createdAt": "2026-07-26T09:00:14.051Z"
+    },
+    {
+      "key": "deal_11",
+      "name": "Belson - Q3 New License",
+      "companyKey": "comp_14",
+      "ownerEmployeeKey": "sales_7",
+      "stage": "LEADS",
+      "value": 229911,
+      "winProbability": 0.6399921475580782,
+      "closeDate": "2026-08-19T07:53:06.413Z",
+      "createdAt": "2026-05-01T00:01:02.648Z"
+    },
+    {
+      "key": "deal_12",
+      "name": "Cyberdyne - Q1 Expansion",
+      "companyKey": "comp_7",
+      "ownerEmployeeKey": "sales_4",
+      "stage": "CLOSED_LOST",
+      "value": 145383,
+      "winProbability": 0,
+      "closeDate": "2026-08-19T03:56:05.815Z",
+      "createdAt": "2026-08-03T19:18:46.179Z"
+    },
+    {
+      "key": "deal_13",
+      "name": "Pied Piper - Q2 Enterprise Upgrade",
+      "companyKey": "comp_10",
+      "ownerEmployeeKey": "sales_6",
+      "stage": "CLOSED_WON",
+      "value": 298183,
+      "winProbability": 1,
+      "closeDate": "2026-08-02T06:18:15.682Z",
+      "createdAt": "2026-02-20T19:31:50.623Z"
+    },
+    {
+      "key": "deal_14",
+      "name": "Acme Corp - Q3 Service Agreement",
+      "companyKey": "comp_0",
+      "ownerEmployeeKey": "sales_1",
+      "stage": "CLOSED_WON",
+      "value": 415376,
+      "winProbability": 1,
+      "closeDate": "2026-07-31T13:58:29.862Z",
+      "createdAt": "2026-02-17T20:00:10.689Z"
+    },
+    {
+      "key": "deal_15",
+      "name": "Belson - Q4 New License",
+      "companyKey": "comp_14",
+      "ownerEmployeeKey": "cro",
+      "stage": "NEGOTIATION",
+      "value": 187114,
+      "winProbability": 0.17860405790709014,
+      "closeDate": "2026-08-12T21:10:18.573Z",
+      "createdAt": "2026-02-28T22:17:07.575Z"
+    },
+    {
+      "key": "deal_16",
+      "name": "Massive Dynamic - Q2 New License",
+      "companyKey": "comp_8",
+      "ownerEmployeeKey": "sales_1",
+      "stage": "NEGOTIATION",
+      "value": 214304,
+      "winProbability": 0.5065076628641454,
+      "closeDate": "2026-07-24T05:25:20.351Z",
+      "createdAt": "2026-05-20T11:53:52.585Z"
+    },
+    {
+      "key": "deal_17",
+      "name": "Raviga - Q3 New License",
+      "companyKey": "comp_13",
+      "ownerEmployeeKey": "sales_7",
+      "stage": "LEADS",
+      "value": 326638,
+      "winProbability": 0.748052276346728,
+      "closeDate": "2026-07-25T12:34:59.744Z",
+      "createdAt": "2026-05-01T23:41:32.134Z"
+    },
+    {
+      "key": "deal_18",
+      "name": "Umbrella Corp - Q3 New License",
+      "companyKey": "comp_4",
+      "ownerEmployeeKey": "cro",
+      "stage": "PROPOSAL",
+      "value": 96657,
+      "winProbability": 0.21619119759843894,
+      "closeDate": "2026-08-19T11:58:37.456Z",
+      "createdAt": "2026-03-15T18:11:46.083Z"
+    },
+    {
+      "key": "deal_19",
+      "name": "Wayne Enterprises - Q1 Expansion",
+      "companyKey": "comp_6",
+      "ownerEmployeeKey": "sales_1",
+      "stage": "PROPOSAL",
+      "value": 95810,
+      "winProbability": 0.7908670303203541,
+      "closeDate": "2026-08-28T20:51:03.239Z",
+      "createdAt": "2026-03-18T05:49:30.135Z"
+    },
+    {
+      "key": "deal_20",
+      "name": "Pied Piper - Q1 Expansion",
+      "companyKey": "comp_10",
+      "ownerEmployeeKey": "sales_8",
+      "stage": "CLOSED_WON",
+      "value": 471337,
+      "winProbability": 1,
+      "closeDate": "2026-08-08T11:25:16.275Z",
+      "createdAt": "2026-07-10T23:12:40.997Z"
+    },
+    {
+      "key": "deal_21",
+      "name": "Hooli - Q1 Expansion",
+      "companyKey": "comp_9",
+      "ownerEmployeeKey": "sales_4",
+      "stage": "CLOSED_WON",
+      "value": 308648,
+      "winProbability": 1,
+      "closeDate": "2026-08-29T06:11:06.523Z",
+      "createdAt": "2026-01-12T10:00:05.660Z"
+    },
+    {
+      "key": "deal_22",
+      "name": "Endframe - Q1 Service Agreement",
+      "companyKey": "comp_12",
+      "ownerEmployeeKey": "sales_6",
+      "stage": "LEADS",
+      "value": 203398,
+      "winProbability": 0.21170020131442052,
+      "closeDate": "2026-08-09T12:01:51.082Z",
+      "createdAt": "2026-06-18T07:15:25.618Z"
+    },
+    {
+      "key": "deal_23",
+      "name": "Wayne Enterprises - Q2 Expansion",
+      "companyKey": "comp_6",
+      "ownerEmployeeKey": "sales_6",
+      "stage": "PROPOSAL",
+      "value": 110751,
+      "winProbability": 0.8641778006941723,
+      "closeDate": "2026-08-25T03:15:32.037Z",
+      "createdAt": "2026-07-16T01:18:49.581Z"
+    },
+    {
+      "key": "deal_24",
+      "name": "Umbrella Corp - Q3 New License",
+      "companyKey": "comp_4",
+      "ownerEmployeeKey": "cro",
+      "stage": "LEADS",
+      "value": 65206,
+      "winProbability": 0.16165228160231795,
+      "closeDate": "2026-07-31T13:49:20.482Z",
+      "createdAt": "2026-07-05T08:02:23.203Z"
+    },
+    {
+      "key": "deal_25",
+      "name": "Pied Piper - Q1 New License",
+      "companyKey": "comp_10",
+      "ownerEmployeeKey": "sales_6",
+      "stage": "CLOSED_LOST",
+      "value": 176549,
+      "winProbability": 0,
+      "closeDate": "2026-08-30T16:13:06.483Z",
+      "createdAt": "2026-05-04T07:52:30.882Z"
+    },
+    {
+      "key": "deal_26",
+      "name": "Endframe - Q3 Service Agreement",
+      "companyKey": "comp_12",
+      "ownerEmployeeKey": "sales_3",
+      "stage": "CLOSED_WON",
+      "value": 208208,
+      "winProbability": 1,
+      "closeDate": "2026-08-01T08:29:40.593Z",
+      "createdAt": "2026-08-02T23:09:12.630Z"
+    },
+    {
+      "key": "deal_27",
+      "name": "Massive Dynamic - Q1 Service Agreement",
+      "companyKey": "comp_8",
+      "ownerEmployeeKey": "sales_4",
+      "stage": "CLOSED_WON",
+      "value": 94745,
+      "winProbability": 1,
+      "closeDate": "2026-08-27T11:30:14.230Z",
+      "createdAt": "2026-05-16T10:16:21.667Z"
+    },
+    {
+      "key": "deal_28",
+      "name": "Soylent Corp - Q3 Service Agreement",
+      "companyKey": "comp_2",
+      "ownerEmployeeKey": "sales_8",
+      "stage": "NEGOTIATION",
+      "value": 21191,
+      "winProbability": 0.7804304345069357,
+      "closeDate": "2026-08-02T20:09:12.296Z",
+      "createdAt": "2026-02-07T11:57:26.394Z"
+    },
+    {
+      "key": "deal_29",
+      "name": "Hooli - Q4 Enterprise Upgrade",
+      "companyKey": "comp_9",
+      "ownerEmployeeKey": "sales_4",
+      "stage": "LEADS",
+      "value": 445529,
+      "winProbability": 0.7435034126409626,
+      "closeDate": "2026-08-23T18:27:06.917Z",
+      "createdAt": "2026-04-24T09:17:51.574Z"
+    },
+    {
+      "key": "deal_30",
+      "name": "Aviato - Q4 Enterprise Upgrade",
+      "companyKey": "comp_11",
+      "ownerEmployeeKey": "sales_4",
+      "stage": "PROPOSAL",
+      "value": 153213,
+      "winProbability": 0.39248328929756704,
+      "closeDate": "2026-08-19T18:13:42.116Z",
+      "createdAt": "2026-01-06T02:51:24.735Z"
+    },
+    {
+      "key": "deal_31",
+      "name": "Aviato - Q1 New License",
+      "companyKey": "comp_11",
+      "ownerEmployeeKey": "sales_2",
+      "stage": "CLOSED_WON",
+      "value": 369912,
+      "winProbability": 1,
+      "closeDate": "2026-08-03T02:30:53.394Z",
+      "createdAt": "2026-07-22T15:22:57.662Z"
+    },
+    {
+      "key": "deal_32",
+      "name": "Massive Dynamic - Q2 Expansion",
+      "companyKey": "comp_8",
+      "ownerEmployeeKey": "sales_5",
+      "stage": "CLOSED_WON",
+      "value": 61681,
+      "winProbability": 1,
+      "closeDate": "2026-08-17T07:40:20.812Z",
+      "createdAt": "2026-06-05T08:17:33.076Z"
+    },
+    {
+      "key": "deal_33",
+      "name": "Belson - Q3 Expansion",
+      "companyKey": "comp_14",
+      "ownerEmployeeKey": "sales_2",
+      "stage": "PROPOSAL",
+      "value": 412101,
+      "winProbability": 0.5271112558990979,
+      "closeDate": "2026-08-30T16:16:37.666Z",
+      "createdAt": "2026-05-27T17:06:00.136Z"
+    },
+    {
+      "key": "deal_34",
+      "name": "Black Mesa - Q2 New License",
+      "companyKey": "comp_16",
+      "ownerEmployeeKey": "sales_2",
+      "stage": "CLOSED_WON",
+      "value": 400290,
+      "winProbability": 1,
+      "closeDate": "2026-08-09T09:21:08.113Z",
+      "createdAt": "2026-06-08T21:27:27.113Z"
+    },
+    {
+      "key": "deal_35",
+      "name": "Acme Corp - Q3 Enterprise Upgrade",
+      "companyKey": "comp_0",
+      "ownerEmployeeKey": "sales_4",
+      "stage": "CLOSED_WON",
+      "value": 185452,
+      "winProbability": 1,
+      "closeDate": "2026-08-02T01:35:49.472Z",
+      "createdAt": "2026-02-02T14:18:10.962Z"
+    },
+    {
+      "key": "deal_36",
+      "name": "Globex - Q2 Expansion",
+      "companyKey": "comp_1",
+      "ownerEmployeeKey": "sales_4",
+      "stage": "CLOSED_WON",
+      "value": 328941,
+      "winProbability": 1,
+      "closeDate": "2026-08-30T00:58:07.152Z",
+      "createdAt": "2026-08-12T16:58:53.870Z"
+    },
+    {
+      "key": "deal_37",
+      "name": "Raviga - Q2 New License",
+      "companyKey": "comp_13",
+      "ownerEmployeeKey": "sales_7",
+      "stage": "NEGOTIATION",
+      "value": 124029,
+      "winProbability": 0.8990105711139686,
+      "closeDate": "2026-08-12T04:24:03.115Z",
+      "createdAt": "2026-02-13T05:21:46.983Z"
+    },
+    {
+      "key": "deal_38",
+      "name": "Raviga - Q3 Enterprise Upgrade",
+      "companyKey": "comp_13",
+      "ownerEmployeeKey": "sales_7",
+      "stage": "CLOSED_WON",
+      "value": 216599,
+      "winProbability": 1,
+      "closeDate": "2026-08-07T01:23:24.809Z",
+      "createdAt": "2026-03-05T12:14:54.087Z"
+    },
+    {
+      "key": "deal_39",
+      "name": "Globex - Q4 Service Agreement",
+      "companyKey": "comp_1",
+      "ownerEmployeeKey": "sales_1",
+      "stage": "CLOSED_WON",
+      "value": 339083,
+      "winProbability": 1,
+      "closeDate": "2026-08-28T23:10:12.459Z",
+      "createdAt": "2026-04-06T13:17:54.320Z"
+    }
+  ],
+  "projects": [
+    {
+      "key": "proj_0",
+      "name": "Project Alpha",
+      "description": "Comprehensive execution plan for Project Alpha",
+      "status": "COMPLETED",
+      "startDate": "2026-04-23T18:37:47.116Z",
+      "dueDate": "2026-08-24T21:17:13.304Z",
+      "budget": 1875982,
+      "tasks": [
+        {
+          "title": "Task 1 for Project Alpha",
+          "status": "REVIEW",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-23T10:36:53.668Z"
+        },
+        {
+          "title": "Task 2 for Project Alpha",
+          "status": "DONE",
+          "priority": "HIGH",
+          "dueDate": "2026-08-28T14:21:57.194Z"
+        },
+        {
+          "title": "Task 3 for Project Alpha",
+          "status": "IN_PROGRESS",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-31T19:50:27.237Z"
+        },
+        {
+          "title": "Task 4 for Project Alpha",
+          "status": "DONE",
+          "priority": "LOW",
+          "dueDate": "2026-08-23T08:07:37.112Z"
+        },
+        {
+          "title": "Task 5 for Project Alpha",
+          "status": "DONE",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-27T16:04:38.513Z"
+        },
+        {
+          "title": "Task 6 for Project Alpha",
+          "status": "TODO",
+          "priority": "LOW",
+          "dueDate": "2026-08-25T00:29:42.752Z"
+        },
+        {
+          "title": "Task 7 for Project Alpha",
+          "status": "DONE",
+          "priority": "HIGH",
+          "dueDate": "2026-08-25T04:15:32.905Z"
+        },
+        {
+          "title": "Task 8 for Project Alpha",
+          "status": "REVIEW",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-28T18:17:38.153Z"
+        },
+        {
+          "title": "Task 9 for Project Alpha",
+          "status": "TODO",
+          "priority": "HIGH",
+          "dueDate": "2026-08-25T08:19:13.121Z"
+        }
+      ]
+    },
+    {
+      "key": "proj_1",
+      "name": "Project Beta",
+      "description": "Comprehensive execution plan for Project Beta",
+      "status": "PLANNING",
+      "startDate": "2026-05-16T12:29:27.580Z",
+      "dueDate": "2026-08-28T06:13:16.568Z",
+      "budget": 1524121,
+      "tasks": [
+        {
+          "title": "Task 1 for Project Beta",
+          "status": "REVIEW",
+          "priority": "HIGH",
+          "dueDate": "2026-08-29T18:12:47.043Z"
+        },
+        {
+          "title": "Task 2 for Project Beta",
+          "status": "DONE",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-23T09:18:18.584Z"
+        },
+        {
+          "title": "Task 3 for Project Beta",
+          "status": "REVIEW",
+          "priority": "HIGH",
+          "dueDate": "2026-08-30T07:55:14.158Z"
+        },
+        {
+          "title": "Task 4 for Project Beta",
+          "status": "DONE",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-28T06:26:55.309Z"
+        },
+        {
+          "title": "Task 5 for Project Beta",
+          "status": "DONE",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-25T05:54:28.701Z"
+        },
+        {
+          "title": "Task 6 for Project Beta",
+          "status": "DONE",
+          "priority": "HIGH",
+          "dueDate": "2026-08-31T08:48:19.265Z"
+        },
+        {
+          "title": "Task 7 for Project Beta",
+          "status": "IN_PROGRESS",
+          "priority": "LOW",
+          "dueDate": "2026-08-25T07:14:44.473Z"
+        }
+      ]
+    },
+    {
+      "key": "proj_2",
+      "name": "Website Redesign",
+      "description": "Comprehensive execution plan for Website Redesign",
+      "status": "AT_RISK",
+      "startDate": "2026-02-05T09:04:08.836Z",
+      "dueDate": "2026-08-25T10:36:07.983Z",
+      "budget": 912767,
+      "tasks": [
+        {
+          "title": "Task 1 for Website Redesign",
+          "status": "IN_PROGRESS",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-28T11:40:38.687Z"
+        },
+        {
+          "title": "Task 2 for Website Redesign",
+          "status": "IN_PROGRESS",
+          "priority": "LOW",
+          "dueDate": "2026-08-31T10:07:12.800Z"
+        },
+        {
+          "title": "Task 3 for Website Redesign",
+          "status": "TODO",
+          "priority": "LOW",
+          "dueDate": "2026-08-24T17:37:57.039Z"
+        },
+        {
+          "title": "Task 4 for Website Redesign",
+          "status": "TODO",
+          "priority": "HIGH",
+          "dueDate": "2026-08-22T18:35:44.378Z"
+        },
+        {
+          "title": "Task 5 for Website Redesign",
+          "status": "REVIEW",
+          "priority": "HIGH",
+          "dueDate": "2026-08-22T18:28:36.959Z"
+        },
+        {
+          "title": "Task 6 for Website Redesign",
+          "status": "REVIEW",
+          "priority": "LOW",
+          "dueDate": "2026-08-31T15:02:39.705Z"
+        },
+        {
+          "title": "Task 7 for Website Redesign",
+          "status": "REVIEW",
+          "priority": "HIGH",
+          "dueDate": "2026-08-30T14:25:56.456Z"
+        },
+        {
+          "title": "Task 8 for Website Redesign",
+          "status": "REVIEW",
+          "priority": "LOW",
+          "dueDate": "2026-08-27T06:17:44.847Z"
+        },
+        {
+          "title": "Task 9 for Website Redesign",
+          "status": "DONE",
+          "priority": "LOW",
+          "dueDate": "2026-08-28T23:11:19.476Z"
+        },
+        {
+          "title": "Task 10 for Website Redesign",
+          "status": "IN_PROGRESS",
+          "priority": "HIGH",
+          "dueDate": "2026-08-26T10:34:17.118Z"
+        },
+        {
+          "title": "Task 11 for Website Redesign",
+          "status": "REVIEW",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-28T16:40:51.548Z"
+        },
+        {
+          "title": "Task 12 for Website Redesign",
+          "status": "IN_PROGRESS",
+          "priority": "LOW",
+          "dueDate": "2026-08-23T10:22:06.629Z"
+        }
+      ]
+    },
+    {
+      "key": "proj_3",
+      "name": "Mobile App Launch",
+      "description": "Comprehensive execution plan for Mobile App Launch",
+      "status": "DELAYED",
+      "startDate": "2026-05-08T00:06:44.374Z",
+      "dueDate": "2026-08-27T13:08:28.945Z",
+      "budget": 424168,
+      "tasks": [
+        {
+          "title": "Task 1 for Mobile App Launch",
+          "status": "REVIEW",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-26T13:51:41.370Z"
+        },
+        {
+          "title": "Task 2 for Mobile App Launch",
+          "status": "DONE",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-27T17:35:52.996Z"
+        },
+        {
+          "title": "Task 3 for Mobile App Launch",
+          "status": "TODO",
+          "priority": "HIGH",
+          "dueDate": "2026-08-30T01:44:19.322Z"
+        },
+        {
+          "title": "Task 4 for Mobile App Launch",
+          "status": "REVIEW",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-23T03:01:19.118Z"
+        },
+        {
+          "title": "Task 5 for Mobile App Launch",
+          "status": "TODO",
+          "priority": "LOW",
+          "dueDate": "2026-08-23T11:32:57.455Z"
+        },
+        {
+          "title": "Task 6 for Mobile App Launch",
+          "status": "DONE",
+          "priority": "LOW",
+          "dueDate": "2026-08-26T00:05:45.824Z"
+        }
+      ]
+    },
+    {
+      "key": "proj_4",
+      "name": "Q3 Marketing Campaign",
+      "description": "Comprehensive execution plan for Q3 Marketing Campaign",
+      "status": "ON_TRACK",
+      "startDate": "2026-01-19T02:26:49.490Z",
+      "dueDate": "2026-08-31T01:38:06.524Z",
+      "budget": 1586999,
+      "tasks": [
+        {
+          "title": "Task 1 for Q3 Marketing Campaign",
+          "status": "DONE",
+          "priority": "HIGH",
+          "dueDate": "2026-08-29T02:39:29.719Z"
+        },
+        {
+          "title": "Task 2 for Q3 Marketing Campaign",
+          "status": "REVIEW",
+          "priority": "LOW",
+          "dueDate": "2026-08-27T08:28:39.478Z"
+        },
+        {
+          "title": "Task 3 for Q3 Marketing Campaign",
+          "status": "REVIEW",
+          "priority": "HIGH",
+          "dueDate": "2026-08-26T19:56:40.313Z"
+        },
+        {
+          "title": "Task 4 for Q3 Marketing Campaign",
+          "status": "TODO",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-27T11:42:53.961Z"
+        },
+        {
+          "title": "Task 5 for Q3 Marketing Campaign",
+          "status": "DONE",
+          "priority": "HIGH",
+          "dueDate": "2026-08-23T12:07:56.960Z"
+        },
+        {
+          "title": "Task 6 for Q3 Marketing Campaign",
+          "status": "DONE",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-29T06:20:07.528Z"
+        },
+        {
+          "title": "Task 7 for Q3 Marketing Campaign",
+          "status": "TODO",
+          "priority": "HIGH",
+          "dueDate": "2026-08-28T09:52:40.325Z"
+        },
+        {
+          "title": "Task 8 for Q3 Marketing Campaign",
+          "status": "DONE",
+          "priority": "HIGH",
+          "dueDate": "2026-08-28T10:27:56.717Z"
+        },
+        {
+          "title": "Task 9 for Q3 Marketing Campaign",
+          "status": "REVIEW",
+          "priority": "HIGH",
+          "dueDate": "2026-08-22T00:42:06.450Z"
+        },
+        {
+          "title": "Task 10 for Q3 Marketing Campaign",
+          "status": "DONE",
+          "priority": "HIGH",
+          "dueDate": "2026-08-27T13:41:18.423Z"
+        },
+        {
+          "title": "Task 11 for Q3 Marketing Campaign",
+          "status": "DONE",
+          "priority": "LOW",
+          "dueDate": "2026-08-31T10:18:08.743Z"
+        },
+        {
+          "title": "Task 12 for Q3 Marketing Campaign",
+          "status": "DONE",
+          "priority": "HIGH",
+          "dueDate": "2026-08-29T20:23:51.927Z"
+        }
+      ]
+    },
+    {
+      "key": "proj_5",
+      "name": "Infrastructure Migration",
+      "description": "Comprehensive execution plan for Infrastructure Migration",
+      "status": "PLANNING",
+      "startDate": "2026-05-16T00:18:39.212Z",
+      "dueDate": "2026-08-27T00:13:03.937Z",
+      "budget": 853400,
+      "tasks": [
+        {
+          "title": "Task 1 for Infrastructure Migration",
+          "status": "REVIEW",
+          "priority": "HIGH",
+          "dueDate": "2026-08-30T19:40:52.362Z"
+        },
+        {
+          "title": "Task 2 for Infrastructure Migration",
+          "status": "IN_PROGRESS",
+          "priority": "HIGH",
+          "dueDate": "2026-08-30T06:55:00.520Z"
+        },
+        {
+          "title": "Task 3 for Infrastructure Migration",
+          "status": "IN_PROGRESS",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-26T20:25:54.770Z"
+        },
+        {
+          "title": "Task 4 for Infrastructure Migration",
+          "status": "DONE",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-31T06:21:08.888Z"
+        },
+        {
+          "title": "Task 5 for Infrastructure Migration",
+          "status": "REVIEW",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-31T12:26:38.383Z"
+        },
+        {
+          "title": "Task 6 for Infrastructure Migration",
+          "status": "DONE",
+          "priority": "LOW",
+          "dueDate": "2026-08-29T12:26:51.690Z"
+        }
+      ]
+    },
+    {
+      "key": "proj_6",
+      "name": "Security Audit",
+      "description": "Comprehensive execution plan for Security Audit",
+      "status": "ON_TRACK",
+      "startDate": "2026-04-20T17:51:37.678Z",
+      "dueDate": "2026-08-30T01:31:17.132Z",
+      "budget": 564146,
+      "tasks": [
+        {
+          "title": "Task 1 for Security Audit",
+          "status": "TODO",
+          "priority": "LOW",
+          "dueDate": "2026-08-28T14:54:22.043Z"
+        },
+        {
+          "title": "Task 2 for Security Audit",
+          "status": "IN_PROGRESS",
+          "priority": "LOW",
+          "dueDate": "2026-08-30T03:33:48.988Z"
+        },
+        {
+          "title": "Task 3 for Security Audit",
+          "status": "IN_PROGRESS",
+          "priority": "LOW",
+          "dueDate": "2026-08-22T01:54:25.247Z"
+        },
+        {
+          "title": "Task 4 for Security Audit",
+          "status": "DONE",
+          "priority": "LOW",
+          "dueDate": "2026-08-28T20:20:10.395Z"
+        },
+        {
+          "title": "Task 5 for Security Audit",
+          "status": "REVIEW",
+          "priority": "HIGH",
+          "dueDate": "2026-08-26T09:23:46.452Z"
+        },
+        {
+          "title": "Task 6 for Security Audit",
+          "status": "IN_PROGRESS",
+          "priority": "HIGH",
+          "dueDate": "2026-08-26T19:20:40.949Z"
+        },
+        {
+          "title": "Task 7 for Security Audit",
+          "status": "TODO",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-23T17:36:29.535Z"
+        }
+      ]
+    },
+    {
+      "key": "proj_7",
+      "name": "ERP Implementation",
+      "description": "Comprehensive execution plan for ERP Implementation",
+      "status": "COMPLETED",
+      "startDate": "2026-05-30T23:06:46.526Z",
+      "dueDate": "2026-08-28T10:12:42.449Z",
+      "budget": 834570,
+      "tasks": [
+        {
+          "title": "Task 1 for ERP Implementation",
+          "status": "DONE",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-30T07:24:52.017Z"
+        },
+        {
+          "title": "Task 2 for ERP Implementation",
+          "status": "IN_PROGRESS",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-22T12:04:55.145Z"
+        },
+        {
+          "title": "Task 3 for ERP Implementation",
+          "status": "TODO",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-23T17:01:36.189Z"
+        },
+        {
+          "title": "Task 4 for ERP Implementation",
+          "status": "DONE",
+          "priority": "LOW",
+          "dueDate": "2026-08-30T04:53:05.486Z"
+        },
+        {
+          "title": "Task 5 for ERP Implementation",
+          "status": "IN_PROGRESS",
+          "priority": "HIGH",
+          "dueDate": "2026-08-31T06:49:56.096Z"
+        },
+        {
+          "title": "Task 6 for ERP Implementation",
+          "status": "IN_PROGRESS",
+          "priority": "LOW",
+          "dueDate": "2026-08-22T00:11:48.690Z"
+        }
+      ]
+    },
+    {
+      "key": "proj_8",
+      "name": "Sales Training Program",
+      "description": "Comprehensive execution plan for Sales Training Program",
+      "status": "ON_TRACK",
+      "startDate": "2026-03-28T08:40:51.780Z",
+      "dueDate": "2026-08-27T18:25:57.923Z",
+      "budget": 960048,
+      "tasks": [
+        {
+          "title": "Task 1 for Sales Training Program",
+          "status": "DONE",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-27T03:32:10.691Z"
+        },
+        {
+          "title": "Task 2 for Sales Training Program",
+          "status": "REVIEW",
+          "priority": "HIGH",
+          "dueDate": "2026-08-24T17:46:17.165Z"
+        },
+        {
+          "title": "Task 3 for Sales Training Program",
+          "status": "DONE",
+          "priority": "LOW",
+          "dueDate": "2026-08-22T15:33:07.098Z"
+        },
+        {
+          "title": "Task 4 for Sales Training Program",
+          "status": "REVIEW",
+          "priority": "HIGH",
+          "dueDate": "2026-08-26T12:35:28.540Z"
+        },
+        {
+          "title": "Task 5 for Sales Training Program",
+          "status": "IN_PROGRESS",
+          "priority": "HIGH",
+          "dueDate": "2026-08-29T11:46:02.512Z"
+        },
+        {
+          "title": "Task 6 for Sales Training Program",
+          "status": "TODO",
+          "priority": "LOW",
+          "dueDate": "2026-08-28T14:07:47.503Z"
+        },
+        {
+          "title": "Task 7 for Sales Training Program",
+          "status": "DONE",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-27T04:48:04.262Z"
+        },
+        {
+          "title": "Task 8 for Sales Training Program",
+          "status": "REVIEW",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-23T10:45:40.580Z"
+        },
+        {
+          "title": "Task 9 for Sales Training Program",
+          "status": "TODO",
+          "priority": "MEDIUM",
+          "dueDate": "2026-08-24T05:33:47.296Z"
+        }
+      ]
+    }
+  ],
+  "products": [
+    {
+      "key": "prod_0",
+      "sku": "SKU-92878",
+      "name": "Lite Widget 1",
+      "category": "Merchandise",
+      "price": 4406,
+      "cost": 856,
+      "quantity": 40,
+      "stockStatus": "LOW_STOCK"
+    },
+    {
+      "key": "prod_1",
+      "sku": "SKU-85446",
+      "name": "Basic Module 2",
+      "category": "Electronics",
+      "price": 1247,
+      "cost": 743,
+      "quantity": 132,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_2",
+      "sku": "SKU-62912",
+      "name": "Pro Device 3",
+      "category": "Furniture",
+      "price": 1714,
+      "cost": 2489,
+      "quantity": 170,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_3",
+      "sku": "SKU-27791",
+      "name": "Lite Module 4",
+      "category": "Office Supplies",
+      "price": 1121,
+      "cost": 2464,
+      "quantity": 15,
+      "stockStatus": "LOW_STOCK"
+    },
+    {
+      "key": "prod_4",
+      "sku": "SKU-27810",
+      "name": "Lite Module 5",
+      "category": "Furniture",
+      "price": 1101,
+      "cost": 775,
+      "quantity": 192,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_5",
+      "sku": "SKU-95419",
+      "name": "Pro Module 6",
+      "category": "Electronics",
+      "price": 3202,
+      "cost": 1994,
+      "quantity": 425,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_6",
+      "sku": "SKU-58879",
+      "name": "Enterprise Device 7",
+      "category": "Software Licenses",
+      "price": 1562,
+      "cost": 1006,
+      "quantity": 451,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_7",
+      "sku": "SKU-98281",
+      "name": "Basic Module 8",
+      "category": "Furniture",
+      "price": 1519,
+      "cost": 1509,
+      "quantity": 363,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_8",
+      "sku": "SKU-40341",
+      "name": "Basic Device 9",
+      "category": "Electronics",
+      "price": 3486,
+      "cost": 2320,
+      "quantity": 485,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_9",
+      "sku": "SKU-68566",
+      "name": "Pro System 10",
+      "category": "Software Licenses",
+      "price": 2410,
+      "cost": 2339,
+      "quantity": 426,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_10",
+      "sku": "SKU-26178",
+      "name": "Basic Widget 11",
+      "category": "Furniture",
+      "price": 4798,
+      "cost": 1071,
+      "quantity": 74,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_11",
+      "sku": "SKU-67443",
+      "name": "Pro Widget 12",
+      "category": "Furniture",
+      "price": 899,
+      "cost": 1736,
+      "quantity": 75,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_12",
+      "sku": "SKU-79463",
+      "name": "Max Module 13",
+      "category": "Electronics",
+      "price": 3059,
+      "cost": 2014,
+      "quantity": 169,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_13",
+      "sku": "SKU-35076",
+      "name": "Basic Device 14",
+      "category": "Software Licenses",
+      "price": 636,
+      "cost": 1326,
+      "quantity": 75,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_14",
+      "sku": "SKU-91344",
+      "name": "Max System 15",
+      "category": "Electronics",
+      "price": 2654,
+      "cost": 1777,
+      "quantity": 304,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_15",
+      "sku": "SKU-42466",
+      "name": "Max Pack 16",
+      "category": "Furniture",
+      "price": 1535,
+      "cost": 1988,
+      "quantity": 35,
+      "stockStatus": "LOW_STOCK"
+    },
+    {
+      "key": "prod_16",
+      "sku": "SKU-66745",
+      "name": "Max Pack 17",
+      "category": "Office Supplies",
+      "price": 1458,
+      "cost": 750,
+      "quantity": 17,
+      "stockStatus": "LOW_STOCK"
+    },
+    {
+      "key": "prod_17",
+      "sku": "SKU-76111",
+      "name": "Lite License 18",
+      "category": "Merchandise",
+      "price": 1264,
+      "cost": 964,
+      "quantity": 341,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_18",
+      "sku": "SKU-50548",
+      "name": "Basic Pack 19",
+      "category": "Software Licenses",
+      "price": 4604,
+      "cost": 2044,
+      "quantity": 480,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_19",
+      "sku": "SKU-44727",
+      "name": "Enterprise Device 20",
+      "category": "Software Licenses",
+      "price": 3646,
+      "cost": 481,
+      "quantity": 101,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_20",
+      "sku": "SKU-25313",
+      "name": "Basic Device 21",
+      "category": "Furniture",
+      "price": 2180,
+      "cost": 77,
+      "quantity": 227,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_21",
+      "sku": "SKU-17450",
+      "name": "Basic Device 22",
+      "category": "Software Licenses",
+      "price": 1868,
+      "cost": 2492,
+      "quantity": 268,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_22",
+      "sku": "SKU-77159",
+      "name": "Basic Widget 23",
+      "category": "Merchandise",
+      "price": 2873,
+      "cost": 1063,
+      "quantity": 405,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_23",
+      "sku": "SKU-98827",
+      "name": "Max Widget 24",
+      "category": "Merchandise",
+      "price": 3452,
+      "cost": 1086,
+      "quantity": 469,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_24",
+      "sku": "SKU-35566",
+      "name": "Max Pack 25",
+      "category": "Office Supplies",
+      "price": 2935,
+      "cost": 1405,
+      "quantity": 39,
+      "stockStatus": "LOW_STOCK"
+    },
+    {
+      "key": "prod_25",
+      "sku": "SKU-34307",
+      "name": "Max Device 26",
+      "category": "Electronics",
+      "price": 1828,
+      "cost": 2247,
+      "quantity": 358,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_26",
+      "sku": "SKU-25066",
+      "name": "Pro Pack 27",
+      "category": "Furniture",
+      "price": 803,
+      "cost": 820,
+      "quantity": 157,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_27",
+      "sku": "SKU-77719",
+      "name": "Max Device 28",
+      "category": "Merchandise",
+      "price": 3957,
+      "cost": 248,
+      "quantity": 239,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_28",
+      "sku": "SKU-63204",
+      "name": "Lite System 29",
+      "category": "Merchandise",
+      "price": 1079,
+      "cost": 995,
+      "quantity": 150,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_29",
+      "sku": "SKU-26701",
+      "name": "Basic Widget 30",
+      "category": "Merchandise",
+      "price": 3420,
+      "cost": 2216,
+      "quantity": 498,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_30",
+      "sku": "SKU-96618",
+      "name": "Pro Module 31",
+      "category": "Furniture",
+      "price": 683,
+      "cost": 886,
+      "quantity": 359,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_31",
+      "sku": "SKU-46282",
+      "name": "Lite Widget 32",
+      "category": "Office Supplies",
+      "price": 3560,
+      "cost": 931,
+      "quantity": 155,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_32",
+      "sku": "SKU-87501",
+      "name": "Basic Device 33",
+      "category": "Software Licenses",
+      "price": 915,
+      "cost": 2033,
+      "quantity": 279,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_33",
+      "sku": "SKU-13975",
+      "name": "Lite Pack 34",
+      "category": "Office Supplies",
+      "price": 2613,
+      "cost": 2297,
+      "quantity": 232,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_34",
+      "sku": "SKU-71503",
+      "name": "Pro Widget 35",
+      "category": "Merchandise",
+      "price": 2246,
+      "cost": 332,
+      "quantity": 151,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_35",
+      "sku": "SKU-95934",
+      "name": "Pro Device 36",
+      "category": "Software Licenses",
+      "price": 3921,
+      "cost": 1973,
+      "quantity": 226,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_36",
+      "sku": "SKU-74213",
+      "name": "Basic Widget 37",
+      "category": "Office Supplies",
+      "price": 1688,
+      "cost": 2318,
+      "quantity": 350,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_37",
+      "sku": "SKU-32063",
+      "name": "Pro Pack 38",
+      "category": "Furniture",
+      "price": 3137,
+      "cost": 60,
+      "quantity": 20,
+      "stockStatus": "LOW_STOCK"
+    },
+    {
+      "key": "prod_38",
+      "sku": "SKU-23420",
+      "name": "Max Device 39",
+      "category": "Software Licenses",
+      "price": 806,
+      "cost": 1146,
+      "quantity": 335,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_39",
+      "sku": "SKU-35327",
+      "name": "Enterprise Pack 40",
+      "category": "Merchandise",
+      "price": 2106,
+      "cost": 193,
+      "quantity": 47,
+      "stockStatus": "LOW_STOCK"
+    },
+    {
+      "key": "prod_40",
+      "sku": "SKU-54217",
+      "name": "Pro System 41",
+      "category": "Electronics",
+      "price": 1132,
+      "cost": 757,
+      "quantity": 382,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_41",
+      "sku": "SKU-91274",
+      "name": "Enterprise Module 42",
+      "category": "Electronics",
+      "price": 1727,
+      "cost": 1078,
+      "quantity": 357,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_42",
+      "sku": "SKU-36911",
+      "name": "Enterprise License 43",
+      "category": "Merchandise",
+      "price": 2256,
+      "cost": 1939,
+      "quantity": 5,
+      "stockStatus": "LOW_STOCK"
+    },
+    {
+      "key": "prod_43",
+      "sku": "SKU-49388",
+      "name": "Basic Device 44",
+      "category": "Office Supplies",
+      "price": 1782,
+      "cost": 1370,
+      "quantity": 489,
+      "stockStatus": "IN_STOCK"
+    },
+    {
+      "key": "prod_44",
+      "sku": "SKU-91565",
+      "name": "Enterprise System 45",
+      "category": "Electronics",
+      "price": 380,
+      "cost": 678,
+      "quantity": 320,
+      "stockStatus": "IN_STOCK"
+    }
+  ],
+  "receivableInvoices": [
+    {
+      "number": "INV-1000",
+      "customerKey": "cust_15",
+      "amount": 9233,
+      "dueDate": "2026-08-29T21:34:24.320Z",
+      "status": "PAID",
+      "createdAt": "2026-06-27T03:37:03.987Z",
+      "updatedAt": "2026-07-26T08:31:57.080Z"
+    },
+    {
+      "number": "INV-1001",
+      "customerKey": "cust_11",
+      "amount": 20687,
+      "dueDate": "2026-08-29T12:56:09.133Z",
+      "status": "IN_COLLECTIONS",
+      "createdAt": "2026-05-05T10:25:22.418Z",
+      "updatedAt": "2026-08-21T19:00:53.781Z"
+    },
+    {
+      "number": "INV-1002",
+      "customerKey": "cust_12",
+      "amount": 13049,
+      "dueDate": "2026-08-28T21:22:25.384Z",
+      "status": "PAID",
+      "createdAt": "2026-05-19T14:59:14.254Z",
+      "updatedAt": "2026-08-13T21:18:48.141Z"
+    },
+    {
+      "number": "INV-1003",
+      "customerKey": "cust_5",
+      "amount": 48942,
+      "dueDate": "2026-08-27T13:00:26.755Z",
+      "status": "IN_COLLECTIONS",
+      "createdAt": "2026-04-30T18:30:41.879Z",
+      "updatedAt": "2026-08-21T19:00:53.781Z"
+    },
+    {
+      "number": "INV-1004",
+      "customerKey": "cust_11",
+      "amount": 34235,
+      "dueDate": "2026-08-29T13:30:59.959Z",
+      "status": "PAID",
+      "createdAt": "2026-06-28T19:19:12.162Z",
+      "updatedAt": "2026-07-24T05:31:43.500Z"
+    },
+    {
+      "number": "INV-1005",
+      "customerKey": "cust_13",
+      "amount": 37724,
+      "dueDate": "2026-08-26T01:35:51.887Z",
+      "status": "PAID",
+      "createdAt": "2026-02-11T16:32:59.395Z",
+      "updatedAt": "2026-08-21T11:08:34.325Z"
+    },
+    {
+      "number": "INV-1006",
+      "customerKey": "cust_8",
+      "amount": 18761,
+      "dueDate": "2026-08-22T16:55:00.765Z",
+      "status": "PAID",
+      "createdAt": "2026-05-29T08:34:31.746Z",
+      "updatedAt": "2026-08-15T03:33:17.810Z"
+    },
+    {
+      "number": "INV-1007",
+      "customerKey": "cust_1",
+      "amount": 13386,
+      "dueDate": "2026-08-22T06:43:00.716Z",
+      "status": "PAID",
+      "createdAt": "2026-08-20T09:08:45.416Z",
+      "updatedAt": "2026-07-23T22:03:33.891Z"
+    },
+    {
+      "number": "INV-1008",
+      "customerKey": "cust_14",
+      "amount": 3889,
+      "dueDate": "2026-08-22T20:15:27.266Z",
+      "status": "PAID",
+      "createdAt": "2026-03-06T18:36:47.808Z",
+      "updatedAt": "2026-08-07T11:21:43.129Z"
+    },
+    {
+      "number": "INV-1009",
+      "customerKey": "cust_2",
+      "amount": 33101,
+      "dueDate": "2026-08-23T12:09:12.889Z",
+      "status": "PAID",
+      "createdAt": "2026-03-23T18:33:46.146Z",
+      "updatedAt": "2026-08-18T23:25:17.776Z"
+    },
+    {
+      "number": "INV-1010",
+      "customerKey": "cust_12",
+      "amount": 11481,
+      "dueDate": "2026-08-22T11:47:48.606Z",
+      "status": "IN_COLLECTIONS",
+      "createdAt": "2026-04-02T23:59:01.753Z",
+      "updatedAt": "2026-08-21T19:00:53.781Z"
+    },
+    {
+      "number": "INV-1011",
+      "customerKey": "cust_5",
+      "amount": 46459,
+      "dueDate": "2026-08-24T12:24:34.797Z",
+      "status": "PAID",
+      "createdAt": "2026-04-05T15:51:18.506Z",
+      "updatedAt": "2026-07-25T00:52:17.962Z"
+    },
+    {
+      "number": "INV-1012",
+      "customerKey": "cust_10",
+      "amount": 22888,
+      "dueDate": "2026-08-23T08:29:07.860Z",
+      "status": "PAID",
+      "createdAt": "2026-03-15T01:42:10.706Z",
+      "updatedAt": "2026-08-17T13:08:06.613Z"
+    },
+    {
+      "number": "INV-1013",
+      "customerKey": "cust_2",
+      "amount": 42204,
+      "dueDate": "2026-08-29T06:28:35.991Z",
+      "status": "PAID",
+      "createdAt": "2026-05-15T05:52:08.375Z",
+      "updatedAt": "2026-07-23T16:25:39.846Z"
+    },
+    {
+      "number": "INV-1014",
+      "customerKey": "cust_14",
+      "amount": 31541,
+      "dueDate": "2026-08-25T06:55:22.824Z",
+      "status": "PAID",
+      "createdAt": "2026-06-30T07:59:07.286Z",
+      "updatedAt": "2026-08-05T21:33:57.336Z"
+    },
+    {
+      "number": "INV-1015",
+      "customerKey": "cust_14",
+      "amount": 38723,
+      "dueDate": "2026-08-23T11:32:17.970Z",
+      "status": "PAID",
+      "createdAt": "2026-05-16T19:05:38.695Z",
+      "updatedAt": "2026-07-30T15:05:54.498Z"
+    },
+    {
+      "number": "INV-1016",
+      "customerKey": "cust_2",
+      "amount": 41903,
+      "dueDate": "2026-08-27T21:02:28.886Z",
+      "status": "PAID",
+      "createdAt": "2026-07-17T14:54:48.158Z",
+      "updatedAt": "2026-08-09T20:35:45.706Z"
+    },
+    {
+      "number": "INV-1017",
+      "customerKey": "cust_10",
+      "amount": 37651,
+      "dueDate": "2026-08-30T02:56:54.256Z",
+      "status": "OVERDUE",
+      "createdAt": "2026-04-16T04:17:26.542Z",
+      "updatedAt": "2026-08-21T19:00:53.781Z"
+    },
+    {
+      "number": "INV-1018",
+      "customerKey": "cust_4",
+      "amount": 30883,
+      "dueDate": "2026-08-28T06:58:02.775Z",
+      "status": "PAID",
+      "createdAt": "2026-06-11T22:05:21.254Z",
+      "updatedAt": "2026-08-02T16:31:59.875Z"
+    },
+    {
+      "number": "INV-1019",
+      "customerKey": "cust_5",
+      "amount": 3126,
+      "dueDate": "2026-08-23T18:43:40.826Z",
+      "status": "IN_COLLECTIONS",
+      "createdAt": "2026-01-13T07:27:43.504Z",
+      "updatedAt": "2026-08-21T19:00:53.781Z"
+    },
+    {
+      "number": "INV-1020",
+      "customerKey": "cust_6",
+      "amount": 34575,
+      "dueDate": "2026-08-24T02:14:13.784Z",
+      "status": "PAID",
+      "createdAt": "2026-07-14T00:40:43.671Z",
+      "updatedAt": "2026-07-24T21:03:24.804Z"
+    },
+    {
+      "number": "INV-1021",
+      "customerKey": "cust_2",
+      "amount": 24774,
+      "dueDate": "2026-08-23T21:37:36.149Z",
+      "status": "PAID",
+      "createdAt": "2026-01-31T09:39:54.349Z",
+      "updatedAt": "2026-08-13T13:03:04.134Z"
+    },
+    {
+      "number": "INV-1022",
+      "customerKey": "cust_6",
+      "amount": 6723,
+      "dueDate": "2026-08-31T20:47:01.287Z",
+      "status": "PAID",
+      "createdAt": "2026-05-02T18:08:13.574Z",
+      "updatedAt": "2026-07-30T18:58:04.793Z"
+    },
+    {
+      "number": "INV-1023",
+      "customerKey": "cust_4",
+      "amount": 18048,
+      "dueDate": "2026-08-28T16:54:09.049Z",
+      "status": "PAID",
+      "createdAt": "2026-04-16T04:25:25.591Z",
+      "updatedAt": "2026-07-25T16:06:48.344Z"
+    },
+    {
+      "number": "INV-1024",
+      "customerKey": "cust_12",
+      "amount": 13001,
+      "dueDate": "2026-08-25T05:29:55.232Z",
+      "status": "PAID",
+      "createdAt": "2026-07-16T20:15:26.752Z",
+      "updatedAt": "2026-08-17T19:15:26.487Z"
+    },
+    {
+      "number": "INV-1025",
+      "customerKey": "cust_5",
+      "amount": 15657,
+      "dueDate": "2026-08-31T11:48:37.126Z",
+      "status": "PAID",
+      "createdAt": "2026-06-20T00:29:07.773Z",
+      "updatedAt": "2026-08-02T23:55:48.161Z"
+    },
+    {
+      "number": "INV-1026",
+      "customerKey": "cust_8",
+      "amount": 39528,
+      "dueDate": "2026-08-27T22:12:07.112Z",
+      "status": "PAID",
+      "createdAt": "2026-04-04T22:02:44.097Z",
+      "updatedAt": "2026-08-04T21:34:29.143Z"
+    },
+    {
+      "number": "INV-1027",
+      "customerKey": "cust_6",
+      "amount": 39368,
+      "dueDate": "2026-08-24T11:13:32.799Z",
+      "status": "IN_COLLECTIONS",
+      "createdAt": "2026-06-02T13:19:57.115Z",
+      "updatedAt": "2026-08-21T19:00:53.781Z"
+    },
+    {
+      "number": "INV-1028",
+      "customerKey": "cust_10",
+      "amount": 49973,
+      "dueDate": "2026-08-29T01:09:06.546Z",
+      "status": "PAID",
+      "createdAt": "2026-08-13T15:52:27.989Z",
+      "updatedAt": "2026-07-25T17:41:51.557Z"
+    },
+    {
+      "number": "INV-1029",
+      "customerKey": "cust_9",
+      "amount": 28242,
+      "dueDate": "2026-08-31T10:58:21.144Z",
+      "status": "PAID",
+      "createdAt": "2026-05-14T21:25:41.051Z",
+      "updatedAt": "2026-07-25T22:25:25.547Z"
+    },
+    {
+      "number": "INV-1030",
+      "customerKey": "cust_15",
+      "amount": 21220,
+      "dueDate": "2026-08-22T02:56:07.902Z",
+      "status": "PAID",
+      "createdAt": "2026-08-17T23:10:42.177Z",
+      "updatedAt": "2026-07-29T20:48:02.926Z"
+    },
+    {
+      "number": "INV-1031",
+      "customerKey": "cust_2",
+      "amount": 44128,
+      "dueDate": "2026-08-23T16:05:02.362Z",
+      "status": "PAID",
+      "createdAt": "2026-07-28T04:41:42.526Z",
+      "updatedAt": "2026-08-02T11:40:07.786Z"
+    },
+    {
+      "number": "INV-1032",
+      "customerKey": "cust_6",
+      "amount": 25483,
+      "dueDate": "2026-08-26T21:24:37.704Z",
+      "status": "PAID",
+      "createdAt": "2026-02-03T19:22:52.179Z",
+      "updatedAt": "2026-08-06T21:50:30.733Z"
+    },
+    {
+      "number": "INV-1033",
+      "customerKey": "cust_13",
+      "amount": 39098,
+      "dueDate": "2026-08-25T08:50:13.318Z",
+      "status": "PAID",
+      "createdAt": "2026-04-11T22:18:09.627Z",
+      "updatedAt": "2026-08-21T14:21:32.835Z"
+    },
+    {
+      "number": "INV-1034",
+      "customerKey": "cust_1",
+      "amount": 19206,
+      "dueDate": "2026-08-27T02:38:40.468Z",
+      "status": "PAID",
+      "createdAt": "2026-08-03T12:59:55.615Z",
+      "updatedAt": "2026-08-06T22:56:16.165Z"
+    },
+    {
+      "number": "INV-1035",
+      "customerKey": "cust_13",
+      "amount": 26961,
+      "dueDate": "2026-08-26T22:06:18.194Z",
+      "status": "PAID",
+      "createdAt": "2026-03-28T06:57:19.488Z",
+      "updatedAt": "2026-07-28T19:35:57.180Z"
+    },
+    {
+      "number": "INV-1036",
+      "customerKey": "cust_2",
+      "amount": 42904,
+      "dueDate": "2026-08-25T21:58:01.272Z",
+      "status": "OVERDUE",
+      "createdAt": "2026-01-18T03:37:18.123Z",
+      "updatedAt": "2026-08-21T19:00:53.781Z"
+    },
+    {
+      "number": "INV-1037",
+      "customerKey": "cust_2",
+      "amount": 32298,
+      "dueDate": "2026-08-26T12:26:41.359Z",
+      "status": "PAID",
+      "createdAt": "2026-07-18T15:20:31.930Z",
+      "updatedAt": "2026-07-23T18:37:01.107Z"
+    },
+    {
+      "number": "INV-1038",
+      "customerKey": "cust_10",
+      "amount": 47854,
+      "dueDate": "2026-08-30T00:08:44.526Z",
+      "status": "IN_COLLECTIONS",
+      "createdAt": "2026-05-30T02:10:29.225Z",
+      "updatedAt": "2026-08-21T19:00:53.781Z"
+    },
+    {
+      "number": "INV-1039",
+      "customerKey": "cust_8",
+      "amount": 26037,
+      "dueDate": "2026-08-25T06:07:54.856Z",
+      "status": "OVERDUE",
+      "createdAt": "2026-03-16T16:19:59.182Z",
+      "updatedAt": "2026-08-21T19:00:53.781Z"
+    },
+    {
+      "number": "INV-1040",
+      "customerKey": "cust_15",
+      "amount": 11113,
+      "dueDate": "2026-08-29T06:26:32.202Z",
+      "status": "PAID",
+      "createdAt": "2026-01-04T10:19:13.960Z",
+      "updatedAt": "2026-08-17T23:47:55.809Z"
+    },
+    {
+      "number": "INV-1041",
+      "customerKey": "cust_3",
+      "amount": 16553,
+      "dueDate": "2026-08-26T06:37:51.045Z",
+      "status": "PAID",
+      "createdAt": "2026-01-12T09:29:37.183Z",
+      "updatedAt": "2026-08-15T02:27:01.808Z"
+    },
+    {
+      "number": "INV-1042",
+      "customerKey": "cust_6",
+      "amount": 29176,
+      "dueDate": "2026-08-24T21:48:45.912Z",
+      "status": "OVERDUE",
+      "createdAt": "2026-03-24T10:53:14.336Z",
+      "updatedAt": "2026-08-21T19:00:53.781Z"
+    },
+    {
+      "number": "INV-1043",
+      "customerKey": "cust_14",
+      "amount": 25509,
+      "dueDate": "2026-08-23T01:42:20.196Z",
+      "status": "CURRENT",
+      "createdAt": "2026-08-15T07:09:07.228Z",
+      "updatedAt": "2026-08-21T19:00:53.781Z"
+    },
+    {
+      "number": "INV-1044",
+      "customerKey": "cust_4",
+      "amount": 20733,
+      "dueDate": "2026-08-25T22:46:23.701Z",
+      "status": "PAID",
+      "createdAt": "2026-08-21T17:40:30.167Z",
+      "updatedAt": "2026-08-12T10:26:02.315Z"
+    },
+    {
+      "number": "INV-1045",
+      "customerKey": "cust_13",
+      "amount": 35629,
+      "dueDate": "2026-08-29T19:37:04.991Z",
+      "status": "PAID",
+      "createdAt": "2026-02-20T14:35:27.060Z",
+      "updatedAt": "2026-08-14T10:29:20.859Z"
+    },
+    {
+      "number": "INV-1046",
+      "customerKey": "cust_9",
+      "amount": 12533,
+      "dueDate": "2026-08-29T17:29:41.977Z",
+      "status": "PAID",
+      "createdAt": "2026-08-13T09:02:19.690Z",
+      "updatedAt": "2026-08-06T15:41:23.257Z"
+    },
+    {
+      "number": "INV-1047",
+      "customerKey": "cust_16",
+      "amount": 34374,
+      "dueDate": "2026-08-29T23:18:53.025Z",
+      "status": "PAID",
+      "createdAt": "2026-03-18T19:33:28.528Z",
+      "updatedAt": "2026-08-19T02:06:38.716Z"
+    },
+    {
+      "number": "INV-1048",
+      "customerKey": "cust_12",
+      "amount": 28810,
+      "dueDate": "2026-08-24T20:39:49.989Z",
+      "status": "PAID",
+      "createdAt": "2026-05-25T12:30:56.028Z",
+      "updatedAt": "2026-08-06T03:20:21.815Z"
+    },
+    {
+      "number": "INV-1049",
+      "customerKey": "cust_14",
+      "amount": 12924,
+      "dueDate": "2026-08-22T19:07:25.109Z",
+      "status": "PAID",
+      "createdAt": "2026-01-22T04:45:58.632Z",
+      "updatedAt": "2026-08-12T14:45:28.204Z"
+    },
+    {
+      "number": "INV-1050",
+      "customerKey": "cust_8",
+      "amount": 40872,
+      "dueDate": "2026-08-27T02:42:10.725Z",
+      "status": "IN_COLLECTIONS",
+      "createdAt": "2026-01-05T04:56:34.857Z",
+      "updatedAt": "2026-08-21T19:00:53.781Z"
+    },
+    {
+      "number": "INV-1051",
+      "customerKey": "cust_6",
+      "amount": 14017,
+      "dueDate": "2026-08-31T12:46:57.169Z",
+      "status": "PAID",
+      "createdAt": "2026-04-04T03:02:43.886Z",
+      "updatedAt": "2026-08-14T06:47:57.959Z"
+    },
+    {
+      "number": "INV-1052",
+      "customerKey": "cust_9",
+      "amount": 31976,
+      "dueDate": "2026-08-23T15:51:32.540Z",
+      "status": "PAID",
+      "createdAt": "2026-08-08T18:14:18.017Z",
+      "updatedAt": "2026-08-20T22:21:11.164Z"
+    },
+    {
+      "number": "INV-1053",
+      "customerKey": "cust_11",
+      "amount": 37385,
+      "dueDate": "2026-08-22T03:16:16.803Z",
+      "status": "CURRENT",
+      "createdAt": "2026-04-16T10:02:12.976Z",
+      "updatedAt": "2026-08-21T19:00:53.781Z"
+    },
+    {
+      "number": "INV-1054",
+      "customerKey": "cust_4",
+      "amount": 43906,
+      "dueDate": "2026-08-23T20:21:52.967Z",
+      "status": "OVERDUE",
+      "createdAt": "2026-07-19T16:52:20.361Z",
+      "updatedAt": "2026-08-21T19:00:53.781Z"
+    },
+    {
+      "number": "INV-1055",
+      "customerKey": "cust_10",
+      "amount": 25755,
+      "dueDate": "2026-08-23T00:44:29.957Z",
+      "status": "OVERDUE",
+      "createdAt": "2026-05-03T18:43:59.539Z",
+      "updatedAt": "2026-08-21T19:00:53.781Z"
+    },
+    {
+      "number": "INV-1056",
+      "customerKey": "cust_4",
+      "amount": 19119,
+      "dueDate": "2026-08-22T01:56:25.035Z",
+      "status": "PAID",
+      "createdAt": "2026-06-30T01:51:58.139Z",
+      "updatedAt": "2026-07-27T13:06:08.530Z"
+    },
+    {
+      "number": "INV-1057",
+      "customerKey": "cust_12",
+      "amount": 23577,
+      "dueDate": "2026-08-27T05:37:57.864Z",
+      "status": "IN_COLLECTIONS",
+      "createdAt": "2026-05-27T05:12:33.703Z",
+      "updatedAt": "2026-08-21T19:00:53.781Z"
+    },
+    {
+      "number": "INV-1058",
+      "customerKey": "cust_13",
+      "amount": 22897,
+      "dueDate": "2026-08-29T08:18:23.293Z",
+      "status": "IN_COLLECTIONS",
+      "createdAt": "2026-08-10T02:26:28.031Z",
+      "updatedAt": "2026-08-21T19:00:53.781Z"
+    },
+    {
+      "number": "INV-1059",
+      "customerKey": "cust_13",
+      "amount": 40871,
+      "dueDate": "2026-08-24T02:42:38.459Z",
+      "status": "PAID",
+      "createdAt": "2026-03-10T08:20:14.939Z",
+      "updatedAt": "2026-08-17T04:55:19.311Z"
+    }
+  ],
+  "payableInvoices": [
+    {
+      "vendorKey": "vendor_1",
+      "invoiceNumber": "AP-2000",
+      "date": "2026-01-25T19:47:59.456Z",
+      "amount": 6178,
+      "status": "REJECTED"
+    },
+    {
+      "vendorKey": "vendor_2",
+      "invoiceNumber": "AP-2001",
+      "date": "2026-03-04T02:34:47.285Z",
+      "amount": 4064,
+      "status": "REJECTED"
+    },
+    {
+      "vendorKey": "vendor_0",
+      "invoiceNumber": "AP-2002",
+      "date": "2026-05-01T20:01:08.750Z",
+      "amount": 7380,
+      "status": "REJECTED"
+    },
+    {
+      "vendorKey": "vendor_3",
+      "invoiceNumber": "AP-2003",
+      "date": "2026-06-03T19:18:27.059Z",
+      "amount": 4113,
+      "status": "PAID"
+    },
+    {
+      "vendorKey": "vendor_4",
+      "invoiceNumber": "AP-2004",
+      "date": "2026-04-22T20:39:30.609Z",
+      "amount": 3479,
+      "status": "SCHEDULED"
+    },
+    {
+      "vendorKey": "vendor_2",
+      "invoiceNumber": "AP-2005",
+      "date": "2026-03-02T02:11:07.879Z",
+      "amount": 6777,
+      "status": "PAID"
+    },
+    {
+      "vendorKey": "vendor_3",
+      "invoiceNumber": "AP-2006",
+      "date": "2026-06-11T08:43:33.421Z",
+      "amount": 1633,
+      "status": "APPROVED"
+    },
+    {
+      "vendorKey": "vendor_4",
+      "invoiceNumber": "AP-2007",
+      "date": "2026-08-08T21:43:09.922Z",
+      "amount": 6902,
+      "status": "REJECTED"
+    },
+    {
+      "vendorKey": "vendor_4",
+      "invoiceNumber": "AP-2008",
+      "date": "2026-08-11T08:41:47.927Z",
+      "amount": 9750,
+      "status": "REJECTED"
+    },
+    {
+      "vendorKey": "vendor_3",
+      "invoiceNumber": "AP-2009",
+      "date": "2026-03-28T14:17:12.617Z",
+      "amount": 4883,
+      "status": "APPROVED"
+    },
+    {
+      "vendorKey": "vendor_4",
+      "invoiceNumber": "AP-2010",
+      "date": "2026-03-22T07:57:58.357Z",
+      "amount": 7914,
+      "status": "APPROVED"
+    },
+    {
+      "vendorKey": "vendor_0",
+      "invoiceNumber": "AP-2011",
+      "date": "2026-04-12T04:46:10.003Z",
+      "amount": 7269,
+      "status": "PENDING"
+    },
+    {
+      "vendorKey": "vendor_5",
+      "invoiceNumber": "AP-2012",
+      "date": "2026-04-10T07:35:54.680Z",
+      "amount": 6194,
+      "status": "PAID"
+    },
+    {
+      "vendorKey": "vendor_0",
+      "invoiceNumber": "AP-2013",
+      "date": "2026-03-21T16:22:35.893Z",
+      "amount": 2613,
+      "status": "REJECTED"
+    },
+    {
+      "vendorKey": "vendor_4",
+      "invoiceNumber": "AP-2014",
+      "date": "2026-02-16T11:44:26.430Z",
+      "amount": 5479,
+      "status": "SCHEDULED"
+    },
+    {
+      "vendorKey": "vendor_2",
+      "invoiceNumber": "AP-2015",
+      "date": "2026-08-05T21:56:25.946Z",
+      "amount": 6226,
+      "status": "PENDING"
+    },
+    {
+      "vendorKey": "vendor_5",
+      "invoiceNumber": "AP-2016",
+      "date": "2026-05-23T06:45:19.854Z",
+      "amount": 3628,
+      "status": "PENDING"
+    },
+    {
+      "vendorKey": "vendor_4",
+      "invoiceNumber": "AP-2017",
+      "date": "2026-05-09T05:48:23.875Z",
+      "amount": 3506,
+      "status": "PENDING"
+    },
+    {
+      "vendorKey": "vendor_1",
+      "invoiceNumber": "AP-2018",
+      "date": "2026-08-13T06:55:28.572Z",
+      "amount": 5499,
+      "status": "PENDING"
+    },
+    {
+      "vendorKey": "vendor_4",
+      "invoiceNumber": "AP-2019",
+      "date": "2026-08-05T02:58:56.654Z",
+      "amount": 5240,
+      "status": "PAID"
+    },
+    {
+      "vendorKey": "vendor_0",
+      "invoiceNumber": "AP-2020",
+      "date": "2026-03-28T16:46:01.680Z",
+      "amount": 1170,
+      "status": "APPROVED"
+    },
+    {
+      "vendorKey": "vendor_3",
+      "invoiceNumber": "AP-2021",
+      "date": "2026-02-06T15:04:50.612Z",
+      "amount": 2409,
+      "status": "PENDING"
+    },
+    {
+      "vendorKey": "vendor_0",
+      "invoiceNumber": "AP-2022",
+      "date": "2026-08-04T23:42:55.587Z",
+      "amount": 1919,
+      "status": "REJECTED"
+    },
+    {
+      "vendorKey": "vendor_1",
+      "invoiceNumber": "AP-2023",
+      "date": "2026-06-25T10:17:58.976Z",
+      "amount": 7478,
+      "status": "SCHEDULED"
+    },
+    {
+      "vendorKey": "vendor_5",
+      "invoiceNumber": "AP-2024",
+      "date": "2026-04-25T06:53:48.455Z",
+      "amount": 8261,
+      "status": "PAID"
+    },
+    {
+      "vendorKey": "vendor_4",
+      "invoiceNumber": "AP-2025",
+      "date": "2026-01-25T03:02:58.378Z",
+      "amount": 8264,
+      "status": "SCHEDULED"
+    },
+    {
+      "vendorKey": "vendor_4",
+      "invoiceNumber": "AP-2026",
+      "date": "2026-06-11T23:16:09.933Z",
+      "amount": 1237,
+      "status": "SCHEDULED"
+    },
+    {
+      "vendorKey": "vendor_0",
+      "invoiceNumber": "AP-2027",
+      "date": "2026-07-13T11:46:51.342Z",
+      "amount": 1404,
+      "status": "SCHEDULED"
+    },
+    {
+      "vendorKey": "vendor_0",
+      "invoiceNumber": "AP-2028",
+      "date": "2026-07-08T06:39:19.310Z",
+      "amount": 1507,
+      "status": "PENDING"
+    },
+    {
+      "vendorKey": "vendor_1",
+      "invoiceNumber": "AP-2029",
+      "date": "2026-07-23T19:27:19.818Z",
+      "amount": 1119,
+      "status": "PENDING"
+    }
+  ],
+  "expenses": [
+    {
+      "employeeKey": "sales_5",
+      "name": "Expense 1",
+      "category": "OFFICE_SUPPLIES",
+      "merchant": "Amazon",
+      "date": "2026-01-12T20:03:22.510Z",
+      "amount": 1434,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "cfo",
+      "name": "Expense 2",
+      "category": "MEALS",
+      "merchant": "Microsoft",
+      "date": "2026-04-10T17:33:22.131Z",
+      "amount": 79,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "eng_6",
+      "name": "Expense 3",
+      "category": "OTHER",
+      "merchant": "Uber",
+      "date": "2026-04-13T08:46:51.209Z",
+      "amount": 1201,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "cfo",
+      "name": "Expense 4",
+      "category": "OTHER",
+      "merchant": "Google Cloud",
+      "date": "2026-01-07T06:50:36.378Z",
+      "amount": 1017,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "fin_4",
+      "name": "Expense 5",
+      "category": "TRAVEL",
+      "merchant": "AWS",
+      "date": "2026-04-13T08:11:25.934Z",
+      "amount": 718,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "sales_7",
+      "name": "Expense 6",
+      "category": "OTHER",
+      "merchant": "Starbucks",
+      "date": "2026-08-13T23:58:40.984Z",
+      "amount": 660,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "sales_8",
+      "name": "Expense 7",
+      "category": "OFFICE_SUPPLIES",
+      "merchant": "Starbucks",
+      "date": "2026-07-03T07:42:57.458Z",
+      "amount": 501,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "sales_7",
+      "name": "Expense 8",
+      "category": "FACILITIES_LEASE",
+      "merchant": "AWS",
+      "date": "2026-02-10T22:50:24.227Z",
+      "amount": 1928,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "eng_14",
+      "name": "Expense 9",
+      "category": "SOFTWARE",
+      "merchant": "Delta Airlines",
+      "date": "2026-07-25T23:41:27.279Z",
+      "amount": 1974,
+      "status": "APPROVED"
+    },
+    {
+      "employeeKey": "fin_1",
+      "name": "Expense 10",
+      "category": "FACILITIES_LEASE",
+      "merchant": "WeWork",
+      "date": "2026-01-23T11:50:36.221Z",
+      "amount": 410,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "eng_7",
+      "name": "Expense 11",
+      "category": "OTHER",
+      "merchant": "WeWork",
+      "date": "2026-03-19T00:09:54.518Z",
+      "amount": 1629,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "sales_4",
+      "name": "Expense 12",
+      "category": "SOFTWARE",
+      "merchant": "Microsoft",
+      "date": "2026-05-25T16:57:58.856Z",
+      "amount": 1616,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "eng_8",
+      "name": "Expense 13",
+      "category": "TRAVEL",
+      "merchant": "Delta Airlines",
+      "date": "2026-05-30T07:15:12.751Z",
+      "amount": 255,
+      "status": "APPROVED"
+    },
+    {
+      "employeeKey": "sales_3",
+      "name": "Expense 14",
+      "category": "TRAVEL",
+      "merchant": "Starbucks",
+      "date": "2026-07-22T14:54:23.550Z",
+      "amount": 1859,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "eng_2",
+      "name": "Expense 15",
+      "category": "OTHER",
+      "merchant": "Uber",
+      "date": "2026-05-18T22:20:41.964Z",
+      "amount": 1594,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "sales_8",
+      "name": "Expense 16",
+      "category": "TRAVEL",
+      "merchant": "Microsoft",
+      "date": "2026-03-16T02:07:16.336Z",
+      "amount": 1640,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "eng_12",
+      "name": "Expense 17",
+      "category": "OTHER",
+      "merchant": "AWS",
+      "date": "2026-03-11T04:43:55.596Z",
+      "amount": 981,
+      "status": "APPROVED"
+    },
+    {
+      "employeeKey": "eng_9",
+      "name": "Expense 18",
+      "category": "TRAVEL",
+      "merchant": "Amazon",
+      "date": "2026-02-21T20:02:42.179Z",
+      "amount": 500,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "eng_8",
+      "name": "Expense 19",
+      "category": "FACILITIES_LEASE",
+      "merchant": "Starbucks",
+      "date": "2026-06-09T01:46:32.014Z",
+      "amount": 280,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "eng_8",
+      "name": "Expense 20",
+      "category": "TRAVEL",
+      "merchant": "Microsoft",
+      "date": "2026-07-29T01:03:17.696Z",
+      "amount": 772,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "eng_13",
+      "name": "Expense 21",
+      "category": "TRAVEL",
+      "merchant": "Microsoft",
+      "date": "2026-01-05T04:16:13.767Z",
+      "amount": 388,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "sales_1",
+      "name": "Expense 22",
+      "category": "OTHER",
+      "merchant": "Microsoft",
+      "date": "2026-04-09T02:15:07.906Z",
+      "amount": 1202,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "ceo",
+      "name": "Expense 23",
+      "category": "MEALS",
+      "merchant": "Uber",
+      "date": "2026-05-18T03:29:07.102Z",
+      "amount": 42,
+      "status": "APPROVED"
+    },
+    {
+      "employeeKey": "fin_5",
+      "name": "Expense 24",
+      "category": "SOFTWARE",
+      "merchant": "Uber",
+      "date": "2026-08-13T16:31:19.793Z",
+      "amount": 1848,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "fin_2",
+      "name": "Expense 25",
+      "category": "TRAVEL",
+      "merchant": "Uber",
+      "date": "2026-08-10T14:08:13.615Z",
+      "amount": 1215,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "eng_12",
+      "name": "Expense 26",
+      "category": "SOFTWARE",
+      "merchant": "AWS",
+      "date": "2026-03-07T19:59:20.314Z",
+      "amount": 1791,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "eng_8",
+      "name": "Expense 27",
+      "category": "OTHER",
+      "merchant": "AWS",
+      "date": "2026-08-15T12:33:00.003Z",
+      "amount": 460,
+      "status": "APPROVED"
+    },
+    {
+      "employeeKey": "eng_1",
+      "name": "Expense 28",
+      "category": "FACILITIES_LEASE",
+      "merchant": "Google Cloud",
+      "date": "2026-04-24T04:59:43.273Z",
+      "amount": 679,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "sales_8",
+      "name": "Expense 29",
+      "category": "SOFTWARE",
+      "merchant": "Microsoft",
+      "date": "2026-05-14T22:17:30.802Z",
+      "amount": 1521,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "eng_15",
+      "name": "Expense 30",
+      "category": "SOFTWARE",
+      "merchant": "AWS",
+      "date": "2026-01-19T10:49:59.905Z",
+      "amount": 1697,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "cro",
+      "name": "Expense 31",
+      "category": "TRAVEL",
+      "merchant": "Amazon",
+      "date": "2026-05-06T08:20:40.012Z",
+      "amount": 700,
+      "status": "APPROVED"
+    },
+    {
+      "employeeKey": "eng_3",
+      "name": "Expense 32",
+      "category": "TRAVEL",
+      "merchant": "Amazon",
+      "date": "2026-07-25T10:06:59.673Z",
+      "amount": 1046,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "eng_7",
+      "name": "Expense 33",
+      "category": "OTHER",
+      "merchant": "WeWork",
+      "date": "2026-05-15T21:13:51.629Z",
+      "amount": 1347,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "sales_7",
+      "name": "Expense 34",
+      "category": "OTHER",
+      "merchant": "Uber",
+      "date": "2026-01-20T16:59:51.134Z",
+      "amount": 1475,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "cfo",
+      "name": "Expense 35",
+      "category": "OFFICE_SUPPLIES",
+      "merchant": "Delta Airlines",
+      "date": "2026-01-03T17:11:42.566Z",
+      "amount": 607,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "sales_6",
+      "name": "Expense 36",
+      "category": "TRAVEL",
+      "merchant": "Starbucks",
+      "date": "2026-05-26T08:26:11.273Z",
+      "amount": 1430,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "sales_1",
+      "name": "Expense 37",
+      "category": "OFFICE_SUPPLIES",
+      "merchant": "Amazon",
+      "date": "2026-04-15T03:09:57.713Z",
+      "amount": 1109,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "fin_5",
+      "name": "Expense 38",
+      "category": "SOFTWARE",
+      "merchant": "Starbucks",
+      "date": "2026-01-21T22:30:53.818Z",
+      "amount": 915,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "sales_6",
+      "name": "Expense 39",
+      "category": "OTHER",
+      "merchant": "AWS",
+      "date": "2026-03-03T08:27:08.523Z",
+      "amount": 1246,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "fin_5",
+      "name": "Expense 40",
+      "category": "FACILITIES_LEASE",
+      "merchant": "Starbucks",
+      "date": "2026-05-07T05:17:16.889Z",
+      "amount": 1106,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "cfo",
+      "name": "Expense 41",
+      "category": "SOFTWARE",
+      "merchant": "Amazon",
+      "date": "2026-04-29T15:34:25.907Z",
+      "amount": 785,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "sales_7",
+      "name": "Expense 42",
+      "category": "FACILITIES_LEASE",
+      "merchant": "AWS",
+      "date": "2026-07-18T00:59:50.631Z",
+      "amount": 1921,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "eng_12",
+      "name": "Expense 43",
+      "category": "SOFTWARE",
+      "merchant": "Google Cloud",
+      "date": "2026-04-09T02:09:30.660Z",
+      "amount": 1559,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "sales_4",
+      "name": "Expense 44",
+      "category": "SOFTWARE",
+      "merchant": "Starbucks",
+      "date": "2026-06-09T20:18:07.707Z",
+      "amount": 1732,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "sales_2",
+      "name": "Expense 45",
+      "category": "TRAVEL",
+      "merchant": "Delta Airlines",
+      "date": "2026-04-21T18:14:10.685Z",
+      "amount": 977,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "eng_3",
+      "name": "Expense 46",
+      "category": "MEALS",
+      "merchant": "Microsoft",
+      "date": "2026-07-23T18:39:25.154Z",
+      "amount": 1680,
+      "status": "APPROVED"
+    },
+    {
+      "employeeKey": "cfo",
+      "name": "Expense 47",
+      "category": "TRAVEL",
+      "merchant": "Uber",
+      "date": "2026-06-17T12:07:36.029Z",
+      "amount": 337,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "eng_1",
+      "name": "Expense 48",
+      "category": "TRAVEL",
+      "merchant": "Starbucks",
+      "date": "2026-04-08T14:43:37.766Z",
+      "amount": 1130,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "fin_4",
+      "name": "Expense 49",
+      "category": "SOFTWARE",
+      "merchant": "Google Cloud",
+      "date": "2026-05-23T19:20:48.106Z",
+      "amount": 485,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "eng_4",
+      "name": "Expense 50",
+      "category": "SOFTWARE",
+      "merchant": "Delta Airlines",
+      "date": "2026-01-31T07:22:06.587Z",
+      "amount": 1834,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "eng_11",
+      "name": "Expense 51",
+      "category": "OFFICE_SUPPLIES",
+      "merchant": "Microsoft",
+      "date": "2026-06-07T13:57:13.627Z",
+      "amount": 1272,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "sales_7",
+      "name": "Expense 52",
+      "category": "OTHER",
+      "merchant": "Microsoft",
+      "date": "2026-07-06T00:22:11.386Z",
+      "amount": 1912,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "eng_15",
+      "name": "Expense 53",
+      "category": "FACILITIES_LEASE",
+      "merchant": "Uber",
+      "date": "2026-03-19T17:55:46.011Z",
+      "amount": 447,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "eng_1",
+      "name": "Expense 54",
+      "category": "SOFTWARE",
+      "merchant": "Starbucks",
+      "date": "2026-04-03T00:26:32.952Z",
+      "amount": 270,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "eng_6",
+      "name": "Expense 55",
+      "category": "MEALS",
+      "merchant": "WeWork",
+      "date": "2026-06-16T22:30:55.098Z",
+      "amount": 692,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "sales_7",
+      "name": "Expense 56",
+      "category": "MEALS",
+      "merchant": "WeWork",
+      "date": "2026-02-11T09:36:16.630Z",
+      "amount": 1544,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "sales_2",
+      "name": "Expense 57",
+      "category": "SOFTWARE",
+      "merchant": "Microsoft",
+      "date": "2026-05-29T05:43:53.335Z",
+      "amount": 1764,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "eng_5",
+      "name": "Expense 58",
+      "category": "OTHER",
+      "merchant": "Amazon",
+      "date": "2026-02-17T00:40:07.549Z",
+      "amount": 29,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "eng_2",
+      "name": "Expense 59",
+      "category": "SOFTWARE",
+      "merchant": "WeWork",
+      "date": "2026-05-28T03:06:34.406Z",
+      "amount": 178,
+      "status": "APPROVED"
+    },
+    {
+      "employeeKey": "sales_1",
+      "name": "Expense 60",
+      "category": "OTHER",
+      "merchant": "Microsoft",
+      "date": "2026-05-26T19:18:01.714Z",
+      "amount": 1853,
+      "status": "APPROVED"
+    },
+    {
+      "employeeKey": "eng_2",
+      "name": "Expense 61",
+      "category": "TRAVEL",
+      "merchant": "Google Cloud",
+      "date": "2026-02-21T00:51:07.893Z",
+      "amount": 1070,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "eng_3",
+      "name": "Expense 62",
+      "category": "OFFICE_SUPPLIES",
+      "merchant": "Starbucks",
+      "date": "2026-01-16T05:11:45.159Z",
+      "amount": 88,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "fin_1",
+      "name": "Expense 63",
+      "category": "TRAVEL",
+      "merchant": "Uber",
+      "date": "2026-02-13T16:53:28.623Z",
+      "amount": 133,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "eng_12",
+      "name": "Expense 64",
+      "category": "OTHER",
+      "merchant": "AWS",
+      "date": "2026-01-06T08:31:20.733Z",
+      "amount": 1727,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "eng_2",
+      "name": "Expense 65",
+      "category": "MEALS",
+      "merchant": "Uber",
+      "date": "2026-01-31T17:02:50.424Z",
+      "amount": 1993,
+      "status": "APPROVED"
+    },
+    {
+      "employeeKey": "fin_3",
+      "name": "Expense 66",
+      "category": "FACILITIES_LEASE",
+      "merchant": "Delta Airlines",
+      "date": "2026-03-28T08:49:01.448Z",
+      "amount": 291,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "sales_4",
+      "name": "Expense 67",
+      "category": "TRAVEL",
+      "merchant": "WeWork",
+      "date": "2026-03-02T20:09:10.618Z",
+      "amount": 880,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "sales_7",
+      "name": "Expense 68",
+      "category": "TRAVEL",
+      "merchant": "Microsoft",
+      "date": "2026-05-12T16:49:27.360Z",
+      "amount": 863,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "eng_13",
+      "name": "Expense 69",
+      "category": "OFFICE_SUPPLIES",
+      "merchant": "Delta Airlines",
+      "date": "2026-03-02T18:11:54.830Z",
+      "amount": 1019,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "eng_14",
+      "name": "Expense 70",
+      "category": "FACILITIES_LEASE",
+      "merchant": "Amazon",
+      "date": "2026-04-27T17:02:23.467Z",
+      "amount": 1650,
+      "status": "APPROVED"
+    },
+    {
+      "employeeKey": "sales_4",
+      "name": "Expense 71",
+      "category": "SOFTWARE",
+      "merchant": "Google Cloud",
+      "date": "2026-07-09T17:41:08.987Z",
+      "amount": 1320,
+      "status": "APPROVED"
+    },
+    {
+      "employeeKey": "sales_1",
+      "name": "Expense 72",
+      "category": "TRAVEL",
+      "merchant": "Amazon",
+      "date": "2026-06-20T19:31:54.896Z",
+      "amount": 374,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "sales_6",
+      "name": "Expense 73",
+      "category": "SOFTWARE",
+      "merchant": "Uber",
+      "date": "2026-07-19T18:43:41.581Z",
+      "amount": 427,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "sales_1",
+      "name": "Expense 74",
+      "category": "FACILITIES_LEASE",
+      "merchant": "WeWork",
+      "date": "2026-07-15T15:21:39.067Z",
+      "amount": 72,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "sales_1",
+      "name": "Expense 75",
+      "category": "SOFTWARE",
+      "merchant": "Google Cloud",
+      "date": "2026-02-08T00:42:37.541Z",
+      "amount": 703,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "eng_2",
+      "name": "Expense 76",
+      "category": "FACILITIES_LEASE",
+      "merchant": "AWS",
+      "date": "2026-08-13T19:15:29.914Z",
+      "amount": 1573,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "sales_3",
+      "name": "Expense 77",
+      "category": "SOFTWARE",
+      "merchant": "Microsoft",
+      "date": "2026-07-16T08:07:25.612Z",
+      "amount": 992,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "cro",
+      "name": "Expense 78",
+      "category": "OTHER",
+      "merchant": "Amazon",
+      "date": "2026-08-18T02:28:52.860Z",
+      "amount": 463,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "sales_2",
+      "name": "Expense 79",
+      "category": "MEALS",
+      "merchant": "Delta Airlines",
+      "date": "2026-04-18T04:04:15.069Z",
+      "amount": 274,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "eng_8",
+      "name": "Expense 80",
+      "category": "TRAVEL",
+      "merchant": "Microsoft",
+      "date": "2026-03-22T08:02:47.429Z",
+      "amount": 307,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "eng_10",
+      "name": "Expense 81",
+      "category": "SOFTWARE",
+      "merchant": "Delta Airlines",
+      "date": "2026-08-16T22:11:41.687Z",
+      "amount": 924,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "eng_1",
+      "name": "Expense 82",
+      "category": "TRAVEL",
+      "merchant": "Uber",
+      "date": "2026-03-24T00:39:29.132Z",
+      "amount": 1568,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "fin_2",
+      "name": "Expense 83",
+      "category": "SOFTWARE",
+      "merchant": "WeWork",
+      "date": "2026-08-21T10:49:14.920Z",
+      "amount": 1756,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "eng_14",
+      "name": "Expense 84",
+      "category": "FACILITIES_LEASE",
+      "merchant": "Delta Airlines",
+      "date": "2026-01-25T07:03:18.304Z",
+      "amount": 1302,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "fin_2",
+      "name": "Expense 85",
+      "category": "TRAVEL",
+      "merchant": "AWS",
+      "date": "2026-06-28T12:30:11.817Z",
+      "amount": 1036,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "sales_5",
+      "name": "Expense 86",
+      "category": "TRAVEL",
+      "merchant": "AWS",
+      "date": "2026-02-26T02:52:22.412Z",
+      "amount": 1154,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "fin_4",
+      "name": "Expense 87",
+      "category": "TRAVEL",
+      "merchant": "WeWork",
+      "date": "2026-04-28T19:04:19.105Z",
+      "amount": 1109,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "eng_10",
+      "name": "Expense 88",
+      "category": "SOFTWARE",
+      "merchant": "Starbucks",
+      "date": "2026-04-09T22:30:03.956Z",
+      "amount": 743,
+      "status": "APPROVED"
+    },
+    {
+      "employeeKey": "cro",
+      "name": "Expense 89",
+      "category": "FACILITIES_LEASE",
+      "merchant": "Delta Airlines",
+      "date": "2026-05-12T01:36:19.103Z",
+      "amount": 1338,
+      "status": "APPROVED"
+    },
+    {
+      "employeeKey": "eng_9",
+      "name": "Expense 90",
+      "category": "FACILITIES_LEASE",
+      "merchant": "WeWork",
+      "date": "2026-06-06T04:57:58.667Z",
+      "amount": 1332,
+      "status": "APPROVED"
+    },
+    {
+      "employeeKey": "sales_1",
+      "name": "Expense 91",
+      "category": "FACILITIES_LEASE",
+      "merchant": "Amazon",
+      "date": "2026-03-01T19:31:09.246Z",
+      "amount": 435,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "sales_6",
+      "name": "Expense 92",
+      "category": "SOFTWARE",
+      "merchant": "Microsoft",
+      "date": "2026-07-15T06:58:54.050Z",
+      "amount": 132,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "eng_10",
+      "name": "Expense 93",
+      "category": "TRAVEL",
+      "merchant": "Google Cloud",
+      "date": "2026-06-09T15:22:19.430Z",
+      "amount": 950,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "fin_2",
+      "name": "Expense 94",
+      "category": "FACILITIES_LEASE",
+      "merchant": "Uber",
+      "date": "2026-05-09T01:36:49.093Z",
+      "amount": 1322,
+      "status": "APPROVED"
+    },
+    {
+      "employeeKey": "eng_5",
+      "name": "Expense 95",
+      "category": "OFFICE_SUPPLIES",
+      "merchant": "Microsoft",
+      "date": "2026-07-12T12:08:18.778Z",
+      "amount": 491,
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "eng_7",
+      "name": "Expense 96",
+      "category": "FACILITIES_LEASE",
+      "merchant": "Amazon",
+      "date": "2026-04-26T23:09:15.806Z",
+      "amount": 341,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "sales_3",
+      "name": "Expense 97",
+      "category": "FACILITIES_LEASE",
+      "merchant": "Uber",
+      "date": "2026-06-12T11:50:40.238Z",
+      "amount": 890,
+      "status": "APPROVED"
+    },
+    {
+      "employeeKey": "eng_9",
+      "name": "Expense 98",
+      "category": "OFFICE_SUPPLIES",
+      "merchant": "Uber",
+      "date": "2026-02-01T23:42:34.007Z",
+      "amount": 1423,
+      "status": "PROCESSING"
+    },
+    {
+      "employeeKey": "eng_15",
+      "name": "Expense 99",
+      "category": "FACILITIES_LEASE",
+      "merchant": "Google Cloud",
+      "date": "2026-05-14T05:54:29.464Z",
+      "amount": 1849,
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "eng_12",
+      "name": "Expense 100",
+      "category": "FACILITIES_LEASE",
+      "merchant": "Microsoft",
+      "date": "2026-01-28T21:14:34.987Z",
+      "amount": 981,
+      "status": "APPROVED"
+    }
+  ],
+  "roadmapPhases": [
+    {
+      "title": "Q1 Planning",
+      "sortOrder": 0,
+      "tasks": [
+        {
+          "title": "Strategic Goal 1 in Q1 Planning",
+          "statusLabel": "Completed",
+          "progressPct": 57,
+          "startDate": "2026-02-18T06:22:03.939Z",
+          "endDate": "2026-08-26T01:03:09.534Z"
+        },
+        {
+          "title": "Strategic Goal 2 in Q1 Planning",
+          "statusLabel": "In Progress",
+          "progressPct": 48,
+          "startDate": "2026-08-13T17:43:52.548Z",
+          "endDate": "2026-08-27T11:52:53.918Z"
+        },
+        {
+          "title": "Strategic Goal 3 in Q1 Planning",
+          "statusLabel": "Completed",
+          "progressPct": 8,
+          "startDate": "2026-07-12T00:56:57.272Z",
+          "endDate": "2026-08-22T15:57:12.354Z"
+        },
+        {
+          "title": "Strategic Goal 4 in Q1 Planning",
+          "statusLabel": "Completed",
+          "progressPct": 52,
+          "startDate": "2026-04-13T22:53:38.867Z",
+          "endDate": "2026-08-30T21:56:50.236Z"
+        },
+        {
+          "title": "Strategic Goal 5 in Q1 Planning",
+          "statusLabel": "Planned",
+          "progressPct": 91,
+          "startDate": "2026-02-27T04:15:14.782Z",
+          "endDate": "2026-08-26T06:13:00.725Z"
+        },
+        {
+          "title": "Strategic Goal 6 in Q1 Planning",
+          "statusLabel": "In Progress",
+          "progressPct": 73,
+          "startDate": "2026-02-25T09:25:26.656Z",
+          "endDate": "2026-08-30T00:39:26.063Z"
+        }
+      ]
+    },
+    {
+      "title": "Q2 Execution",
+      "sortOrder": 1,
+      "tasks": [
+        {
+          "title": "Strategic Goal 1 in Q2 Execution",
+          "statusLabel": "In Progress",
+          "progressPct": 61,
+          "startDate": "2026-08-04T08:03:55.085Z",
+          "endDate": "2026-08-25T06:30:45.374Z"
+        },
+        {
+          "title": "Strategic Goal 2 in Q2 Execution",
+          "statusLabel": "Completed",
+          "progressPct": 89,
+          "startDate": "2026-07-20T12:55:20.598Z",
+          "endDate": "2026-08-29T16:38:50.140Z"
+        },
+        {
+          "title": "Strategic Goal 3 in Q2 Execution",
+          "statusLabel": "In Progress",
+          "progressPct": 36,
+          "startDate": "2026-05-03T23:24:35.260Z",
+          "endDate": "2026-08-29T22:23:10.441Z"
+        },
+        {
+          "title": "Strategic Goal 4 in Q2 Execution",
+          "statusLabel": "Planned",
+          "progressPct": 78,
+          "startDate": "2026-05-01T09:05:08.176Z",
+          "endDate": "2026-08-23T02:58:07.155Z"
+        },
+        {
+          "title": "Strategic Goal 5 in Q2 Execution",
+          "statusLabel": "In Progress",
+          "progressPct": 4,
+          "startDate": "2026-05-20T04:15:36.760Z",
+          "endDate": "2026-08-23T01:57:01.532Z"
+        },
+        {
+          "title": "Strategic Goal 6 in Q2 Execution",
+          "statusLabel": "In Progress",
+          "progressPct": 23,
+          "startDate": "2026-04-21T19:44:27.374Z",
+          "endDate": "2026-08-28T22:22:02.453Z"
+        },
+        {
+          "title": "Strategic Goal 7 in Q2 Execution",
+          "statusLabel": "Completed",
+          "progressPct": 34,
+          "startDate": "2026-07-05T22:23:24.542Z",
+          "endDate": "2026-08-24T13:49:42.566Z"
+        }
+      ]
+    },
+    {
+      "title": "Q3 Expansion",
+      "sortOrder": 2,
+      "tasks": [
+        {
+          "title": "Strategic Goal 1 in Q3 Expansion",
+          "statusLabel": "Planned",
+          "progressPct": 33,
+          "startDate": "2026-05-29T06:43:34.727Z",
+          "endDate": "2026-08-31T01:23:02.984Z"
+        },
+        {
+          "title": "Strategic Goal 2 in Q3 Expansion",
+          "statusLabel": "In Progress",
+          "progressPct": 9,
+          "startDate": "2026-08-19T09:35:32.711Z",
+          "endDate": "2026-08-28T18:11:59.674Z"
+        },
+        {
+          "title": "Strategic Goal 3 in Q3 Expansion",
+          "statusLabel": "In Progress",
+          "progressPct": 79,
+          "startDate": "2026-03-07T01:53:47.058Z",
+          "endDate": "2026-08-22T00:00:18.728Z"
+        },
+        {
+          "title": "Strategic Goal 4 in Q3 Expansion",
+          "statusLabel": "In Progress",
+          "progressPct": 34,
+          "startDate": "2026-04-08T20:50:05.011Z",
+          "endDate": "2026-08-25T10:10:00.648Z"
+        },
+        {
+          "title": "Strategic Goal 5 in Q3 Expansion",
+          "statusLabel": "Completed",
+          "progressPct": 55,
+          "startDate": "2026-05-03T21:02:51.375Z",
+          "endDate": "2026-08-26T07:39:02.610Z"
+        },
+        {
+          "title": "Strategic Goal 6 in Q3 Expansion",
+          "statusLabel": "Planned",
+          "progressPct": 53,
+          "startDate": "2026-03-05T16:30:26.267Z",
+          "endDate": "2026-08-22T09:54:45.703Z"
+        },
+        {
+          "title": "Strategic Goal 7 in Q3 Expansion",
+          "statusLabel": "Completed",
+          "progressPct": 2,
+          "startDate": "2026-04-06T05:37:17.069Z",
+          "endDate": "2026-08-26T19:57:17.891Z"
+        },
+        {
+          "title": "Strategic Goal 8 in Q3 Expansion",
+          "statusLabel": "Completed",
+          "progressPct": 79,
+          "startDate": "2026-01-08T10:39:08.898Z",
+          "endDate": "2026-08-30T13:58:06.307Z"
+        }
+      ]
+    },
+    {
+      "title": "Q4 Review",
+      "sortOrder": 3,
+      "tasks": [
+        {
+          "title": "Strategic Goal 1 in Q4 Review",
+          "statusLabel": "Planned",
+          "progressPct": 6,
+          "startDate": "2026-06-23T16:15:55.597Z",
+          "endDate": "2026-08-30T04:49:03.755Z"
+        },
+        {
+          "title": "Strategic Goal 2 in Q4 Review",
+          "statusLabel": "In Progress",
+          "progressPct": 79,
+          "startDate": "2026-06-13T03:20:13.743Z",
+          "endDate": "2026-08-22T12:51:57.279Z"
+        },
+        {
+          "title": "Strategic Goal 3 in Q4 Review",
+          "statusLabel": "Planned",
+          "progressPct": 100,
+          "startDate": "2026-02-20T03:04:50.035Z",
+          "endDate": "2026-08-22T04:48:25.107Z"
+        }
+      ]
+    }
+  ],
+  "sprints": [
+    {
+      "name": "Sprint 1",
+      "completionPct": 30,
+      "endsAt": "2026-08-27T17:23:06.977Z",
+      "issues": [
+        {
+          "title": "JIRA-256",
+          "type": "STORY",
+          "status": "DONE",
+          "priority": "HIGH",
+          "storyPoints": 3
+        },
+        {
+          "title": "JIRA-257",
+          "type": "BUG",
+          "status": "IN_REVIEW",
+          "priority": "MEDIUM",
+          "storyPoints": 8
+        },
+        {
+          "title": "JIRA-794",
+          "type": "TASK",
+          "status": "IN_REVIEW",
+          "priority": "LOW",
+          "storyPoints": 3
+        },
+        {
+          "title": "JIRA-295",
+          "type": "BUG",
+          "status": "DONE",
+          "priority": "LOW",
+          "storyPoints": 5
+        },
+        {
+          "title": "JIRA-123",
+          "type": "BUG",
+          "status": "IN_PROGRESS",
+          "priority": "HIGH",
+          "storyPoints": 2
+        },
+        {
+          "title": "JIRA-599",
+          "type": "STORY",
+          "status": "DONE",
+          "priority": "HIGH",
+          "storyPoints": 8
+        },
+        {
+          "title": "JIRA-223",
+          "type": "TASK",
+          "status": "DONE",
+          "priority": "LOW",
+          "storyPoints": 5
+        },
+        {
+          "title": "JIRA-539",
+          "type": "TASK",
+          "status": "DONE",
+          "priority": "MEDIUM",
+          "storyPoints": 3
+        }
+      ]
+    },
+    {
+      "name": "Sprint 2",
+      "completionPct": 50,
+      "endsAt": "2026-08-26T19:10:28.414Z",
+      "issues": [
+        {
+          "title": "JIRA-338",
+          "type": "STORY",
+          "status": "IN_PROGRESS",
+          "priority": "LOW",
+          "storyPoints": 8
+        },
+        {
+          "title": "JIRA-832",
+          "type": "TASK",
+          "status": "DONE",
+          "priority": "HIGH",
+          "storyPoints": 5
+        },
+        {
+          "title": "JIRA-534",
+          "type": "TASK",
+          "status": "IN_REVIEW",
+          "priority": "HIGH",
+          "storyPoints": 3
+        },
+        {
+          "title": "JIRA-768",
+          "type": "TASK",
+          "status": "DONE",
+          "priority": "HIGH",
+          "storyPoints": 5
+        },
+        {
+          "title": "JIRA-829",
+          "type": "BUG",
+          "status": "IN_REVIEW",
+          "priority": "HIGH",
+          "storyPoints": 2
+        },
+        {
+          "title": "JIRA-322",
+          "type": "BUG",
+          "status": "IN_PROGRESS",
+          "priority": "HIGH",
+          "storyPoints": 2
+        },
+        {
+          "title": "JIRA-178",
+          "type": "BUG",
+          "status": "TODO",
+          "priority": "HIGH",
+          "storyPoints": 5
+        },
+        {
+          "title": "JIRA-204",
+          "type": "TASK",
+          "status": "IN_PROGRESS",
+          "priority": "HIGH",
+          "storyPoints": 3
+        },
+        {
+          "title": "JIRA-684",
+          "type": "TASK",
+          "status": "DONE",
+          "priority": "MEDIUM",
+          "storyPoints": 2
+        },
+        {
+          "title": "JIRA-798",
+          "type": "BUG",
+          "status": "DONE",
+          "priority": "HIGH",
+          "storyPoints": 2
+        },
+        {
+          "title": "JIRA-299",
+          "type": "STORY",
+          "status": "TODO",
+          "priority": "LOW",
+          "storyPoints": 5
+        },
+        {
+          "title": "JIRA-473",
+          "type": "STORY",
+          "status": "IN_PROGRESS",
+          "priority": "HIGH",
+          "storyPoints": 8
+        },
+        {
+          "title": "JIRA-471",
+          "type": "STORY",
+          "status": "IN_PROGRESS",
+          "priority": "LOW",
+          "storyPoints": 3
+        }
+      ]
+    },
+    {
+      "name": "Sprint 3",
+      "completionPct": 16,
+      "endsAt": "2026-08-31T04:47:23.116Z",
+      "issues": [
+        {
+          "title": "JIRA-965",
+          "type": "STORY",
+          "status": "IN_REVIEW",
+          "priority": "LOW",
+          "storyPoints": 8
+        },
+        {
+          "title": "JIRA-642",
+          "type": "BUG",
+          "status": "IN_REVIEW",
+          "priority": "MEDIUM",
+          "storyPoints": 1
+        },
+        {
+          "title": "JIRA-343",
+          "type": "STORY",
+          "status": "IN_REVIEW",
+          "priority": "HIGH",
+          "storyPoints": 8
+        },
+        {
+          "title": "JIRA-222",
+          "type": "STORY",
+          "status": "TODO",
+          "priority": "LOW",
+          "storyPoints": 1
+        },
+        {
+          "title": "JIRA-173",
+          "type": "TASK",
+          "status": "IN_REVIEW",
+          "priority": "HIGH",
+          "storyPoints": 2
+        },
+        {
+          "title": "JIRA-549",
+          "type": "BUG",
+          "status": "DONE",
+          "priority": "LOW",
+          "storyPoints": 3
+        },
+        {
+          "title": "JIRA-544",
+          "type": "BUG",
+          "status": "DONE",
+          "priority": "MEDIUM",
+          "storyPoints": 3
+        },
+        {
+          "title": "JIRA-938",
+          "type": "TASK",
+          "status": "IN_PROGRESS",
+          "priority": "LOW",
+          "storyPoints": 5
+        },
+        {
+          "title": "JIRA-362",
+          "type": "TASK",
+          "status": "IN_PROGRESS",
+          "priority": "HIGH",
+          "storyPoints": 3
+        },
+        {
+          "title": "JIRA-427",
+          "type": "STORY",
+          "status": "DONE",
+          "priority": "LOW",
+          "storyPoints": 5
+        },
+        {
+          "title": "JIRA-200",
+          "type": "STORY",
+          "status": "TODO",
+          "priority": "LOW",
+          "storyPoints": 5
+        },
+        {
+          "title": "JIRA-202",
+          "type": "STORY",
+          "status": "DONE",
+          "priority": "HIGH",
+          "storyPoints": 1
+        },
+        {
+          "title": "JIRA-485",
+          "type": "STORY",
+          "status": "TODO",
+          "priority": "LOW",
+          "storyPoints": 5
+        },
+        {
+          "title": "JIRA-580",
+          "type": "TASK",
+          "status": "TODO",
+          "priority": "HIGH",
+          "storyPoints": 8
+        },
+        {
+          "title": "JIRA-170",
+          "type": "TASK",
+          "status": "IN_REVIEW",
+          "priority": "LOW",
+          "storyPoints": 3
+        }
+      ]
+    },
+    {
+      "name": "Sprint 4",
+      "completionPct": 69,
+      "endsAt": "2026-08-24T08:55:47.037Z",
+      "issues": [
+        {
+          "title": "JIRA-343",
+          "type": "STORY",
+          "status": "IN_REVIEW",
+          "priority": "LOW",
+          "storyPoints": 8
+        },
+        {
+          "title": "JIRA-156",
+          "type": "TASK",
+          "status": "IN_PROGRESS",
+          "priority": "LOW",
+          "storyPoints": 3
+        },
+        {
+          "title": "JIRA-484",
+          "type": "TASK",
+          "status": "IN_REVIEW",
+          "priority": "MEDIUM",
+          "storyPoints": 1
+        },
+        {
+          "title": "JIRA-356",
+          "type": "STORY",
+          "status": "TODO",
+          "priority": "HIGH",
+          "storyPoints": 2
+        },
+        {
+          "title": "JIRA-435",
+          "type": "BUG",
+          "status": "DONE",
+          "priority": "LOW",
+          "storyPoints": 5
+        },
+        {
+          "title": "JIRA-656",
+          "type": "STORY",
+          "status": "IN_PROGRESS",
+          "priority": "HIGH",
+          "storyPoints": 1
+        },
+        {
+          "title": "JIRA-855",
+          "type": "BUG",
+          "status": "IN_REVIEW",
+          "priority": "HIGH",
+          "storyPoints": 3
+        },
+        {
+          "title": "JIRA-518",
+          "type": "BUG",
+          "status": "TODO",
+          "priority": "MEDIUM",
+          "storyPoints": 1
+        },
+        {
+          "title": "JIRA-426",
+          "type": "STORY",
+          "status": "IN_PROGRESS",
+          "priority": "LOW",
+          "storyPoints": 8
+        },
+        {
+          "title": "JIRA-191",
+          "type": "TASK",
+          "status": "IN_REVIEW",
+          "priority": "HIGH",
+          "storyPoints": 3
+        },
+        {
+          "title": "JIRA-642",
+          "type": "STORY",
+          "status": "TODO",
+          "priority": "MEDIUM",
+          "storyPoints": 3
+        },
+        {
+          "title": "JIRA-167",
+          "type": "STORY",
+          "status": "IN_REVIEW",
+          "priority": "LOW",
+          "storyPoints": 1
+        },
+        {
+          "title": "JIRA-520",
+          "type": "TASK",
+          "status": "DONE",
+          "priority": "HIGH",
+          "storyPoints": 8
+        },
+        {
+          "title": "JIRA-604",
+          "type": "BUG",
+          "status": "TODO",
+          "priority": "LOW",
+          "storyPoints": 2
+        },
+        {
+          "title": "JIRA-353",
+          "type": "BUG",
+          "status": "IN_REVIEW",
+          "priority": "LOW",
+          "storyPoints": 5
+        }
+      ]
+    },
+    {
+      "name": "Sprint 5",
+      "completionPct": 87,
+      "endsAt": "2026-08-28T13:26:52.618Z",
+      "issues": [
+        {
+          "title": "JIRA-318",
+          "type": "STORY",
+          "status": "DONE",
+          "priority": "MEDIUM",
+          "storyPoints": 5
+        },
+        {
+          "title": "JIRA-788",
+          "type": "STORY",
+          "status": "DONE",
+          "priority": "HIGH",
+          "storyPoints": 5
+        },
+        {
+          "title": "JIRA-657",
+          "type": "STORY",
+          "status": "DONE",
+          "priority": "MEDIUM",
+          "storyPoints": 3
+        },
+        {
+          "title": "JIRA-355",
+          "type": "TASK",
+          "status": "DONE",
+          "priority": "LOW",
+          "storyPoints": 5
+        },
+        {
+          "title": "JIRA-654",
+          "type": "TASK",
+          "status": "TODO",
+          "priority": "HIGH",
+          "storyPoints": 1
+        },
+        {
+          "title": "JIRA-745",
+          "type": "STORY",
+          "status": "IN_PROGRESS",
+          "priority": "HIGH",
+          "storyPoints": 1
+        },
+        {
+          "title": "JIRA-816",
+          "type": "BUG",
+          "status": "IN_REVIEW",
+          "priority": "MEDIUM",
+          "storyPoints": 3
+        },
+        {
+          "title": "JIRA-573",
+          "type": "BUG",
+          "status": "IN_REVIEW",
+          "priority": "LOW",
+          "storyPoints": 2
+        },
+        {
+          "title": "JIRA-429",
+          "type": "STORY",
+          "status": "IN_PROGRESS",
+          "priority": "LOW",
+          "storyPoints": 3
+        },
+        {
+          "title": "JIRA-867",
+          "type": "TASK",
+          "status": "TODO",
+          "priority": "LOW",
+          "storyPoints": 5
+        },
+        {
+          "title": "JIRA-986",
+          "type": "BUG",
+          "status": "DONE",
+          "priority": "HIGH",
+          "storyPoints": 8
+        },
+        {
+          "title": "JIRA-447",
+          "type": "STORY",
+          "status": "IN_REVIEW",
+          "priority": "LOW",
+          "storyPoints": 8
+        },
+        {
+          "title": "JIRA-184",
+          "type": "STORY",
+          "status": "IN_PROGRESS",
+          "priority": "LOW",
+          "storyPoints": 3
+        },
+        {
+          "title": "JIRA-439",
+          "type": "STORY",
+          "status": "TODO",
+          "priority": "MEDIUM",
+          "storyPoints": 8
+        }
+      ]
+    }
+  ],
+  "cashFlowSnapshots": [
+    {
+      "month": "Jan",
+      "inflow": 83364,
+      "outflow": 124705,
+      "net": -41341
+    },
+    {
+      "month": "Feb",
+      "inflow": 74925,
+      "outflow": 31442,
+      "net": 43483
+    },
+    {
+      "month": "Mar",
+      "inflow": 248891,
+      "outflow": 55236,
+      "net": 193655
+    },
+    {
+      "month": "Apr",
+      "inflow": 243989,
+      "outflow": 55395,
+      "net": 188594
+    },
+    {
+      "month": "May",
+      "inflow": 247530,
+      "outflow": 33854,
+      "net": 213676
+    },
+    {
+      "month": "Jun",
+      "inflow": 77331,
+      "outflow": 82082,
+      "net": -4751
+    },
+    {
+      "month": "Jul",
+      "inflow": 190466,
+      "outflow": 63102,
+      "net": 127364
+    },
+    {
+      "month": "Aug",
+      "inflow": 217003,
+      "outflow": 37993,
+      "net": 179010
+    }
+  ],
+  "ledgerTransactions": [
+    {
+      "date": "2026-03-13T04:43:16.887Z",
+      "description": "Payment from Hooli",
+      "amount": 696,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-08-19T21:41:31.766Z",
+      "description": "Payment from Stark Industries",
+      "amount": 10669,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-05-20T22:34:41.430Z",
+      "description": "Payment to Salesforce",
+      "amount": 10556,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-08-13T02:43:43.809Z",
+      "description": "Payment to Salesforce",
+      "amount": 4970,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-04-10T15:24:29.249Z",
+      "description": "Payment to Google Workspace",
+      "amount": 507,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-01-13T23:13:23.975Z",
+      "description": "Payment from Globex",
+      "amount": 6887,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-01-08T16:51:47.327Z",
+      "description": "Payment from Wayne Enterprises",
+      "amount": 11860,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-05-09T23:14:45.202Z",
+      "description": "Payment to Google Workspace",
+      "amount": 10496,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-05-26T19:34:55.286Z",
+      "description": "Payment from Wayne Enterprises",
+      "amount": 9427,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-08-08T03:36:44.168Z",
+      "description": "Payment from Stark Industries",
+      "amount": 6830,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-01-03T02:22:49.246Z",
+      "description": "Payment to Google Workspace",
+      "amount": 6637,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-03-28T01:40:59.451Z",
+      "description": "Payment to GCP",
+      "amount": 13683,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-03-15T04:04:07.520Z",
+      "description": "Payment to GCP",
+      "amount": 3917,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-07-28T05:16:46.977Z",
+      "description": "Payment to Salesforce",
+      "amount": 6609,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-07-17T10:02:30.273Z",
+      "description": "Payment to AWS",
+      "amount": 12503,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-07-10T06:58:17.419Z",
+      "description": "Payment from Acme Corp",
+      "amount": 12386,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-04-24T09:27:19.790Z",
+      "description": "Payment from Cyberdyne",
+      "amount": 4731,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-03-29T01:13:06.067Z",
+      "description": "Payment from Belson",
+      "amount": 8402,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-03-10T13:46:51.883Z",
+      "description": "Payment to Google Workspace",
+      "amount": 999,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-01-06T13:18:44.435Z",
+      "description": "Payment from Initech",
+      "amount": 10997,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-05-23T12:08:35.966Z",
+      "description": "Payment from Aperture Science",
+      "amount": 1336,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-06-23T08:21:13.695Z",
+      "description": "Payment from Stark Industries",
+      "amount": 4065,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-04-26T01:00:57.379Z",
+      "description": "Payment to GCP",
+      "amount": 10134,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-04-20T14:08:14.825Z",
+      "description": "Payment from Pied Piper",
+      "amount": 7864,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-06-17T11:38:59.872Z",
+      "description": "Payment from Black Mesa",
+      "amount": 6342,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-03-14T01:58:32.403Z",
+      "description": "Payment to Google Workspace",
+      "amount": 8076,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-03-14T20:24:54.403Z",
+      "description": "Payment from Belson",
+      "amount": 9313,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-07-01T18:13:40.829Z",
+      "description": "Payment from Soylent Corp",
+      "amount": 3752,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-06-14T13:46:57.427Z",
+      "description": "Payment to Google Workspace",
+      "amount": 12398,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-04-17T19:32:21.329Z",
+      "description": "Payment from Endframe",
+      "amount": 2387,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-06-18T20:16:13.877Z",
+      "description": "Payment to Salesforce",
+      "amount": 5784,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-05-09T05:43:32.392Z",
+      "description": "Payment to Salesforce",
+      "amount": 1487,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-03-23T23:07:48.617Z",
+      "description": "Payment to Google Workspace",
+      "amount": 4619,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-03-23T22:37:41.497Z",
+      "description": "Payment from Raviga",
+      "amount": 648,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-04-21T13:21:38.436Z",
+      "description": "Payment to AWS",
+      "amount": 10982,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-08-07T17:15:16.611Z",
+      "description": "Payment to Google Workspace",
+      "amount": 13148,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-07-04T04:47:52.374Z",
+      "description": "Payment to AWS",
+      "amount": 7349,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-06-13T18:40:29.884Z",
+      "description": "Payment to AWS",
+      "amount": 887,
+      "status": "CLEARED",
+      "isCredit": false
+    },
+    {
+      "date": "2026-05-09T19:05:13.599Z",
+      "description": "Payment from Aperture Science",
+      "amount": 11031,
+      "status": "CLEARED",
+      "isCredit": true
+    },
+    {
+      "date": "2026-05-30T11:00:05.122Z",
+      "description": "Payment from Initech",
+      "amount": 13797,
+      "status": "CLEARED",
+      "isCredit": true
+    }
+  ],
+  "candidates": [
+    {
+      "name": "Candidate 1",
+      "role": "Software Engineer",
+      "stage": "OFFER_SENT",
+      "timeInStage": "1 day",
+      "appliedAt": "2026-08-11T08:20:14.610Z",
+      "source": "LinkedIn",
+      "currentRole": "Sales Associate",
+      "experience": "5 years",
+      "location": "Remote",
+      "email": "candidate1@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via LinkedIn",
+          "createdAt": "2026-08-11T08:20:14.610Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 2",
+      "role": "Product Manager",
+      "stage": "FINAL_INTERVIEW",
+      "timeInStage": "10 days",
+      "appliedAt": "2026-08-05T02:05:07.754Z",
+      "source": "LinkedIn",
+      "currentRole": "Senior PM",
+      "experience": "3 years",
+      "location": "San Francisco",
+      "email": "candidate2@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via LinkedIn",
+          "createdAt": "2026-08-05T02:05:07.754Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 3",
+      "role": "Designer",
+      "stage": "TECH_INTERVIEW",
+      "timeInStage": "2 days",
+      "appliedAt": "2026-08-15T15:06:15.988Z",
+      "source": "LinkedIn",
+      "currentRole": "Senior PM",
+      "experience": "5 years",
+      "location": "New York",
+      "email": "candidate3@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via LinkedIn",
+          "createdAt": "2026-08-15T15:06:15.988Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 4",
+      "role": "Designer",
+      "stage": "SCREENING",
+      "timeInStage": "3 days",
+      "appliedAt": "2026-08-16T01:00:53.888Z",
+      "source": "LinkedIn",
+      "currentRole": "UI Designer",
+      "experience": "3 years",
+      "location": "Remote",
+      "email": "candidate4@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via LinkedIn",
+          "createdAt": "2026-08-16T01:00:53.888Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 5",
+      "role": "Designer",
+      "stage": "HIRED",
+      "timeInStage": "28 days",
+      "appliedAt": "2026-07-10T01:11:59.897Z",
+      "source": "LinkedIn",
+      "currentRole": "Junior Developer",
+      "experience": "5 years",
+      "location": "San Francisco",
+      "email": "candidate5@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via LinkedIn",
+          "createdAt": "2026-07-10T01:11:59.897Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 6",
+      "role": "Software Engineer",
+      "stage": "TECH_INTERVIEW",
+      "timeInStage": "11 days",
+      "appliedAt": "2026-08-05T09:47:20.560Z",
+      "source": "Indeed",
+      "currentRole": "Junior Developer",
+      "experience": "9 years",
+      "location": "New York",
+      "email": "candidate6@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via Indeed",
+          "createdAt": "2026-08-05T09:47:20.560Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 7",
+      "role": "Product Manager",
+      "stage": "TECH_INTERVIEW",
+      "timeInStage": "7 days",
+      "appliedAt": "2026-08-10T19:09:17.380Z",
+      "source": "Careers Page",
+      "currentRole": "Sales Associate",
+      "experience": "4 years",
+      "location": "London",
+      "email": "candidate7@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via Careers Page",
+          "createdAt": "2026-08-10T19:09:17.380Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 8",
+      "role": "Designer",
+      "stage": "APPLIED",
+      "timeInStage": "0 days",
+      "appliedAt": "2026-08-21T08:55:19.600Z",
+      "source": "Indeed",
+      "currentRole": "Junior Developer",
+      "experience": "9 years",
+      "location": "New York",
+      "email": "candidate8@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via Indeed",
+          "createdAt": "2026-08-21T08:55:19.600Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 9",
+      "role": "Software Engineer",
+      "stage": "TECH_INTERVIEW",
+      "timeInStage": "7 days",
+      "appliedAt": "2026-08-05T14:42:52.886Z",
+      "source": "Careers Page",
+      "currentRole": "Sales Associate",
+      "experience": "3 years",
+      "location": "Remote",
+      "email": "candidate9@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via Careers Page",
+          "createdAt": "2026-08-05T14:42:52.886Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 10",
+      "role": "Software Engineer",
+      "stage": "SCREENING",
+      "timeInStage": "13 days",
+      "appliedAt": "2026-07-29T02:27:07.285Z",
+      "source": "Indeed",
+      "currentRole": "UI Designer",
+      "experience": "4 years",
+      "location": "San Francisco",
+      "email": "candidate10@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via Indeed",
+          "createdAt": "2026-07-29T02:27:07.285Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 11",
+      "role": "Product Manager",
+      "stage": "HIRED",
+      "timeInStage": "22 days",
+      "appliedAt": "2026-07-22T19:00:38.165Z",
+      "source": "Referral",
+      "currentRole": "Senior PM",
+      "experience": "4 years",
+      "location": "Remote",
+      "email": "candidate11@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via Referral",
+          "createdAt": "2026-07-22T19:00:38.165Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 12",
+      "role": "Software Engineer",
+      "stage": "TECH_INTERVIEW",
+      "timeInStage": "4 days",
+      "appliedAt": "2026-08-08T01:39:33.708Z",
+      "source": "Careers Page",
+      "currentRole": "Junior Developer",
+      "experience": "5 years",
+      "location": "London",
+      "email": "candidate12@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via Careers Page",
+          "createdAt": "2026-08-08T01:39:33.708Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 13",
+      "role": "Software Engineer",
+      "stage": "OFFER_SENT",
+      "timeInStage": "3 days",
+      "appliedAt": "2026-07-24T10:27:13.183Z",
+      "source": "Referral",
+      "currentRole": "Sales Associate",
+      "experience": "8 years",
+      "location": "San Francisco",
+      "email": "candidate13@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via Referral",
+          "createdAt": "2026-07-24T10:27:13.183Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 14",
+      "role": "Sales Representative",
+      "stage": "TECH_INTERVIEW",
+      "timeInStage": "7 days",
+      "appliedAt": "2026-07-30T03:33:19.002Z",
+      "source": "Indeed",
+      "currentRole": "UI Designer",
+      "experience": "9 years",
+      "location": "San Francisco",
+      "email": "candidate14@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via Indeed",
+          "createdAt": "2026-07-30T03:33:19.002Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 15",
+      "role": "Designer",
+      "stage": "SCREENING",
+      "timeInStage": "3 days",
+      "appliedAt": "2026-08-10T07:07:54.589Z",
+      "source": "Careers Page",
+      "currentRole": "UI Designer",
+      "experience": "6 years",
+      "location": "London",
+      "email": "candidate15@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via Careers Page",
+          "createdAt": "2026-08-10T07:07:54.589Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 16",
+      "role": "Designer",
+      "stage": "APPLIED",
+      "timeInStage": "1 day",
+      "appliedAt": "2026-08-20T15:52:28.272Z",
+      "source": "Careers Page",
+      "currentRole": "Junior Developer",
+      "experience": "5 years",
+      "location": "New York",
+      "email": "candidate16@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via Careers Page",
+          "createdAt": "2026-08-20T15:52:28.272Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 17",
+      "role": "Software Engineer",
+      "stage": "FINAL_INTERVIEW",
+      "timeInStage": "1 day",
+      "appliedAt": "2026-08-20T01:24:02.947Z",
+      "source": "Referral",
+      "currentRole": "Junior Developer",
+      "experience": "3 years",
+      "location": "Remote",
+      "email": "candidate17@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via Referral",
+          "createdAt": "2026-08-20T01:24:02.947Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 18",
+      "role": "Software Engineer",
+      "stage": "HIRED",
+      "timeInStage": "31 days",
+      "appliedAt": "2026-07-11T09:08:44.197Z",
+      "source": "Indeed",
+      "currentRole": "Sales Associate",
+      "experience": "10 years",
+      "location": "London",
+      "email": "candidate18@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via Indeed",
+          "createdAt": "2026-07-11T09:08:44.197Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 19",
+      "role": "Sales Representative",
+      "stage": "REJECTED",
+      "timeInStage": "7 days",
+      "appliedAt": "2026-06-23T09:20:28.871Z",
+      "source": "Careers Page",
+      "currentRole": "Sales Associate",
+      "experience": "6 years",
+      "location": "London",
+      "email": "candidate19@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via Careers Page",
+          "createdAt": "2026-06-23T09:20:28.871Z"
+        }
+      ]
+    },
+    {
+      "name": "Candidate 20",
+      "role": "Product Manager",
+      "stage": "APPLIED",
+      "timeInStage": "0 days",
+      "appliedAt": "2026-08-21T09:23:48.326Z",
+      "source": "Referral",
+      "currentRole": "Senior PM",
+      "experience": "3 years",
+      "location": "New York",
+      "email": "candidate20@example.com",
+      "education": "BS Computer Science",
+      "resumeUrl": "resume.pdf",
+      "activities": [
+        {
+          "action": "Application Submitted",
+          "description": "Applied via Referral",
+          "createdAt": "2026-08-21T09:23:48.326Z"
+        }
+      ]
+    }
+  ],
+  "timesheets": [
+    {
+      "employeeKey": "ceo",
+      "weekStart": "2026-08-03T05:03:51.084Z",
+      "regularHours": 40,
+      "overtimeHours": 1.2,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:16 AM",
+          "clockOut": "05:19 PM",
+          "totalHours": 8.1
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "09:02 AM",
+          "clockOut": "05:09 PM",
+          "totalHours": 8.1
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "09:01 AM",
+          "clockOut": "05:17 PM",
+          "totalHours": 8.3
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "08:45 AM",
+          "clockOut": "05:26 PM",
+          "totalHours": 8.7
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "08:49 AM",
+          "clockOut": "04:47 PM",
+          "totalHours": 8
+        }
+      ]
+    },
+    {
+      "employeeKey": "cto",
+      "weekStart": "2026-07-27T01:07:03.954Z",
+      "regularHours": 39.7,
+      "overtimeHours": 0.9,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:02 AM",
+          "clockOut": "04:42 PM",
+          "totalHours": 7.7
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "09:01 AM",
+          "clockOut": "05:20 PM",
+          "totalHours": 8.3
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "08:54 AM",
+          "clockOut": "05:12 PM",
+          "totalHours": 8.3
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "08:59 AM",
+          "clockOut": "05:08 PM",
+          "totalHours": 8.2
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:09 AM",
+          "clockOut": "05:12 PM",
+          "totalHours": 8.1
+        }
+      ]
+    },
+    {
+      "employeeKey": "cfo",
+      "weekStart": "2026-08-01T20:01:42.729Z",
+      "regularHours": 38.6,
+      "overtimeHours": 1.2,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:09 AM",
+          "clockOut": "05:29 PM",
+          "totalHours": 8.3
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "08:53 AM",
+          "clockOut": "05:30 PM",
+          "totalHours": 8.6
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "09:59 AM",
+          "clockOut": "05:21 PM",
+          "totalHours": 7.4
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:54 AM",
+          "clockOut": "05:04 PM",
+          "totalHours": 7.2
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:07 AM",
+          "clockOut": "05:22 PM",
+          "totalHours": 8.3
+        }
+      ]
+    },
+    {
+      "employeeKey": "cro",
+      "weekStart": "2026-07-30T00:35:52.876Z",
+      "regularHours": 39,
+      "overtimeHours": 0.3,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:03 AM",
+          "clockOut": "05:01 PM",
+          "totalHours": 8
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "09:50 AM",
+          "clockOut": "05:26 PM",
+          "totalHours": 7.6
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "08:52 AM",
+          "clockOut": "05:02 PM",
+          "totalHours": 8.2
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:09 AM",
+          "clockOut": "05:15 PM",
+          "totalHours": 8.1
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:33 AM",
+          "clockOut": "04:57 PM",
+          "totalHours": 7.4
+        }
+      ]
+    },
+    {
+      "employeeKey": "eng_1",
+      "weekStart": "2026-08-09T01:54:33.324Z",
+      "regularHours": 40,
+      "overtimeHours": 3,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "08:48 AM",
+          "clockOut": "05:23 PM",
+          "totalHours": 8.6
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "08:53 AM",
+          "clockOut": "05:18 PM",
+          "totalHours": 8.4
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "08:47 AM",
+          "clockOut": "06:32 PM",
+          "totalHours": 9.8
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:03 AM",
+          "clockOut": "05:12 PM",
+          "totalHours": 8.2
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:20 AM",
+          "clockOut": "05:18 PM",
+          "totalHours": 8
+        }
+      ]
+    },
+    {
+      "employeeKey": "eng_2",
+      "weekStart": "2026-07-29T11:51:48.140Z",
+      "regularHours": 39.2,
+      "overtimeHours": 5.2,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:49 AM",
+          "clockOut": "05:05 PM",
+          "totalHours": 7.3
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "09:06 AM",
+          "clockOut": "05:01 PM",
+          "totalHours": 7.9
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "09:05 AM",
+          "clockOut": "08:45 PM",
+          "totalHours": 11.7
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:02 AM",
+          "clockOut": "06:28 PM",
+          "totalHours": 9.4
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "08:53 AM",
+          "clockOut": "04:58 PM",
+          "totalHours": 8.1
+        }
+      ]
+    },
+    {
+      "employeeKey": "eng_3",
+      "weekStart": "2026-08-09T20:39:06.875Z",
+      "regularHours": 38.6,
+      "overtimeHours": 3,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:09 AM",
+          "clockOut": "07:52 PM",
+          "totalHours": 10.7
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "08:59 AM",
+          "clockOut": "04:31 PM",
+          "totalHours": 7.5
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "09:44 AM",
+          "clockOut": "04:47 PM",
+          "totalHours": 7.1
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "08:54 AM",
+          "clockOut": "05:06 PM",
+          "totalHours": 8.2
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:04 AM",
+          "clockOut": "05:07 PM",
+          "totalHours": 8.1
+        }
+      ]
+    },
+    {
+      "employeeKey": "eng_4",
+      "weekStart": "2026-08-01T10:58:01.117Z",
+      "regularHours": 39.5,
+      "overtimeHours": 1.3,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "08:52 AM",
+          "clockOut": "05:23 PM",
+          "totalHours": 8.5
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "09:05 AM",
+          "clockOut": "05:29 PM",
+          "totalHours": 8.4
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "08:53 AM",
+          "clockOut": "04:38 PM",
+          "totalHours": 7.8
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:03 AM",
+          "clockOut": "04:44 PM",
+          "totalHours": 7.7
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "08:54 AM",
+          "clockOut": "05:20 PM",
+          "totalHours": 8.4
+        }
+      ]
+    },
+    {
+      "employeeKey": "eng_5",
+      "weekStart": "2026-08-07T09:03:18.901Z",
+      "regularHours": 39,
+      "overtimeHours": 0.9,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "08:47 AM",
+          "clockOut": "05:19 PM",
+          "totalHours": 8.5
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "08:51 AM",
+          "clockOut": "04:46 PM",
+          "totalHours": 7.9
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "09:02 AM",
+          "clockOut": "05:25 PM",
+          "totalHours": 8.4
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:06 AM",
+          "clockOut": "04:37 PM",
+          "totalHours": 7.5
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:04 AM",
+          "clockOut": "04:39 PM",
+          "totalHours": 7.6
+        }
+      ]
+    },
+    {
+      "employeeKey": "eng_6",
+      "weekStart": "2026-08-01T19:36:17.273Z",
+      "regularHours": 39.6,
+      "overtimeHours": 3.5,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:08 AM",
+          "clockOut": "05:13 PM",
+          "totalHours": 8.1
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "08:50 AM",
+          "clockOut": "05:23 PM",
+          "totalHours": 8.6
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "09:31 AM",
+          "clockOut": "05:09 PM",
+          "totalHours": 7.6
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "08:47 AM",
+          "clockOut": "05:16 PM",
+          "totalHours": 8.5
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "08:47 AM",
+          "clockOut": "07:03 PM",
+          "totalHours": 10.3
+        }
+      ]
+    },
+    {
+      "employeeKey": "eng_7",
+      "weekStart": "2026-08-21T00:07:04.892Z",
+      "regularHours": 39.1,
+      "overtimeHours": 2.2,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:55 AM",
+          "clockOut": "05:07 PM",
+          "totalHours": 7.2
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "08:52 AM",
+          "clockOut": "06:33 PM",
+          "totalHours": 9.7
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "09:07 AM",
+          "clockOut": "05:26 PM",
+          "totalHours": 8.3
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:09 AM",
+          "clockOut": "05:19 PM",
+          "totalHours": 8.2
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:24 AM",
+          "clockOut": "05:20 PM",
+          "totalHours": 7.9
+        }
+      ]
+    },
+    {
+      "employeeKey": "eng_8",
+      "weekStart": "2026-08-19T00:34:48.417Z",
+      "regularHours": 39.1,
+      "overtimeHours": 1.3,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:00 AM",
+          "clockOut": "05:14 PM",
+          "totalHours": 8.2
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "09:06 AM",
+          "clockOut": "05:03 PM",
+          "totalHours": 8
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "09:44 AM",
+          "clockOut": "04:51 PM",
+          "totalHours": 7.1
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "08:48 AM",
+          "clockOut": "05:24 PM",
+          "totalHours": 8.6
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:03 AM",
+          "clockOut": "05:30 PM",
+          "totalHours": 8.5
+        }
+      ]
+    },
+    {
+      "employeeKey": "eng_9",
+      "weekStart": "2026-08-06T03:07:36.002Z",
+      "regularHours": 39.8,
+      "overtimeHours": 4.2,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:00 AM",
+          "clockOut": "05:27 PM",
+          "totalHours": 8.5
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "09:01 AM",
+          "clockOut": "06:14 PM",
+          "totalHours": 9.2
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "08:56 AM",
+          "clockOut": "04:44 PM",
+          "totalHours": 7.8
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:19 AM",
+          "clockOut": "06:13 PM",
+          "totalHours": 8.9
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:04 AM",
+          "clockOut": "06:42 PM",
+          "totalHours": 9.6
+        }
+      ]
+    },
+    {
+      "employeeKey": "eng_10",
+      "weekStart": "2026-08-04T09:43:00.480Z",
+      "regularHours": 39.8,
+      "overtimeHours": 3.7,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "08:46 AM",
+          "clockOut": "04:47 PM",
+          "totalHours": 8
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "09:20 AM",
+          "clockOut": "05:08 PM",
+          "totalHours": 7.8
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "09:10 AM",
+          "clockOut": "05:26 PM",
+          "totalHours": 8.3
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:16 AM",
+          "clockOut": "08:28 PM",
+          "totalHours": 11.2
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:10 AM",
+          "clockOut": "05:20 PM",
+          "totalHours": 8.2
+        }
+      ]
+    },
+    {
+      "employeeKey": "eng_11",
+      "weekStart": "2026-08-11T21:38:34.767Z",
+      "regularHours": 40,
+      "overtimeHours": 8,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "08:49 AM",
+          "clockOut": "05:14 PM",
+          "totalHours": 8.4
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "08:50 AM",
+          "clockOut": "08:26 PM",
+          "totalHours": 11.6
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "08:46 AM",
+          "clockOut": "08:03 PM",
+          "totalHours": 11.3
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "08:48 AM",
+          "clockOut": "05:11 PM",
+          "totalHours": 8.4
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "08:55 AM",
+          "clockOut": "05:12 PM",
+          "totalHours": 8.3
+        }
+      ]
+    },
+    {
+      "employeeKey": "eng_12",
+      "weekStart": "2026-08-03T15:27:21.811Z",
+      "regularHours": 39.5,
+      "overtimeHours": 0.9,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:03 AM",
+          "clockOut": "05:08 PM",
+          "totalHours": 8.1
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "08:48 AM",
+          "clockOut": "05:17 PM",
+          "totalHours": 8.5
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "09:47 AM",
+          "clockOut": "05:27 PM",
+          "totalHours": 7.7
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "08:58 AM",
+          "clockOut": "05:18 PM",
+          "totalHours": 8.3
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:43 AM",
+          "clockOut": "05:30 PM",
+          "totalHours": 7.8
+        }
+      ]
+    },
+    {
+      "employeeKey": "eng_13",
+      "weekStart": "2026-08-09T04:43:20.535Z",
+      "regularHours": 40,
+      "overtimeHours": 4.7,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:01 AM",
+          "clockOut": "05:10 PM",
+          "totalHours": 8.2
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "08:46 AM",
+          "clockOut": "05:21 PM",
+          "totalHours": 8.6
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "09:07 AM",
+          "clockOut": "08:29 PM",
+          "totalHours": 11.4
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:03 AM",
+          "clockOut": "05:03 PM",
+          "totalHours": 8
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "08:51 AM",
+          "clockOut": "05:19 PM",
+          "totalHours": 8.5
+        }
+      ]
+    },
+    {
+      "employeeKey": "eng_14",
+      "weekStart": "2026-07-27T10:25:35.624Z",
+      "regularHours": 38.7,
+      "overtimeHours": 0.7,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:10 AM",
+          "clockOut": "05:21 PM",
+          "totalHours": 8.2
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "08:55 AM",
+          "clockOut": "04:43 PM",
+          "totalHours": 7.8
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "09:03 AM",
+          "clockOut": "05:30 PM",
+          "totalHours": 8.5
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:53 AM",
+          "clockOut": "05:09 PM",
+          "totalHours": 7.3
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:00 AM",
+          "clockOut": "04:34 PM",
+          "totalHours": 7.6
+        }
+      ]
+    },
+    {
+      "employeeKey": "eng_15",
+      "weekStart": "2026-08-17T05:29:00.074Z",
+      "regularHours": 40,
+      "overtimeHours": 1.7,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:02 AM",
+          "clockOut": "05:09 PM",
+          "totalHours": 8.1
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "09:08 AM",
+          "clockOut": "05:07 PM",
+          "totalHours": 8
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "09:09 AM",
+          "clockOut": "05:06 PM",
+          "totalHours": 8
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:01 AM",
+          "clockOut": "06:31 PM",
+          "totalHours": 9.5
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:04 AM",
+          "clockOut": "05:08 PM",
+          "totalHours": 8.1
+        }
+      ]
+    },
+    {
+      "employeeKey": "sales_1",
+      "weekStart": "2026-08-07T11:38:24.311Z",
+      "regularHours": 39.8,
+      "overtimeHours": 4.7,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:02 AM",
+          "clockOut": "04:49 PM",
+          "totalHours": 7.8
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "09:09 AM",
+          "clockOut": "05:17 PM",
+          "totalHours": 8.1
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "08:45 AM",
+          "clockOut": "05:13 PM",
+          "totalHours": 8.5
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "08:50 AM",
+          "clockOut": "05:15 PM",
+          "totalHours": 8.4
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:06 AM",
+          "clockOut": "08:46 PM",
+          "totalHours": 11.7
+        }
+      ]
+    },
+    {
+      "employeeKey": "sales_2",
+      "weekStart": "2026-08-16T13:00:42.582Z",
+      "regularHours": 39.8,
+      "overtimeHours": 4.4,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:09 AM",
+          "clockOut": "05:17 PM",
+          "totalHours": 8.1
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "08:56 AM",
+          "clockOut": "04:46 PM",
+          "totalHours": 7.8
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "08:46 AM",
+          "clockOut": "05:22 PM",
+          "totalHours": 8.6
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:02 AM",
+          "clockOut": "07:31 PM",
+          "totalHours": 10.5
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:55 AM",
+          "clockOut": "07:06 PM",
+          "totalHours": 9.2
+        }
+      ]
+    },
+    {
+      "employeeKey": "sales_3",
+      "weekStart": "2026-08-12T21:39:29.210Z",
+      "regularHours": 39.6,
+      "overtimeHours": 5.9,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:09 AM",
+          "clockOut": "05:20 PM",
+          "totalHours": 8.2
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "09:01 AM",
+          "clockOut": "07:39 PM",
+          "totalHours": 10.6
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "09:20 AM",
+          "clockOut": "04:54 PM",
+          "totalHours": 7.6
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "08:57 AM",
+          "clockOut": "07:53 PM",
+          "totalHours": 10.9
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "08:55 AM",
+          "clockOut": "05:07 PM",
+          "totalHours": 8.2
+        }
+      ]
+    },
+    {
+      "employeeKey": "sales_4",
+      "weekStart": "2026-07-26T00:54:50.251Z",
+      "regularHours": 40,
+      "overtimeHours": 2.7,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:35 AM",
+          "clockOut": "07:08 PM",
+          "totalHours": 9.6
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "08:56 AM",
+          "clockOut": "05:18 PM",
+          "totalHours": 8.4
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "08:59 AM",
+          "clockOut": "05:04 PM",
+          "totalHours": 8.1
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "08:52 AM",
+          "clockOut": "05:19 PM",
+          "totalHours": 8.5
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "08:56 AM",
+          "clockOut": "05:01 PM",
+          "totalHours": 8.1
+        }
+      ]
+    },
+    {
+      "employeeKey": "sales_5",
+      "weekStart": "2026-08-05T22:27:59.769Z",
+      "regularHours": 39.3,
+      "overtimeHours": 1.4,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:01 AM",
+          "clockOut": "04:49 PM",
+          "totalHours": 7.8
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "09:47 AM",
+          "clockOut": "05:17 PM",
+          "totalHours": 7.5
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "08:51 AM",
+          "clockOut": "05:28 PM",
+          "totalHours": 8.6
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "08:54 AM",
+          "clockOut": "05:07 PM",
+          "totalHours": 8.2
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "08:50 AM",
+          "clockOut": "05:25 PM",
+          "totalHours": 8.6
+        }
+      ]
+    },
+    {
+      "employeeKey": "sales_6",
+      "weekStart": "2026-08-21T11:12:21.843Z",
+      "regularHours": 39.6,
+      "overtimeHours": 1,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:04 AM",
+          "clockOut": "05:30 PM",
+          "totalHours": 8.4
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "09:03 AM",
+          "clockOut": "05:00 PM",
+          "totalHours": 8
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "08:58 AM",
+          "clockOut": "04:31 PM",
+          "totalHours": 7.6
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "08:52 AM",
+          "clockOut": "04:59 PM",
+          "totalHours": 8.1
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:01 AM",
+          "clockOut": "05:29 PM",
+          "totalHours": 8.5
+        }
+      ]
+    },
+    {
+      "employeeKey": "sales_7",
+      "weekStart": "2026-08-14T06:05:08.728Z",
+      "regularHours": 38.5,
+      "overtimeHours": 2.6,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:07 AM",
+          "clockOut": "05:21 PM",
+          "totalHours": 8.2
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "09:45 AM",
+          "clockOut": "05:06 PM",
+          "totalHours": 7.4
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "08:52 AM",
+          "clockOut": "04:45 PM",
+          "totalHours": 7.9
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:56 AM",
+          "clockOut": "05:09 PM",
+          "totalHours": 7.2
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:08 AM",
+          "clockOut": "07:29 PM",
+          "totalHours": 10.4
+        }
+      ]
+    },
+    {
+      "employeeKey": "sales_8",
+      "weekStart": "2026-08-18T08:02:30.420Z",
+      "regularHours": 39.8,
+      "overtimeHours": 1.2,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "08:45 AM",
+          "clockOut": "05:26 PM",
+          "totalHours": 8.7
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "09:19 AM",
+          "clockOut": "05:30 PM",
+          "totalHours": 8.2
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "09:06 AM",
+          "clockOut": "05:26 PM",
+          "totalHours": 8.3
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:06 AM",
+          "clockOut": "05:04 PM",
+          "totalHours": 8
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "08:55 AM",
+          "clockOut": "04:45 PM",
+          "totalHours": 7.8
+        }
+      ]
+    },
+    {
+      "employeeKey": "fin_1",
+      "weekStart": "2026-07-29T18:13:01.716Z",
+      "regularHours": 39.5,
+      "overtimeHours": 0.7,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:09 AM",
+          "clockOut": "05:26 PM",
+          "totalHours": 8.3
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "09:00 AM",
+          "clockOut": "04:51 PM",
+          "totalHours": 7.9
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "08:46 AM",
+          "clockOut": "04:54 PM",
+          "totalHours": 8.1
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:35 AM",
+          "clockOut": "05:08 PM",
+          "totalHours": 7.6
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:07 AM",
+          "clockOut": "05:23 PM",
+          "totalHours": 8.3
+        }
+      ]
+    },
+    {
+      "employeeKey": "fin_2",
+      "weekStart": "2026-08-11T10:47:09.655Z",
+      "regularHours": 39.6,
+      "overtimeHours": 2.8,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:02 AM",
+          "clockOut": "05:27 PM",
+          "totalHours": 8.4
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "08:45 AM",
+          "clockOut": "05:22 PM",
+          "totalHours": 8.6
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "08:58 AM",
+          "clockOut": "05:05 PM",
+          "totalHours": 8.1
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:24 AM",
+          "clockOut": "07:08 PM",
+          "totalHours": 9.7
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:53 AM",
+          "clockOut": "05:29 PM",
+          "totalHours": 7.6
+        }
+      ]
+    },
+    {
+      "employeeKey": "fin_3",
+      "weekStart": "2026-08-20T15:37:38.612Z",
+      "regularHours": 39.3,
+      "overtimeHours": 0.5,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "09:04 AM",
+          "clockOut": "05:18 PM",
+          "totalHours": 8.2
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "08:53 AM",
+          "clockOut": "05:11 PM",
+          "totalHours": 8.3
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "09:04 AM",
+          "clockOut": "05:04 PM",
+          "totalHours": 8
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:09 AM",
+          "clockOut": "04:36 PM",
+          "totalHours": 7.5
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:20 AM",
+          "clockOut": "05:07 PM",
+          "totalHours": 7.8
+        }
+      ]
+    },
+    {
+      "employeeKey": "fin_4",
+      "weekStart": "2026-08-13T14:06:53.791Z",
+      "regularHours": 39.1,
+      "overtimeHours": 1.2,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "08:46 AM",
+          "clockOut": "05:14 PM",
+          "totalHours": 8.5
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "08:51 AM",
+          "clockOut": "05:20 PM",
+          "totalHours": 8.5
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "09:33 AM",
+          "clockOut": "04:36 PM",
+          "totalHours": 7.1
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "09:10 AM",
+          "clockOut": "05:20 PM",
+          "totalHours": 8.2
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:04 AM",
+          "clockOut": "05:03 PM",
+          "totalHours": 8
+        }
+      ]
+    },
+    {
+      "employeeKey": "fin_5",
+      "weekStart": "2026-08-05T17:37:58.080Z",
+      "regularHours": 40,
+      "overtimeHours": 3.3,
+      "days": [
+        {
+          "dayLabel": "Monday",
+          "clockIn": "08:49 AM",
+          "clockOut": "05:01 PM",
+          "totalHours": 8.2
+        },
+        {
+          "dayLabel": "Tuesday",
+          "clockIn": "08:57 AM",
+          "clockOut": "05:10 PM",
+          "totalHours": 8.2
+        },
+        {
+          "dayLabel": "Wednesday",
+          "clockIn": "08:59 AM",
+          "clockOut": "05:13 PM",
+          "totalHours": 8.2
+        },
+        {
+          "dayLabel": "Thursday",
+          "clockIn": "08:48 AM",
+          "clockOut": "07:13 PM",
+          "totalHours": 10.4
+        },
+        {
+          "dayLabel": "Friday",
+          "clockIn": "09:04 AM",
+          "clockOut": "05:23 PM",
+          "totalHours": 8.3
+        }
+      ]
+    }
+  ],
+  "attendanceExceptions": [
+    {
+      "employeeKey": "cro",
+      "type": "OVERTIME",
+      "label": "Unauthorized Overtime",
+      "date": "2026-08-10T02:37:26.143Z"
+    },
+    {
+      "employeeKey": "eng_2",
+      "type": "OVERTIME",
+      "label": "Unauthorized Overtime",
+      "date": "2026-08-15T00:32:32.995Z"
+    },
+    {
+      "employeeKey": "eng_7",
+      "type": "MISSING_OUT",
+      "label": "Missed punch",
+      "date": "2026-08-04T02:14:45.307Z"
+    },
+    {
+      "employeeKey": "eng_14",
+      "type": "MISSING_IN",
+      "label": "Missed punch",
+      "date": "2026-08-18T11:41:16.852Z"
+    },
+    {
+      "employeeKey": "eng_15",
+      "type": "OVERTIME",
+      "label": "Unauthorized Overtime",
+      "date": "2026-08-18T04:54:41.917Z"
+    },
+    {
+      "employeeKey": "sales_3",
+      "type": "MISSING_IN",
+      "label": "Missed punch",
+      "date": "2026-08-04T08:47:03.376Z"
+    },
+    {
+      "employeeKey": "sales_6",
+      "type": "MISSING_IN",
+      "label": "Missed punch",
+      "date": "2026-08-21T10:45:42.494Z"
+    },
+    {
+      "employeeKey": "fin_3",
+      "type": "MISSING_OUT",
+      "label": "Missed punch",
+      "date": "2026-08-09T21:37:02.428Z"
+    }
+  ],
+  "leaveRequests": [
+    {
+      "employeeKey": "eng_4",
+      "type": "VACATION",
+      "startDate": "2026-08-22T06:10:14.625Z",
+      "endDate": "2026-09-02T16:15:44.402Z",
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "sales_3",
+      "type": "VACATION",
+      "startDate": "2026-08-23T12:37:24.966Z",
+      "endDate": "2026-09-06T09:43:57.381Z",
+      "status": "REJECTED"
+    },
+    {
+      "employeeKey": "sales_6",
+      "type": "PERSONAL",
+      "startDate": "2026-08-24T02:06:48.391Z",
+      "endDate": "2026-09-06T17:45:33.400Z",
+      "status": "REJECTED"
+    }
+  ],
+  "payrollRuns": [
+    {
+      "label": "July 2026 Payroll",
+      "payDate": "2026-07-31T00:00:00.000Z",
+      "status": "PAID",
+      "lines": [
+        {
+          "employeeKey": "ceo",
+          "gross": 29166.67,
+          "deductions": 5833.33,
+          "net": 23333.34,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 4375
+            },
+            {
+              "label": "State Tax",
+              "amount": 1458.33
+            }
+          ]
+        },
+        {
+          "employeeKey": "cto",
+          "gross": 23333.33,
+          "deductions": 4666.67,
+          "net": 18666.66,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 3500
+            },
+            {
+              "label": "State Tax",
+              "amount": 1166.67
+            }
+          ]
+        },
+        {
+          "employeeKey": "cfo",
+          "gross": 21666.67,
+          "deductions": 4333.33,
+          "net": 17333.34,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 3250
+            },
+            {
+              "label": "State Tax",
+              "amount": 1083.33
+            }
+          ]
+        },
+        {
+          "employeeKey": "cro",
+          "gross": 22500,
+          "deductions": 4500,
+          "net": 18000,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 3375
+            },
+            {
+              "label": "State Tax",
+              "amount": 1125
+            }
+          ]
+        },
+        {
+          "employeeKey": "eng_1",
+          "gross": 11894.5,
+          "deductions": 2378.91,
+          "net": 9515.59,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1784.18
+            },
+            {
+              "label": "State Tax",
+              "amount": 594.73
+            }
+          ]
+        },
+        {
+          "employeeKey": "eng_2",
+          "gross": 9993.42,
+          "deductions": 1998.68,
+          "net": 7994.74,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1499.01
+            },
+            {
+              "label": "State Tax",
+              "amount": 499.67
+            }
+          ]
+        },
+        {
+          "employeeKey": "eng_3",
+          "gross": 12245.25,
+          "deductions": 2449.05,
+          "net": 9796.2,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1836.79
+            },
+            {
+              "label": "State Tax",
+              "amount": 612.26
+            }
+          ]
+        },
+        {
+          "employeeKey": "eng_4",
+          "gross": 11100.17,
+          "deductions": 2220.04,
+          "net": 8880.13,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1665.03
+            },
+            {
+              "label": "State Tax",
+              "amount": 555.01
+            }
+          ]
+        },
+        {
+          "employeeKey": "eng_5",
+          "gross": 9225.58,
+          "deductions": 1845.12,
+          "net": 7380.46,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1383.84
+            },
+            {
+              "label": "State Tax",
+              "amount": 461.28
+            }
+          ]
+        },
+        {
+          "employeeKey": "eng_6",
+          "gross": 11873.58,
+          "deductions": 2374.72,
+          "net": 9498.86,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1781.04
+            },
+            {
+              "label": "State Tax",
+              "amount": 593.68
+            }
+          ]
+        },
+        {
+          "employeeKey": "eng_7",
+          "gross": 12214.33,
+          "deductions": 2442.87,
+          "net": 9771.46,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1832.15
+            },
+            {
+              "label": "State Tax",
+              "amount": 610.72
+            }
+          ]
+        },
+        {
+          "employeeKey": "eng_8",
+          "gross": 12342.17,
+          "deductions": 2468.44,
+          "net": 9873.73,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1851.33
+            },
+            {
+              "label": "State Tax",
+              "amount": 617.11
+            }
+          ]
+        },
+        {
+          "employeeKey": "eng_9",
+          "gross": 10409.92,
+          "deductions": 2081.99,
+          "net": 8327.93,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1561.49
+            },
+            {
+              "label": "State Tax",
+              "amount": 520.5
+            }
+          ]
+        },
+        {
+          "employeeKey": "eng_10",
+          "gross": 10342.75,
+          "deductions": 2068.55,
+          "net": 8274.2,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1551.41
+            },
+            {
+              "label": "State Tax",
+              "amount": 517.14
+            }
+          ]
+        },
+        {
+          "employeeKey": "eng_11",
+          "gross": 12183.33,
+          "deductions": 2436.67,
+          "net": 9746.66,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1827.5
+            },
+            {
+              "label": "State Tax",
+              "amount": 609.17
+            }
+          ]
+        },
+        {
+          "employeeKey": "eng_12",
+          "gross": 10430.67,
+          "deductions": 2086.13,
+          "net": 8344.54,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1564.6
+            },
+            {
+              "label": "State Tax",
+              "amount": 521.53
+            }
+          ]
+        },
+        {
+          "employeeKey": "eng_13",
+          "gross": 11016.17,
+          "deductions": 2203.24,
+          "net": 8812.93,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1652.43
+            },
+            {
+              "label": "State Tax",
+              "amount": 550.81
+            }
+          ]
+        },
+        {
+          "employeeKey": "eng_14",
+          "gross": 12353.83,
+          "deductions": 2470.76,
+          "net": 9883.07,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1853.07
+            },
+            {
+              "label": "State Tax",
+              "amount": 617.69
+            }
+          ]
+        },
+        {
+          "employeeKey": "eng_15",
+          "gross": 10427.17,
+          "deductions": 2085.44,
+          "net": 8341.73,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1564.08
+            },
+            {
+              "label": "State Tax",
+              "amount": 521.36
+            }
+          ]
+        },
+        {
+          "employeeKey": "sales_1",
+          "gross": 7973.17,
+          "deductions": 1594.64,
+          "net": 6378.53,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1195.98
+            },
+            {
+              "label": "State Tax",
+              "amount": 398.66
+            }
+          ]
+        },
+        {
+          "employeeKey": "sales_2",
+          "gross": 6816.17,
+          "deductions": 1363.24,
+          "net": 5452.93,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1022.43
+            },
+            {
+              "label": "State Tax",
+              "amount": 340.81
+            }
+          ]
+        },
+        {
+          "employeeKey": "sales_3",
+          "gross": 8168.58,
+          "deductions": 1633.72,
+          "net": 6534.86,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1225.29
+            },
+            {
+              "label": "State Tax",
+              "amount": 408.43
+            }
+          ]
+        },
+        {
+          "employeeKey": "sales_4",
+          "gross": 9824.92,
+          "deductions": 1964.99,
+          "net": 7859.93,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1473.74
+            },
+            {
+              "label": "State Tax",
+              "amount": 491.25
+            }
+          ]
+        },
+        {
+          "employeeKey": "sales_5",
+          "gross": 8308.5,
+          "deductions": 1661.71,
+          "net": 6646.79,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1246.28
+            },
+            {
+              "label": "State Tax",
+              "amount": 415.43
+            }
+          ]
+        },
+        {
+          "employeeKey": "sales_6",
+          "gross": 7149.17,
+          "deductions": 1429.84,
+          "net": 5719.33,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1072.38
+            },
+            {
+              "label": "State Tax",
+              "amount": 357.46
+            }
+          ]
+        },
+        {
+          "employeeKey": "sales_7",
+          "gross": 9193.42,
+          "deductions": 1838.68,
+          "net": 7354.74,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1379.01
+            },
+            {
+              "label": "State Tax",
+              "amount": 459.67
+            }
+          ]
+        },
+        {
+          "employeeKey": "sales_8",
+          "gross": 8814.08,
+          "deductions": 1762.81,
+          "net": 7051.27,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1322.11
+            },
+            {
+              "label": "State Tax",
+              "amount": 440.7
+            }
+          ]
+        },
+        {
+          "employeeKey": "fin_1",
+          "gross": 6351.25,
+          "deductions": 1270.25,
+          "net": 5081,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 952.69
+            },
+            {
+              "label": "State Tax",
+              "amount": 317.56
+            }
+          ]
+        },
+        {
+          "employeeKey": "fin_2",
+          "gross": 6845.25,
+          "deductions": 1369.05,
+          "net": 5476.2,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1026.79
+            },
+            {
+              "label": "State Tax",
+              "amount": 342.26
+            }
+          ]
+        },
+        {
+          "employeeKey": "fin_3",
+          "gross": 7929.42,
+          "deductions": 1585.88,
+          "net": 6343.54,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1189.41
+            },
+            {
+              "label": "State Tax",
+              "amount": 396.47
+            }
+          ]
+        },
+        {
+          "employeeKey": "fin_4",
+          "gross": 6144,
+          "deductions": 1228.8,
+          "net": 4915.2,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 921.6
+            },
+            {
+              "label": "State Tax",
+              "amount": 307.2
+            }
+          ]
+        },
+        {
+          "employeeKey": "fin_5",
+          "gross": 8090.5,
+          "deductions": 1618.11,
+          "net": 6472.39,
+          "taxLines": [
+            {
+              "label": "Federal Tax",
+              "amount": 1213.58
+            },
+            {
+              "label": "State Tax",
+              "amount": 404.53
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "vendors": [
+    {
+      "key": "vendor_0",
+      "name": "AWS"
+    },
+    {
+      "key": "vendor_1",
+      "name": "Google Cloud"
+    },
+    {
+      "key": "vendor_2",
+      "name": "Salesforce"
+    },
+    {
+      "key": "vendor_3",
+      "name": "Slack"
+    },
+    {
+      "key": "vendor_4",
+      "name": "Microsoft"
+    },
+    {
+      "key": "vendor_5",
+      "name": "Zoom"
+    }
+  ]
+}

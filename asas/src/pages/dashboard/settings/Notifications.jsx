@@ -4,7 +4,9 @@ import {
   Search, 
   Clock,
   Shield,
+  ChevronDown
 } from 'lucide-react';
+import { useState } from 'react';
 import TopBarActions from '../../../components/TopBarActions';
 import SettingsTabs from './SettingsTabs';
 
@@ -25,6 +27,43 @@ const Toggle = ({ on, color = 'green' }) => {
 };
 
 export default function SettingsNotifications() {
+  const [previewEvent, setPreviewEvent] = useState('invoice');
+
+  const getPreviewData = () => {
+    switch(previewEvent) {
+      case 'sprint':
+        return { 
+          title: 'Action Required: Sprint Milestone', 
+          desc: 'Q3 Expansion milestone "Beta Release" is due today.', 
+          btn: 'View in Jira',
+          icon: 'S', color: 'bg-accent'
+        };
+      case 'system':
+        return { 
+          title: 'Security Alert: New Login', 
+          desc: 'A new login was detected from IP 192.168.1.1 in Berlin, DE.', 
+          btn: 'Review Activity',
+          icon: '!', color: 'bg-danger'
+        };
+      case 'risk':
+        return { 
+          title: 'Risk Escalation: Delay', 
+          desc: 'Project Alpha has been flagged as high risk due to resource constraints.', 
+          btn: 'View Risk Matrix',
+          icon: 'R', color: 'bg-warning'
+        };
+      case 'invoice':
+      default:
+        return { 
+          title: 'Action Required: Invoice Approval', 
+          desc: 'SysTech Automations submitted an invoice for $125,000.', 
+          btn: 'Review in Dashboard',
+          icon: 'A', color: 'bg-primary'
+        };
+    }
+  };
+  const preview = getPreviewData();
+
   return (
     <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
       
@@ -37,9 +76,6 @@ export default function SettingsNotifications() {
               placeholder="Search..." 
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 border border-border-default rounded px-1.5 py-0.5 bg-surface-raised">
-              <span className="text-[10px] text-caption font-medium">⌘K</span>
-            </div>
           </div>
           
           <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-strong shrink-0"></div>
@@ -71,12 +107,12 @@ export default function SettingsNotifications() {
                   <h3 className="text-sm font-bold text-heading mb-1">Quiet Hours</h3>
                   <div className="flex items-center gap-3 text-sm text-body-light">
                     Pause all non-critical alerts between 
-                    <div className="bg-surface-raised border border-border-strong px-3 py-1.5 rounded-input text-heading font-medium shadow-card">
-                      10:00 PM
+                    <div className="bg-surface-raised border border-border-strong px-3 py-1.5 rounded-input text-heading font-medium shadow-card flex items-center gap-2 cursor-pointer hover:bg-surface-muted transition-colors">
+                      10:00 PM <ChevronDown size={14} className="text-caption" />
                     </div>
                     and 
-                    <div className="bg-surface-raised border border-border-strong px-3 py-1.5 rounded-input text-heading font-medium shadow-card">
-                      06:00 AM
+                    <div className="bg-surface-raised border border-border-strong px-3 py-1.5 rounded-input text-heading font-medium shadow-card flex items-center gap-2 cursor-pointer hover:bg-surface-muted transition-colors">
+                      06:00 AM <ChevronDown size={14} className="text-caption" />
                     </div>
                   </div>
                 </div>
@@ -111,7 +147,7 @@ export default function SettingsNotifications() {
               <div className="divide-y divide-border-subtle">
                 
                 {/* Row 1 */}
-                <div className="grid grid-cols-12 items-center py-5">
+                <div onMouseEnter={() => setPreviewEvent('invoice')} className="grid grid-cols-12 items-center py-5 cursor-pointer hover:bg-surface-active px-4 -mx-4 transition-colors rounded-lg">
                   <div className="col-span-6">
                     <span className="block text-[10px] font-medium text-muted mb-0.5">Finance</span>
                     <span className="block text-sm font-semibold text-heading">Invoice Approvals</span>
@@ -122,7 +158,7 @@ export default function SettingsNotifications() {
                 </div>
 
                 {/* Row 2 */}
-                <div className="grid grid-cols-12 items-center py-5">
+                <div onMouseEnter={() => setPreviewEvent('sprint')} className="grid grid-cols-12 items-center py-5 cursor-pointer hover:bg-surface-active px-4 -mx-4 transition-colors rounded-lg">
                   <div className="col-span-6">
                     <span className="block text-[10px] font-medium text-muted mb-0.5">Projects</span>
                     <span className="block text-sm font-semibold text-heading">Sprint Milestone</span>
@@ -133,18 +169,18 @@ export default function SettingsNotifications() {
                 </div>
 
                 {/* Row 3 (Danger/System) */}
-                <div className="grid grid-cols-12 items-center py-5">
+                <div onMouseEnter={() => setPreviewEvent('system')} className="grid grid-cols-12 items-center py-5 cursor-pointer hover:bg-surface-active px-4 -mx-4 transition-colors rounded-lg">
                   <div className="col-span-6">
                     <span className="block text-[10px] font-medium text-danger mb-0.5">System</span>
                     <span className="block text-sm font-semibold text-heading">New Login (New IP)</span>
                   </div>
-                  <div className="col-span-2 flex justify-center"><Toggle on={true} color="red" /></div>
-                  <div className="col-span-2 flex justify-center"><Toggle on={true} color="red" /></div>
-                  <div className="col-span-2 flex justify-center"><Toggle on={true} color="red" /></div>
+                  <div className="col-span-2 flex justify-center"><Toggle on={true} color="green" /></div>
+                  <div className="col-span-2 flex justify-center"><Toggle on={true} color="green" /></div>
+                  <div className="col-span-2 flex justify-center"><Toggle on={true} color="green" /></div>
                 </div>
 
                 {/* Row 4 */}
-                <div className="grid grid-cols-12 items-center py-5">
+                <div onMouseEnter={() => setPreviewEvent('risk')} className="grid grid-cols-12 items-center py-5 cursor-pointer hover:bg-surface-active px-4 -mx-4 transition-colors rounded-lg">
                   <div className="col-span-6">
                     <span className="block text-[10px] font-medium text-muted mb-0.5">Risks</span>
                     <span className="block text-sm font-semibold text-heading">Risk Matrix Escalation</span>
@@ -175,8 +211,8 @@ export default function SettingsNotifications() {
                 <div className="bg-surface-raised rounded-card-sm shadow-elevated p-5 border border-border-subtle">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <div className="w-5 h-5 bg-primary rounded-xs flex items-center justify-center text-[10px] font-bold text-on-primary">
-                        A
+                      <div className={`w-5 h-5 ${preview.color} rounded-xs flex items-center justify-center text-[10px] font-bold text-on-primary`}>
+                        {preview.icon}
                       </div>
                       <span className="text-[11px] font-semibold text-body">Asas</span>
                     </div>
@@ -184,15 +220,15 @@ export default function SettingsNotifications() {
                   </div>
                   
                   <h3 className="text-sm font-bold text-heading leading-tight mb-2">
-                    Action Required: Invoice Approval
+                    {preview.title}
                   </h3>
                   
                   <p className="text-xs text-body-light leading-relaxed mb-4">
-                    SysTech Automations submitted an invoice for $125,000.
+                    {preview.desc}
                   </p>
                   
                   <button className="w-full bg-primary text-on-primary text-xs font-semibold py-2.5 rounded-input hover:bg-primary-hover transition-colors">
-                    Review in Dashboard
+                    {preview.btn}
                   </button>
                 </div>
                 

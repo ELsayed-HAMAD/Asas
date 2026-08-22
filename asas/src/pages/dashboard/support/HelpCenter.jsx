@@ -5,11 +5,21 @@ import {
   Bell, 
   Headset, 
   MessageSquare,
-  ArrowRight
+  ArrowRight,
+  Loader2
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supportService } from '../../../services/support.service';
 import TopBarActions from '../../../components/TopBarActions';
 
 export default function SupportDashboard() {
+  const { data: responseData, isLoading, isError } = useQuery({
+    queryKey: ['support', 'tickets'],
+    queryFn: supportService.getTickets,
+  });
+
+  const tickets = responseData?.data?.tickets || [];
+
   return (
     <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
       
@@ -22,9 +32,6 @@ export default function SupportDashboard() {
               placeholder="Search documentation..." 
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 border border-border-default rounded px-1.5 py-0.5 bg-surface-muted">
-              <span className="text-[10px] text-caption font-medium">⌘K</span>
-            </div>
           </div>
           
           <button className="text-muted hover:text-heading transition-colors">
@@ -81,33 +88,45 @@ export default function SupportDashboard() {
               </div>
               
               <div className="divide-y divide-border-subtle">
-                {/* Ticket 1 */}
-                <div className="flex items-center justify-between p-6 bg-accent-light/30 border-l-4 border-l-blue-600 cursor-pointer hover:bg-accent-light/50 transition-colors">
-                  <div>
-                    <h3 className="text-sm font-bold text-heading mb-1">#9021: API Rate Limit Error</h3>
-                    <p className="text-xs text-muted font-medium">Created 2 hours ago via Web</p>
+                {isLoading ? (
+                  <div className="flex justify-center p-8">
+                    <Loader2 className="animate-spin text-muted" size={24} />
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span className="bg-[#eff6ff] border border-[#bfdbfe] text-accent px-3 py-1 rounded text-[11px] font-bold">
-                      In Progress
-                    </span>
-                    <ChevronRight size={16} className="text-caption" />
+                ) : isError ? (
+                  <div className="p-6 text-center text-sm text-danger font-semibold">
+                    Failed to load tickets.
                   </div>
-                </div>
-
-                {/* Ticket 2 */}
-                <div className="flex items-center justify-between p-6 bg-surface-raised border-l-4 border-l-transparent hover:bg-surface-muted cursor-pointer transition-colors">
-                  <div>
-                    <h3 className="text-sm font-bold text-heading mb-1">#9015: MFA Setup Issue</h3>
-                    <p className="text-xs text-muted font-medium">Resolved Yesterday</p>
+                ) : tickets.length > 0 ? (
+                  tickets.map((ticket) => (
+                    <div 
+                      key={ticket.id} 
+                      className={`flex items-center justify-between p-6 cursor-pointer transition-colors ${
+                        ticket.status === 'IN_PROGRESS' || ticket.status === 'OPEN'
+                          ? 'bg-accent-light/30 border-l-4 border-l-blue-600 hover:bg-accent-light/50'
+                          : 'bg-surface-raised border-l-4 border-l-transparent hover:bg-surface-muted'
+                      }`}
+                    >
+                      <div>
+                        <h3 className="text-sm font-bold text-heading mb-1">{ticket.title}</h3>
+                        <p className="text-xs text-muted font-medium">Created {new Date(ticket.createdAt).toLocaleDateString()}</p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className={`px-3 py-1 rounded text-[11px] font-bold ${
+                          ticket.status === 'OPEN' || ticket.status === 'IN_PROGRESS'
+                            ? 'bg-[#eff6ff] border border-[#bfdbfe] text-accent'
+                            : 'bg-surface-active border border-border-default text-body-light'
+                        }`}>
+                          {ticket.status.replace('_', ' ')}
+                        </span>
+                        <ChevronRight size={16} className="text-caption" />
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-6 text-center text-sm text-muted font-semibold">
+                    No recent tickets found.
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span className="bg-surface-active border border-border-default text-body-light px-3 py-1 rounded text-[11px] font-bold">
-                      Resolved
-                    </span>
-                    <ChevronRight size={16} className="text-caption" />
-                  </div>
-                </div>
+                )}
               </div>
             </div>
 

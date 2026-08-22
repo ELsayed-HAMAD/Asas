@@ -15,6 +15,7 @@ import Landing from './pages/marketing/Landing'
 // ── Auth ───────────────────────────────────────────────────
 import Login    from './pages/auth/Login'
 import Register from './pages/auth/Register'
+import Onboarding from './pages/auth/Onboarding'
 
 // ── Dashboard ──────────────────────────────────────────────
 import DashboardOverview from './pages/dashboard/DashboardOverview'
@@ -35,6 +36,7 @@ import Expenses            from './pages/dashboard/finance/Expenses'
 import CRMOverview      from './pages/dashboard/crm/CRMOverview'
 import DealsPipeline    from './pages/dashboard/crm/DealsPipeline'
 import SalesPerformance from './pages/dashboard/crm/SalesPerformance'
+import RevenueForecast from './pages/dashboard/crm/RevenueForecast'
 
 // ── Inventory ──────────────────────────────────────────────
 import ProductCatalog from './pages/dashboard/inventory/ProductCatalog'
@@ -86,6 +88,7 @@ export default function App() {
 
       {/* ── Dashboard (protected — redirect to login if not logged in) ── */}
       <Route element={<AuthGuard />}>
+        <Route path="/onboarding" element={<Onboarding />} />
         <Route element={<DashboardLayout />}>
 
           {/* Overview */}
@@ -107,6 +110,7 @@ export default function App() {
           <Route path="/dashboard/crm"                  element={<CRMOverview />} />
           <Route path="/dashboard/crm/deals"            element={<DealsPipeline />} />
           <Route path="/dashboard/crm/sales-performance" element={<SalesPerformance />} />
+          <Route path="/dashboard/crm/revenue-forecast" element={<RevenueForecast />} />
 
           {/* Inventory */}
           <Route path="/dashboard/inventory" element={<ProductCatalog />} />

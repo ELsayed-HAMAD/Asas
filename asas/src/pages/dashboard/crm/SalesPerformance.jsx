@@ -8,32 +8,42 @@ import {
   Target, 
   TrendingUp, 
   Clock, 
-  MoreHorizontal 
+  MoreHorizontal,
+  Loader2
 } from 'lucide-react';
 import {
   AreaChart, Area, ResponsiveContainer, PieChart, Pie, Cell, Tooltip
 } from 'recharts'
-
+import { useQuery } from '@tanstack/react-query';
+import { crmService } from '../../../services/crm.service';
 import TopBarActions from '../../../components/TopBarActions';
 
-// ── Chart Data ──────────────────────────────────────────────────────
-const CLOSED_SPARK = [
-  { v: 180 }, { v: 200 }, { v: 260 }, { v: 240 }, { v: 300 }, { v: 340 }, { v: 380 },
-]
-const REP_SPARKS = [
-  [{ v: 8 }, { v: 12 }, { v: 10 }, { v: 16 }, { v: 14 }],
-  [{ v: 10 }, { v: 8 }, { v: 14 }, { v: 10 }, { v: 14 }],
-  [{ v: 14 }, { v: 18 }, { v: 10 }, { v: 6 }, { v: 10 }],
-]
 const REP_SPARK_COLORS = ['#10b981', '#3b82f6', '#ef4444']
 
-const WIN_LOSS_DATA = [
-  { name: 'Won', value: 65, color: '#10b981' },
-  { name: 'Lost', value: 25, color: '#ef4444' },
-  { name: 'Pending', value: 10, color: '#9ca3af' },
-]
-
 export default function SalesPerformance() {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['crm', 'sales-performance'],
+    queryFn: crmService.getSalesPerformance,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-surface">
+        <Loader2 className="animate-spin text-muted" size={24} />
+      </div>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="flex h-full items-center justify-center bg-surface text-danger">
+        Failed to load sales performance.
+      </div>
+    );
+  }
+
+  const { closedSpark, repSparks, winLossData } = data;
+
   return (
     <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
       
@@ -46,9 +56,6 @@ export default function SalesPerformance() {
               placeholder="Search..." 
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-56 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 border border-border-default rounded px-1.5 py-0.5 bg-surface-muted">
-              <span className="text-[10px] text-caption font-medium">⌘K</span>
-            </div>
           </div>
           
           <button className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors">
@@ -92,11 +99,11 @@ export default function SalesPerformance() {
               <p className="text-[11px] font-bold text-muted uppercase tracking-wider">Total Closed Won</p>
               <TrendingUp size={16} className="text-success-dot" />
             </div>
-            <p className="text-3xl font-extrabold text-heading tracking-tight relative z-10">$1.45M</p>
+            <p className="text-3xl font-extrabold text-heading tracking-tight relative z-10">$1.25M</p>
             {/* Sparkline Area Chart */}
             <div className="absolute bottom-0 left-0 w-full h-14">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={CLOSED_SPARK} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <AreaChart data={closedSpark} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="closedGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
@@ -151,17 +158,17 @@ export default function SalesPerformance() {
                 <tr className="hover:bg-surface-muted">
                   <td className="px-6 py-4 text-sm text-body-light font-semibold">1</td>
                   <td className="px-2 py-4 flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden shrink-0">
-                      <img src="/api/placeholder/28/28" alt="Sarah Jenkins" className="w-full h-full object-cover opacity-80" />
+                    <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center overflow-hidden shrink-0 text-[10px] font-bold tracking-wider">
+                      SJ
                     </div>
                     <span className="text-sm font-semibold text-heading">Sarah Jenkins</span>
                   </td>
                   <td className="px-6 py-4 text-right text-sm text-body-light font-semibold">68%</td>
-                  <td className="px-6 py-4 text-right text-sm font-bold text-heading tabular-nums">$540k</td>
+                  <td className="px-6 py-4 text-right text-sm font-bold text-heading tabular-nums">$450k</td>
                   <td className="px-6 py-4 text-right">
                     <div className="w-10 h-5 inline-block">
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={REP_SPARKS[0]} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
+                        <AreaChart data={repSparks[0]} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
                           <Area type="monotone" dataKey="v" stroke={REP_SPARK_COLORS[0]} strokeWidth={1.5} fill={REP_SPARK_COLORS[0]} fillOpacity={0.15} dot={false} animationDuration={600} />
                         </AreaChart>
                       </ResponsiveContainer>
@@ -172,17 +179,17 @@ export default function SalesPerformance() {
                 <tr className="hover:bg-surface-muted">
                   <td className="px-6 py-4 text-sm text-body-light font-semibold">2</td>
                   <td className="px-2 py-4 flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full bg-surface-strong flex items-center justify-center overflow-hidden shrink-0">
-                      <img src="/api/placeholder/28/28" alt="Marcus Chen" className="w-full h-full object-cover opacity-80" />
+                    <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center overflow-hidden shrink-0 text-[10px] font-bold tracking-wider">
+                      MC
                     </div>
                     <span className="text-sm font-semibold text-heading">Marcus Chen</span>
                   </td>
                   <td className="px-6 py-4 text-right text-sm text-body-light font-semibold">54%</td>
-                  <td className="px-6 py-4 text-right text-sm font-bold text-heading tabular-nums">$425k</td>
+                  <td className="px-6 py-4 text-right text-sm font-bold text-heading tabular-nums">$350k</td>
                   <td className="px-6 py-4 text-right">
                     <div className="w-10 h-5 inline-block">
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={REP_SPARKS[1]} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
+                        <AreaChart data={repSparks[1]} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
                           <Area type="monotone" dataKey="v" stroke={REP_SPARK_COLORS[1]} strokeWidth={1.5} fill={REP_SPARK_COLORS[1]} fillOpacity={0.15} dot={false} animationDuration={600} />
                         </AreaChart>
                       </ResponsiveContainer>
@@ -193,17 +200,17 @@ export default function SalesPerformance() {
                 <tr className="hover:bg-surface-muted">
                   <td className="px-6 py-4 text-sm text-body-light font-semibold">3</td>
                   <td className="px-2 py-4 flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full bg-surface-strong flex items-center justify-center overflow-hidden shrink-0">
-                      <img src="/api/placeholder/28/28" alt="Jane Doe" className="w-full h-full object-cover opacity-80" />
+                    <div className="w-7 h-7 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center overflow-hidden shrink-0 text-[10px] font-bold tracking-wider">
+                      JD
                     </div>
                     <span className="text-sm font-semibold text-heading">Jane Doe</span>
                   </td>
                   <td className="px-6 py-4 text-right text-sm text-body-light font-semibold">49%</td>
-                  <td className="px-6 py-4 text-right text-sm font-bold text-heading tabular-nums">$310k</td>
+                  <td className="px-6 py-4 text-right text-sm font-bold text-heading tabular-nums">$280k</td>
                   <td className="px-6 py-4 text-right">
                     <div className="w-10 h-5 inline-block">
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={REP_SPARKS[2]} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
+                        <AreaChart data={repSparks[2]} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
                           <Area type="monotone" dataKey="v" stroke={REP_SPARK_COLORS[2]} strokeWidth={1.5} fill={REP_SPARK_COLORS[2]} fillOpacity={0.15} dot={false} animationDuration={600} />
                         </AreaChart>
                       </ResponsiveContainer>
@@ -282,7 +289,7 @@ export default function SalesPerformance() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={WIN_LOSS_DATA}
+                      data={winLossData}
                       cx="50%" cy="50%"
                       innerRadius={50} outerRadius={70}
                       paddingAngle={3}
@@ -290,7 +297,7 @@ export default function SalesPerformance() {
                       animationDuration={1000}
                       stroke="none"
                     >
-                      {WIN_LOSS_DATA.map((entry, i) => (
+                      {winLossData.map((entry, i) => (
                         <Cell key={i} fill={entry.color} />
                       ))}
                     </Pie>
@@ -309,7 +316,7 @@ export default function SalesPerformance() {
 
               {/* Legend */}
               <div className="flex flex-col gap-4">
-                {WIN_LOSS_DATA.map((item) => (
+                {winLossData.map((item) => (
                   <div key={item.name} className="flex items-center justify-between w-28">
                     <div className="flex items-center gap-2">
                       <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></div>
@@ -347,8 +354,8 @@ export default function SalesPerformance() {
                 </div>
                 <div className="flex items-center gap-4">
                   <span className="text-sm font-bold text-heading tabular-nums">$125,000</span>
-                  <div className="w-6 h-6 rounded-full overflow-hidden shrink-0 border border-border-default bg-surface-active">
-                    <img src="/api/placeholder/24/24" alt="Rep" className="w-full h-full object-cover opacity-80" />
+                  <div className="w-6 h-6 rounded-full shrink-0 bg-blue-100 text-blue-700 flex items-center justify-center text-[9px] font-bold tracking-wider">
+                    SJ
                   </div>
                 </div>
               </div>
@@ -366,8 +373,8 @@ export default function SalesPerformance() {
                 </div>
                 <div className="flex items-center gap-4">
                   <span className="text-sm font-bold text-heading tabular-nums">$85,500</span>
-                  <div className="w-6 h-6 rounded-full overflow-hidden shrink-0 border border-border-default bg-surface-active">
-                    <img src="/api/placeholder/24/24" alt="Rep" className="w-full h-full object-cover opacity-80" />
+                  <div className="w-6 h-6 rounded-full shrink-0 bg-purple-100 text-purple-700 flex items-center justify-center text-[9px] font-bold tracking-wider">
+                    MC
                   </div>
                 </div>
               </div>
@@ -385,8 +392,8 @@ export default function SalesPerformance() {
                 </div>
                 <div className="flex items-center gap-4">
                   <span className="text-sm font-bold text-heading tabular-nums">$60,000</span>
-                  <div className="w-6 h-6 rounded-full overflow-hidden shrink-0 border border-border-default bg-surface-active">
-                    <img src="/api/placeholder/24/24" alt="Rep" className="w-full h-full object-cover opacity-80" />
+                  <div className="w-6 h-6 rounded-full shrink-0 bg-orange-100 text-orange-700 flex items-center justify-center text-[9px] font-bold tracking-wider">
+                    JD
                   </div>
                 </div>
               </div>

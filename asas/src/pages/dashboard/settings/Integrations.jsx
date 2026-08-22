@@ -46,6 +46,20 @@ const INTEGRATIONS = [
 
 export default function SettingsIntegrations() {
   const [selectedId, setSelectedId] = useState('github');
+  const [syncPullRequests, setSyncPullRequests] = useState(true);
+  const [syncCICD, setSyncCICD] = useState(false);
+
+  const selectedIntegration = INTEGRATIONS.find(i => i.id === selectedId) || INTEGRATIONS[0];
+
+  const renderIntegrationIcon = (id) => {
+    switch(id) {
+      case 'github': return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center font-bold text-xl rounded-button shadow-inner">G</div>;
+      case 'slack': return <div className="w-full h-full bg-purple-600 text-white flex items-center justify-center font-bold text-xl rounded-button shadow-inner">S</div>;
+      case 'stripe': return <div className="w-full h-full bg-indigo-500 text-white flex items-center justify-center font-bold text-xl rounded-button shadow-inner">S</div>;
+      case 'aws': return <div className="w-full h-full bg-orange-500 text-white flex items-center justify-center font-bold text-xl rounded-button shadow-inner">A</div>;
+      default: return <Cloud size={24} className="text-muted" />;
+    }
+  };
 
   return (
     <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
@@ -59,9 +73,6 @@ export default function SettingsIntegrations() {
               placeholder="Search integrations..." 
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 border border-border-default rounded px-1.5 py-0.5 bg-surface-muted">
-              <span className="text-[10px] text-caption font-medium">⌘K</span>
-            </div>
           </div>
           
           <button className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised">
@@ -87,16 +98,7 @@ export default function SettingsIntegrations() {
             {INTEGRATIONS.map((integration) => {
               const isSelected = selectedId === integration.id;
               
-              // Map mock icons to rendering
-              const renderIcon = () => {
-                switch(integration.id) {
-                  case 'github': return <Cloud size={24} className="text-heading" />;
-                  case 'slack': return <Cloud size={24} className="text-danger" />;
-                  case 'stripe': return <span className="font-bold text-xl text-accent">S</span>;
-                  case 'aws': return <span className="font-bold text-xl text-warning">a,</span>;
-                  default: return <Cloud size={24} />;
-                }
-              };
+              // Mapped through renderIntegrationIcon
 
               return (
                 <div 
@@ -109,8 +111,8 @@ export default function SettingsIntegrations() {
                   }`}
                 >
                   <div className="flex items-start justify-between mb-8">
-                    <div className="w-12 h-12 bg-surface-muted border border-border-subtle rounded-button flex items-center justify-center shrink-0">
-                      {renderIcon()}
+                    <div className="w-12 h-12 flex items-center justify-center shrink-0">
+                      {renderIntegrationIcon(integration.id)}
                     </div>
                     {integration.status === 'Connected' ? (
                       <span className="inline-flex items-center gap-1.5 bg-success-light text-success-text px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide">
@@ -127,6 +129,13 @@ export default function SettingsIntegrations() {
                     <h3 className="text-base font-bold text-heading mb-1">{integration.name}</h3>
                     <p className="text-sm text-muted">{integration.desc}</p>
                   </div>
+                  
+                  {/* Barcode / Sparkline Fix: Conditionally render with strict bounds */}
+                  {integration.activityData && integration.activityData.length > 0 && (
+                    <div className="h-10 w-full mt-4 overflow-hidden relative">
+                      {/* SVG Sparkline or Graph renders here */}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -141,10 +150,10 @@ export default function SettingsIntegrations() {
             
             {/* Header */}
             <div className="flex items-center gap-4 mb-10">
-              <div className="w-10 h-10 bg-surface-muted border border-border-subtle rounded-button flex items-center justify-center shrink-0">
-                <Cloud size={20} className="text-heading" />
+              <div className="w-10 h-10 flex items-center justify-center shrink-0">
+                {renderIntegrationIcon(selectedIntegration.id)}
               </div>
-              <h2 className="text-xl font-bold text-heading">GitHub Enterprise</h2>
+              <h2 className="text-xl font-bold text-heading">{selectedIntegration.name}</h2>
             </div>
             
             {/* Configuration Options */}
@@ -155,18 +164,16 @@ export default function SettingsIntegrations() {
                 {/* Option 1 */}
                 <div className="flex items-center justify-between p-4">
                   <span className="text-sm font-semibold text-heading">Sync Pull Requests</span>
-                  {/* Toggle ON */}
-                  <div className="w-10 h-5 bg-accent rounded-full relative flex items-center px-0.5 cursor-pointer shadow-panel">
-                    <div className="w-4 h-4 bg-on-primary rounded-full translate-x-5 transition-transform shadow-card"></div>
+                  <div onClick={() => setSyncPullRequests(!syncPullRequests)} className={`w-10 h-5 rounded-full relative flex items-center px-0.5 cursor-pointer shadow-panel ${syncPullRequests ? 'bg-accent' : 'bg-surface-strong'}`}>
+                    <div className={`w-4 h-4 bg-on-primary rounded-full transition-transform shadow-card ${syncPullRequests ? 'translate-x-5' : 'border border-border-strong'}`}></div>
                   </div>
                 </div>
 
                 {/* Option 2 */}
                 <div className="flex items-center justify-between p-4">
                   <span className="text-sm font-semibold text-heading">Sync CI/CD Status</span>
-                  {/* Toggle OFF */}
-                  <div className="w-10 h-5 bg-surface-strong rounded-full relative flex items-center px-0.5 cursor-pointer shadow-panel">
-                    <div className="w-4 h-4 bg-on-primary rounded-full transition-transform shadow-card border border-border-strong"></div>
+                  <div onClick={() => setSyncCICD(!syncCICD)} className={`w-10 h-5 rounded-full relative flex items-center px-0.5 cursor-pointer shadow-panel ${syncCICD ? 'bg-accent' : 'bg-surface-strong'}`}>
+                    <div className={`w-4 h-4 bg-on-primary rounded-full transition-transform shadow-card ${syncCICD ? 'translate-x-5' : 'border border-border-strong'}`}></div>
                   </div>
                 </div>
 
@@ -203,14 +210,16 @@ export default function SettingsIntegrations() {
                   <span className="text-terminal-muted opacity-60">(15m ago)</span>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-terminal-error font-bold">500 ERR</span>
-                    <span className="text-terminal-muted">:</span>
-                    <span className="text-terminal-text">check_suite.rerequested</span>
+                {syncCICD && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-terminal-error font-bold">500 ERR</span>
+                      <span className="text-terminal-muted">:</span>
+                      <span className="text-terminal-text">check_suite.rerequested</span>
+                    </div>
+                    <span className="text-terminal-muted opacity-60">(1h ago)</span>
                   </div>
-                  <span className="text-terminal-muted opacity-60">(1h ago)</span>
-                </div>
+                )}
 
               </div>
             </div>

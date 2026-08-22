@@ -2,52 +2,80 @@ import React from 'react';
 import { 
   ChevronRight, Calendar, Search, Download, 
   Wallet, RefreshCw, FileText, Flame, 
-  MoreHorizontal, AlertTriangle, TrendingUp 
+  MoreHorizontal, AlertTriangle, TrendingUp, Loader2
 } from 'lucide-react';
 import {
   AreaChart, Area, ComposedChart, Bar, Line, XAxis, YAxis,
-  CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
+  CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts'
-
-// ── Chart Data ──────────────────────────────────────────────────────
-const MRR_SPARKLINE = [
-  { v: 140 }, { v: 155 }, { v: 148 }, { v: 162 }, { v: 158 }, { v: 170 }, { v: 175 }, { v: 185 },
-]
-
-const CASH_FLOW_CHART = [
-  { month: 'Jan', inflow: 180000, outflow: -120000, net: 60000 },
-  { month: 'Feb', inflow: 250000, outflow: -150000, net: 100000 },
-  { month: 'Mar', inflow: 210000, outflow: -170000, net: 40000 },
-  { month: 'Apr', inflow: 300000, outflow: -160000, net: 140000 },
-  { month: 'May', inflow: 230000, outflow: -160000, net: 70000 },
-  { month: 'Jun', inflow: 340000, outflow: -160000, net: 180000 },
-]
-
-const EXPENSE_DATA = [
-  { name: 'Payroll', value: 45, color: 'var(--color-info)' },
-  { name: 'Marketing', value: 30, color: 'var(--color-chart-orange)' },
-  { name: 'Software', value: 15, color: 'var(--color-chart-purple)' },
-  { name: 'Office', value: 10, color: 'var(--color-caption)' },
-]
-
-// ── Mock Data ────────────────────────────────────────────────
-const RECENT_TRANSACTIONS = [
-  { id: '1', date: 'Today', description: 'Stripe Payout', amount: 12450.00, status: 'Cleared', type: 'positive' },
-  { id: '2', date: 'Yesterday', description: 'AWS Cloud Hosting', amount: -3240.00, status: 'Cleared', type: 'negative' },
-  { id: '3', date: 'Jun 02', description: 'Acme Corp Retainer', amount: 45000.00, status: 'Processing', type: 'positive' },
-];
-
-const formatCurrency = (num) => {
-  const isNegative = num < 0;
-  const formatted = new Intl.NumberFormat('en-US', {
-    style: 'currency', currency: 'USD', minimumFractionDigits: 2
-  }).format(Math.abs(num));
-  return isNegative ? `-${formatted}` : `+${formatted}`;
-};
-
+import { useQuery } from '@tanstack/react-query';
+import { financeService } from '../../../services/finance.service';
 import TopBarActions from '../../../components/TopBarActions';
 
+const formatCurrency = (num, forcePlus = false, compact = false) => {
+  const isNegative = num < 0;
+  const options = { style: 'currency', currency: 'USD' };
+  
+  if (compact) {
+    options.notation = 'compact';
+    options.maximumFractionDigits = 1;
+  } else {
+    options.minimumFractionDigits = 2;
+  }
+
+  const formatted = new Intl.NumberFormat('en-US', options).format(Math.abs(num));
+  if (isNegative) return `-${formatted}`;
+  return forcePlus ? `+${formatted}` : formatted;
+};
+
+const EXPENSE_COLORS = [
+  'var(--color-info)',
+  'var(--color-chart-orange)',
+  'var(--color-chart-purple)',
+  'var(--color-caption)',
+  'var(--color-chart-positive)',
+  'var(--color-chart-negative)',
+]
+
 export default function FinanceOverview() {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['finance', 'overview'],
+    queryFn: financeService.getOverview,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-surface">
+        <Loader2 className="animate-spin text-muted" size={24} />
+      </div>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="flex h-full items-center justify-center bg-surface text-danger">
+        Failed to load finance overview.
+      </div>
+    );
+  }
+
+  const mrrSparkline = data.mrrSparkline.map((v, i) => ({ v, id: i }))
+  
+  const totalExpense = data.expenseBreakdown.reduce((sum, e) => sum + e.value, 0) || 1;
+  const expenseData = [...data.expenseBreakdown]
+    .sort((a, b) => b.value - a.value)
+    .map((e, i) => ({
+      name: e.name,
+      value: e.value, // raw value for Pie
+      pct: Math.round((e.value / totalExpense) * 100), // percentage for Legend
+      color: EXPENSE_COLORS[i % EXPENSE_COLORS.length]
+    }));
+
+  // Fallback if no expenses
+  if (expenseData.length === 0) {
+    expenseData.push({ name: 'None', value: 1, pct: 100, color: 'var(--color-caption)' });
+  }
+
   return (
     <div className="flex h-full flex-col bg-surface overflow-x-hidden min-w-[1000px]">
       
@@ -66,9 +94,6 @@ export default function FinanceOverview() {
               placeholder="Search..." 
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-56 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 border border-border-default rounded px-1.5 py-0.5 bg-surface-muted">
-              <span className="text-[10px] text-caption font-medium">⌘K</span>
-            </div>
           </div>
           
           <button className="p-1.5 text-muted hover:text-heading transition-colors">
@@ -106,11 +131,11 @@ export default function FinanceOverview() {
               <p className="text-[10px] font-bold text-muted uppercase tracking-wider w-3/4">Monthly Recurring Rev (MRR)</p>
               <RefreshCw size={16} className="text-caption" />
             </div>
-            <p className="text-3xl font-extrabold text-heading tracking-tight relative z-10">$185k</p>
+            <p className="text-3xl font-extrabold text-heading tracking-tight relative z-10">{formatCurrency(mrrSparkline[mrrSparkline.length - 1]?.v || 0)}</p>
             {/* MRR Sparkline */}
             <div className="absolute bottom-0 left-0 w-full h-12">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={MRR_SPARKLINE} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <AreaChart data={mrrSparkline} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="mrrGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="var(--color-chart-blue)" stopOpacity={0.3} />
@@ -164,18 +189,21 @@ export default function FinanceOverview() {
           <div className="p-6 pt-0">
             <div className="w-full h-[320px] mt-4">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={CASH_FLOW_CHART} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <ComposedChart data={data.cashFlows} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--color-muted)', fontWeight: 500 }} dy={8} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-caption)', fontWeight: 600 }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                   <Tooltip
-                    contentStyle={{ borderRadius: 'var(--radius-button)', border: '1px solid var(--color-border-default)', boxShadow: 'var(--shadow-card-hover)', fontSize: 13 }}
+                    contentStyle={{ borderRadius: 'var(--radius-button)', border: '1px solid var(--color-border-default)', boxShadow: 'var(--shadow-card-hover)', fontSize: 13, padding: '12px', lineHeight: '1.5' }}
                     formatter={(value, name) => {
                       const label = name === 'inflow' ? 'Inflow' : name === 'outflow' ? 'Outflow' : 'Net'
-                      return [`$${(Math.abs(value) / 1000).toFixed(0)}k`, label]
+                      // Do not use Math.abs() for Net so negative values render correctly in the tooltip
+                      const formattedValue = name === 'net' ? (value / 1000).toFixed(0) : Math.abs(value / 1000).toFixed(0)
+                      return [`$${formattedValue}k`, label]
                     }}
                     labelStyle={{ fontWeight: 600, color: 'var(--color-heading)' }}
                   />
+                  <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 13, fontWeight: 500, color: 'var(--color-muted)' }} formatter={(value) => value.charAt(0).toUpperCase() + value.slice(1)} />
                   <Bar dataKey="inflow" fill="var(--color-chart-positive)" radius={[4, 4, 0, 0]} barSize={20} animationDuration={1000} />
                   <Bar dataKey="outflow" fill="var(--color-chart-negative)" radius={[4, 4, 0, 0]} barSize={20} animationDuration={1000} />
                   <Line type="monotone" dataKey="net" stroke="var(--color-chart-primary)" strokeWidth={3} dot={{ r: 4, fill: 'var(--color-chart-primary)', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} animationDuration={1200} />
@@ -207,19 +235,23 @@ export default function FinanceOverview() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-faint">
-                  {RECENT_TRANSACTIONS.map((tx) => (
+                  {data.recentTransactions.map((tx) => (
                     <tr key={tx.id} className="hover:bg-surface-muted/50">
-                      <td className="px-6 py-4 text-sm text-body-light font-medium">{tx.date}</td>
+                      <td className="px-6 py-4 text-sm text-body-light font-medium">
+                        {new Date(tx.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit' })}
+                      </td>
                       <td className="px-6 py-4 text-sm font-bold text-heading">{tx.description}</td>
                       <td className={`px-6 py-4 text-sm font-medium text-right tabular-nums ${
-                        tx.type === 'positive' ? 'text-success' : 'text-heading'
+                        tx.type === 'credit' ? 'text-success' : 'text-heading'
                       }`}>
-                        {formatCurrency(tx.amount)}
+                        {formatCurrency(tx.type === 'debit' ? -tx.amount : tx.amount, tx.type === 'credit')}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                          tx.status === 'Cleared' 
-                            ? 'bg-success-light text-success border border-success-border' 
+                          tx.status === 'CLEARED' 
+                            ? (tx.type === 'credit' 
+                                ? 'bg-success-light text-success border border-success-border'
+                                : 'bg-surface-muted text-body border border-border-default')
                             : 'bg-surface-muted text-body-light border border-border-default'
                         }`}>
                           {tx.status}
@@ -227,6 +259,13 @@ export default function FinanceOverview() {
                       </td>
                     </tr>
                   ))}
+                  {data.recentTransactions.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-8 text-center text-muted text-sm">
+                        No recent transactions found.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -241,7 +280,7 @@ export default function FinanceOverview() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={EXPENSE_DATA}
+                    data={expenseData}
                     cx="50%" cy="50%"
                     innerRadius={55} outerRadius={80}
                     paddingAngle={3}
@@ -249,31 +288,31 @@ export default function FinanceOverview() {
                     animationDuration={1000}
                     stroke="none"
                   >
-                    {EXPENSE_DATA.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
+                    {expenseData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip
                     contentStyle={{ borderRadius: 'var(--radius-button)', border: '1px solid var(--color-border-default)', boxShadow: 'var(--shadow-card-hover)', fontSize: 13 }}
-                    formatter={(value, name) => [`${value}%`, name]}
+                    formatter={(value) => [formatCurrency(value), '']}
                   />
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <span className="text-[10px] font-bold text-caption uppercase tracking-widest">Total</span>
-                <span className="text-2xl font-extrabold text-heading mt-0.5">$45,000</span>
+                <span className="text-2xl font-extrabold text-heading mt-0.5">{formatCurrency(totalExpense, false, true)}</span>
               </div>
             </div>
 
             {/* Legend */}
-            <div className="grid grid-cols-2 gap-y-4 gap-x-2 mt-auto">
-              {EXPENSE_DATA.map((item) => (
-                <div key={item.name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></div>
-                    <span className="text-xs font-semibold text-body-light">{item.name}</span>
+            <div className="flex flex-col gap-3 mt-auto">
+              {expenseData.map((item) => (
+                <div key={item.name} className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }}></div>
+                    <span className="text-xs font-semibold text-body-light truncate">{item.name}</span>
                   </div>
-                  <span className="text-xs font-bold text-heading">{item.value}%</span>
+                  <span className="text-xs font-bold text-heading shrink-0">{item.pct}%</span>
                 </div>
               ))}
             </div>

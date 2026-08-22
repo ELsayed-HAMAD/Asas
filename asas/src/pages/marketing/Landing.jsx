@@ -191,8 +191,8 @@ const FEATURES = [
     preview: <RoutingPreview />,
   },
   {
-    title: 'Enterprise-Grade Security',
-    desc:  'Bank-level encryption, SOC2 compliance, and granular role-based access control.',
+    title: 'Workspace isolation',
+    desc:  'Each company is a separate tenant. Sessions use short-lived JWTs; passwords are hashed. Roles control who can change payroll, settings, and records.',
     preview: <SecurityPreview />,
   },
 ]

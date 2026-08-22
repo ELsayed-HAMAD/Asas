@@ -11,35 +11,16 @@ import {
   Filter, 
   AlertTriangle, 
   TrendingDown,
-  Info
+  Info,
+  Loader2
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Legend
 } from 'recharts'
-
-// ── Mock Data ────────────────────────────────────────────────
-
-const FORECAST_BY_REP = [
-  { id: '1', name: 'Alex Mercer', closed: 1200000, commit: 450000, bestCase: 200000, quotaPct: 85, color: 'bg-green-500' },
-  { id: '2', name: 'Sarah Jenkins', closed: 950000, commit: 300000, bestCase: 400000, quotaPct: 62, color: 'bg-blue-600' },
-  { id: '3', name: 'David Chen', closed: 820000, commit: 150000, bestCase: 100000, quotaPct: 45, color: 'bg-orange-500' },
-];
-
-const CHART_DATA = [
-  { month: 'Jan', closed: 450000, commit: 180000, pipeline: 150000 },
-  { month: 'Feb', closed: 550000, commit: 150000, pipeline: 100000 },
-  { month: 'Mar', closed: 680000, commit: 100000, pipeline: 200000 },
-  { month: 'Apr', closed: 350000, commit: 150000, pipeline: 0 },
-  { month: 'May', closed: 450000, commit: 120000, pipeline: 250000 },
-  { month: 'Jun', closed: 350000, commit: 250000, pipeline: 300000 },
-  { month: 'Jul', closed: 150000, commit: 200000, pipeline: 0 },
-  { month: 'Aug', closed: 50000, commit: 150000, pipeline: 0 },
-  { month: 'Sep', closed: 20000, commit: 230000, pipeline: 700000 },
-  { month: 'Oct', closed: 0, commit: 100000, pipeline: 550000 },
-  { month: 'Nov', closed: 0, commit: 80000, pipeline: 680000 },
-  { month: 'Dec', closed: 0, commit: 50000, pipeline: 1100000 },
-];
+import { useQuery } from '@tanstack/react-query';
+import { crmService } from '../../../services/crm.service';
+import TopBarActions from '../../../components/TopBarActions';
 
 const formatCurrency = (num) => {
   if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
@@ -47,9 +28,29 @@ const formatCurrency = (num) => {
   return `$${num}`;
 };
 
-import TopBarActions from '../../../components/TopBarActions';
-
 export default function RevenueForecast() {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['crm', 'forecast'],
+    queryFn: crmService.getForecast,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#fafafa]">
+        <Loader2 className="animate-spin text-gray-400" size={24} />
+      </div>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#fafafa] text-red-500">
+        Failed to load revenue forecast.
+      </div>
+    );
+  }
+
+  const { forecastByRep, chartData } = data;
 
   return (
     <div className="flex h-full flex-col bg-[#fafafa] overflow-hidden min-w-[1000px]">
@@ -63,9 +64,6 @@ export default function RevenueForecast() {
               placeholder="Search..." 
               className="pl-9 pr-12 py-1.5 text-sm border border-gray-200 rounded-md bg-white w-56 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 border border-gray-200 rounded px-1.5 py-0.5 bg-gray-50">
-              <span className="text-[10px] text-gray-400 font-medium">⌘K</span>
-            </div>
           </div>
           
           <div className="h-6 w-px bg-gray-200 mx-1"></div>
@@ -173,7 +171,7 @@ export default function RevenueForecast() {
           {/* Recharts Stacked Bar Chart */}
           <div className="w-full h-[360px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={CHART_DATA} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
+              <BarChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280', fontWeight: 500 }} dy={8} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af', fontWeight: 500 }} tickFormatter={(v) => v >= 1000000 ? `$${(v/1000000).toFixed(1)}M` : `$${(v/1000).toFixed(0)}k`} />
@@ -216,7 +214,7 @@ export default function RevenueForecast() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {FORECAST_BY_REP.map((rep) => (
+                {forecastByRep.map((rep) => (
                   <tr key={rep.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 flex items-center gap-3">
                       <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden shrink-0 border border-gray-200">
@@ -230,7 +228,7 @@ export default function RevenueForecast() {
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
                         <div className="w-12 bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                          <div className={`h-full rounded-full ${rep.color}`} style={{ width: `${rep.quotaPct}%` }}></div>
+                          <div className={`h-full rounded-full ${rep.color || 'bg-blue-500'}`} style={{ width: `${rep.quotaPct}%` }}></div>
                         </div>
                         <span className="text-xs font-semibold text-gray-600 w-8 text-right">{rep.quotaPct}%</span>
                       </div>

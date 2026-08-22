@@ -126,8 +126,65 @@ function StatCard({ stat }) {
 }
 
 import TopBarActions from '../../components/TopBarActions';
+import { useQuery } from '@tanstack/react-query';
+import { dashboardService } from '../../services/dashboard.service';
+import { Loader2 } from 'lucide-react';
 
 export default function DashboardOverview() {
+  const { data: responseData, isLoading, isError } = useQuery({
+    queryKey: ['dashboard', 'overview'],
+    queryFn: dashboardService.getOverview,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center flex-1 p-8">
+        <Loader2 className="animate-spin text-muted" size={32} />
+      </div>
+    );
+  }
+
+  if (isError || !responseData) {
+    return (
+      <div className="flex h-full items-center justify-center flex-1 p-8 text-danger">
+        Failed to load dashboard overview.
+      </div>
+    );
+  }
+
+  const metrics = responseData?.data?.metrics || {};
+
+  const stats = [
+    {
+      label: 'Monthly Revenue',
+      value: new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(metrics.monthlyRevenue || 0),
+      change: 'This month',
+      trend: 'up',
+      icon: DollarSign,
+    },
+    {
+      label: 'Active Deals',
+      value: metrics.activeDeals?.toString() || '0',
+      change: 'In pipeline',
+      trend: 'neutral',
+      icon: TrendingUp,
+    },
+    {
+      label: 'Total Headcount',
+      value: metrics.totalUsers?.toString() || '0',
+      change: 'System users',
+      trend: 'up',
+      icon: Users,
+    },
+    {
+      label: 'Open Projects',
+      value: metrics.openProjects?.toString() || '0',
+      change: 'Active & planned',
+      trend: 'down',
+      icon: CreditCard,
+    },
+  ];
+
   return (
     <div className="p-page md:p-page max-w-7xl mx-auto space-y-section">
       
@@ -141,7 +198,7 @@ export default function DashboardOverview() {
 
       {/* ── KPI Grid ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-grid-lg">
-        {STATS.map((stat, i) => (
+        {stats.map((stat, i) => (
           <StatCard key={i} stat={stat} />
         ))}
       </div>

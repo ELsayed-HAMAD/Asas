@@ -1,0 +1,403 @@
+{
+  "departments": [
+    { "key": "engineering", "name": "Engineering" },
+    { "key": "product", "name": "Product" },
+    { "key": "sales", "name": "Sales" },
+    { "key": "hr", "name": "HR" },
+    { "key": "data", "name": "Data" },
+    { "key": "marketing", "name": "Marketing" },
+    { "key": "it", "name": "IT" },
+    { "key": "finance", "name": "Finance" }
+  ],
+  "employees": [
+    {
+      "key": "elena",
+      "name": "Elena Rodriguez",
+      "title": "VP of Engineering",
+      "departmentKey": "engineering",
+      "status": "ACTIVE",
+      "hiredAt": "2019-03-12",
+      "salary": 210000,
+      "equityOptions": 12000,
+      "band": "E7",
+      "location": "San Francisco, CA",
+      "employeeNumber": "EMP-1001",
+      "email": "elena@example.com"
+    },
+    {
+      "key": "sarah",
+      "name": "Sarah Jenkins",
+      "title": "Frontend Developer",
+      "departmentKey": "engineering",
+      "managerKey": "elena",
+      "status": "ACTIVE",
+      "hiredAt": "2021-06-15",
+      "salary": 125000,
+      "equityOptions": 2500,
+      "band": "E4",
+      "location": "Austin, TX",
+      "employeeNumber": "EMP-1042",
+      "email": "sarah@example.com"
+    },
+    {
+      "key": "marcus",
+      "name": "Marcus Chen",
+      "title": "DevOps Engineer",
+      "departmentKey": "engineering",
+      "managerKey": "elena",
+      "status": "ACTIVE",
+      "hiredAt": "2020-11-02",
+      "salary": 138000,
+      "equityOptions": 3000,
+      "band": "E5",
+      "location": "Seattle, WA",
+      "employeeNumber": "EMP-1033",
+      "email": "marcus@example.com"
+    },
+    {
+      "key": "david",
+      "name": "David Lee",
+      "title": "UX Researcher",
+      "departmentKey": "product",
+      "status": "ON_LEAVE",
+      "hiredAt": "2022-01-20",
+      "salary": 115000,
+      "equityOptions": 1800,
+      "band": "P4",
+      "location": "Remote",
+      "employeeNumber": "EMP-1108",
+      "email": "david@example.com"
+    },
+    {
+      "key": "michael",
+      "name": "Michael Chang",
+      "title": "QA Tester",
+      "departmentKey": "engineering",
+      "managerKey": "elena",
+      "status": "ACTIVE",
+      "hiredAt": "2023-04-10",
+      "salary": 98000,
+      "band": "E3",
+      "location": "Austin, TX",
+      "employeeNumber": "EMP-1180",
+      "email": "michael@example.com"
+    },
+    {
+      "key": "jessica",
+      "name": "Jessica Smith",
+      "title": "Product Designer",
+      "departmentKey": "product",
+      "status": "ACTIVE",
+      "hiredAt": "2021-09-01",
+      "salary": 122000,
+      "band": "P4",
+      "location": "New York, NY",
+      "employeeNumber": "EMP-1055",
+      "email": "jessica@example.com"
+    },
+    {
+      "key": "robert",
+      "name": "Robert Fox",
+      "title": "Account Executive",
+      "departmentKey": "sales",
+      "status": "ACTIVE",
+      "hiredAt": "2020-05-18",
+      "salary": 95000,
+      "band": "S4",
+      "location": "Chicago, IL",
+      "employeeNumber": "EMP-1020",
+      "email": "robert@example.com"
+    },
+    {
+      "key": "amanda",
+      "name": "Amanda Cooper",
+      "title": "Sales Dev Rep",
+      "departmentKey": "sales",
+      "managerKey": "robert",
+      "status": "ACTIVE",
+      "hiredAt": "2023-02-14",
+      "salary": 72000,
+      "band": "S2",
+      "location": "Chicago, IL",
+      "employeeNumber": "EMP-1192",
+      "email": "amanda@example.com"
+    },
+    {
+      "key": "thomas",
+      "name": "Thomas Wright",
+      "title": "Backend Engineer",
+      "departmentKey": "engineering",
+      "managerKey": "elena",
+      "status": "ACTIVE",
+      "hiredAt": "2019-08-22",
+      "salary": 145000,
+      "equityOptions": 4000,
+      "band": "E5",
+      "location": "San Francisco, CA",
+      "employeeNumber": "EMP-1012",
+      "email": "thomas@example.com"
+    },
+    {
+      "key": "lisa",
+      "name": "Lisa Taylor",
+      "title": "HR Manager",
+      "departmentKey": "hr",
+      "status": "ACTIVE",
+      "hiredAt": "2018-01-08",
+      "salary": 130000,
+      "band": "H5",
+      "location": "Austin, TX",
+      "employeeNumber": "EMP-1004",
+      "email": "lisa@example.com"
+    },
+    {
+      "key": "james",
+      "name": "James Wilson",
+      "title": "Data Scientist",
+      "departmentKey": "data",
+      "status": "ACTIVE",
+      "hiredAt": "2022-07-11",
+      "salary": 140000,
+      "band": "D5",
+      "location": "Remote",
+      "employeeNumber": "EMP-1144",
+      "email": "james@example.com"
+    },
+    {
+      "key": "karen",
+      "name": "Karen Martinez",
+      "title": "Marketing Dir.",
+      "departmentKey": "marketing",
+      "status": "ACTIVE",
+      "hiredAt": "2019-11-30",
+      "salary": 155000,
+      "band": "M6",
+      "location": "New York, NY",
+      "employeeNumber": "EMP-1018",
+      "email": "karen@example.com"
+    },
+    {
+      "key": "steven",
+      "name": "Steven White",
+      "title": "Systems Admin",
+      "departmentKey": "it",
+      "status": "ACTIVE",
+      "hiredAt": "2021-03-03",
+      "salary": 105000,
+      "band": "I4",
+      "location": "Austin, TX",
+      "employeeNumber": "EMP-1077",
+      "email": "steven@example.com"
+    },
+    {
+      "key": "nancy",
+      "name": "Nancy Hall",
+      "title": "Financial Analyst",
+      "departmentKey": "finance",
+      "status": "ACTIVE",
+      "hiredAt": "2020-09-15",
+      "salary": 110000,
+      "band": "F4",
+      "location": "Chicago, IL",
+      "employeeNumber": "EMP-1061",
+      "email": "nancy@example.com"
+    }
+  ],
+  "payrollRun": {
+    "label": "March 2026 Semi-Monthly",
+    "payDate": "2026-03-15",
+    "status": "PENDING",
+    "lines": [
+      {
+        "employeeKey": "sarah",
+        "gross": 5208.33,
+        "deductions": 1245.2,
+        "net": 3963.13,
+        "baseSalary": 5208.33,
+        "missedDaysCount": 0,
+        "missedDaysAmount": 0,
+        "bonusLabel": "Performance",
+        "bonusAmount": 0,
+        "taxes": [
+          { "label": "Federal Income Tax", "amount": 780.5, "override": false },
+          { "label": "State Tax", "amount": 312.4, "override": false },
+          { "label": "Social Security", "amount": 152.3, "override": false }
+        ]
+      },
+      {
+        "employeeKey": "marcus",
+        "gross": 5750,
+        "deductions": 1380,
+        "net": 4370,
+        "baseSalary": 5750,
+        "taxes": [
+          { "label": "Federal Income Tax", "amount": 860, "override": false },
+          { "label": "State Tax", "amount": 340, "override": false },
+          { "label": "Social Security", "amount": 180, "override": false }
+        ]
+      },
+      {
+        "employeeKey": "elena",
+        "gross": 8750,
+        "deductions": 2100,
+        "net": 6650,
+        "baseSalary": 8750,
+        "bonusLabel": "Leadership stipend",
+        "bonusAmount": 500,
+        "taxes": [
+          { "label": "Federal Income Tax", "amount": 1400, "override": false },
+          { "label": "State Tax", "amount": 450, "override": false },
+          { "label": "Social Security", "amount": 250, "override": false }
+        ]
+      }
+    ]
+  },
+  "leaveRequests": [
+    {
+      "employeeKey": "david",
+      "type": "VACATION",
+      "startDate": "2026-03-10",
+      "endDate": "2026-03-21",
+      "status": "APPROVED"
+    },
+    {
+      "employeeKey": "jessica",
+      "type": "SICK",
+      "startDate": "2026-03-18",
+      "endDate": "2026-03-19",
+      "status": "PENDING"
+    },
+    {
+      "employeeKey": "amanda",
+      "type": "PERSONAL",
+      "startDate": "2026-03-25",
+      "endDate": "2026-03-25",
+      "status": "PENDING"
+    }
+  ],
+  "attendanceExceptions": [
+    {
+      "employeeKey": "marcus",
+      "type": "MISSING_OUT",
+      "label": "Missing clock-out",
+      "date": "2026-03-17",
+      "alert": true
+    },
+    {
+      "employeeKey": "thomas",
+      "type": "OVERTIME",
+      "label": "Overtime 3.5h",
+      "date": "2026-03-16",
+      "alert": true
+    },
+    {
+      "employeeKey": "michael",
+      "type": "MISSING_IN",
+      "label": "Missing clock-in",
+      "date": "2026-03-18",
+      "alert": true
+    }
+  ],
+  "timesheets": [
+    {
+      "employeeKey": "sarah",
+      "weekStart": "2026-03-16",
+      "regularHours": 40,
+      "overtimeHours": 2,
+      "totalHours": 42,
+      "days": [
+        { "dayLabel": "Mon", "clockIn": "09:02", "clockOut": "17:15", "totalHours": 8.2 },
+        { "dayLabel": "Tue", "clockIn": "08:55", "clockOut": "17:05", "totalHours": 8.1 },
+        { "dayLabel": "Wed", "clockIn": "09:10", "clockOut": "18:30", "totalHours": 9.3 },
+        { "dayLabel": "Thu", "clockIn": "09:00", "clockOut": "17:00", "totalHours": 8 },
+        { "dayLabel": "Fri", "clockIn": "08:45", "clockOut": "17:00", "totalHours": 8.2 }
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "key": "alex",
+      "name": "Alex Rivera",
+      "role": "Senior Frontend Engineer",
+      "stage": "TECH_INTERVIEW",
+      "timeInStage": "3 days",
+      "appliedAt": "2026-03-01",
+      "currentRole": "Frontend Lead @ Northwind",
+      "experience": "7 years",
+      "source": "LinkedIn",
+      "location": "Austin, TX",
+      "email": "alex.rivera@email.com",
+      "education": "B.S. Computer Science",
+      "activities": [
+        { "action": "Moved to Tech Interview", "description": "Passed screening with Elena", "createdAt": "2026-03-12T15:00:00.000Z" },
+        { "action": "Resume reviewed", "description": "Strong React/TypeScript background", "createdAt": "2026-03-02T10:00:00.000Z" }
+      ]
+    },
+    {
+      "key": "priya",
+      "name": "Priya Shah",
+      "role": "Backend Engineer",
+      "stage": "SCREENING",
+      "timeInStage": "1 day",
+      "appliedAt": "2026-03-15",
+      "currentRole": "Software Engineer @ Contoso",
+      "experience": "5 years",
+      "source": "Referral",
+      "location": "Remote",
+      "email": "priya.shah@email.com",
+      "education": "M.S. Software Engineering",
+      "activities": [
+        { "action": "Application received", "description": "Referred by Thomas Wright", "createdAt": "2026-03-15T09:00:00.000Z" }
+      ]
+    },
+    {
+      "key": "jordan",
+      "name": "Jordan Blake",
+      "role": "Product Designer",
+      "stage": "APPLIED",
+      "timeInStage": "2 hours",
+      "appliedAt": "2026-03-18",
+      "currentRole": "Designer @ Figma-ish",
+      "experience": "4 years",
+      "source": "Careers page",
+      "location": "New York, NY",
+      "email": "jordan.blake@email.com",
+      "education": "B.F.A. Interaction Design",
+      "activities": []
+    },
+    {
+      "key": "sam",
+      "name": "Sam Okonkwo",
+      "role": "DevOps Engineer",
+      "stage": "FINAL_INTERVIEW",
+      "timeInStage": "5 days",
+      "appliedAt": "2026-02-20",
+      "currentRole": "SRE @ CloudCo",
+      "experience": "8 years",
+      "source": "Agency",
+      "location": "Seattle, WA",
+      "email": "sam.okonkwo@email.com",
+      "education": "B.S. Information Systems",
+      "activities": [
+        { "action": "Final interview scheduled", "description": "Panel with Elena and Marcus", "createdAt": "2026-03-10T14:00:00.000Z" }
+      ]
+    },
+    {
+      "key": "maya",
+      "name": "Maya Chen",
+      "role": "Account Executive",
+      "stage": "OFFER_SENT",
+      "timeInStage": "1 day",
+      "appliedAt": "2026-02-10",
+      "currentRole": "AE @ Salesforce partner",
+      "experience": "6 years",
+      "source": "LinkedIn",
+      "location": "Chicago, IL",
+      "email": "maya.chen@email.com",
+      "education": "B.A. Business",
+      "activities": [
+        { "action": "Offer sent", "description": "Base + OTE package emailed", "createdAt": "2026-03-17T16:00:00.000Z" }
+      ]
+    }
+  ]
+}

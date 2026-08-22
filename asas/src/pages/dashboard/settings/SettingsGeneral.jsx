@@ -3,12 +3,45 @@ import {
   ChevronRight, 
   Search, 
   Cloud,
-  ChevronDown
+  ChevronDown,
+  Loader2
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { settingsService } from '../../../services/settings.service';
 import TopBarActions from '../../../components/TopBarActions';
 import SettingsTabs from './SettingsTabs';
 
 export default function SettingsGeneral() {
+  const { data: responseData, isLoading, isError } = useQuery({
+    queryKey: ['settings', 'general'],
+    queryFn: settingsService.getGeneral,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-surface flex-1">
+        <Loader2 className="animate-spin text-muted" size={24} />
+      </div>
+    );
+  }
+
+  if (isError || !responseData) {
+    return (
+      <div className="flex h-full items-center justify-center bg-surface text-danger flex-1">
+        Failed to load general settings.
+      </div>
+    );
+  }
+
+  const tenant = responseData.data?.tenant || {};
+
+  // Compute dynamic current dates and local timezone for the UI
+  const now = new Date();
+  const format1 = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const format2 = now.toISOString().split('T')[0];
+  const format3 = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
   return (
     <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
       
@@ -21,9 +54,6 @@ export default function SettingsGeneral() {
               placeholder="Search settings..." 
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 border border-border-default rounded px-1.5 py-0.5 bg-surface-muted">
-              <span className="text-[10px] text-caption font-medium">⌘K</span>
-            </div>
           </div>
           
           <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-strong shrink-0"></div>
@@ -62,7 +92,7 @@ export default function SettingsGeneral() {
                   <label className="block text-xs font-bold text-heading mb-1.5">Workspace Name</label>
                   <input 
                     type="text" 
-                    defaultValue="Global Operations"
+                    defaultValue={tenant.name || ''}
                     className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
@@ -70,7 +100,7 @@ export default function SettingsGeneral() {
                   <label className="block text-xs font-bold text-heading mb-1.5">Support Email</label>
                   <input 
                     type="email" 
-                    defaultValue="ops@asas.com"
+                    defaultValue={tenant.supportEmail || ''}
                     className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
@@ -87,8 +117,15 @@ export default function SettingsGeneral() {
               <div>
                 <label className="block text-xs font-bold text-heading mb-1.5">Timezone</label>
                 <div className="relative">
-                  <select className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary">
-                    <option>(GMT-08:00) Pacific Time</option>
+                  <select 
+                    className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary"
+                    defaultValue={tenant.timezone || localTimezone}
+                  >
+                    <option value="UTC">(GMT+00:00) UTC</option>
+                    <option value="PST">(GMT-08:00) Pacific Time</option>
+                    {localTimezone !== 'UTC' && localTimezone !== 'PST' && (
+                      <option value={localTimezone}>Local ({localTimezone})</option>
+                    )}
                   </select>
                   <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
                 </div>
@@ -96,8 +133,12 @@ export default function SettingsGeneral() {
               <div>
                 <label className="block text-xs font-bold text-heading mb-1.5">Currency</label>
                 <div className="relative">
-                  <select className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary">
-                    <option>USD ($)</option>
+                  <select 
+                    className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary"
+                    defaultValue={tenant.currency || 'USD'}
+                  >
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
                   </select>
                   <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
                 </div>
@@ -106,9 +147,14 @@ export default function SettingsGeneral() {
             
             <div>
               <label className="block text-xs font-bold text-heading mb-1.5">Date Format</label>
-              <div className="relative">
-                <select className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary">
-                  <option>MM/DD/YYYY (12/31/2023)</option>
+              <div className="relative w-1/2">
+                <select 
+                  className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary"
+                  defaultValue={tenant.dateFormat || 'MMM d, yyyy'}
+                >
+                  <option value="MMM d, yyyy">{format1}</option>
+                  <option value="yyyy-MM-dd">{format2}</option>
+                  <option value="dd/MM/yyyy">{format3}</option>
                 </select>
                 <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
               </div>
@@ -151,7 +197,7 @@ export default function SettingsGeneral() {
                 <span className="text-3xl font-extrabold text-heading tracking-tight">$2,400</span>
                 <span className="text-sm font-medium text-muted">/ month</span>
               </div>
-              <p className="text-[11px] font-medium text-muted">Next billing date: Nov 01</p>
+              <p className="text-[11px] font-medium text-muted">Next billing date: Sept 22</p>
             </div>
 
             {/* Usage Card */}
@@ -175,7 +221,7 @@ export default function SettingsGeneral() {
                   <span className="text-[11px] font-medium text-body-light">450GB / 1TB</span>
                 </div>
                 <div className="w-full bg-surface-strong rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-muted h-full rounded-full" style={{ width: '45%' }}></div>
+                  <div className="bg-primary h-full rounded-full" style={{ width: '45%' }}></div>
                 </div>
               </div>
 

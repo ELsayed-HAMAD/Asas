@@ -15,6 +15,7 @@ The platform is designed with a strict focus on top-tier professional aesthetics
 
 * **Premium UI/UX:** Built on a custom Tailwind v4 `@theme`, featuring tailored spacing, subtle hover states, micro-animations, and a completely custom, scrollbar-free sidebar navigation.
 * **Tenant Isolation:** Fastify API with JWT authentication and strict tenant-level data boundaries.
+* **Typed Domain Models:** Full Prisma schema with typed modules for HR, Finance, CRM, Inventory, and Projects.
 * **Unified Workspace:** A single-page application (React + Vite) that seamlessly routes between distinct business modules.
 * **Rapid Local Development:** Powered by Prisma and SQLite for zero-friction local setup and prototyping.
 
