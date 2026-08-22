@@ -103,6 +103,7 @@ allure-report/
 # =========================
 .vscode/*
 !.vscode/extensions.json
+.cursor/
 .idea/
 *.suo
 *.ntvs*

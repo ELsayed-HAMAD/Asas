@@ -14,13 +14,18 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) { this.setState({ errorInfo }); }
   render() {
     if (this.state.hasError) {
+      const showDetail = import.meta.env.DEV
       return (
-        <div style={{ padding: '2rem', fontFamily: 'system-ui', color: 'red', backgroundColor: '#fee', minHeight: '100vh' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Application Crashed</h1>
-          <p style={{ fontWeight: 'bold' }}>{this.state.error && this.state.error.toString()}</p>
-          <pre style={{ overflowX: 'auto', background: '#fff', padding: '1rem', marginTop: '1rem', fontSize: '12px', color: '#333' }}>
-            {this.state.errorInfo && this.state.errorInfo.componentStack}
-          </pre>
+        <div style={{ padding: '2rem', fontFamily: 'system-ui', color: '#7f1d1d', backgroundColor: '#fef2f2', minHeight: '100vh' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Something went wrong</h1>
+          <p>Reload the page. If this keeps happening, sign out and sign back in.</p>
+          {showDetail && (
+            <pre style={{ overflowX: 'auto', background: '#fff', padding: '1rem', marginTop: '1rem', fontSize: '12px', color: '#333' }}>
+              {this.state.error && this.state.error.toString()}
+              {'\n'}
+              {this.state.errorInfo && this.state.errorInfo.componentStack}
+            </pre>
+          )}
         </div>
       );
     }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, DollarSign, Clock, UserPlus,
@@ -6,8 +6,9 @@ import {
   Package, FolderKanban, Settings, HelpCircle, Search,
   ChevronDown, ChevronRight, Bell, Plus, LogOut, Menu,
   ArrowDownCircle, ArrowUpCircle, PieChart, Layers, Map, Zap,
+  Check, User, Moon, Download
 } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 
 // ── Navigation config ──────────────────────────────────────
 const NAV = [
@@ -47,6 +48,7 @@ const NAV = [
       { label: 'Overview',          path: '/dashboard/crm' },
       { label: 'Deals Pipeline',    path: '/dashboard/crm/deals' },
       { label: 'Sales Performance', path: '/dashboard/crm/sales-performance' },
+      { label: 'Revenue Forecast',  path: '/dashboard/crm/revenue-forecast' },
     ],
   },
   {
@@ -97,6 +99,7 @@ const BREADCRUMB_LABELS = {
   crm:                   'CRM',
   deals:                 'Deals Pipeline',
   'sales-performance':   'Sales Performance',
+  'revenue-forecast':    'Revenue Forecast',
   inventory:             'Inventory',
   projects:              'Projects',
   sprints:               'Active Sprints',
@@ -167,8 +170,7 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate }) {
                 }`}
               >
                 {isActive && (
-                  <motion.div
-                    layoutId="sidebar-indicator"
+                  <div
                     className="absolute left-0 top-[6px] bottom-[6px] w-[3px] bg-primary rounded-r-full"
                   />
                 )}
@@ -193,8 +195,7 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate }) {
       }`}
     >
       {isActive && (
-        <motion.div
-          layoutId="sidebar-indicator"
+        <div
           className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-primary rounded-r-full"
         />
       )}
@@ -204,10 +205,42 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate }) {
   )
 }
 
+import { useAuthStore } from '../store/authStore'
+
 // ── Sidebar Content Component ────────────────────────────────
 function SidebarContent({ navProps, navigate }) {
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setUserMenuOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  const user = useAuthStore(state => state.user)
+  const clearSession = useAuthStore(state => state.clearSession)
+
+  const displayName = user?.name || 'User'
+  const roleLabel = user?.role ? String(user.role).charAt(0) + String(user.role).slice(1).toLowerCase() : 'Member'
+  const initials = displayName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(part => part[0]?.toUpperCase())
+    .join('') || 'U'
+
+  const handleLogout = () => {
+    clearSession()
+    navigate('/login', { replace: true })
+  }
+
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full relative">
       
       {/* Brand */}
       <div className="px-4 py-4 flex items-center gap-3 border-b border-border-subtle flex-shrink-0">
@@ -216,13 +249,13 @@ function SidebarContent({ navProps, navigate }) {
         </div>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-heading leading-tight">Asas</p>
-          <p className="text-[11px] text-caption">Enterprise ERP</p>
+          <p className="text-[11px] text-caption truncate">{user?.tenant?.name || 'Enterprise ERP'}</p>
         </div>
       </div>
 
       {/* Quick action */}
       <div className="px-3 py-3 flex-shrink-0">
-        <button className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary text-sm font-medium px-3 py-2 rounded-button hover:bg-primary-hover active:scale-[0.98] transition-all">
+        <button type="button" className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary text-sm font-medium px-3 py-2 rounded-button hover:bg-primary-hover active:scale-[0.98] transition-all">
           <Plus size={14} />
           New Entry
         </button>
@@ -243,23 +276,94 @@ function SidebarContent({ navProps, navigate }) {
       </div>
 
       {/* User profile */}
-      <div className="px-3 py-3 border-t border-border-subtle flex-shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-full bg-surface-strong flex items-center justify-center text-xs font-semibold text-body flex-shrink-0">
-            JD
+      <div ref={menuRef} className="px-3 py-3 border-t border-border-subtle flex-shrink-0 relative">
+        <AnimatePresence>
+          {userMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 350, damping: 25 }}
+              className="absolute bottom-full left-3 mb-2 w-72 bg-surface-raised border border-border-default rounded-xl shadow-2xl z-50 overflow-hidden"
+            >
+              {/* 1. Identity Header */}
+              <div className="p-4 flex items-center gap-4">
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-full bg-surface-strong flex items-center justify-center text-lg font-bold text-body shadow-inner">
+                    {initials}
+                  </div>
+                  <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-success rounded-full border-2 border-surface-raised shadow-sm"></div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-base font-bold text-heading truncate leading-tight">{displayName}</p>
+                  <p className="text-sm text-muted truncate mt-0.5">{user?.email || 'elsayed@asas.com'}</p>
+                </div>
+              </div>
+
+              {/* 2. Workspace Switcher */}
+              <div className="border-t border-border-subtle p-2">
+                <div className="px-3 py-2 flex items-center justify-between hover:bg-surface-muted rounded-input cursor-pointer transition-colors">
+                  <span className="text-sm font-semibold text-heading truncate">{user?.tenant?.name || 'Enterprise ERP'}</span>
+                  <Check size={16} className="text-accent shrink-0" />
+                </div>
+                <div className="px-3 py-2 flex items-center gap-3 text-sm font-semibold text-accent hover:bg-surface-muted rounded-input cursor-pointer transition-colors mt-1">
+                  <Plus size={16} />
+                  Create New Workspace
+                </div>
+              </div>
+
+              {/* 3. Account Actions */}
+              <div className="border-t border-border-subtle p-2 flex flex-col gap-1">
+                <button 
+                  onClick={() => { setUserMenuOpen(false); navigate('/dashboard/settings'); }}
+                  className="flex items-center gap-3 text-left px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors"
+                >
+                  <User size={16} className="text-caption" />
+                  Profile & Preferences
+                </button>
+                <button 
+                  onClick={() => { setUserMenuOpen(false); document.documentElement.classList.toggle('dark'); }}
+                  className="flex items-center gap-3 text-left px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors"
+                >
+                  <Moon size={16} className="text-caption" />
+                  Toggle Theme
+                </button>
+                <button 
+                  onClick={() => setUserMenuOpen(false)}
+                  className="flex items-center gap-3 text-left px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors"
+                >
+                  <Download size={16} className="text-caption" />
+                  Download Desktop App
+                </button>
+              </div>
+
+              {/* 4. Destructive Action */}
+              <div className="border-t border-border-subtle p-2">
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-3 text-left px-3 py-2 text-danger hover:bg-danger-light hover:text-danger-hover rounded-input text-sm font-bold transition-colors"
+                >
+                  <LogOut size={16} />
+                  Log Out
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <button 
+          type="button"
+          onClick={() => setUserMenuOpen(!userMenuOpen)}
+          className="w-full flex items-center gap-2.5 hover:bg-surface-muted p-2 -mx-2 rounded-lg transition-colors text-left"
+        >
+          <div className="w-8 h-8 rounded-full bg-surface-strong flex items-center justify-center text-xs font-bold text-body flex-shrink-0">
+            {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-heading truncate">Jane Doe</p>
-            <p className="text-[11px] text-caption truncate">Admin</p>
+            <p className="text-sm font-semibold text-heading truncate">{displayName}</p>
+            <p className="text-[11px] font-medium text-caption truncate">{roleLabel}</p>
           </div>
-          <button
-            onClick={() => navigate('/login')}
-            title="Log out"
-            className="text-caption hover:text-body transition-colors p-1 rounded"
-          >
-            <LogOut size={14} />
-          </button>
-        </div>
+        </button>
       </div>
 
     </div>
@@ -300,7 +404,7 @@ export default function DashboardLayout() {
   const breadcrumbs = pathname
     .split('/')
     .filter(Boolean)
-    .map(seg => BREADCRUMB_LABELS[seg] || seg)
+    .map(seg => BREADCRUMB_LABELS[seg] || (seg.charAt(0).toUpperCase() + seg.slice(1)));
 
   const navProps = { pathname, openSections, toggleSection, onNavigate: () => setMobileSidebarOpen(false) }
 
@@ -310,7 +414,7 @@ export default function DashboardLayout() {
     <div className="flex h-screen bg-surface overflow-hidden">
 
       {/* ── Desktop sidebar ── */}
-      <aside className="hidden md:flex w-55 min-w-55 bg-surface-raised border-r border-border-subtle flex-col">
+      <aside className="hidden md:flex w-55 min-w-55 bg-surface-raised border-r border-border-subtle flex-col relative z-30">
         <SidebarContent navProps={navProps} navigate={navigate} />
       </aside>
 

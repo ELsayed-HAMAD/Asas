@@ -11,39 +11,13 @@ import {
   Cpu,
   X,
   AlertTriangle,
-  ShoppingCart
+  ShoppingCart,
+  Loader2,
+  Box
 } from 'lucide-react';
-
-// ── Mock Data ────────────────────────────────────────────────
-const PRODUCTS = [
-  { 
-    id: '1', 
-    name: 'Enterprise Server X9', 
-    sku: 'SRV-001', 
-    price: 4250.00, 
-    stock: 142, 
-    status: 'In Stock',
-    icon: <Server size={18} className="text-body-light" />
-  },
-  { 
-    id: '2', 
-    name: 'Optical Sensor v2', 
-    sku: 'SENS-089', 
-    price: 120.00, 
-    stock: 2, 
-    status: 'Low Stock',
-    icon: <SlidersHorizontal size={18} className="text-body-light" />
-  },
-  { 
-    id: '3', 
-    name: 'Quantum Processor Alpha', 
-    sku: 'QPA-045', 
-    price: 890.00, 
-    stock: 45, 
-    status: 'In Stock',
-    icon: <Cpu size={18} className="text-body-light" />
-  },
-];
+import { useQuery } from '@tanstack/react-query';
+import { inventoryService } from '../../../services/inventory.service';
+import TopBarActions from '../../../components/TopBarActions';
 
 const formatCurrency = (num) => {
   return new Intl.NumberFormat('en-US', {
@@ -51,11 +25,38 @@ const formatCurrency = (num) => {
   }).format(num);
 };
 
-import TopBarActions from '../../../components/TopBarActions';
-
 export default function Inventory() {
-  const [selectedId, setSelectedId] = useState('2');
-  const selectedProduct = PRODUCTS.find(p => p.id === selectedId);
+  const [selectedId, setSelectedId] = useState(null);
+
+  const { data: responseData, isLoading, isError } = useQuery({
+    queryKey: ['inventory', 'products'],
+    queryFn: inventoryService.listProducts,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-surface">
+        <Loader2 className="animate-spin text-muted" size={24} />
+      </div>
+    );
+  }
+
+  if (isError || !responseData) {
+    return (
+      <div className="flex h-full items-center justify-center bg-surface text-danger">
+        Failed to load product catalog.
+      </div>
+    );
+  }
+
+  const products = responseData.data || [];
+
+  // Auto-select first product if none selected
+  if (!selectedId && products.length > 0) {
+    setSelectedId(products[0].id);
+  }
+
+  const selectedProduct = products.find(p => p.id === selectedId);
 
   return (
     <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
@@ -69,9 +70,6 @@ export default function Inventory() {
               placeholder="Search..." 
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-72 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 border border-border-default rounded px-1.5 py-0.5 bg-surface-muted">
-              <span className="text-[10px] text-caption font-medium">⌘K</span>
-            </div>
           </div>
           
           <button className="text-muted hover:text-heading transition-colors">
@@ -85,7 +83,7 @@ export default function Inventory() {
           </button>
           
           <button className="bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors">
-            Upgrade
+            New Product
           </button>
         </div>
       </TopBarActions>
@@ -116,44 +114,52 @@ export default function Inventory() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
-                {PRODUCTS.map(product => {
-                  const isSelected = selectedId === product.id;
-                  const isLowStock = product.status === 'Low Stock';
+                {products.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" className="px-6 py-8 text-center text-sm text-muted">
+                      No products found.
+                    </td>
+                  </tr>
+                ) : (
+                  products.map(product => {
+                    const isSelected = selectedId === product.id;
+                    const isLowStock = product.status === 'LOW_STOCK' || product.status === 'OUT_OF_STOCK';
 
-                  return (
-                    <tr 
-                      key={product.id}
-                      onClick={() => setSelectedId(product.id)}
-                      className={`cursor-pointer transition-colors ${
-                        isSelected ? 'bg-accent-light/30 border-l-2 border-l-blue-600' : 'bg-surface-raised hover:bg-surface-muted border-l-2 border-l-transparent'
-                      }`}
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded border border-border-default bg-surface-muted flex items-center justify-center shrink-0">
-                            {product.icon}
+                    return (
+                      <tr 
+                        key={product.id}
+                        onClick={() => setSelectedId(product.id)}
+                        className={`cursor-pointer transition-colors ${
+                          isSelected ? 'bg-accent-light/30 border-l-2 border-l-blue-600' : 'bg-surface-raised hover:bg-surface-muted border-l-2 border-l-transparent'
+                        }`}
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded border border-border-default bg-surface-muted flex items-center justify-center shrink-0">
+                              <Box size={18} className="text-body-light" />
+                            </div>
+                            <span className="text-sm font-semibold text-heading">{product.name}</span>
                           </div>
-                          <span className="text-sm font-semibold text-heading">{product.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-body-light">
-                        {product.sku}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-medium text-heading tabular-nums text-right">
-                        {formatCurrency(product.price)}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <span className={`inline-flex px-2.5 py-1 rounded text-xs font-semibold ${
-                          isLowStock 
-                            ? 'bg-danger-light text-danger border border-danger-border' 
-                            : 'bg-success-light text-success-text border border-[#bbf7d0]'
-                        }`}>
-                          {product.stock} {product.status}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-body-light">
+                          {product.sku}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-heading tabular-nums text-right">
+                          {formatCurrency(product.price)}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className={`inline-flex px-2.5 py-1 rounded text-xs font-semibold ${
+                            isLowStock 
+                              ? 'bg-danger-light text-danger border border-danger-border' 
+                              : 'bg-success-light text-success-text border border-[#bbf7d0]'
+                          }`}>
+                            {product.stock} {product.status.replace('_', ' ')}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -162,21 +168,21 @@ export default function Inventory() {
         {/* Right: Detail Panel */}
         <div className="w-[420px] bg-surface-raised border-l border-border-default flex flex-col flex-shrink-0">
           
-          {selectedProduct && (
+          {selectedProduct ? (
             <>
               {/* Detail Header */}
               <div className="p-6 border-b border-border-default">
                 <div className="flex items-start justify-between mb-8">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-surface-active rounded-button flex items-center justify-center border border-border-default">
-                      {selectedProduct.icon}
+                      <Box size={24} className="text-body-light" />
                     </div>
                     <div>
                       <h2 className="text-lg font-bold text-heading">{selectedProduct.name}</h2>
                       <p className="text-sm text-muted mt-0.5">SKU: {selectedProduct.sku}</p>
                     </div>
                   </div>
-                  <button className="text-caption hover:text-body transition-colors">
+                  <button onClick={() => setSelectedId(null)} className="text-caption hover:text-body transition-colors">
                     <X size={20} />
                   </button>
                 </div>
@@ -199,14 +205,14 @@ export default function Inventory() {
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 
                 {/* Stock Alert */}
-                {selectedProduct.status === 'Low Stock' && (
+                {(selectedProduct.status === 'LOW_STOCK' || selectedProduct.status === 'OUT_OF_STOCK') && (
                   <div className="bg-danger-light border border-danger-border rounded-button p-4">
                     <div className="flex items-center gap-2 mb-1">
                       <AlertTriangle size={16} className="text-danger" />
                       <h3 className="text-xs font-bold text-danger-hover uppercase tracking-wide">Stock Alert</h3>
                     </div>
                     <p className="text-sm text-[#991b1b] ml-6 leading-relaxed">
-                      Current stock ({selectedProduct.stock}) is below minimum threshold (10). Action required.
+                      Current stock ({selectedProduct.stock}) is {selectedProduct.stock === 0 ? 'empty' : `below minimum threshold (${selectedProduct.minThreshold})`}. Action required.
                     </p>
                   </div>
                 )}
@@ -216,13 +222,13 @@ export default function Inventory() {
                   <div>
                     <label className="block text-xs font-medium text-muted mb-1.5">Unit Price</label>
                     <div className="w-full bg-surface-muted border border-border-default rounded-input px-3 py-2.5 text-sm font-medium text-heading">
-                      $120.00
+                      {formatCurrency(selectedProduct.price)}
                     </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-muted mb-1.5">Location</label>
                     <div className="w-full bg-surface-muted border border-border-default rounded-input px-3 py-2.5 text-sm font-medium text-heading">
-                      Warehouse A - Aisle 4, Bin 12
+                      {selectedProduct.warehouse ? `${selectedProduct.warehouse} - Aisle ${selectedProduct.aisle || 'N/A'}, Bin ${selectedProduct.bin || 'N/A'}` : 'Location Not Set'}
                     </div>
                   </div>
                 </div>
@@ -231,11 +237,11 @@ export default function Inventory() {
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div className="border border-border-default rounded-button p-4 bg-surface-raised">
                     <p className="text-[11px] font-medium text-muted mb-1">Avg. Monthly Usage</p>
-                    <p className="text-lg font-bold text-heading">45 Units</p>
+                    <p className="text-lg font-bold text-heading">{selectedProduct.avgMonthlyUsage || 0} Units</p>
                   </div>
                   <div className="border border-border-default rounded-button p-4 bg-surface-raised">
                     <p className="text-[11px] font-medium text-muted mb-1">Lead Time</p>
-                    <p className="text-lg font-bold text-heading">14 Days</p>
+                    <p className="text-lg font-bold text-heading">{selectedProduct.leadTimeDays || 0} Days</p>
                   </div>
                 </div>
               </div>
@@ -248,6 +254,10 @@ export default function Inventory() {
                 </button>
               </div>
             </>
+          ) : (
+            <div className="flex h-full items-center justify-center text-muted">
+              Select a product to view details.
+            </div>
           )}
 
         </div>

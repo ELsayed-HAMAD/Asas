@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { 
   ChevronRight, 
   Download, 
@@ -7,43 +8,46 @@ import {
   AlertTriangle, 
   Clock, 
   MoreHorizontal, 
-  Pencil
+  Pencil,
+  Loader2
 } from 'lucide-react';
-
-// ── Mock Data ────────────────────────────────────────────────
-
-const EXCEPTIONS = [
-  { id: 'exc_1', name: 'Sarah Jenkins', avatar: 'SJ', type: 'missing_out', label: 'Missing Out-Punch', date: 'Jun 04', alert: true },
-  { id: 'exc_2', name: 'Marcus Chen', avatar: 'MC', type: 'overtime', label: 'Overtime +2h', date: 'Jun 03', alert: false },
-  { id: 'exc_3', name: 'Elena Rodriguez', avatar: 'ER', type: 'missing_in', label: 'Missing In-Punch', date: 'Jun 02', alert: true },
-  { id: 'exc_4', name: 'David Kim', avatar: 'DK', type: 'overtime', label: 'Overtime +1.5h', date: 'Jun 01', alert: false },
-];
-
-const LEAVE_REQUESTS = [
-  { id: 'req_1', name: 'James Wilson', avatar: 'JW', type: 'Vacation', date: 'Jun 10 - Jun 14' },
-  { id: 'req_2', name: 'Maria Garcia', avatar: 'MG', type: 'Sick Leave', date: 'Jun 05' },
-  { id: 'req_3', name: 'Robert Taylor', avatar: 'RT', type: 'Vacation', date: 'Jul 01 - Jul 05' },
-  { id: 'req_4', name: 'Linda Martinez', avatar: 'LM', type: 'Personal', date: 'Jun 12' },
-  { id: 'req_5', name: 'William Anderson', avatar: 'WA', type: 'Vacation', date: 'Aug 15 - Aug 20' },
-  { id: 'req_6', name: 'Patricia Thomas', avatar: 'PT', type: 'Sick Leave', date: 'Jun 04' },
-  { id: 'req_7', name: 'Charles Jackson', avatar: 'CJ', type: 'Vacation', date: 'Sep 01 - Sep 10' },
-  { id: 'req_8', name: 'Susan White', avatar: 'SW', type: 'Personal', date: 'Jun 18' },
-];
-
 import TopBarActions from '../../../components/TopBarActions';
+import { hrService } from '../../../services/hr.service';
+
+function formatShortDate(dateStr) {
+  if (!dateStr) return '—'
+  return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: '2-digit' })
+}
 
 export default function TimeAttendance() {
-  const [selectedId, setSelectedId] = useState('exc_1');
+  const [selectedId, setSelectedId] = useState(null);
+
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ['hr', 'attendance'],
+    queryFn: () => hrService.listAttendance(),
+  })
+
+  const exceptions = data?.exceptions || []
+  const leaveRequests = data?.leaveRequests || []
+  const timesheets = data?.timesheets || []
+
+  // Auto-select first exception or leave request if none is selected
+  useEffect(() => {
+    if (!selectedId) {
+      if (exceptions.length > 0) setSelectedId(exceptions[0].id)
+      else if (leaveRequests.length > 0) setSelectedId(leaveRequests[0].id)
+    }
+  }, [exceptions, leaveRequests, selectedId])
 
   return (
     <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-[1000px]">
       
       <TopBarActions>
         <div className="flex gap-3">
-          <button className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors">
+          <button className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card">
             <Download size={16} /> Export
           </button>
-          <button className="bg-primary text-white px-5 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors">
+          <button className="bg-primary text-white px-5 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors shadow-card">
             Approve All Valid
           </button>
         </div>
@@ -58,7 +62,7 @@ export default function TimeAttendance() {
             <div className="flex items-center gap-2 text-sm">
               <span className="text-muted font-medium text-xs tracking-wider uppercase">Filter</span>
               <button className="flex items-center gap-2 border border-border-strong text-body px-3 py-1.5 rounded-input hover:bg-surface-muted">
-                Engineering <ChevronDown size={14} className="text-caption" />
+                All Departments <ChevronDown size={14} className="text-caption" />
               </button>
             </div>
             <div className="flex items-center gap-2 text-sm ml-2">
@@ -81,20 +85,29 @@ export default function TimeAttendance() {
         {/* KPIs Row */}
         <div className="grid grid-cols-4 gap-4">
           <div className="border border-border-default rounded-button p-4 bg-surface-raised shadow-card">
-            <p className="text-[11px] font-semibold text-muted mb-2">Pending PTO</p>
-            <p className="text-2xl font-bold text-heading">12</p>
+            <p className="text-[11px] font-semibold text-muted mb-2">Total Timesheets</p>
+            <p className="text-2xl font-bold text-heading">{timesheets.length}</p>
           </div>
           <div className="border border-border-default rounded-button p-4 bg-surface-raised shadow-card">
-            <p className="text-[11px] font-semibold text-muted mb-2">Missing Punches</p>
-            <p className="text-2xl font-bold text-danger">8</p>
+            <p className="text-[11px] font-semibold text-muted mb-2">Total Exceptions</p>
+            <p className="text-2xl font-bold text-danger">{exceptions.length}</p>
           </div>
           <div className="border border-border-default rounded-button p-4 bg-surface-raised shadow-card">
             <p className="text-[11px] font-semibold text-muted mb-2">Total Overtime</p>
-            <p className="text-2xl font-bold text-heading">42h</p>
+            <p className="text-2xl font-bold text-heading">{Math.round(timesheets.reduce((acc, ts) => acc + ts.overtimeHours, 0) * 10) / 10}h</p>
           </div>
           <div className="border border-border-default rounded-button p-4 bg-surface-raised shadow-card">
-            <p className="text-[11px] font-semibold text-muted mb-2">Approval Rate</p>
-            <p className="text-2xl font-bold text-heading">88%</p>
+            <p className="text-[11px] font-semibold text-muted mb-2">On-Time Rate</p>
+            <p className="text-2xl font-bold text-heading">
+              {timesheets.length > 0 ? (
+                (() => {
+                  const totalDays = timesheets.reduce((acc, ts) => acc + (ts.days?.length || 0), 0);
+                  const lateDays = exceptions.filter(e => e.type === 'late' || e.type === 'early_out').length;
+                  if (totalDays === 0) return '100%';
+                  return `${Math.round(((totalDays - lateDays) / totalDays) * 100)}%`;
+                })()
+              ) : '100%'}
+            </p>
           </div>
         </div>
       </div>
@@ -104,208 +117,219 @@ export default function TimeAttendance() {
         
         {/* Left: Interactive List Area */}
         <div className="flex-1 flex flex-col bg-surface-raised overflow-y-auto">
-          
+          {isLoading && (
+            <div className="flex items-center justify-center p-10 text-muted">
+              <Loader2 className="animate-spin mr-2" size={20} /> Loading attendance data...
+            </div>
+          )}
+          {isError && (
+            <div className="p-10 text-danger">{error?.message || 'Error loading attendance data'}</div>
+          )}
+          {!isLoading && exceptions.length === 0 && leaveRequests.length === 0 && (
+            <div className="p-10 text-center text-muted">
+              <p className="text-sm">No attendance records found.</p>
+              <p className="text-xs mt-2">Load the sample pack to see demo data.</p>
+            </div>
+          )}
+
           {/* Section: Exceptions */}
-          <div className="px-6 py-2.5 bg-surface-muted/80 border-b border-border-default sticky top-0 z-10">
-            <span className="text-[10px] font-bold text-muted uppercase tracking-wider">
-              Timesheet Exceptions · 4 Items
-            </span>
-          </div>
-          <div className="divide-y divide-border-subtle">
-            {EXCEPTIONS.map(item => {
-              const isSelected = selectedId === item.id;
-              return (
-                <div 
-                  key={item.id}
-                  onClick={() => setSelectedId(item.id)}
-                  className={`flex items-center justify-between px-6 py-3 cursor-pointer transition-colors ${
-                    isSelected ? 'bg-accent-light/50 border-l-4 border-l-blue-600' : 'bg-surface-raised hover:bg-surface-muted border-l-4 border-l-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="w-8 h-8 rounded-full bg-surface-strong flex items-center justify-center text-xs font-semibold text-body-light border border-border-strong">
-                      {item.avatar}
+          {exceptions.length > 0 && (
+            <>
+              <div className="px-6 py-2.5 bg-surface-muted/80 border-b border-border-default sticky top-0 z-10">
+                <span className="text-[10px] font-bold text-muted uppercase tracking-wider">
+                  Timesheet Exceptions · {exceptions.length} Items
+                </span>
+              </div>
+              <div className="divide-y divide-border-subtle">
+                {exceptions.map(item => {
+                  const isSelected = selectedId === item.id;
+                  return (
+                    <div 
+                      key={item.id}
+                      onClick={() => setSelectedId(item.id)}
+                      className={`flex items-center justify-between px-6 py-3 cursor-pointer transition-colors ${
+                        isSelected ? 'bg-accent-light/50 border-l-4 border-l-blue-600' : 'bg-surface-raised hover:bg-surface-muted border-l-4 border-l-transparent'
+                      }`}
+                    >
+                      <div className="flex items-center gap-4 flex-1">
+                        <div className="w-8 h-8 rounded-full bg-surface-strong flex items-center justify-center text-xs font-semibold text-body-light border border-border-strong overflow-hidden">
+                          {item.avatar ? <img src={item.avatar} alt={item.name} className="w-full h-full object-cover" /> : (item.name?.[0] || '?')}
+                        </div>
+                        <div className="w-40 font-semibold text-sm text-heading truncate">{item.name}</div>
+                        <div className={`flex items-center gap-1.5 text-sm font-medium ${item.alert ? 'text-danger' : 'text-body-light'}`}>
+                          {item.alert ? <AlertTriangle size={14} /> : <Clock size={14} className="text-caption" />}
+                          {item.label}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm text-muted">{formatShortDate(item.date)}</span>
+                        <MoreHorizontal size={16} className="text-caption" />
+                      </div>
                     </div>
-                    <div className="w-40 font-semibold text-sm text-heading">{item.name}</div>
-                    <div className={`flex items-center gap-1.5 text-sm font-medium ${item.alert ? 'text-danger' : 'text-body-light'}`}>
-                      {item.alert ? <AlertTriangle size={14} /> : <Clock size={14} className="text-caption" />}
-                      {item.label}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm text-muted">{item.date}</span>
-                    <MoreHorizontal size={16} className="text-caption" />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
 
           {/* Section: Leave Requests */}
-          <div className="px-6 py-2.5 bg-surface-muted/80 border-y border-border-default sticky top-0 z-10">
-            <span className="text-[10px] font-bold text-muted uppercase tracking-wider">
-              Leave Requests · 12 Items
-            </span>
-          </div>
-          <div className="divide-y divide-border-subtle">
-            {LEAVE_REQUESTS.map(item => {
-              const isSelected = selectedId === item.id;
-              return (
-                <div 
-                  key={item.id}
-                  onClick={() => setSelectedId(item.id)}
-                  className={`flex items-center justify-between px-6 py-3 cursor-pointer transition-colors ${
-                    isSelected ? 'bg-accent-light/50 border-l-4 border-l-blue-600' : 'bg-surface-raised hover:bg-surface-muted border-l-4 border-l-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="w-8 h-8 rounded-full bg-surface-strong flex items-center justify-center text-xs font-semibold text-body-light border border-border-strong">
-                      {item.avatar}
+          {leaveRequests.length > 0 && (
+            <>
+              <div className="px-6 py-2.5 bg-surface-muted/80 border-y border-border-default sticky top-0 z-10">
+                <span className="text-[10px] font-bold text-muted uppercase tracking-wider">
+                  Pending Time Off · {leaveRequests.length} Items
+                </span>
+              </div>
+              <div className="divide-y divide-border-subtle">
+                {leaveRequests.map(item => {
+                  const isSelected = selectedId === item.id;
+                  const displayDate = item.endDate ? `${formatShortDate(item.date)} - ${formatShortDate(item.endDate)}` : formatShortDate(item.date);
+                  return (
+                    <div 
+                      key={item.id}
+                      onClick={() => setSelectedId(item.id)}
+                      className={`flex items-center justify-between px-6 py-3 cursor-pointer transition-colors ${
+                        isSelected ? 'bg-accent-light/50 border-l-4 border-l-blue-600' : 'bg-surface-raised hover:bg-surface-muted border-l-4 border-l-transparent'
+                      }`}
+                    >
+                      <div className="flex items-center gap-4 flex-1">
+                        <div className="w-8 h-8 rounded-full bg-surface-strong flex items-center justify-center text-xs font-semibold text-body-light border border-border-strong overflow-hidden">
+                          {item.avatar ? <img src={item.avatar} alt={item.name} className="w-full h-full object-cover" /> : (item.name?.[0] || '?')}
+                        </div>
+                        <div className="w-40 font-semibold text-sm text-heading truncate">{item.name}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-surface-strong text-body border border-border-subtle">
+                            {item.type}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm text-muted whitespace-nowrap">{displayDate}</span>
+                        <MoreHorizontal size={16} className="text-caption" />
+                      </div>
                     </div>
-                    <div className="w-40 font-semibold text-sm text-heading">{item.name}</div>
-                    <div className="text-sm text-body-light font-medium">
-                      {item.type}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm text-muted">{item.date}</span>
-                    <MoreHorizontal size={16} className="text-caption" />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Right: Detail Panel */}
         <div className="w-[500px] bg-surface-muted border-l border-border-default overflow-y-auto p-6 flex-shrink-0">
-          
-          {/* Profile Header */}
-          <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 mb-6 flex items-center justify-between shadow-card">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-surface-strong rounded-full border border-border-strong flex items-center justify-center text-body-light font-bold text-lg">
-                SJ
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-heading">Sarah Jenkins</h2>
-                <p className="text-xs text-muted mt-0.5">Software Engineer · Engineering Dept</p>
-              </div>
-            </div>
-            <button className="bg-primary text-white px-4 py-2 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors">
-              Approve Week
-            </button>
-          </div>
+          {(() => {
+            if (!selectedId) return <div className="text-muted text-center mt-10">Select an item to view details</div>;
 
-          {/* Timesheet Table */}
-          <div className="bg-surface-raised border border-border-default rounded-card-sm shadow-card overflow-hidden mb-6">
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-surface-raised border-b border-border-subtle">
-                <tr>
-                  <th className="px-5 py-3 text-[10px] font-bold text-caption uppercase tracking-wider w-16">Day</th>
-                  <th className="px-5 py-3 text-[10px] font-bold text-caption uppercase tracking-wider">In</th>
-                  <th className="px-5 py-3 text-[10px] font-bold text-caption uppercase tracking-wider">Out</th>
-                  <th className="px-5 py-3 text-[10px] font-bold text-caption uppercase tracking-wider">Total</th>
-                  <th className="px-5 py-3 text-[10px] font-bold text-caption uppercase tracking-wider text-right w-20">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-subtle text-sm">
-                
-                {/* Regular Rows */}
-                <tr className="hover:bg-surface-muted">
-                  <td className="px-5 py-3.5 text-body-light font-medium">Mon</td>
-                  <td className="px-5 py-3.5 font-semibold text-heading">09:00</td>
-                  <td className="px-5 py-3.5 font-semibold text-heading">17:00</td>
-                  <td className="px-5 py-3.5 text-body-light">8h 00m</td>
-                  <td className="px-5 py-3.5 text-right"><Pencil size={14} className="inline-block text-caption hover:text-body cursor-pointer" /></td>
-                </tr>
-                <tr className="hover:bg-surface-muted">
-                  <td className="px-5 py-3.5 text-body-light font-medium">Tue</td>
-                  <td className="px-5 py-3.5 font-semibold text-heading">08:55</td>
-                  <td className="px-5 py-3.5 font-semibold text-heading">18:00</td>
-                  <td className="px-5 py-3.5 text-body-light">9h 05m</td>
-                  <td className="px-5 py-3.5 text-right"><Pencil size={14} className="inline-block text-caption hover:text-body cursor-pointer" /></td>
-                </tr>
-                <tr className="hover:bg-surface-muted">
-                  <td className="px-5 py-3.5 text-body-light font-medium">Wed</td>
-                  <td className="px-5 py-3.5 font-semibold text-heading">09:10</td>
-                  <td className="px-5 py-3.5 font-semibold text-heading">17:15</td>
-                  <td className="px-5 py-3.5 text-body-light">8h 05m</td>
-                  <td className="px-5 py-3.5 text-right"><Pencil size={14} className="inline-block text-caption hover:text-body cursor-pointer" /></td>
-                </tr>
-
-                {/* Exception Row (Thursday) */}
-                <tr className="bg-danger-light/30">
-                  <td className="px-5 py-3.5 text-danger font-semibold">Thu</td>
-                  <td className="px-5 py-3.5 font-semibold text-heading">09:00</td>
-                  <td className="px-5 py-3.5">
-                    <span className="inline-block border border-red-300 text-danger bg-surface-raised px-3 py-1 rounded text-sm font-semibold tracking-widest">
-                      --:--
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 text-muted">-h -m</td>
-                  <td className="px-5 py-3.5 text-right">
-                    <button className="bg-primary text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-primary-hover transition-colors">
-                      Fill
-                    </button>
-                  </td>
-                </tr>
-
-                <tr className="hover:bg-surface-muted">
-                  <td className="px-5 py-3.5 text-body-light font-medium">Fri</td>
-                  <td className="px-5 py-3.5 font-semibold text-heading">08:45</td>
-                  <td className="px-5 py-3.5 font-semibold text-heading">17:20</td>
-                  <td className="px-5 py-3.5 text-body-light">8h 35m</td>
-                  <td className="px-5 py-3.5 text-right"><Pencil size={14} className="inline-block text-caption hover:text-body cursor-pointer" /></td>
-                </tr>
-
-              </tbody>
-            </table>
-          </div>
-
-          {/* Bottom Summary Cards */}
-          <div className="grid grid-cols-2 gap-4">
+            const selectedException = exceptions.find(e => e.id === selectedId);
+            const selectedLeave = leaveRequests.find(l => l.id === selectedId);
             
-            {/* Weekly Summary */}
-            <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card">
-              <h3 className="text-[10px] font-bold text-muted uppercase tracking-wider mb-4">Weekly Summary</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between text-body-light">
-                  <span>Regular Hours</span>
-                  <span className="font-semibold text-heading">31h 45m</span>
-                </div>
-                <div className="flex justify-between text-body-light pb-3 border-b border-border-subtle">
-                  <span>Overtime</span>
-                  <span className="font-semibold text-heading">2h 00m</span>
-                </div>
-                <div className="flex justify-between font-bold text-heading pt-1">
-                  <span>TOTAL</span>
-                  <span>33h 45m</span>
-                </div>
-              </div>
-            </div>
+            const activeItem = selectedException || selectedLeave;
+            if (!activeItem) return null;
 
-            {/* Recent Activity */}
-            <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card">
-              <h3 className="text-[10px] font-bold text-muted uppercase tracking-wider mb-4">Recent Activity</h3>
-              <div className="relative pl-3 space-y-4">
-                <div className="absolute left-[3px] top-1.5 bottom-1 w-px bg-surface-strong"></div>
+            const employeeId = activeItem.employeeId;
+            const ts = timesheets.find(t => t.employeeId === employeeId);
+            const employeeName = activeItem.name;
+            const initials = employeeName ? employeeName.split(' ').map(n => n[0]).join('').slice(0, 2) : '??';
+
+            return (
+              <>
+                {/* Profile Header */}
+                <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 mb-6 flex items-center justify-between shadow-card">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-surface-strong rounded-full border border-border-strong flex items-center justify-center text-body-light font-bold text-lg overflow-hidden">
+                      {activeItem.avatar ? <img src={activeItem.avatar} alt={activeItem.name} className="w-full h-full object-cover" /> : initials}
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-heading">{employeeName}</h2>
+                      <p className="text-xs text-muted mt-0.5">Employee Details</p>
+                    </div>
+                  </div>
+                  <button className="bg-primary text-white px-4 py-2 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card">
+                    Approve Week
+                  </button>
+                </div>
+
+                {/* Timesheet Table */}
+                <div className="bg-surface-raised border border-border-default rounded-card-sm shadow-card overflow-hidden mb-6">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-surface-raised border-b border-border-subtle">
+                      <tr>
+                        <th className="px-5 py-3 text-[10px] font-bold text-caption uppercase tracking-wider w-16">Day</th>
+                        <th className="px-5 py-3 text-[10px] font-bold text-caption uppercase tracking-wider">In</th>
+                        <th className="px-5 py-3 text-[10px] font-bold text-caption uppercase tracking-wider">Out</th>
+                        <th className="px-5 py-3 text-[10px] font-bold text-caption uppercase tracking-wider">Total</th>
+                        <th className="px-5 py-3 text-[10px] font-bold text-caption uppercase tracking-wider text-right w-20">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-subtle text-sm">
+                      {ts && ts.days && ts.days.length > 0 ? (
+                        ts.days.map((day, idx) => (
+                          <tr key={day.id || idx} className="hover:bg-surface-muted transition-colors">
+                            <td className="px-5 py-3.5 text-body-light font-medium">{day.dayLabel || '—'}</td>
+                            <td className="px-5 py-3.5 font-semibold text-heading">{day.clockIn || '—'}</td>
+                            <td className="px-5 py-3.5 font-semibold text-heading">{day.clockOut || '—'}</td>
+                            <td className="px-5 py-3.5 text-body-light">{day.totalHours || '0'}h</td>
+                            <td className="px-5 py-3.5 text-right"><Pencil size={14} className="inline-block text-caption hover:text-body cursor-pointer" /></td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="px-5 py-4 text-center text-muted text-sm">
+                            No timesheet days recorded for this week.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                  
+                  {ts && (
+                    <div className="px-5 py-4 bg-surface-muted/50 border-t border-border-default flex items-center justify-between">
+                      <span className="text-sm font-semibold text-heading">Weekly Total</span>
+                      <div className="flex gap-4">
+                        <span className="text-sm text-body-light">Regular: {ts.regularHours}h</span>
+                        <span className="text-sm text-body-light">Overtime: {ts.overtimeHours}h</span>
+                        <span className="text-sm font-bold text-heading">Total: {ts.totalHours}h</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Exception Notice */}
+                {selectedException && (
+                  <div className={`p-4 rounded-card-sm border ${selectedException.alert ? 'bg-danger-light border-danger/20' : 'bg-warning-light border-warning/20'} mb-6 shadow-card`}>
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle size={18} className={`mt-0.5 ${selectedException.alert ? 'text-danger' : 'text-warning'}`} />
+                      <div>
+                        <h3 className={`text-sm font-bold ${selectedException.alert ? 'text-danger' : 'text-warning-dark'}`}>
+                          Action Required: {selectedException.label}
+                        </h3>
+                        <p className="text-xs text-body mt-1 leading-relaxed">
+                          This employee's timesheet on {formatShortDate(selectedException.date)} is missing a punch or has unauthorized overtime. Please review and adjust the timesheet before approving the week.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
-                <div className="relative z-10">
-                  <div className="absolute -left-[11px] top-1.5 w-2 h-2 rounded-full bg-gray-300 ring-4 ring-white"></div>
-                  <p className="text-xs font-semibold text-heading leading-tight">System flagged missing punch on Thursday.</p>
-                  <p className="text-[10px] text-muted mt-0.5">Jun 04, 18:00</p>
-                </div>
-                
-                <div className="relative z-10">
-                  <div className="absolute -left-[11px] top-1.5 w-2 h-2 rounded-full bg-gray-300 ring-4 ring-white"></div>
-                  <p className="text-xs font-semibold text-heading leading-tight">Sarah Jenkins modified Tuesday punch OUT.</p>
-                  <p className="text-[10px] text-muted mt-0.5">Jun 03, 09:15</p>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
+                {/* Leave Notice */}
+                {selectedLeave && (
+                  <div className="p-4 rounded-card-sm border border-border-default bg-surface-raised mb-6 shadow-card">
+                    <div className="flex items-start gap-3">
+                      <Clock size={18} className="mt-0.5 text-accent" />
+                      <div>
+                        <h3 className="text-sm font-bold text-heading">
+                          Time Off Request: {selectedLeave.type}
+                        </h3>
+                        <p className="text-xs text-body mt-1 leading-relaxed">
+                          Requested for {formatShortDate(selectedLeave.date)} {selectedLeave.endDate ? `to ${formatShortDate(selectedLeave.endDate)}` : ''}.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       </div>
     </div>

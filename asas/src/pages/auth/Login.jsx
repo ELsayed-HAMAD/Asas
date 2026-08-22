@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { authService } from '../../services/auth.service'
+import { useAuthStore } from '../../store/authStore'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -31,8 +32,7 @@ export default function Login() {
     // localStorage.setItem('asas_token', res.token)
     try {
       const result = await authService.login(form)
-      localStorage.setItem('asas_token', result.token)
-      localStorage.setItem('asas_user', JSON.stringify(result.user))
+      useAuthStore.getState().setSession(result.user, result.token)
       navigate('/dashboard')
     } catch (requestError) {
       setError(requestError.response?.data?.error?.message || 'Unable to sign in. Please try again.')

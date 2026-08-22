@@ -1,7 +1,10 @@
-import api from '../lib/axios'
+import api from '../lib/axios';
+
+const unwrap = response => response.data;
 
 export const dashboardService = {
-  overview: () => api.get('/dashboard/overview').then(response => response.data.data),
-  createDemoData: () => api.post('/dashboard/demo-data').then(response => response.data.data),
-  getMockData: (component) => api.get(`/dashboard/mock/${component}`).then(response => response.data.data),
-}
+  getOverview: async () => {
+    const res = await api.get('/dashboard/overview');
+    return unwrap(res);
+  }
+};

@@ -16,32 +16,56 @@ import {
   Equal,
   Send,
   MessageSquare,
-  Code2
+  Code2,
+  Loader2
 } from 'lucide-react';
-
-// ── Mock Data ────────────────────────────────────────────────
-const SPRINT_ISSUES = {
-  inProgress: [
-    { id: 'PROJ-201', title: 'Integrate RFID Scanner API', tag: 'Backend', priority: 'high', selected: true },
-    { id: 'PROJ-198', title: 'Optimize Database Queries for Inventory', tag: 'Database', priority: 'medium', selected: false },
-    { id: 'PROJ-195', title: 'Implement OAuth 2.0 Flow', tag: 'Auth', priority: 'high', selected: false },
-  ],
-  inReview: [
-    { id: 'PROJ-182', title: 'Audit Logging Middleware', tag: 'Security', priority: 'medium', selected: false },
-    { id: 'PROJ-180', title: 'Update Dependency Vulnerabilities', tag: 'Security', priority: 'high', selected: false },
-  ],
-  todo: [
-    { id: 'PROJ-205', title: 'Draft API Documentation', selected: false },
-    { id: 'PROJ-206', title: 'Setup Staging Environment', selected: false },
-    { id: 'PROJ-207', title: 'Design System QA', selected: false },
-    { id: 'PROJ-208', title: 'Client Sync Meeting Prep', selected: false },
-  ]
-};
-
+import { useQuery } from '@tanstack/react-query';
+import { projectsService } from '../../../services/projects.service';
 import TopBarActions from '../../../components/TopBarActions';
 
 export default function ActiveSprints() {
-  const [selectedId, setSelectedId] = useState('PROJ-201');
+  const [selectedId, setSelectedId] = useState(null);
+  
+  const { data: responseData, isLoading, isError } = useQuery({
+    queryKey: ['projects', 'sprints'],
+    queryFn: projectsService.getSprints,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-surface-raised">
+        <Loader2 className="animate-spin text-muted" size={24} />
+      </div>
+    );
+  }
+
+  if (isError || !responseData) {
+    return (
+      <div className="flex h-full items-center justify-center bg-surface-raised text-danger">
+        Failed to load active sprints.
+      </div>
+    );
+  }
+
+  const sprints = responseData.data?.sprints || [];
+  const activeSprint = sprints.length > 0 ? sprints[0] : null;
+  const issues = activeSprint?.issues || [];
+
+  const todoIssues = issues.filter(i => i.status === 'TODO');
+  const inProgressIssues = issues.filter(i => i.status === 'IN_PROGRESS');
+  const inReviewIssues = issues.filter(i => i.status === 'IN_REVIEW');
+  const doneIssues = issues.filter(i => i.status === 'DONE');
+
+  const dynamicCompletionPct = issues.length > 0 ? Math.round((doneIssues.length / issues.length) * 100) : 0;
+
+  // Auto-select first issue if none selected
+  if (!selectedId && issues.length > 0) {
+    // Try to select the first non-done issue, otherwise just the first issue
+    const firstActive = issues.find(i => i.status !== 'DONE');
+    setSelectedId(firstActive ? firstActive.id : issues[0].id);
+  }
+
+  const selectedIssue = issues.find(i => i.id === selectedId);
 
   // Custom Icon for 'In Progress' (Half filled circle)
   const HalfCircleIcon = ({ className }) => (
@@ -63,9 +87,6 @@ export default function ActiveSprints() {
               placeholder="Search..." 
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted w-72 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 border border-border-default rounded px-1.5 py-0.5 bg-surface-raised shadow-card">
-              <span className="text-[10px] text-caption font-medium">⌘K</span>
-            </div>
           </div>
           
           <button className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors">
@@ -78,273 +99,296 @@ export default function ActiveSprints() {
         </div>
       </TopBarActions>
 
-      {/* ── Sprint Info Bar ── */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-border-default bg-surface-raised flex-shrink-0 text-sm">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 font-bold text-heading">
-            <Rocket size={16} className="text-body" />
-            Sprint 42: Warehouse Automation
-          </div>
-          
-          <div className="w-px h-4 bg-gray-300"></div>
-          
-          <div className="flex items-center gap-2 text-muted font-medium">
-            <Clock size={16} className="text-caption" />
-            Time Remaining: 3 Days
-          </div>
-
-          <div className="w-px h-4 bg-gray-300"></div>
-
-          <div className="flex items-center gap-3">
-            <span className="text-muted font-medium">Completion: 68%</span>
-            <div className="w-48 bg-surface-strong rounded-full h-1.5 overflow-hidden">
-              <div className="bg-primary h-full rounded-full" style={{ width: '68%' }}></div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <button className="text-muted hover:text-heading transition-colors">
-            <Bell size={18} />
-          </button>
-          <div className="w-7 h-7 bg-surface-strong rounded-full border border-border-strong"></div>
-        </div>
-      </div>
-
-      {/* ── Main Split View ── */}
-      <div className="flex-1 flex overflow-hidden">
-        
-        {/* Left: Issue List Area */}
-        <div className="flex-1 overflow-y-auto bg-surface p-6 space-y-6">
-          
-          {/* IN PROGRESS GROUP */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-2 h-2 rounded-full bg-[#475569]"></div>
-              <h3 className="text-[11px] font-bold text-muted uppercase tracking-wider">In Progress <span className="ml-1 text-caption font-medium">5</span></h3>
-            </div>
-            <div className="space-y-2">
-              {SPRINT_ISSUES.inProgress.map(issue => {
-                const isSelected = selectedId === issue.id;
-                return (
-                  <div 
-                    key={issue.id}
-                    onClick={() => setSelectedId(issue.id)}
-                    className={`flex items-center justify-between p-3 rounded-button border cursor-pointer transition-colors ${
-                      isSelected 
-                        ? 'bg-accent-light/30 border-accent-light border-l-4 border-l-blue-600 shadow-card' 
-                        : 'bg-surface-raised border-border-default hover:border-border-strong border-l-4 border-l-transparent shadow-card'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <HalfCircleIcon className="w-5 h-5 text-[#475569]" />
-                      <span className="text-sm font-medium text-muted">{issue.id}</span>
-                      <span className="text-sm font-bold text-heading ml-1">{issue.title}</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      {issue.tag && (
-                        <span className="bg-surface-active text-body-light px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider">
-                          {issue.tag}
-                        </span>
-                      )}
-                      {issue.priority === 'high' ? (
-                        <ChevronsUp size={16} className="text-danger" strokeWidth={3} />
-                      ) : (
-                        <Equal size={16} className="text-caption" strokeWidth={3} />
-                      )}
-                      <div className="w-6 h-6 rounded-full bg-surface-active border border-border-default"></div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* IN REVIEW GROUP */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-2 h-2 rounded-full bg-[#eab308]"></div>
-              <h3 className="text-[11px] font-bold text-muted uppercase tracking-wider">In Review <span className="ml-1 text-caption font-medium">3</span></h3>
-            </div>
-            <div className="space-y-2">
-              {SPRINT_ISSUES.inReview.map(issue => {
-                const isSelected = selectedId === issue.id;
-                return (
-                  <div 
-                    key={issue.id}
-                    onClick={() => setSelectedId(issue.id)}
-                    className={`flex items-center justify-between p-3 rounded-button border cursor-pointer transition-colors ${
-                      isSelected ? 'bg-accent-light/30 border-accent-light border-l-4 border-l-blue-600 shadow-card' : 'bg-surface-raised border-border-default hover:border-border-strong border-l-4 border-l-transparent shadow-card'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Eye size={20} className="text-[#eab308]" />
-                      <span className="text-sm font-medium text-muted">{issue.id}</span>
-                      <span className="text-sm font-bold text-heading ml-1">{issue.title}</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      {issue.tag && (
-                        <span className="bg-surface-active text-body-light px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider">
-                          {issue.tag}
-                        </span>
-                      )}
-                      {issue.priority === 'high' ? (
-                        <ChevronsUp size={16} className="text-danger" strokeWidth={3} />
-                      ) : (
-                        <Equal size={16} className="text-caption" strokeWidth={3} />
-                      )}
-                      <div className="w-6 h-6 rounded-full bg-surface-active border border-border-default"></div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* TODO GROUP */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-1.5 h-1.5 rounded-full bg-transparent border-2 border-gray-400"></div>
-              <h3 className="text-[11px] font-bold text-muted uppercase tracking-wider">Todo <span className="ml-1 text-caption font-medium">8</span></h3>
-            </div>
-            <div className="space-y-2">
-              {SPRINT_ISSUES.todo.map(issue => {
-                const isSelected = selectedId === issue.id;
-                return (
-                  <div 
-                    key={issue.id}
-                    onClick={() => setSelectedId(issue.id)}
-                    className={`flex items-center justify-between p-3 rounded-button border cursor-pointer transition-colors ${
-                      isSelected ? 'bg-accent-light/30 border-accent-light border-l-4 border-l-blue-600 shadow-card' : 'bg-surface-raised border-border-default hover:border-border-strong border-l-4 border-l-transparent shadow-card'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Circle size={20} className="text-faint" />
-                      <span className="text-sm font-medium text-muted">{issue.id}</span>
-                      <span className="text-sm font-bold text-heading ml-1">{issue.title}</span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-        </div>
-
-        {/* Right: Detail Panel */}
-        <div className="w-[450px] bg-surface border-l border-border-default flex flex-col flex-shrink-0">
-          
-          {/* Details Scrollable Content */}
-          <div className="flex-1 overflow-y-auto p-6">
-            
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-semibold text-muted">PROJ-201</span>
-              <div className="flex items-center gap-2 text-caption">
-                <button className="hover:text-body transition-colors"><MoreHorizontal size={18} /></button>
-                <button className="hover:text-body transition-colors"><X size={18} /></button>
-              </div>
-            </div>
-
-            <h1 className="text-3xl font-extrabold text-heading leading-tight tracking-tight mb-4">
-              Integrate RFID Scanner API
-            </h1>
-
-            {/* Tags */}
-            <div className="flex items-center gap-2 mb-8">
-              <span className="inline-flex items-center gap-1.5 bg-[#eff6ff] text-[#3b82f6] px-2.5 py-1 rounded-full text-xs font-bold">
-                <HalfCircleIcon className="w-3.5 h-3.5" /> In Progress
-              </span>
-              <span className="inline-flex items-center gap-1 bg-danger-light text-danger px-2.5 py-1 rounded-full text-xs font-bold">
-                <ChevronsUp size={14} strokeWidth={3} /> High Priority
-              </span>
-            </div>
-
-            {/* Checklist Box */}
-            <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card mb-6">
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-sm font-bold text-heading">Checklist (33%)</h3>
-                <div className="w-24 bg-surface-strong rounded-full h-2 overflow-hidden">
-                  <div className="bg-primary h-full rounded-full" style={{ width: '33%' }}></div>
-                </div>
+      {activeSprint ? (
+        <>
+          {/* ── Sprint Info Bar ── */}
+          <div className="flex items-center justify-between px-6 py-3 border-b border-border-default bg-surface-raised flex-shrink-0 text-sm">
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2 font-bold text-heading">
+                <Rocket size={16} className="text-body" />
+                {activeSprint.name}
               </div>
               
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <CheckSquare size={18} className="text-black shrink-0 mt-0.5" fill="black" stroke="white" />
-                  <span className="text-sm font-medium text-muted line-through">Auth Token implementation</span>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Square size={18} className="text-faint shrink-0 mt-0.5" />
-                  <span className="text-sm font-medium text-body">Webhook payload parsing</span>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Square size={18} className="text-faint shrink-0 mt-0.5" />
-                  <span className="text-sm font-medium text-body">Unit tests</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Activity Feed Box */}
-            <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card">
-              <h3 className="text-sm font-bold text-heading mb-6">Activity & Pull Requests</h3>
+              <div className="w-px h-4 bg-gray-300"></div>
               
-              <div className="relative pl-4 space-y-8">
-                {/* Vertical Timeline Line */}
-                <div className="absolute left-[31px] top-4 bottom-0 w-px bg-surface-strong"></div>
-                
-                {/* PR Item */}
-                <div className="relative z-10 flex gap-4">
-                  <div className="w-8 h-8 rounded-full bg-surface-active border border-border-default flex items-center justify-center shrink-0 shadow-card mt-0.5"></div>
-                  <div>
-                    <p className="text-sm text-body leading-relaxed">
-                      <span className="font-bold text-heading">Mark D. opened PR #402</span> in <span className="font-semibold text-heading bg-surface-active px-1 rounded">asas-backend</span>
-                    </p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="inline-flex items-center gap-1.5 border border-[#bbf7d0] bg-[#f0fdf4] text-success-text px-2 py-0.5 rounded text-[9px] font-bold tracking-wider uppercase">
-                        <div className="w-1.5 h-1.5 rounded-full bg-success"></div>
-                        Build: Passing
-                      </span>
-                      <Code2 size={14} className="text-caption" />
-                    </div>
-                    <p className="text-xs text-muted mt-2 font-medium">2 hours ago</p>
-                  </div>
-                </div>
+              <div className="flex items-center gap-2 text-muted font-medium">
+                <Clock size={16} className="text-caption" />
+                Time Remaining: TBD
+              </div>
 
-                {/* Status Update Item */}
-                <div className="relative z-10 flex gap-4">
-                  <div className="w-8 h-8 rounded-full bg-surface-active border border-border-default flex items-center justify-center shrink-0 shadow-card mt-0.5">
-                    <MessageSquare size={14} className="text-muted" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-body leading-relaxed">
-                      <span className="font-bold text-heading">System marked issue as</span> <span className="text-[#3b82f6] font-semibold">In Progress</span>
-                    </p>
-                    <p className="text-xs text-muted mt-1 font-medium">Yesterday</p>
-                  </div>
-                </div>
+              <div className="w-px h-4 bg-gray-300"></div>
 
+              <div className="flex items-center gap-3">
+                <span className="text-muted font-medium">Completion: {dynamicCompletionPct}%</span>
+                <div className="w-48 bg-surface-strong rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-primary h-full rounded-full" style={{ width: `${dynamicCompletionPct}%` }}></div>
+                </div>
               </div>
             </div>
-            
-          </div>
 
-          {/* Comment Footer (Sticky) */}
-          <div className="p-6 bg-surface border-t border-border-default">
-            <div className="relative">
-              <input 
-                type="text" 
-                placeholder="Add a comment... ⌘+Enter" 
-                className="w-full bg-[#f1f5f9] border border-border-default rounded-button pl-4 pr-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:bg-surface-raised transition-colors placeholder-gray-400"
-              />
-              <button className="absolute right-3 top-1/2 -translate-y-1/2 text-caption hover:text-black transition-colors">
-                <Send size={16} />
+            <div className="flex items-center gap-4">
+              <button className="text-muted hover:text-heading transition-colors">
+                <Bell size={18} />
               </button>
+              <div className="w-7 h-7 bg-surface-strong rounded-full border border-border-strong"></div>
             </div>
           </div>
 
+          {/* ── Main Split View ── */}
+          <div className="flex-1 flex overflow-hidden">
+            
+            {/* Left: Issue List Area */}
+            <div className="flex-1 overflow-y-auto bg-surface p-6 space-y-6">
+              
+              {/* TODO GROUP */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-transparent border-2 border-gray-400"></div>
+                  <h3 className="text-[11px] font-bold text-muted uppercase tracking-wider">Todo <span className="ml-1 text-caption font-medium">{todoIssues.length}</span></h3>
+                </div>
+                <div className="space-y-2">
+                  {todoIssues.length === 0 ? <div className="text-sm text-muted">No issues in todo.</div> : null}
+                  {todoIssues.map(issue => {
+                    const isSelected = selectedId === issue.id;
+                    return (
+                      <div 
+                        key={issue.id}
+                        onClick={() => setSelectedId(issue.id)}
+                        className={`flex items-center justify-between p-3 rounded-button border cursor-pointer transition-colors ${
+                          isSelected ? 'bg-accent-light/30 border-accent-light border-l-4 border-l-blue-600 shadow-card' : 'bg-surface-raised border-border-default hover:border-border-strong border-l-4 border-l-transparent shadow-card'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Circle size={20} className="text-faint" />
+                          <span className="text-sm font-medium text-muted">{issue.key || issue.id.substring(issue.id.length - 8)}</span>
+                          <span className="text-sm font-bold text-heading ml-1">{issue.title}</span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          {issue.tag && (
+                            <span className="bg-surface-active text-body-light px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider">
+                              {issue.tag}
+                            </span>
+                          )}
+                          {issue.priority === 'HIGH' || issue.priority === 'URGENT' ? (
+                            <ChevronsUp size={16} className="text-danger" strokeWidth={3} />
+                          ) : (
+                            <Equal size={16} className="text-caption" strokeWidth={3} />
+                          )}
+                          <div className="w-6 h-6 rounded-full bg-surface-active border border-border-default"></div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* IN PROGRESS GROUP */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-2 h-2 rounded-full bg-[#3b82f6]"></div>
+                  <h3 className="text-[11px] font-bold text-muted uppercase tracking-wider">In Progress <span className="ml-1 text-caption font-medium">{inProgressIssues.length}</span></h3>
+                </div>
+                <div className="space-y-2">
+                  {inProgressIssues.length === 0 ? <div className="text-sm text-muted">No issues in progress.</div> : null}
+                  {inProgressIssues.map(issue => {
+                    const isSelected = selectedId === issue.id;
+                    return (
+                      <div 
+                        key={issue.id}
+                        onClick={() => setSelectedId(issue.id)}
+                        className={`flex items-center justify-between p-3 rounded-button border cursor-pointer transition-colors ${
+                          isSelected 
+                            ? 'bg-accent-light/30 border-accent-light border-l-4 border-l-blue-600 shadow-card' 
+                            : 'bg-surface-raised border-border-default hover:border-border-strong border-l-4 border-l-transparent shadow-card'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <HalfCircleIcon className="w-5 h-5 text-[#3b82f6]" />
+                          <span className="text-sm font-medium text-muted">{issue.key || issue.id.substring(issue.id.length - 8)}</span>
+                          <span className="text-sm font-bold text-heading ml-1">{issue.title}</span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          {issue.tag && (
+                            <span className="bg-surface-active text-body-light px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider">
+                              {issue.tag}
+                            </span>
+                          )}
+                          {issue.priority === 'HIGH' || issue.priority === 'URGENT' ? (
+                            <ChevronsUp size={16} className="text-danger" strokeWidth={3} />
+                          ) : (
+                            <Equal size={16} className="text-caption" strokeWidth={3} />
+                          )}
+                          <div className="w-6 h-6 rounded-full bg-surface-active border border-border-default"></div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* IN REVIEW GROUP */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-2 h-2 rounded-full bg-[#eab308]"></div>
+                  <h3 className="text-[11px] font-bold text-muted uppercase tracking-wider">In Review <span className="ml-1 text-caption font-medium">{inReviewIssues.length}</span></h3>
+                </div>
+                <div className="space-y-2">
+                  {inReviewIssues.length === 0 ? <div className="text-sm text-muted">No issues in review.</div> : null}
+                  {inReviewIssues.map(issue => {
+                    const isSelected = selectedId === issue.id;
+                    return (
+                      <div 
+                        key={issue.id}
+                        onClick={() => setSelectedId(issue.id)}
+                        className={`flex items-center justify-between p-3 rounded-button border cursor-pointer transition-colors ${
+                          isSelected ? 'bg-accent-light/30 border-accent-light border-l-4 border-l-blue-600 shadow-card' : 'bg-surface-raised border-border-default hover:border-border-strong border-l-4 border-l-transparent shadow-card'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Eye size={20} className="text-[#eab308]" />
+                          <span className="text-sm font-medium text-muted">{issue.key || issue.id.substring(issue.id.length - 8)}</span>
+                          <span className="text-sm font-bold text-heading ml-1">{issue.title}</span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          {issue.tag && (
+                            <span className="bg-surface-active text-body-light px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider">
+                              {issue.tag}
+                            </span>
+                          )}
+                          {issue.priority === 'HIGH' || issue.priority === 'URGENT' ? (
+                            <ChevronsUp size={16} className="text-danger" strokeWidth={3} />
+                          ) : (
+                            <Equal size={16} className="text-caption" strokeWidth={3} />
+                          )}
+                          <div className="w-6 h-6 rounded-full bg-surface-active border border-border-default"></div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* DONE GROUP */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-2 h-2 rounded-full bg-success"></div>
+                  <h3 className="text-[11px] font-bold text-muted uppercase tracking-wider">Done <span className="ml-1 text-caption font-medium">{doneIssues.length}</span></h3>
+                </div>
+                <div className="space-y-2">
+                  {doneIssues.length === 0 ? <div className="text-sm text-muted">No completed issues.</div> : null}
+                  {doneIssues.map(issue => {
+                    const isSelected = selectedId === issue.id;
+                    return (
+                      <div 
+                        key={issue.id}
+                        onClick={() => setSelectedId(issue.id)}
+                        className={`flex items-center justify-between p-3 rounded-button border cursor-pointer transition-colors ${
+                          isSelected ? 'bg-accent-light/30 border-accent-light border-l-4 border-l-blue-600 shadow-card' : 'bg-surface-raised border-border-default hover:border-border-strong border-l-4 border-l-transparent shadow-card opacity-60 hover:opacity-100'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <CheckSquare size={20} className="text-success" />
+                          <span className="text-sm font-medium text-muted line-through">{issue.key || issue.id.substring(issue.id.length - 8)}</span>
+                          <span className="text-sm font-bold text-heading ml-1 line-through">{issue.title}</span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          {issue.tag && (
+                            <span className="bg-surface-active text-body-light px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider">
+                              {issue.tag}
+                            </span>
+                          )}
+                          <div className="w-6 h-6 rounded-full bg-surface-active border border-border-default"></div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Right: Detail Panel */}
+            <div className="w-[450px] bg-surface border-l border-border-default flex flex-col flex-shrink-0">
+              
+              {selectedIssue ? (
+                <>
+                  {/* Details Scrollable Content */}
+                  <div className="flex-1 overflow-y-auto p-6">
+                    
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-sm font-semibold text-muted">{selectedIssue.key || selectedIssue.id.substring(selectedIssue.id.length - 8)}</span>
+                      <div className="flex items-center gap-2 text-caption">
+                        <button className="hover:text-body transition-colors"><MoreHorizontal size={18} /></button>
+                        <button onClick={() => setSelectedId(null)} className="hover:text-body transition-colors"><X size={18} /></button>
+                      </div>
+                    </div>
+
+                    <h1 className="text-3xl font-extrabold text-heading leading-tight tracking-tight mb-4">
+                      {selectedIssue.title}
+                    </h1>
+
+                    {/* Tags */}
+                    <div className="flex items-center gap-2 mb-8">
+                      <span className="inline-flex items-center gap-1.5 bg-[#eff6ff] text-[#3b82f6] px-2.5 py-1 rounded-full text-xs font-bold">
+                        <HalfCircleIcon className="w-3.5 h-3.5" /> {selectedIssue.status.replace('_', ' ')}
+                      </span>
+                      {selectedIssue.priority === 'HIGH' || selectedIssue.priority === 'URGENT' ? (
+                        <span className="inline-flex items-center gap-1 bg-danger-light text-danger px-2.5 py-1 rounded-full text-xs font-bold">
+                          <ChevronsUp size={14} strokeWidth={3} /> High Priority
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {/* Checklist Box (Stub for now) */}
+                    <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card mb-6">
+                      <div className="flex items-center justify-between mb-5">
+                        <h3 className="text-sm font-bold text-heading">Checklist</h3>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div className="text-sm text-muted">No checklist items yet.</div>
+                      </div>
+                    </div>
+
+                    {/* Activity Feed Box */}
+                    <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card">
+                      <h3 className="text-sm font-bold text-heading mb-6">Activity</h3>
+                      
+                      <div className="relative pl-4 space-y-8">
+                        <div className="text-sm text-muted">No recent activity.</div>
+                      </div>
+                    </div>
+                    
+                  </div>
+
+                  {/* Comment Footer (Sticky) */}
+                  <div className="p-6 bg-surface border-t border-border-default">
+                    <div className="relative">
+                      <input 
+                        type="text" 
+                        placeholder="Add a comment... ⌘+Enter" 
+                        className="w-full bg-[#f1f5f9] border border-border-default rounded-button pl-4 pr-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:bg-surface-raised transition-colors placeholder-gray-400"
+                      />
+                      <button className="absolute right-3 top-1/2 -translate-y-1/2 text-caption hover:text-black transition-colors">
+                        <Send size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex h-full items-center justify-center text-muted">
+                  Select an issue to view details.
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="flex h-full items-center justify-center bg-surface-raised text-muted">
+          No active sprints found.
         </div>
-      </div>
+      )}
     </div>
   );
 }

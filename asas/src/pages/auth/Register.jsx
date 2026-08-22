@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { authService } from '../../services/auth.service'
+import { useAuthStore } from '../../store/authStore'
 
 export default function Register() {
   const navigate = useNavigate()
@@ -17,9 +18,8 @@ export default function Register() {
     setIsLoading(true)
     try {
       const result = await authService.register(form)
-      localStorage.setItem('asas_token', result.token)
-      localStorage.setItem('asas_user', JSON.stringify(result.user))
-      navigate('/dashboard')
+      useAuthStore.getState().setSession(result.user, result.token)
+      navigate('/onboarding')
     } catch (requestError) {
       setError(requestError.response?.data?.error?.message || 'Unable to create your workspace.')
     } finally {

@@ -5,8 +5,13 @@ import {
   ChevronDown,
   RefreshCw,
   Database,
-  FileText
+  FileText,
+  Loader2,
+  Cloud,
+  Calendar
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { settingsService } from '../../../services/settings.service';
 import TopBarActions from '../../../components/TopBarActions';
 import SettingsTabs from './SettingsTabs';
 
@@ -27,6 +32,33 @@ const Toggle = ({ on, color = 'green' }) => {
 };
 
 export default function SettingsDataExport() {
+  const { data: responseData, isLoading, isError } = useQuery({
+    queryKey: ['settings', 'export'],
+    queryFn: settingsService.getExport,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-surface flex-1">
+        <Loader2 className="animate-spin text-muted" size={24} />
+      </div>
+    );
+  }
+
+  if (isError || !responseData) {
+    return (
+      <div className="flex h-full items-center justify-center bg-surface text-danger flex-1">
+        Failed to load export settings.
+      </div>
+    );
+  }
+
+  const jobs = responseData.data?.jobs || [];
+  const backups = responseData.data?.backups || [];
+
+  const liveJobs = jobs.filter(j => j.status === 'RUNNING' || j.status === 'QUEUED');
+  const availableDownloads = jobs.filter(j => j.status === 'DONE');
+
   return (
     <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
       
@@ -39,15 +71,12 @@ export default function SettingsDataExport() {
               placeholder="Search..." 
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 border border-border-default rounded px-1.5 py-0.5 bg-surface-raised">
-              <span className="text-[10px] text-caption font-medium">⌘K</span>
-            </div>
           </div>
           
           <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-strong shrink-0"></div>
           
-          <button className="bg-primary text-on-primary px-5 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card whitespace-nowrap">
-            Create New
+          <button className="bg-surface-muted border border-border-default text-body px-5 py-1.5 rounded-input text-sm font-semibold hover:bg-surface-active transition-colors whitespace-nowrap">
+            View Export History
           </button>
         </div>
       </TopBarActions>
@@ -70,8 +99,10 @@ export default function SettingsDataExport() {
                 <div>
                   <label className="block text-xs font-bold text-muted mb-1.5">Data Scope</label>
                   <div className="relative">
-                    <select className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary">
+                    <select className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised cursor-pointer hover:border-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary">
                       <option>Full Workspace</option>
+                      <option>Specific Projects</option>
+                      <option>Financial Ledgers</option>
                     </select>
                     <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
                   </div>
@@ -79,8 +110,10 @@ export default function SettingsDataExport() {
                 <div>
                   <label className="block text-xs font-bold text-muted mb-1.5">Format</label>
                   <div className="relative">
-                    <select className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary">
+                    <select className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised cursor-pointer hover:border-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary">
                       <option>JSON & CSV</option>
+                      <option>PDF Reports</option>
+                      <option>SQL Dump</option>
                     </select>
                     <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
                   </div>
@@ -91,8 +124,10 @@ export default function SettingsDataExport() {
               <div>
                 <label className="block text-xs font-bold text-muted mb-1.5">Date Range</label>
                 <div className="relative">
-                  <select className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary">
+                  <select className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised cursor-pointer hover:border-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary">
                     <option>All Time</option>
+                    <option>Last 30 Days</option>
+                    <option>Year to Date</option>
                   </select>
                   <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
                 </div>
@@ -112,33 +147,25 @@ export default function SettingsDataExport() {
             <h2 className="text-lg font-bold text-heading mb-6">Scheduled Backups</h2>
             
             <div className="space-y-6">
-              {/* Daily S3 Sync */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-surface-raised rounded-badge flex items-center justify-center shrink-0">
-                    <RefreshCw size={22} className="text-accent" />
+              {backups.length > 0 ? backups.map((backup) => (
+                <div key={backup.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-surface-raised rounded-badge flex items-center justify-center shrink-0">
+                      <RefreshCw size={22} className="text-accent" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-heading">{backup.type} Backup</h3>
+                      <p className="text-[11px] font-medium text-muted mt-0.5">Runs on {backup.cronSchedule}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-heading">Daily AWS S3 Sync</h3>
-                    <p className="text-[11px] font-medium text-muted mt-0.5">Runs at 00:00 UTC</p>
-                  </div>
+                  <Toggle on={backup.enabled} color="green" />
                 </div>
-                <Toggle on={true} color="green" />
-              </div>
-
-              {/* Weekly Postgres Dump */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-surface-raised rounded-badge flex items-center justify-center shrink-0">
-                    <Database size={22} className="text-muted" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-heading">Weekly PostgreSQL Dump</h3>
-                    <p className="text-[11px] font-medium text-muted mt-0.5">Runs Sunday 02:00 UTC</p>
-                  </div>
+              )) : (
+                <div className="flex flex-col items-center justify-center text-sm text-muted py-8 text-center">
+                  <Calendar size={32} className="opacity-20 mb-3" />
+                  No scheduled backups configured.
                 </div>
-                <Toggle on={false} />
-              </div>
+              )}
             </div>
           </div>
 
@@ -154,18 +181,25 @@ export default function SettingsDataExport() {
             <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card">
               <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-4">Live Jobs</h3>
               
-              <div className="mb-1">
-                <div className="flex justify-between items-end mb-1.5">
-                  <span className="text-sm font-semibold text-heading">Finance_Q3_Ledger.csv</span>
-                  <span className="text-[11px] font-bold text-accent">65%</span>
+              {liveJobs.length > 0 ? liveJobs.map(job => (
+                <div key={job.id} className="mb-4 last:mb-0">
+                  <div className="flex justify-between items-end mb-1.5">
+                    <span className="text-sm font-semibold text-heading">{job.filename || 'Export_Job'}</span>
+                    <span className="text-[11px] font-bold text-accent">{job.progressPct || 0}%</span>
+                  </div>
+                  <div className="w-full bg-surface-muted rounded-full h-1.5 overflow-hidden">
+                    <div className="bg-accent h-full rounded-full" style={{ width: `${job.progressPct || 0}%` }}></div>
+                  </div>
+                  <div className="text-right mt-1.5">
+                    <span className="text-[10px] font-medium text-muted">{job.status === 'RUNNING' ? 'Processing...' : 'Queued'}</span>
+                  </div>
                 </div>
-                <div className="w-full bg-surface-muted rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-accent h-full rounded-full" style={{ width: '65%' }}></div>
+              )) : (
+                <div className="flex flex-col items-center justify-center text-xs text-muted py-6 text-center">
+                  <Cloud size={24} className="opacity-20 mb-2" />
+                  No active exports.
                 </div>
-                <div className="text-right mt-1.5">
-                  <span className="text-[10px] font-medium text-muted">Processing...</span>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Available Downloads Card */}
@@ -173,33 +207,28 @@ export default function SettingsDataExport() {
               <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-4">Available Downloads</h3>
               
               <div className="space-y-5">
-                {/* Download 1 */}
-                <div>
-                  <div className="flex items-start justify-between mb-1">
-                    <div className="flex items-center gap-2 overflow-hidden mr-2">
-                      <FileText size={14} className="text-muted shrink-0" />
-                      <span className="text-sm font-semibold text-heading truncate">Workspace_Backup_O...</span>
+                {availableDownloads.length > 0 ? availableDownloads.map(dl => (
+                  <div key={dl.id}>
+                    <div className="flex items-start justify-between mb-1">
+                      <div className="flex items-center gap-2 overflow-hidden mr-2">
+                        <FileText size={14} className="text-muted shrink-0" />
+                        <span className="text-sm font-semibold text-heading truncate" title={dl.filename || 'Export.zip'}>
+                          {dl.filename || 'Export.zip'}
+                        </span>
+                      </div>
+                      <button className="text-[11px] font-semibold text-accent hover:text-accent-hover transition-colors shrink-0">
+                        Download
+                      </button>
                     </div>
-                    <button className="text-[11px] font-semibold text-accent hover:text-accent-hover transition-colors shrink-0">
-                      Download
-                    </button>
+                    {dl.expiresAt && (
+                      <p className="text-[10px] font-medium text-warning ml-5">
+                        Expires {new Date(dl.expiresAt).toLocaleDateString()}
+                      </p>
+                    )}
                   </div>
-                  <p className="text-[10px] font-medium text-warning ml-5">Link expires in 12h</p>
-                </div>
-
-                {/* Download 2 */}
-                <div>
-                  <div className="flex items-start justify-between mb-1">
-                    <div className="flex items-center gap-2 overflow-hidden mr-2">
-                      <FileText size={14} className="text-muted shrink-0" />
-                      <span className="text-sm font-semibold text-heading truncate">HR_Roster_Export.json</span>
-                    </div>
-                    <button className="text-[11px] font-semibold text-accent hover:text-accent-hover transition-colors shrink-0">
-                      Download
-                    </button>
-                  </div>
-                  <p className="text-[10px] font-medium text-warning ml-5">Link expires in 2h</p>
-                </div>
+                )) : (
+                  <div className="text-xs text-muted">No available downloads.</div>
+                )}
               </div>
             </div>
 
