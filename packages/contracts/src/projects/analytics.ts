@@ -71,6 +71,10 @@ export const portfolioUtilizationResponseSchema = z.object({
     totalSpent: moneySchema,
     totalBudget: moneySchema.nullable(),
     utilizationPct: z.number().min(0).nullable(),
+    /** Total project count for the tenant, or 0. */
+    totalProjects: z.int().min(0),
+    /** Projects in an active status (ON_TRACK/DELAYED/AT_RISK), or 0. */
+    activeProjects: z.int().min(0),
   }),
 })
 

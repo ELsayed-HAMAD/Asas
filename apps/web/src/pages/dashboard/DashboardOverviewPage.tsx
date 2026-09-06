@@ -59,7 +59,8 @@ function CardSection({ title, to, children }: { title: string; to: string; child
 /**
  * Cross-module dashboard — pulls KPIs from every module's overview endpoint in parallel.
  * Each card links to its module's main page. Each query handles loading and error
- * independently so one failing module doesn't blank the whole dashboard.
+ * independently so one failing module doesn't blank the whole dashboard. Every KPI value
+ * renders a server-computed `summary` figure — nothing aggregates rows client-side.
  */
 export function DashboardOverviewPage() {
   const finance = useQuery({
@@ -135,15 +136,15 @@ export function DashboardOverviewPage() {
         <KpiCard
           to="/projects"
           label="Active projects"
-          value={projects.data ? String(projects.data.items.filter(p => p.status === 'ON_TRACK' || p.status === 'PLANNING').length) : '…'}
-          subtext={projects.data ? `${projects.data.items.length} total projects` : undefined}
+          value={projects.data ? String(projects.data.summary.activeProjects) : '…'}
+          subtext={projects.data ? `${projects.data.summary.totalProjects} total projects` : undefined}
           loading={projects.isLoading}
         />
         <KpiCard
           to="/projects"
           label="Budget spent"
           value={projects.data
-            ? formatMoney(projects.data.items.reduce((sum, p) => sum + (p.spent?.amount ?? 0), 0), { compact: true })
+            ? formatMoney(projects.data.summary.totalSpent, { compact: true })
             : '…'}
           subtext="Across all projects"
           loading={projects.isLoading}

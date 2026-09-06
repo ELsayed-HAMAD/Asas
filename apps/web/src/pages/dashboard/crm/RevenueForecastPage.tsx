@@ -27,7 +27,8 @@ const chartConfig = {
 /**
  * Revenue forecast — `GET /crm/forecast`. Two real sources: `ForecastSnapshot` rows drive the
  * per-rep table, `SalesQuota` rows drive the quota table, and `monthlyPipeline` is the
- * open-deals-by-close-month chart. All numbers are server-computed; this page only renders.
+ * open-deals-by-close-month chart. The KPI cards render the server's `summary` totals;
+ * this page only renders.
  */
 export function RevenueForecastPage() {
   const { data, isLoading, isError } = useQuery({
@@ -36,14 +37,9 @@ export function RevenueForecastPage() {
   })
 
   const forecast: CrmForecast | undefined = data
-  const totalPipeline = forecast?.monthlyPipeline.reduce(
-    (sum, m) => sum + m.value.amount,
-    0,
-  ) ?? 0
-  const totalQuota = forecast?.quotas.reduce(
-    (sum, q) => sum + q.quota.amount,
-    0,
-  ) ?? 0
+  const totalPipeline = forecast?.summary.totalPipeline.amount ?? 0
+  const totalQuota = forecast?.summary.totalQuota.amount ?? 0
+  const quotaAttainmentPct = forecast?.summary.quotaAttainmentPct ?? null
 
   return (
     <div className="p-6 space-y-6">
@@ -77,7 +73,7 @@ export function RevenueForecastPage() {
           <CardHeader>
             <CardDescription>Quota attainment</CardDescription>
             <CardTitle className="text-2xl tabular-nums">
-              {totalQuota > 0 ? formatPercent(Math.round((totalPipeline / totalQuota) * 10000)) : '—'}
+              {quotaAttainmentPct != null ? formatPercent(quotaAttainmentPct) : '—'}
             </CardTitle>
           </CardHeader>
           <CardContent>

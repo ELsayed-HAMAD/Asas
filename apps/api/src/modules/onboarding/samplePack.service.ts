@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Prisma, type EmployeeStatus, type PrismaClient } from '@prisma/client'
 import { computePayrollLine, Money, type TaxRate } from '@asas/domain'
+import type { ImportEmployeesRequest } from '@asas/contracts'
 import { AppError } from '../../utils/errors.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -105,6 +106,7 @@ interface SeedPackFile {
     stage: string
     timeInStage?: string
     appliedAt?: string
+    avatarUrl?: string
     source?: string
     currentRole?: string
     experience?: string
@@ -636,7 +638,13 @@ export async function applyEnterpriseSamplePack(
         const bonusAmount = line.bonusAmount != null
           ? Money.fromDecimal(String(line.bonusAmount), currency, 'HALF_UP')
           : undefined
-        const result = computePayrollLine({ baseSalary, bonusAmount }, SAMPLE_TAX_RATES)
+        // Conditional spread (not an explicit `undefined`) so the optional `bonusAmount`
+        // property is omitted rather than assigned `undefined` — the same idiom the HR
+        // payroll service uses under `exactOptionalPropertyTypes`.
+        const result = computePayrollLine(
+          { baseSalary, ...(bonusAmount && { bonusAmount }) },
+          SAMPLE_TAX_RATES,
+        )
         await tx.payrollLine.create({
           data: {
             tenantId,
@@ -679,7 +687,7 @@ export async function applyEnterpriseSamplePack(
 export async function importEmployees(
   prisma: PrismaClient,
   tenantId: string,
-  input: ImportEmployeesInput,
+  input: ImportEmployeesRequest,
 ): Promise<{ imported: number }> {
   const currency = await getTenantCurrency(prisma, tenantId)
   const departmentCache = new Map<string, string>()
@@ -723,20 +731,6 @@ export async function importEmployees(
   })
 
   return { imported }
-}
-
-export interface ImportEmployeesInput {
-  employees: {
-    name: string
-    title: string
-    department?: string
-    status?: EmployeeStatus
-    email?: string
-    location?: string
-    salary?: string
-    employeeNumber?: string
-    hiredAt?: string
-  }[]
 }
 
 async function getTenantCurrency(prisma: PrismaClient, tenantId: string): Promise<string> {

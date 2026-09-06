@@ -238,9 +238,10 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
 
   /**
    * The CV preview — same-origin, tenant-scoped, raw `application/pdf` bytes. The web app
-   * feeds this URL to pdf.js, which renders the first page to a canvas. No `schema.response`
-   * is declared: the body is a binary, and a JSON response schema would route it through the
-   * serializer. An orphaned `resumeUrl` (file deleted out-of-band) reads as 404.
+   * fetches these to a Blob and shows them in a native-viewer `<iframe>` (no pdf.js bundled —
+   * it would blow the 500 kB/chunk CI budget). No `schema.response` is declared: the body is a
+   * binary, and a JSON response schema would route it through the serializer. An orphaned
+   * `resumeUrl` (file deleted out-of-band) reads as 404.
    */
   server.get(
     '/candidates/:id/resume',

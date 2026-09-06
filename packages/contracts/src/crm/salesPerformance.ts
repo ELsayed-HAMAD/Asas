@@ -39,6 +39,18 @@ export const salesPerformanceResponseSchema = z.object({
   monthlyClosedWon: z.array(monthlyClosedWonSchema),
   /** Per-owner breakdown, open pipeline first (largest first), then owners with no open deals. */
   byRep: z.array(repPerformanceSchema),
+  /**
+   * Tenant-wide totals, computed server-side (SQL `SUM`/`COUNT` over the same `Deal` rows)
+   * so KPI cards render them instead of re-deriving them from `byRep` in the browser.
+   */
+  summary: z.object({
+    /** `SUM(value)` over all `CLOSED_WON` deals — minor units. */
+    totalWon: moneySchema,
+    totalWonCount: z.int().min(0),
+    totalLostCount: z.int().min(0),
+    /** Overall `totalWonCount / (totalWonCount + totalLostCount)` percentage 0–100, or null. */
+    overallWinRate: z.number().min(0).max(100).nullable(),
+  }),
 })
 
 export type CrmSalesPerformance = z.infer<typeof salesPerformanceResponseSchema>

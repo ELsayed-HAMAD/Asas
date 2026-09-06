@@ -202,13 +202,15 @@ export async function getPortfolioUtilization(
   tenantId: string,
 ): Promise<PortfolioUtilizationResponse> {
   const currency = await getTenantCurrency(prisma, tenantId)
-  const [projects, totals] = await Promise.all([
+  const [projects, totals, totalProjects, activeProjects] = await Promise.all([
     prisma.project.findMany({
       where: { tenantId },
       orderBy: { createdAt: 'asc' },
       select: { id: true, name: true, status: true, budget: true, spent: true },
     }),
     prisma.project.aggregate({ where: { tenantId }, _sum: { budget: true, spent: true } }),
+    prisma.project.count({ where: { tenantId } }),
+    prisma.project.count({ where: { tenantId, status: { in: [...ACTIVE_STATUSES] } } }),
   ])
 
   const items: UtilizationRow[] = projects.map(project => {
@@ -233,6 +235,8 @@ export async function getPortfolioUtilization(
       totalSpent,
       totalBudget,
       utilizationPct: utilizationPct(totalSpent.amount, totalBudget?.amount ?? null),
+      totalProjects,
+      activeProjects,
     },
   }
 }

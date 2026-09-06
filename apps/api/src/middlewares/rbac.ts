@@ -45,7 +45,14 @@ export async function resolveAuthContext(
   headers: FastifyRequest['headers'],
 ): Promise<AuthContext | null> {
   const sessionData = await auth.api.getSession({ headers: fromNodeHeaders(headers) })
-  const tenantId = sessionData?.session.activeOrganizationId
+  // `activeOrganizationId` is a real column on the `Session` row (written by the org
+  // plugin's session hook in `auth.ts`), but better-auth's inferred `getSession()` return
+  // type doesn't surface it in this context, so read it through a narrow structural cast.
+  // `null`/`undefined` means no active workspace yet (the onboarding flow sets one).
+  const session = sessionData?.session ?? null
+  const tenantId = (
+    session as { activeOrganizationId?: string | null } | null
+  )?.activeOrganizationId
   if (!sessionData || !tenantId) return null
 
   const member = await prisma.member.findUnique({

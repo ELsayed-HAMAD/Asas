@@ -83,7 +83,7 @@ asas/
 pnpm install
 
 # Copy environment templates
-cp apps/api/.env.example apps/api/.env   # set DATABASE_URL, BETTER_AUTH_SECRET
+cp apps/api/.env.example apps/api/.env   # set DATABASE_URL, AUTH_SECRET
 cp apps/web/.env.example apps/web/.env   # set VITE_API_URL
 
 # Generate Prisma client
@@ -113,7 +113,7 @@ The following environment variables are required for the API (`apps/api/.env`):
 | Variable | Description | Example |
 |---|---|---|
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@host:5432/db?sslmode=require` |
-| `BETTER_AUTH_SECRET` | Secret for session signing (min 32 chars) | (generate with `openssl rand -base64 32`) |
+| `AUTH_SECRET` | Secret for session signing (min 32 chars) | (generate with `openssl rand -base64 32`) |
 | `PORT` | API server port | `4000` |
 
 The following environment variables are required for the web app (`apps/web/.env`):

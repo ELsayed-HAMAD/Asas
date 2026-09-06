@@ -38,7 +38,8 @@ type RepRow = {
 
 /**
  * Sales performance — `GET /crm/sales-performance`. The monthly closed-won chart and per-rep
- * leaderboard are both server-computed SQL aggregates. This page only renders.
+ * leaderboard are both server-computed SQL aggregates; the KPI cards render the server's
+ * `summary` totals. This page only renders.
  */
 export function SalesPerformancePage() {
   const { data, isLoading, isError } = useQuery({
@@ -47,12 +48,10 @@ export function SalesPerformancePage() {
   })
 
   const perf: CrmSalesPerformance | undefined = data
-  const totalWon = perf?.byRep.reduce((sum, r) => sum + r.wonValue.amount, 0) ?? 0
-  const totalWonCount = perf?.byRep.reduce((sum, r) => sum + r.wonCount, 0) ?? 0
-  const totalLostCount = perf?.byRep.reduce((sum, r) => sum + r.lostCount, 0) ?? 0
-  const overallWinRate = totalWonCount + totalLostCount > 0
-    ? Math.round((totalWonCount / (totalWonCount + totalLostCount)) * 10000)
-    : null
+  const totalWon = perf?.summary.totalWon.amount ?? 0
+  const totalWonCount = perf?.summary.totalWonCount ?? 0
+  const totalLostCount = perf?.summary.totalLostCount ?? 0
+  const overallWinRate = perf?.summary.overallWinRate ?? null
 
   const repRows: RepRow[] = useMemo(() =>
     (perf?.byRep ?? []).map(r => ({

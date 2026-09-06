@@ -276,6 +276,16 @@ export async function getForecast(prisma: PrismaClient, tenantId: string): Promi
     monthlyOpenPipeline(prisma, tenantId, currency),
   ])
 
+  const totalPipeline = {
+    amount: monthlyPipeline.reduce((sum, entry) => sum + entry.value.amount, 0),
+    currency,
+  }
+  // Quotas are summed at Decimal precision and converted to the wire form once.
+  const totalQuota = toMoneyWire(
+    quotas.reduce((acc, quota) => acc.add(quota.quota), new Prisma.Decimal(0)),
+    currency,
+  )!
+
   return {
     forecastByRep: snapshots.map(snapshot => ({
       id: snapshot.id,
@@ -296,6 +306,14 @@ export async function getForecast(prisma: PrismaClient, tenantId: string): Promi
       createdAt: quota.createdAt.toISOString(),
     })),
     monthlyPipeline,
+    summary: {
+      totalPipeline,
+      totalQuota,
+      quotaAttainmentPct:
+        totalQuota.amount > 0
+          ? Number(((totalPipeline.amount / totalQuota.amount) * 100).toFixed(1))
+          : null,
+    },
   }
 }
 
@@ -384,6 +402,11 @@ export async function getSalesPerformance(
     return (a.ownerName ?? '').localeCompare(b.ownerName ?? '')
   })
 
+  // Portfolio totals over the same rows — SQL-level, never a client re-sum of `byRep`.
+  const wonCount = byRep.reduce((sum, rep) => sum + rep.wonCount, 0)
+  const lostCount = byRep.reduce((sum, rep) => sum + rep.lostCount, 0)
+  const wonTotal = byRep.reduce((sum, rep) => sum + rep.wonValue, 0)
+
   return {
     monthlyClosedWon,
     byRep: byRep.map(rep => ({
@@ -397,6 +420,12 @@ export async function getSalesPerformance(
       lostValue: { amount: rep.lostValue, currency },
       winRate: winRate(rep.wonCount, rep.lostCount),
     })),
+    summary: {
+      totalWon: { amount: wonTotal, currency },
+      totalWonCount: wonCount,
+      totalLostCount: lostCount,
+      overallWinRate: winRate(wonCount, lostCount),
+    },
   }
 }
 

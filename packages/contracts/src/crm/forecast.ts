@@ -57,6 +57,18 @@ export const forecastResponseSchema = z.object({
   quotas: z.array(salesQuotaSchema),
   /** Open deals by close-date month, ascending. Empty when no open deal has a close date. */
   monthlyPipeline: z.array(monthlyPipelineEntrySchema),
+  /**
+   * Tenant-wide totals, computed server-side (`SUM` over the same rows as `monthlyPipeline`
+   * and `quotas`) so KPI cards render them instead of re-summing the rows in the browser.
+   */
+  summary: z.object({
+    /** `SUM(value)` over open deals with a close date — minor units. */
+    totalPipeline: moneySchema,
+    /** `SUM(quota)` over all quotas — minor units. */
+    totalQuota: moneySchema,
+    /** `totalPipeline / totalQuota` as a percentage 0–∞, or `null` when there is no quota. */
+    quotaAttainmentPct: z.number().min(0).nullable(),
+  }),
 })
 
 export type CrmForecast = z.infer<typeof forecastResponseSchema>

@@ -5,6 +5,10 @@ import {
   importEmployeesResponseSchema,
   onboardingStatusResponseSchema,
   sampleApplyResponseSchema,
+  type ImportEmployeesRequest,
+  type ImportEmployeesResponse,
+  type OnboardingStatusResponse,
+  type SampleApplyResponse,
 } from '@asas/contracts'
 import type { PrismaClient } from '@prisma/client'
 import type { FastifyInstance } from 'fastify'
@@ -75,7 +79,7 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
       preHandler: requirePermission('onboarding.write'),
       schema: { response: { 201: envelope(sampleApplyResponseSchema), ...errorResponses } },
     },
-    async (request, reply) => {
+    async (request, reply): Promise<{ data: SampleApplyResponse }> => {
       const { tenantId, userId } = requireAuthContext(request)
       const summary = await applyEnterpriseSamplePack(request.server.prisma, tenantId)
       await recordAuditLog(request.server.prisma, {
@@ -106,7 +110,7 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
         response: { 201: envelope(importEmployeesResponseSchema), ...errorResponses },
       },
     },
-    async (request, reply) => {
+    async (request, reply): Promise<{ data: ImportEmployeesResponse }> => {
       const { tenantId, userId } = requireAuthContext(request)
       const result = await importEmployees(request.server.prisma, tenantId, request.body)
       await recordAuditLog(request.server.prisma, {
@@ -128,7 +132,7 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
 export async function getOnboardingStatus(
   prisma: PrismaClient,
   tenantId: string,
-): Promise<{ onboardingStatus: string; hasHrData: boolean; workspaceName: string }> {
+): Promise<OnboardingStatusResponse> {
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } })
   if (!tenant) throw new AppError(404, 'Workspace not found')
   const employeeCount = await prisma.employee.count({ where: { tenantId } })

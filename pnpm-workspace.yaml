@@ -11,3 +11,10 @@ allowBuilds:
   prisma: true
 minimumReleaseAgeExclude:
   - zod@4.5.2
+# @prisma/config@6.19.3 pins its `deepmerge-ts` dependency to exactly 7.1.5, which is
+# affected by CVE-2026-40345 (fixed in deepmerge-ts 8.0.0). Because the dependency is an
+# exact pin, a normal range can never select the fixed line, so we override it here.
+# This is a stopgap — remove it once Prisma ships an @prisma/config whose deepmerge-ts is
+# >= 8, then re-run `pnpm install` and re-audit.
+overrides:
+  deepmerge-ts: '^8.0.0'

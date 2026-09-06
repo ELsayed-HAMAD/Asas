@@ -70,16 +70,20 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
     databaseHooks: {
       session: {
         create: {
+          // better-auth's `before` hook replaces the record being written when it returns
+          // `{ data }` (see @better-auth/core init-options: "If the hook returns an object,
+          // it'll be used instead of the original data"). Returning the raw session object —
+          // as an earlier draft did — is type-invalid and not consumed as a replacement.
           before: async session => {
-            if (session.activeOrganizationId) return session
+            if (session.activeOrganizationId) return
             const membershipCount = await prisma.member.count({ where: { userId: session.userId } })
             if (membershipCount === 1) {
               const onlyMember = await prisma.member.findFirst({ where: { userId: session.userId } })
               if (onlyMember) {
-                return { ...session, activeOrganizationId: onlyMember.tenantId }
+                return { data: { ...session, activeOrganizationId: onlyMember.tenantId } }
               }
             }
-            return session
+            return
           },
         },
       },
