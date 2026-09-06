@@ -1,0 +1,11 @@
+{
+  // Emit config. Tests are excluded so `dist/` contains only shipped code and `.d.ts` files
+  // never reference vitest.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"]
+}

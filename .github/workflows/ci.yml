@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # No live database is required: buildApp() never connects (see apps/api/src/app.ts),
+      # and `prisma generate` only reads the schema shape, not the datasource URL.
+      - name: Generate Prisma client
+        run: pnpm --filter @asas/api run prisma:generate
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      # Includes packages/contracts' enums.generated.test.ts, which fails the build the moment
+      # a Prisma enum changes without the generated Zod schema being regenerated to match.
+      - name: Test
+        run: pnpm run test
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Check bundle size budget
+        run: |
+          for chunk in apps/web/dist/assets/*.js; do
+            size=$(stat -c%s "$chunk")
+            if [ "$size" -gt 512000 ]; then
+              echo "::error file=$chunk::Chunk exceeds the 500 kB budget ($size bytes)"
+              exit 1
+            fi
+          done
+
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: asas_e2e
+          POSTGRES_PASSWORD: asas_e2e
+          POSTGRES_DB: asas_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @asas/api run prisma:generate
+
+      - name: Run API migrations
+        env:
+          DATABASE_URL: postgresql://asas_e2e:asas_e2e@localhost:5432/asas_e2e
+        run: pnpm --filter @asas/api run prisma:migrate
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @asas/web run e2e:install
+
+      - name: Start API
+        env:
+          DATABASE_URL: postgresql://asas_e2e:asas_e2e@localhost:5432/asas_e2e
+          PORT: "4000"
+          BETTER_AUTH_SECRET: e2e-test-secret-must-be-at-least-32-chars
+        run: |
+          pnpm --filter @asas/api run start &
+          sleep 5
+          curl -sf http://127.0.0.1:4000/health || exit 1
+
+      - name: Run E2E tests
+        env:
+          DATABASE_URL: postgresql://asas_e2e:asas_e2e@localhost:5432/asas_e2e
+          E2E_BASE_URL: http://127.0.0.1:5173
+        run: pnpm --filter @asas/web run e2e
+
+      - name: Upload E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 7
