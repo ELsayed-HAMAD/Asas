@@ -39,6 +39,21 @@ export const sampleApplyResponseSchema = z.object({
 
 export type SampleApplyResponse = z.infer<typeof sampleApplyResponseSchema>
 
+// ── Clear sample data ──────────────────────────────────────────────────────────
+
+/**
+ * `DELETE /onboarding/sample-data` — clears the sample dataset from a `SAMPLE_LOADED`
+ * workspace so onboarding can run again. `cleared` is a per-model row count (model name →
+ * rows deleted) so the UI and audit log can report exactly what was removed; `0` for a model
+ * with no rows is expected and meaningful.
+ */
+export const sampleDataClearResponseSchema = z.object({
+  cleared: z.record(z.string(), z.number().int()),
+  onboardingStatus: z.literal('PENDING'),
+})
+
+export type SampleDataClearResponse = z.infer<typeof sampleDataClearResponseSchema>
+
 // ── Import ──────────────────────────────────────────────────────────────────────
 
 /** One employee row to import. Mirrors the legacy `importEmployeesSchema`, money as decimal strings. */
