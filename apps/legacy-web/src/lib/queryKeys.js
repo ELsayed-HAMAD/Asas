@@ -69,6 +69,7 @@ const exportsBase = moduleKeys('exports')
 const settingsBase = moduleKeys('settings')
 const dashboardBase = moduleKeys('dashboard')
 const supportBase = moduleKeys('support')
+const onboardingBase = moduleKeys('onboarding')
 
 export const queryKeys = {
   all: () => root,
@@ -146,5 +147,10 @@ export const queryKeys = {
 
   support: {
     ...supportBase,
+  },
+
+  onboarding: {
+    ...onboardingBase,
+    status: () => [...onboardingBase.all(), 'status'],
   },
 }

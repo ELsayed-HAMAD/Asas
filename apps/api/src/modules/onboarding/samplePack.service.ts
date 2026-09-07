@@ -675,6 +675,140 @@ export async function applyEnterpriseSamplePack(
 }
 
 /**
+ * The tenant-scoped business models the sample pack (and the rest of the app) writes, in an
+ * order that respects every foreign key. Each of these carries a `tenantId`; every *child*
+ * model that lacks one (e.g. `PayrollTaxLine`, `TimesheetDay`, `DealActivity`, `IssueComment`,
+ * `RoadmapTaskAssignee`) is tied to its parent by a `onDelete: Cascade` relation, so deleting
+ * the parent here removes the child too. We therefore delete exactly the tenant-scoped set —
+ * never the tenant's identity/settings rows (see the "never delete" list below).
+ *
+ * Ordered child-parent-first where a child is itself tenant-scoped AND references a sibling
+ * tenant-scoped model (e.g. `StockMovement` → `Product`, `PayrollLine` → `Employee`). The
+ * cascade covers the rest, so this list is the *minimal* set that clears a sample workspace.
+ */
+type TenantBusinessModel =
+  | 'payrollLine'
+  | 'payrollRun'
+  | 'timesheet'
+  | 'attendanceException'
+  | 'leaveRequest'
+  | 'candidate'
+  | 'employee'
+  | 'department'
+  | 'activityEvent'
+  | 'payableInvoice'
+  | 'receivableInvoice'
+  | 'expense'
+  | 'ledgerTransaction'
+  | 'cashFlowSnapshot'
+  | 'vendor'
+  | 'customer'
+  | 'deal'
+  | 'company'
+  | 'agendaItem'
+  | 'salesQuota'
+  | 'forecastSnapshot'
+  | 'purchaseOrder'
+  | 'stockMovement'
+  | 'product'
+  | 'supplier'
+  | 'issue'
+  | 'sprint'
+  | 'project'
+  | 'roadmapPhase'
+  | 'roadmapTask'
+
+const TENANT_BUSINESS_MODELS: readonly TenantBusinessModel[] = [
+  // HR (leaf-ish first)
+  'payrollLine',
+  'payrollRun',
+  'timesheet',
+  'attendanceException',
+  'leaveRequest',
+  'candidate',
+  'employee',
+  'department',
+  'activityEvent',
+  // Finance
+  'payableInvoice',
+  'receivableInvoice',
+  'expense',
+  'ledgerTransaction',
+  'cashFlowSnapshot',
+  'vendor',
+  'customer',
+  // CRM
+  'deal',
+  'company',
+  'agendaItem',
+  'salesQuota',
+  'forecastSnapshot',
+  // Inventory (purchase orders before products: their lines cascade off both)
+  'purchaseOrder',
+  'stockMovement',
+  'product',
+  'supplier',
+  // Projects
+  'issue',
+  'sprint',
+  'project',
+  'roadmapPhase',
+  'roadmapTask',
+]
+
+/**
+ * `DELETE /onboarding/sample-data` — clears the sample pack (or any business data) from the
+ * active workspace so the onboarding flow can be re-run (e.g. load the sample to explore,
+ * then clear it and import the tenant's real data).
+ *
+ * **Safety contract:**
+ *  - Only runs when `tenant.onboardingStatus === 'SAMPLE_LOADED'`. A tenant that imported its
+ *    own data (`IMPORTED`) or has been edited past the sample (`EMPTY` + manual rows) is
+ *    refused with a 409 — this can never wipe real records by accident. The guard reads the
+ *    status *and* requires no imported employees, so the only reachable state is a pure
+ *    sample workspace.
+ *  - Deletes inside a single `$transaction` in one atomic sweep; the tenant row itself is
+ *    never deleted, only its `onboardingStatus` is reset to `PENDING` so the 3-choice
+ *    onboarding shows again.
+ *  - Preserves tenant identity/settings: members, invitations, audit log, subscriptions,
+ *    payment methods, billing invoices, integrations, notification preferences, quiet hours,
+ *    export jobs, backup schedules, and support tickets are all untouched.
+ *
+ * @returns per-model row counts so the UI/audit can report what was cleared.
+ */
+export async function clearSamplePack(
+  prisma: PrismaClient,
+  tenantId: string,
+): Promise<{ cleared: Record<string, number>; onboardingStatus: 'PENDING' }> {
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } })
+  if (!tenant) throw new AppError(404, 'Workspace not found')
+
+  if (tenant.onboardingStatus !== 'SAMPLE_LOADED') {
+    throw new AppError(
+      409,
+      'Only a workspace loaded with the sample dataset can be cleared. Import your own data first if you want to replace it.',
+    )
+  }
+
+  const cleared: Record<string, number> = {}
+  await prisma.$transaction(async tx => {
+    // The union of all tenant-scoped model delegates is indexable by this literal union; the
+    // cast narrows each delegate to the one method the sweep needs (deleteMany by tenantId).
+    const delegates = tx as unknown as Record<
+      TenantBusinessModel,
+      { deleteMany: (args: { where: { tenantId: string } }) => Promise<{ count: number }> }
+    >
+    for (const model of TENANT_BUSINESS_MODELS) {
+      const result = await delegates[model].deleteMany({ where: { tenantId } })
+      cleared[model] = result.count
+    }
+    await tx.tenant.update({ where: { id: tenantId }, data: { onboardingStatus: 'PENDING' } })
+  })
+
+  return { cleared, onboardingStatus: 'PENDING' }
+}
+
+/**
  * Bulk-import employees (the onboarding flow's third path). Departments resolve by name and
  * are created on first sight — the same behavior as the legacy import — and the tenant is
  * marked IMPORTED. Salary arrives as a major-unit decimal string and is normalized through

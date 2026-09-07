@@ -20,6 +20,9 @@ import Onboarding from './pages/auth/Onboarding'
 // ── Dashboard (placeholders until Phase 3 wires real pages) ──
 import DashboardPlaceholder from './pages/dashboard/DashboardPlaceholder'
 
+// ── Real pages landing ahead of Phase 3 ──
+import SettingsGeneral from './pages/dashboard/settings/SettingsGeneral'
+
 // ── 404 ────────────────────────────────────────────────────
 function NotFound() {
   return (
@@ -43,6 +46,12 @@ const DASHBOARD_PATHS = [
   '/dashboard/settings', '/dashboard/settings/billing', '/dashboard/settings/integrations', '/dashboard/settings/notifications', '/dashboard/settings/data-export',
   '/dashboard/support',
 ]
+
+// Routes that already have a real (wired) page; everything else is a placeholder until
+// Phase 3 ports each module page.
+const REAL_PAGES = {
+  '/dashboard/settings': SettingsGeneral,
+}
 
 export default function App() {
   return (
@@ -72,9 +81,10 @@ export default function App() {
             child paths below are valid — React Router 7 forbids absolute children under
             a pathed parent. */}
         <Route element={<DashboardLayout />}>
-          {DASHBOARD_PATHS.map(p => (
-            <Route key={p} path={p} element={<DashboardPlaceholder />} />
-          ))}
+          {DASHBOARD_PATHS.map(p => {
+            const Page = REAL_PAGES[p] ?? DashboardPlaceholder
+            return <Route key={p} path={p} element={<Page />} />
+          })}
         </Route>
       </Route>
 

@@ -5,6 +5,7 @@ import {
   importEmployeesResponseSchema,
   onboardingStatusResponseSchema,
   sampleApplyResponseSchema,
+  sampleDataClearResponseSchema,
 } from '@asas/contracts'
 import type { ImportEmployeesRequest, OnboardingStatus } from '@asas/contracts'
 import type { PrismaClient } from '@prisma/client'
@@ -15,7 +16,7 @@ import { requirePermission } from '../../middlewares/permissions.js'
 import { recordAuditLog } from '../../services/auditLog.js'
 import { moduleKeyPrefix } from '../../plugins/sse.js'
 import { AppError } from '../../utils/errors.js'
-import { applyEnterpriseSamplePack, importEmployees } from './samplePack.service.js'
+import { applyEnterpriseSamplePack, clearSamplePack, importEmployees } from './samplePack.service.js'
 
 /**
  * Onboarding — the preserved 3-path flow (empty / sample / import), ported from the legacy
@@ -125,6 +126,32 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
       request.server.ssePublish(tenantId, [moduleKeyPrefix('hr')])
       reply.code(201)
       return { data: { ...result, onboardingStatus: 'IMPORTED' as const } }
+    },
+  )
+
+  server.delete(
+    '/sample-data',
+    {
+      preHandler: requirePermission('onboarding.write'),
+      schema: { response: { 200: envelope(sampleDataClearResponseSchema), ...errorResponses } },
+    },
+    async request => {
+      const { tenantId, userId } = requireAuthContext(request)
+      const result = await clearSamplePack(request.server.prisma, tenantId)
+      await recordAuditLog(request.server.prisma, {
+        tenantId,
+        actorId: userId,
+        action: 'onboarding.sample.clear',
+        targetType: 'Tenant',
+        targetId: tenantId,
+        metadata: { rows: Object.values(result.cleared).reduce((total, rows) => total + rows, 0) },
+      })
+      // The sweep touched every business module — publish all their prefixes so an open tab
+      // refetches whichever surface it is showing (same set as the sample-apply above).
+      for (const moduleName of ['hr', 'finance', 'crm', 'projects', 'inventory'] as const) {
+        request.server.ssePublish(tenantId, [moduleKeyPrefix(moduleName)])
+      }
+      return { data: result }
     },
   )
 }
