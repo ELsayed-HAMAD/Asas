@@ -276,7 +276,13 @@ export async function getForecast(prisma: PrismaClient, tenantId: string): Promi
     monthlyOpenPipeline(prisma, tenantId, currency),
   ])
   const totalPipeline = monthlyPipeline.reduce((total, entry) => total + entry.value.amount, 0)
-  const totalQuota = quotas.reduce((total, quota) => total + Number(quota.quota), 0)
+  // `quota.quota` is a major-unit Decimal; `toMoneyWire` normalizes it to the integer minor
+  // units (cents) that `totalPipeline` and the wire contract use. Summing `Number(quota.quota)`
+  // directly was 100× too large (dollars vs cents), which also corrupted `quotaAttainmentPct`.
+  const totalQuota = quotas.reduce(
+    (total, quota) => total + (toMoneyWire(quota.quota, currency)?.amount ?? 0),
+    0,
+  )
 
   return {
     forecastByRep: snapshots.map(snapshot => ({

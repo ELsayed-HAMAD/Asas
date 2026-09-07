@@ -62,6 +62,25 @@ describe('computeTaxLines / computeDeductions / computeNetPay', () => {
     expect(computeTaxLines(gross, [])).toEqual([])
     expect(() => computeDeductions([])).toThrow(/at least one tax line/)
   })
+
+  it('treats an all-zero weight set as zero deductions (no RangeError)', () => {
+    const gross = Money.fromDecimal('5000', 'USD')
+    const lines = computeTaxLines(gross, [
+      { label: 'Federal Tax', weight: 0 },
+      { label: 'State Tax', weight: 0 },
+    ])
+    expect(lines.map((line) => line.amount.toDecimalString())).toEqual(['0.00', '0.00'])
+    expect(computeDeductions(lines).toDecimalString()).toBe('0.00')
+  })
+
+  it('treats a negative total weight as zero deductions instead of throwing', () => {
+    const gross = Money.fromDecimal('5000', 'USD')
+    const lines = computeTaxLines(gross, [
+      { label: 'Federal Tax', weight: 15 },
+      { label: 'Credit', weight: -15 },
+    ])
+    expect(computeDeductions(lines).toDecimalString()).toBe('0.00')
+  })
 })
 
 describe('computePayrollLine', () => {
