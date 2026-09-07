@@ -58,6 +58,12 @@ out/
 *.local
 
 # =========================
+# Monorepo task cache
+# =========================
+.turbo/
+*.tsbuildinfo
+
+# =========================
 # Backend Builds & Caches
 # =========================
 # Python
@@ -130,3 +136,6 @@ check_errors.cjs
 lint_output.txt
 *backup*/
 *_backup_*
+# Local agent/session state — never shared, never committed.
+.claude/settings.local.json
+.monkeyscode/
