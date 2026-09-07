@@ -54,6 +54,13 @@ export function computeTaxLines(gross: Money, rates: readonly TaxRate[]): TaxLin
   if (rates.length === 0) return []
 
   const totalWeight = rates.reduce((sum, rate) => sum + Number(rate.weight), 0)
+  if (totalWeight <= 0) {
+    // Zero or negative weights are legal contract input (an all-zero rate set means "no
+    // deduction", a negative weight is a caller mistake the API rejects with a 400). Returning
+    // zero lines here keeps the domain total well-defined instead of throwing an unhandled
+    // RangeError from `Money.allocate` deep in a payroll request.
+    return rates.map(rate => ({ label: rate.label, amount: Money.zero(gross.currency) }))
+  }
   const totalDeduction = gross.percentage(totalWeight, 'HALF_UP')
   const amounts = totalDeduction.allocate(rates.map(rate => rate.weight))
 
