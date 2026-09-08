@@ -22,7 +22,15 @@ export const API_ORIGIN_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost
 
 function buildUrl(path, query) {
   const url = new URL(`${API_BASE_URL}${path}`)
-  for (const [key, value] of Object.entries(query ?? {})) {
+  // `query` is either a plain object of key/value params, or a pre-built query string
+  // (e.g. the signed CV grant's `?h=..&exp=..`) forwarded as-is. Object.entries over a
+  // string would index it by character and emit `?0=h&1=%3D&...` — a signature the server
+  // can never validate — so detect the string form and parse it with URLSearchParams.
+  const entries =
+    typeof query === 'string'
+      ? [...new URLSearchParams(query)]
+      : Object.entries(query ?? {})
+  for (const [key, value] of entries) {
     if (value !== undefined) url.searchParams.set(key, String(value))
   }
   return url.toString()
@@ -54,6 +62,28 @@ export const http = {
   post: (path, options) => request('POST', path, options),
   patch: (path, options) => request('PATCH', path, options),
   delete: (path, options) => request('DELETE', path, options),
+
+  /**
+   * Raw-body PUT (the signed CV upload): the API's `PUT /hr/candidates/:id/resume` expects
+   * the PDF bytes as the body with a content-type, not a JSON envelope. The `?h=..&exp=..`
+   * signature travels in the query string of the grant's uploadUrl (passed as `query`), and
+   * the same httpOnly session cookie authenticates it. Returns the JSON envelope body
+   * (e.g. `{ data: { resumeUrl } }` unwrapped to `{ resumeUrl }`).
+   */
+  async putRaw(path, { body, query, headers } = {}) {
+    const url = buildUrl(path, query)
+    const response = await fetch(url, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'content-type': 'application/pdf', ...(headers ?? {}) },
+      body,
+    })
+    const payload = await response.json().catch(() => null)
+    if (!response.ok) {
+      throw new ApiError(response.status, payload?.error?.message ?? 'Upload failed', payload?.error?.details)
+    }
+    return payload?.data
+  },
 
   /**
    * Fetch a binary document (a payslip/invoice PDF, an export workbook) as a Blob. These

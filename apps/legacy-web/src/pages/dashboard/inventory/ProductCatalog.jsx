@@ -9,12 +9,17 @@ import {
   AlertTriangle,
   ShoppingCart,
   Loader2,
-  Box
+  Box,
+  Pencil,
+  ArrowDownUp,
+  Check
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { inventoryApi } from '../../../lib/api/inventory';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney, formatDate } from '../../../lib/format';
+import { useActiveMemberRole } from '../../../lib/authClient';
+import FormDialog from '../../../components/common/FormDialog';
 import TopBarActions from '../../../components/TopBarActions';
 
 export default function Inventory() {
@@ -53,6 +58,182 @@ export default function Inventory() {
     enabled: activeTab === 'history' && !!selectedProduct,
   });
   const movements = movementData?.items ?? [];
+
+  const queryClient = useQueryClient();
+  const { data: activeMemberRole } = useActiveMemberRole();
+  // Server requires ADMIN for every write (MEMBER gets 403). Gate the write controls so a
+  // MEMBER sees them disabled rather than learning the rule from a rejected request.
+  const canWrite = activeMemberRole === 'OWNER' || activeMemberRole === 'ADMIN';
+  const noRoleTitle = 'Requires the ADMIN role';
+
+  // ── Create / edit product dialog ─────────────────────────────────────────
+  const [productDialog, setProductDialog] = useState({ open: false, mode: 'create', product: null });
+  const [productForm, setProductForm] = useState({
+    name: '',
+    sku: '',
+    price: '',
+    stock: '',
+    minThreshold: '',
+    warehouse: '',
+  });
+  const [productError, setProductError] = useState('');
+
+  const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
+  const [movementForm, setMovementForm] = useState({ kind: 'receive', qty: '', note: '' });
+  const [movementError, setMovementError] = useState('');
+  // Server-side on-hand count after the last successful movement (newStock) — surfaced next
+  // to the Adjust Stock button until the list refetch lands.
+  const [freshStock, setFreshStock] = useState(null);
+
+  const createProductMutation = useMutation({
+    mutationFn: (body) => inventoryApi.createProduct(body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all() });
+      setProductDialog({ open: false, mode: 'create', product: null });
+    },
+    // Surface the server's message in the dialog rather than swallowing it.
+    onError: (error) => setProductError(error?.message || 'Could not create product.'),
+  });
+
+  const updateProductMutation = useMutation({
+    mutationFn: ({ id, patch }) => inventoryApi.updateProduct(id, patch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all() });
+      setProductDialog({ open: false, mode: 'create', product: null });
+    },
+    onError: (error) => setProductError(error?.message || 'Could not save product.'),
+  });
+
+  const recordMovementMutation = useMutation({
+    mutationFn: (body) => inventoryApi.recordStockMovement(body),
+    onSuccess: (result) => {
+      setFreshStock(typeof result?.newStock === 'number' ? result.newStock : null);
+      setAdjustDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.products.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.movements.all() });
+    },
+    onError: (error) => setMovementError(error?.message || 'Could not record movement.'),
+  });
+
+  // Reset the transient on-hand override when a different product is inspected.
+  useEffect(() => {
+    setFreshStock(null);
+  }, [selectedId]);
+
+  const openCreateDialog = () => {
+    setProductForm({ name: '', sku: '', price: '', stock: '', minThreshold: '', warehouse: '' });
+    setProductError('');
+    setProductDialog({ open: true, mode: 'create', product: null });
+  };
+
+  const openEditDialog = (product) => {
+    setProductForm({
+      name: product?.name ?? '',
+      sku: product?.sku ?? '',
+      price: product?.price ?? '',
+      // stock is not editable on update (it changes only through stock movements) — but the
+      // form still carries a key so the shared shape stays stable; it is never rendered or sent.
+      stock: String(product?.stock ?? ''),
+      minThreshold: product?.minThreshold != null ? String(product.minThreshold) : '',
+      warehouse: product?.warehouse ?? '',
+    });
+    setProductError('');
+    setProductDialog({ open: true, mode: 'edit', product });
+  };
+
+  const closeProductDialog = () => {
+    if (createProductMutation.isPending || updateProductMutation.isPending) return;
+    setProductDialog({ open: false, mode: 'create', product: null });
+    setProductError('');
+  };
+
+  const isProductBusy = createProductMutation.isPending || updateProductMutation.isPending;
+
+  const handleProductConfirm = () => {
+    const isCreate = productDialog.mode === 'create';
+
+    const name = productForm.name.trim();
+    const sku = productForm.sku.trim();
+    if (!name || !sku) {
+      setProductError('Name and SKU are required.');
+      return;
+    }
+
+    const num = (value) => {
+      const trimmed = String(value).trim();
+      if (trimmed === '') return null;
+      const n = Number(trimmed);
+      return Number.isFinite(n) ? n : NaN;
+    };
+
+    const body = {};
+    if (name) body.name = name;
+    if (sku) body.sku = sku;
+    // price is a major-unit decimal string — kept verbatim from the input (never a float).
+    const price = String(productForm.price).trim();
+    if (price !== '') body.price = price;
+
+    if (isCreate) {
+      if (productForm.stock !== '' && Number.isInteger(num(productForm.stock))) {
+        body.stock = num(productForm.stock);
+      }
+    }
+    if (productForm.minThreshold !== '' && Number.isInteger(num(productForm.minThreshold))) {
+      body.minThreshold = num(productForm.minThreshold);
+    }
+    // Empty warehouse sends null (clears the location) — the schema accepts a nullable string.
+    body.warehouse = productForm.warehouse.trim() === '' ? null : productForm.warehouse.trim();
+
+    // Client-side range guard: the contract rejects negatives/non-integers, so surface it
+    // inline instead of waiting for a 400 — or silently dropping the field from the body.
+    // (Number.isInteger is false for NaN, so this also covers unparsable input.)
+    if (isCreate && productForm.stock !== '') {
+      const stockN = num(productForm.stock);
+      if (!Number.isInteger(stockN) || stockN < 0) {
+        setProductError('Initial stock must be a whole number of 0 or more.');
+        return;
+      }
+    }
+    if (productForm.minThreshold !== '') {
+      const minN = num(productForm.minThreshold);
+      if (!Number.isInteger(minN) || minN < 0) {
+        setProductError('Minimum threshold must be a whole number of 0 or more.');
+        return;
+      }
+    }
+
+    if (isCreate) {
+      createProductMutation.mutate(body);
+    } else {
+      updateProductMutation.mutate({ id: productDialog.product?.id, patch: body });
+    }
+  };
+
+  const openAdjustDialog = () => {
+    setMovementForm({ kind: 'receive', qty: '', note: '' });
+    setMovementError('');
+    setAdjustDialogOpen(true);
+  };
+
+  const closeAdjustDialog = () => {
+    if (recordMovementMutation.isPending) return;
+    setAdjustDialogOpen(false);
+    setMovementError('');
+  };
+
+  const handleMovementConfirm = () => {
+    if (!selectedProduct) return;
+    const qtyN = Number(String(movementForm.qty).trim());
+    if (!Number.isInteger(qtyN) || qtyN <= 0) {
+      setMovementError('Quantity must be a whole number greater than 0.');
+      return;
+    }
+    recordMovementMutation.mutate({
+      productId: selectedProduct.id,
+      delta: movementForm.kind === 'receive' ? qtyN : -qtyN,
+      note: movementForm.note.trim() === '' ? null : movementForm.note.trim(),
+    });
+  };
 
   if (isLoading) {
     return (
@@ -102,7 +283,9 @@ export default function Inventory() {
           </button>
 
           <button
-            disabled
+            onClick={openCreateDialog}
+            disabled={!canWrite}
+            title={canWrite ? undefined : noRoleTitle}
             className="bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
           >
             New Product
@@ -345,6 +528,33 @@ export default function Inventory() {
 
               {/* Sticky Footer */}
               <div className="p-6 border-t border-border-default bg-surface-raised mt-auto">
+                {/* Transient confirmation: shows the server's post-movement count until the
+                    refetch has synced the list (at which point it equals the displayed stock). */}
+                {freshStock != null && freshStock !== selectedProduct.stock && (
+                  <div className="flex items-center justify-center gap-1.5 mb-3 text-xs font-semibold text-success-text">
+                    <Check size={14} /> On hand: {freshStock} units
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => openEditDialog(selectedProduct)}
+                    disabled={!canWrite}
+                    title={canWrite ? undefined : noRoleTitle}
+                    className="flex items-center justify-center gap-2 border border-border-default bg-surface-raised text-body px-4 py-2.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors shadow-card disabled:opacity-60"
+                  >
+                    <Pencil size={15} /> Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openAdjustDialog}
+                    disabled={!canWrite}
+                    title={canWrite ? undefined : noRoleTitle}
+                    className="flex items-center justify-center gap-2 bg-primary text-white px-4 py-2.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
+                  >
+                    <ArrowDownUp size={15} /> Adjust Stock
+                  </button>
+                </div>
                 <button
                   disabled
                   className="w-full flex items-center justify-center gap-2 bg-primary text-white py-3 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
@@ -361,6 +571,179 @@ export default function Inventory() {
           )}
 
         </div>
+
+        {/* ── New / Edit Product dialog ── */}
+        <FormDialog
+          open={productDialog.open}
+          onClose={closeProductDialog}
+          title={productDialog.mode === 'create' ? 'New product' : 'Edit product'}
+          subtitle={
+            productDialog.mode === 'create'
+              ? 'Add a product to the catalog.'
+              : 'Stock on hand is changed via Adjust Stock, not here.'
+          }
+          confirmLabel={productDialog.mode === 'create' ? 'Create product' : 'Save changes'}
+          busy={isProductBusy}
+          onConfirm={handleProductConfirm}
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-heading mb-1.5">Name</label>
+              <input
+                type="text"
+                value={productForm.name}
+                onChange={(e) => setProductForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="Product name"
+                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-heading mb-1.5">SKU</label>
+              <input
+                type="text"
+                value={productForm.sku}
+                onChange={(e) => setProductForm((f) => ({ ...f, sku: e.target.value }))}
+                placeholder="e.g. WIDGET-001"
+                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-heading mb-1.5">Price</label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={productForm.price}
+                  onChange={(e) => setProductForm((f) => ({ ...f, price: e.target.value }))}
+                  placeholder="0.00"
+                  className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-heading mb-1.5">Min threshold</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={productForm.minThreshold}
+                  onChange={(e) => setProductForm((f) => ({ ...f, minThreshold: e.target.value }))}
+                  placeholder="0"
+                  className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+            </div>
+            {productDialog.mode === 'create' && (
+              <div>
+                <label className="block text-xs font-bold text-heading mb-1.5">Initial stock</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={productForm.stock}
+                  onChange={(e) => setProductForm((f) => ({ ...f, stock: e.target.value }))}
+                  placeholder="0"
+                  className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-bold text-heading mb-1.5">Warehouse</label>
+              <input
+                type="text"
+                value={productForm.warehouse}
+                onChange={(e) => setProductForm((f) => ({ ...f, warehouse: e.target.value }))}
+                placeholder="e.g. Main — Bay A (optional)"
+                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
+            </div>
+            {productError && (
+              <p className="text-sm text-danger flex items-center gap-1.5">
+                <AlertTriangle size={14} /> {productError}
+              </p>
+            )}
+          </div>
+        </FormDialog>
+
+        {/* ── Adjust Stock (movement) dialog ── */}
+        <FormDialog
+          open={adjustDialogOpen}
+          onClose={closeAdjustDialog}
+          title="Adjust stock"
+          subtitle={selectedProduct ? `${selectedProduct.name} — currently ${selectedProduct.stock} on hand.` : undefined}
+          confirmLabel="Record movement"
+          busy={recordMovementMutation.isPending}
+          onConfirm={handleMovementConfirm}
+          width="max-w-md"
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-heading mb-1.5">Movement type</label>
+              <div className="grid grid-cols-2 gap-3">
+                <label
+                  className={`flex items-center gap-2 border rounded-input px-3 py-2.5 text-sm cursor-pointer transition-colors ${
+                    movementForm.kind === 'receive'
+                      ? 'border-success-border bg-success-light text-success-text'
+                      : 'border-border-default bg-surface-raised text-body hover:bg-surface-muted'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="movement-kind"
+                    value="receive"
+                    checked={movementForm.kind === 'receive'}
+                    onChange={() => setMovementForm((f) => ({ ...f, kind: 'receive' }))}
+                    className="accent-primary"
+                  />
+                  Receive stock
+                </label>
+                <label
+                  className={`flex items-center gap-2 border rounded-input px-3 py-2.5 text-sm cursor-pointer transition-colors ${
+                    movementForm.kind === 'issue'
+                      ? 'border-danger-border bg-danger-light text-danger'
+                      : 'border-border-default bg-surface-raised text-body hover:bg-surface-muted'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="movement-kind"
+                    value="issue"
+                    checked={movementForm.kind === 'issue'}
+                    onChange={() => setMovementForm((f) => ({ ...f, kind: 'issue' }))}
+                    className="accent-primary"
+                  />
+                  Issue stock
+                </label>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-heading mb-1.5">Quantity</label>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={movementForm.qty}
+                onChange={(e) => setMovementForm((f) => ({ ...f, qty: e.target.value }))}
+                placeholder="0"
+                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-heading mb-1.5">Note</label>
+              <input
+                type="text"
+                value={movementForm.note}
+                onChange={(e) => setMovementForm((f) => ({ ...f, note: e.target.value }))}
+                placeholder="e.g. PO #4521 receipt (optional)"
+                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
+            </div>
+            {movementError && (
+              <p className="text-sm text-danger flex items-center gap-1.5">
+                <AlertTriangle size={14} /> {movementError}
+              </p>
+            )}
+          </div>
+        </FormDialog>
       </div>
     </div>
   );

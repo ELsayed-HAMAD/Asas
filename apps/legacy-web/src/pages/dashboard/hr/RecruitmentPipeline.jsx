@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Search, Filter, Download, X, FileText,
   Clock, Calendar, CheckCircle2, UserPlus, ArrowRight,
-  Briefcase, MapPin, Mail, Phone, Loader2,
+  Briefcase, MapPin, Mail, Phone, Loader2, Upload, Eye,
 } from 'lucide-react'
 import { hrApi } from '../../../lib/api/hr'
 import { queryKeys } from '../../../lib/queryKeys'
+import { useActiveMemberRole } from '../../../lib/authClient'
+import FormDialog from '../../../components/common/FormDialog'
 
 function initials(name = '') {
   return name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase()).join('') || '?'
@@ -36,11 +38,20 @@ const STAGE_COLORS = {
 
 // ── 2. Candidate Inspector Component ────────────────────────
 
-function CandidateInspector({ candidate, onClose }) {
+const CV_MAX_BYTES = 5 * 1024 * 1024 // Client-side guard mirroring the upload grant's maxBytes (server re-validates)
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return 'PDF'
+  if (bytes >= 1024 * 1024) return `PDF • ${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `PDF • ${Math.max(1, Math.round(bytes / 1024))} KB`
+}
+
+function CandidateInspector({ candidate, onClose, canWrite }) {
   if (!candidate) return null
   const profile = candidate.profile || {}
   const activity = candidate.activity || []
   const avatar = candidate.avatar || initials(candidate.name)
+  const hasCv = !!candidate.resumeUrl
 
   return (
     <div className="w-[340px] bg-surface-raised border-l border-border-subtle flex flex-col h-full flex-shrink-0">
@@ -97,24 +108,11 @@ function CandidateInspector({ candidate, onClose }) {
             </div>
           </div>
 
-          {/* Resume Card */}
-          {profile.resume && (
-            <div>
-              <h4 className="text-[10px] font-semibold text-caption uppercase tracking-wider mb-3">Resume</h4>
-              <div className="flex items-center justify-between p-3 rounded-card-sm border border-border-default bg-surface-muted group hover:bg-surface-raised hover:border-accent-light transition-colors cursor-pointer">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-surface-raised rounded-button border border-border-default group-hover:border-accent-light group-hover:text-accent transition-colors">
-                    <FileText size={16} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-heading">{profile.resume}</p>
-                    <p className="text-[10px] text-muted mt-0.5">PDF • 1.2 MB</p>
-                  </div>
-                </div>
-                <Download size={14} className="text-caption group-hover:text-accent transition-colors" />
-              </div>
-            </div>
-          )}
+          {/* Resume Card — the old mock card, now backed by the real CV surface (upload / view) */}
+          <div>
+            <h4 className="text-[10px] font-semibold text-caption uppercase tracking-wider mb-3">Resume</h4>
+            <CvSection key={candidate.id} candidate={candidate} hasCv={hasCv} canWrite={canWrite} />
+          </div>
 
           {/* Activity Log */}
           <div>
@@ -150,10 +148,126 @@ function CandidateInspector({ candidate, onClose }) {
   )
 }
 
+// CV (resume) section of the inspector. Upload mints the signed grant + PUTs the PDF bytes;
+// view streams the stored PDF as a Blob and opens it in a new tab. Re-mounts per candidate
+// (the parent keys it by id), so the local file/error state resets on selection change.
+function CvSection({ candidate, hasCv, canWrite }) {
+  const queryClient = useQueryClient()
+  const fileInputRef = useRef(null)
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [cvError, setCvError] = useState(null)
+
+  // Both writes require ADMIN server-side; re-invalidate the candidates query so the list,
+  // KPIs, and this inspector all reflect the new CV (SSE covers other tabs). The file is passed
+  // straight into the mutation (not read from state) so the upload can't race a re-render.
+  const uploadMutation = useMutation({
+    mutationFn: (file) => hrApi.uploadResume(candidate.id, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.hr.candidates.all() })
+      setSelectedFile(null)
+      setCvError(null)
+    },
+    onError: (err) => setCvError(err?.message || 'Upload failed'),
+  })
+
+  // One action: the button opens the native picker; a valid selection uploads immediately, an
+  // invalid one (non-PDF / > 5 MB) is rejected inline before any network call.
+  function handleFileChange(event) {
+    const file = event.target.files?.[0]
+    event.target.value = '' // reset so re-selecting the same file re-fires the change
+    setCvError(null)
+    if (!file) return
+    if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) {
+      setCvError('Only PDF files are accepted.')
+      return
+    }
+    if (file.size > CV_MAX_BYTES) {
+      setCvError('The CV must be 5 MB or smaller.')
+      return
+    }
+    setSelectedFile(file)
+    uploadMutation.mutate(file)
+  }
+
+  async function handleView() {
+    try {
+      const blob = await hrApi.getResume(candidate.id)
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch (err) {
+      if (err?.statusCode === 404) setCvError('No CV on file for this candidate.')
+      else setCvError(err?.message || 'Could not load the CV.')
+    }
+  }
+
+  if (hasCv) {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between p-3 rounded-card-sm border border-border-default bg-surface-muted group hover:bg-surface-raised hover:border-accent-light transition-colors cursor-pointer" onClick={handleView}>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-surface-raised rounded-button border border-border-default group-hover:border-accent-light group-hover:text-accent transition-colors">
+              <FileText size={16} />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-heading">resume.pdf</p>
+              <p className="text-[10px] text-muted mt-0.5">PDF · View</p>
+            </div>
+          </div>
+          <Eye size={14} className="text-caption group-hover:text-accent transition-colors" />
+        </div>
+        {cvError && <p className="text-[11px] text-danger">{cvError}</p>}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between p-3 rounded-card-sm border border-dashed border-border-default bg-surface-muted/50">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="p-2 bg-surface-raised rounded-button border border-border-default text-caption">
+            <FileText size={16} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-heading truncate">{selectedFile ? selectedFile.name : 'No CV uploaded'}</p>
+            <p className="text-[10px] text-muted mt-0.5">{selectedFile ? formatBytes(selectedFile.size) : 'PDF, up to 5 MB'}</p>
+          </div>
+        </div>
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+      {cvError && <p className="text-[11px] text-danger">{cvError}</p>}
+      <button
+        type="button"
+        disabled={!canWrite || uploadMutation.isPending}
+        title={canWrite ? undefined : 'Requires the ADMIN role'}
+        onClick={() => fileInputRef.current?.click()}
+        className="flex items-center justify-center gap-1.5 w-full bg-surface-raised border border-border-default text-body text-xs font-medium py-2 rounded-button hover:bg-surface-muted transition-colors disabled:opacity-60"
+      >
+        {uploadMutation.isPending ? (
+          <Loader2 size={14} className="animate-spin" />
+        ) : (
+          <Upload size={14} />
+        )}
+        Upload CV
+      </button>
+    </div>
+  )
+}
+
 // ── 3. Main View Component ──────────────────────────────────
 
 export default function RecruitmentPipeline() {
+  const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState(null)
+
+  const { data: activeMemberRole } = useActiveMemberRole()
+  const canWrite = activeMemberRole === 'OWNER' || activeMemberRole === 'ADMIN'
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.hr.candidates.list(),
@@ -161,6 +275,39 @@ export default function RecruitmentPipeline() {
   })
 
   const candidates = data?.items || []
+
+  // Add-candidate dialog
+  const [addOpen, setAddOpen] = useState(false)
+  const [form, setForm] = useState({ name: '', role: '', email: '', location: '', source: '' })
+  const [formError, setFormError] = useState(null)
+
+  const createMutation = useMutation({
+    mutationFn: (values) => hrApi.createCandidate(values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.hr.candidates.all() })
+      setAddOpen(false)
+      setForm({ name: '', role: '', email: '', location: '', source: '' })
+      setFormError(null)
+    },
+    onError: (err) => setFormError(err?.message || 'Could not create the candidate'),
+  })
+
+  function submitAddCandidate() {
+    const name = form.name.trim()
+    const role = form.role.trim()
+    if (!name || !role) {
+      setFormError('Name and role are required.')
+      return
+    }
+    // Optional fields are omitted when blank — the contract treats undefined as "not provided".
+    createMutation.mutate({
+      name,
+      role,
+      ...(form.email.trim() && { email: form.email.trim() }),
+      ...(form.location.trim() && { location: form.location.trim() }),
+      ...(form.source.trim() && { source: form.source.trim() }),
+    })
+  }
 
   // The endpoint's `summary` is `null` (nothing to aggregate), so the KPI cards derive their
   // stage counts from the loaded page — `limit: 100` covers the full dataset, mirroring the
@@ -211,7 +358,12 @@ export default function RecruitmentPipeline() {
               <h1 className="text-3xl font-bold text-heading tracking-tight">Recruitment Pipeline</h1>
               <p className="text-sm text-muted mt-1">Track and manage active candidate pipelines.</p>
             </div>
-            <button disabled className="bg-primary text-white text-sm font-medium px-4 py-2 rounded-button hover:bg-primary-hover transition-colors flex items-center gap-2 disabled:opacity-60">
+            <button
+              disabled={!canWrite}
+              title={canWrite ? undefined : 'Requires the ADMIN role'}
+              onClick={() => { setFormError(null); setAddOpen(true) }}
+              className="bg-primary text-white text-sm font-medium px-4 py-2 rounded-button hover:bg-primary-hover transition-colors flex items-center gap-2 disabled:opacity-60"
+            >
               <UserPlus size={16} /> Add Candidate
             </button>
           </div>
@@ -337,15 +489,80 @@ export default function RecruitmentPipeline() {
               currentRole: selectedCandidate.currentRole,
               experience: selectedCandidate.experience,
               source: selectedCandidate.source,
-              // The new wire carries a server preview *path* (or null), not a display filename;
-              // the old UI showed a filename string, so surface the fixed CV name when present.
-              resume: selectedCandidate.resumeUrl ? 'resume.pdf' : null,
             },
             activity: [],
           } : null}
+          canWrite={canWrite}
           onClose={() => setSelectedId(null)}
         />
       )}
+
+      {/* ── Add Candidate Dialog ── */}
+      <FormDialog
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        title="Add Candidate"
+        subtitle="Create a new candidate in the recruitment pipeline."
+        confirmLabel="Add Candidate"
+        busy={createMutation.isPending}
+        onConfirm={submitAddCandidate}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-muted mb-1">Name <span className="text-danger">*</span></label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="e.g. Jordan Blake"
+              className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-muted mb-1">Role <span className="text-danger">*</span></label>
+            <input
+              type="text"
+              value={form.role}
+              onChange={(e) => setForm(f => ({ ...f, role: e.target.value }))}
+              placeholder="e.g. Frontend Engineer"
+              className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-muted mb-1">Email</label>
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
+              placeholder="jordan@example.com"
+              className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-muted mb-1">Location</label>
+              <input
+                type="text"
+                value={form.location}
+                onChange={(e) => setForm(f => ({ ...f, location: e.target.value }))}
+                placeholder="e.g. Remote"
+                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted mb-1">Source</label>
+              <input
+                type="text"
+                value={form.source}
+                onChange={(e) => setForm(f => ({ ...f, source: e.target.value }))}
+                placeholder="e.g. LinkedIn"
+                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
+              />
+            </div>
+          </div>
+          {formError && <p className="text-xs text-danger">{formError}</p>}
+        </div>
+      </FormDialog>
 
     </div>
   )
