@@ -10,11 +10,13 @@ import {
   Circle,
   Loader2
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { crmApi } from '../../../lib/api/crm';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney, formatDate } from '../../../lib/format';
+import { useActiveMemberRole } from '../../../lib/authClient';
 import TopBarActions from '../../../components/TopBarActions';
+import FormDialog from '../../../components/common/FormDialog';
 
 const STAGE_ORDER = ['LEADS', 'PROPOSAL', 'NEGOTIATION', 'CLOSED_WON', 'CLOSED_LOST'];
 
@@ -24,6 +26,17 @@ const STAGE_LABELS = {
   NEGOTIATION: 'Negotiation',
   CLOSED_WON: 'Closed Won',
   CLOSED_LOST: 'Closed Lost',
+};
+
+// Stages a brand-new deal can start in (open pipeline stages only).
+const CREATE_STAGES = ['LEADS', 'PROPOSAL', 'NEGOTIATION'];
+
+const EMPTY_DEAL_FORM = {
+  name: '',
+  value: '',
+  stage: 'LEADS',
+  closeDate: '',
+  winProbability: '',
 };
 
 const getStageBadgeColors = (stage) => {
@@ -49,12 +62,80 @@ const initials = (deal) => {
 
 export default function DealsPipeline() {
   const [selectedId, setSelectedId] = useState(null);
+  const [newDealOpen, setNewDealOpen] = useState(false);
+  const [dealForm, setDealForm] = useState(EMPTY_DEAL_FORM);
+  const [formError, setFormError] = useState(null);
+  // { id, message } so a failed stage move is shown only under the deal it failed for.
+  const [stageError, setStageError] = useState(null);
+
+  // Deal writes are ADMIN-only server-side (`deal.write` permission); the controls below are
+  // rendered disabled for non-OWNER/ADMIN members with a hint explaining why.
+  const { data: activeMemberRole } = useActiveMemberRole();
+  const canWrite = activeMemberRole === 'OWNER' || activeMemberRole === 'ADMIN';
+
+  const queryClient = useQueryClient();
 
   // One page is the full board — the server's deal ceiling is 100 rows.
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.crm.deals.list({ limit: 100 }),
     queryFn: () => crmApi.listDeals({ limit: 100 }),
   });
+
+  // Refresh the board (and anything else CRM-shaped) after a successful write; the server's
+  // SSE publish covers other open tabs.
+  const invalidateCrmDeals = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.crm.deals.all() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.crm.all() });
+  };
+
+  const createMutation = useMutation({
+    mutationFn: (payload) => crmApi.createDeal(payload),
+    onSuccess: () => {
+      invalidateCrmDeals();
+      setNewDealOpen(false);
+      setDealForm(EMPTY_DEAL_FORM);
+      setFormError(null);
+    },
+  });
+
+  const stageMutation = useMutation({
+    mutationFn: ({ id, stage }) => crmApi.updateDeal(id, { stage }),
+    onSuccess: () => {
+      invalidateCrmDeals();
+      setStageError(null);
+    },
+    onError: (error, variables) => {
+      setStageError({
+        id: variables.id,
+        message: error?.message || 'Failed to update the deal stage.',
+      });
+    },
+  });
+
+  const openNewDealDialog = () => {
+    setFormError(null);
+    setDealForm(EMPTY_DEAL_FORM);
+    setNewDealOpen(true);
+  };
+
+  const submitNewDeal = () => {
+    const name = dealForm.name.trim();
+    if (!name) {
+      setFormError('Deal name is required.');
+      return;
+    }
+    const payload = { name, stage: dealForm.stage };
+    const value = dealForm.value.trim();
+    payload.value = value === '' ? null : value;
+    if (dealForm.closeDate) payload.closeDate = dealForm.closeDate;
+    const winProbability = dealForm.winProbability.trim();
+    payload.winProbability = winProbability === '' ? null : Math.min(100, Math.max(0, Number(winProbability)));
+    createMutation.mutate(payload);
+  };
+
+  const dialogError = createMutation.error
+    ? (createMutation.error.message || 'Failed to create the deal.')
+    : formError;
 
   if (isLoading) {
     return (
@@ -108,7 +189,12 @@ export default function DealsPipeline() {
             </button>
           </div>
 
-          <button disabled className="bg-primary text-white px-5 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
+          <button
+            disabled={!canWrite}
+            onClick={openNewDealDialog}
+            title={!canWrite ? 'Requires the ADMIN role' : undefined}
+            className="bg-primary text-white px-5 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
+          >
             New Deal
           </button>
         </div>
@@ -223,6 +309,28 @@ export default function DealsPipeline() {
                     <Pencil size={16} className="text-muted" /> Edit
                   </button>
                 </div>
+
+                {/* Stage move — a select is the faithful equivalent of the old page's per-stage actions */}
+                <div className="mt-6 flex items-center gap-3">
+                  <label htmlFor="deal-stage" className="w-14 flex-shrink-0 text-[10px] font-bold text-muted uppercase tracking-wider">Stage</label>
+                  <select
+                    id="deal-stage"
+                    value={selectedDeal.stage}
+                    onChange={(event) => stageMutation.mutate({ id: selectedDeal.id, stage: event.target.value })}
+                    disabled={!canWrite || stageMutation.isPending}
+                    title={!canWrite ? 'Requires the ADMIN role' : undefined}
+                    className="flex-1 px-3 py-2 text-sm font-medium text-body border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-60"
+                  >
+                    {STAGE_ORDER.map((stage) => (
+                      <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>
+                    ))}
+                  </select>
+                </div>
+                {stageError && stageError.id === selectedDeal.id && (
+                  <p className="mt-3 text-xs font-medium text-danger">
+                    {stageError.message}
+                  </p>
+                )}
               </div>
 
               {/* Win Probability Section */}
@@ -267,6 +375,92 @@ export default function DealsPipeline() {
 
         </div>
       </div>
+
+      {/* New Deal Dialog */}
+      <FormDialog
+        open={newDealOpen}
+        onClose={() => setNewDealOpen(false)}
+        title="New Deal"
+        subtitle="Add a deal to the pipeline."
+        confirmLabel="Create deal"
+        busy={createMutation.isPending}
+        onConfirm={submitNewDeal}
+      >
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="new-deal-name" className="block mb-1.5 text-[10px] font-bold text-muted uppercase tracking-wider">Deal name</label>
+            <input
+              id="new-deal-name"
+              type="text"
+              value={dealForm.name}
+              onChange={(event) => {
+                setDealForm((f) => ({ ...f, name: event.target.value }));
+                if (formError) setFormError(null);
+              }}
+              placeholder="e.g. Acme Corp renewal"
+              className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="new-deal-value" className="block mb-1.5 text-[10px] font-bold text-muted uppercase tracking-wider">Value</label>
+              <input
+                id="new-deal-value"
+                type="number"
+                min="0"
+                step="0.01"
+                value={dealForm.value}
+                onChange={(event) => setDealForm((f) => ({ ...f, value: event.target.value }))}
+                placeholder="12500"
+                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label htmlFor="new-deal-stage" className="block mb-1.5 text-[10px] font-bold text-muted uppercase tracking-wider">Stage</label>
+              <select
+                id="new-deal-stage"
+                value={dealForm.stage}
+                onChange={(event) => setDealForm((f) => ({ ...f, stage: event.target.value }))}
+                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              >
+                {CREATE_STAGES.map((stage) => (
+                  <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="new-deal-close-date" className="block mb-1.5 text-[10px] font-bold text-muted uppercase tracking-wider">Close date</label>
+              <input
+                id="new-deal-close-date"
+                type="date"
+                value={dealForm.closeDate}
+                onChange={(event) => setDealForm((f) => ({ ...f, closeDate: event.target.value }))}
+                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label htmlFor="new-deal-win-probability" className="block mb-1.5 text-[10px] font-bold text-muted uppercase tracking-wider">Win probability</label>
+              <input
+                id="new-deal-win-probability"
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={dealForm.winProbability}
+                onChange={(event) => setDealForm((f) => ({ ...f, winProbability: event.target.value }))}
+                placeholder="0-100"
+                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              />
+            </div>
+          </div>
+        </div>
+
+        {dialogError && <p className="mt-4 text-sm font-medium text-danger">{dialogError}</p>}
+      </FormDialog>
     </div>
   );
 }

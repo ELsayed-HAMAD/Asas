@@ -33,5 +33,24 @@ export const hrApi = {
 
   // Candidates
   listCandidates: (params) => http.get('/hr/candidates', { query: params }),
+  getCandidate: (id) => http.get(`/hr/candidates/${id}`),
+  createCandidate: (body) => http.post('/hr/candidates', { body }),
+  updateCandidate: (id, patch) => http.patch(`/hr/candidates/${id}`, { body: patch }),
   updateCandidateStage: (id, stage) => http.post(`/hr/candidates/${id}/stage`, { body: { stage } }),
+
+  // Candidate CV (resume) surface — server-side signed PDF upload.
+  getResumeUploadUrl: (id) => http.get(`/hr/candidates/${id}/resume-upload-url`),
+  uploadResume: async (id, file) => {
+    const grant = await http.get(`/hr/candidates/${id}/resume-upload-url`)
+    // grant.uploadUrl is absolute (`/api/v1/hr/candidates/:id/resume?h=..&exp=..`); the h/exp
+    // signature must travel unchanged, but putRaw prefixes /api/v1 itself, so pass the path
+    // RELATIVE to that base and forward the query string as-is.
+    const queryString = grant.uploadUrl.split('?')[1] ?? ''
+    return http.putRaw(`/hr/candidates/${id}/resume`, { body: file, query: queryString })
+  },
+  // Streams the stored PDF (binary; 404 when the candidate has no CV).
+  getResume: (id) => http.binary(`/hr/candidates/${id}/resume`),
+
+  // Payslips — deterministic per-line PDF (binary download).
+  getPayslip: (runId, lineId) => http.binary(`/hr/payroll/runs/${runId}/payslips/${lineId}`),
 }

@@ -8,8 +8,12 @@ import {
   ArrowDownCircle, ArrowUpCircle, PieChart, Layers, Map, Zap,
   Check, User, Moon, Download
 } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useSession, useActiveOrganization, useActiveMemberRole, signOut } from '../lib/authClient'
+import {
+  authClient, useSession, useActiveOrganization, useActiveMemberRole,
+  useListOrganizations, signOut
+} from '../lib/authClient'
 
 // ── Navigation config ──────────────────────────────────────
 const NAV = [
@@ -210,10 +214,14 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate }) {
 function SidebarContent({ navProps, navigate }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const menuRef = useRef(null)
+  const [switchingOrgId, setSwitchingOrgId] = useState(null)
+  const [orgSwitchError, setOrgSwitchError] = useState('')
 
   const { data: session } = useSession()
   const { data: activeOrganization } = useActiveOrganization()
   const { data: activeMemberRole } = useActiveMemberRole()
+  const { data: organizations } = useListOrganizations()
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -241,6 +249,24 @@ function SidebarContent({ navProps, navigate }) {
     setUserMenuOpen(false)
     navigate('/login', { replace: true })
   }
+
+  // Switch the active workspace: point the session at another org, then hard-reload
+  // to re-anchor every query, the SSE channel, and the onboarding gate to the new tenant.
+  const handleSwitchOrganization = async (organizationId) => {
+    if (switchingOrgId) return
+    setSwitchingOrgId(organizationId)
+    setOrgSwitchError('')
+    try {
+      await authClient.organization.setActive({ organizationId })
+      queryClient.clear()
+      window.location.assign('/dashboard')
+    } catch (err) {
+      setOrgSwitchError(err?.message || 'Could not switch workspace')
+      setSwitchingOrgId(null)
+    }
+  }
+
+  const orgList = Array.isArray(organizations) ? organizations : []
 
   return (
     <div className="flex flex-col h-full relative">
@@ -305,10 +331,44 @@ function SidebarContent({ navProps, navigate }) {
 
               {/* 2. Workspace Switcher */}
               <div className="border-t border-border-subtle p-2">
-                <div className="px-3 py-2 flex items-center justify-between hover:bg-surface-muted rounded-input cursor-pointer transition-colors">
-                  <span className="text-sm font-semibold text-heading truncate">{tenantName}</span>
-                  <Check size={16} className="text-accent shrink-0" />
-                </div>
+                {orgList.length > 1 ? (
+                  <>
+                    {orgList.map(org => {
+                      const isActive = org.id === activeOrganization?.id
+                      return (
+                        <div
+                          key={org.id}
+                          role="button"
+                          tabIndex={isActive || switchingOrgId ? -1 : 0}
+                          onClick={isActive ? undefined : () => handleSwitchOrganization(org.id)}
+                          onKeyDown={isActive || switchingOrgId ? undefined : (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              handleSwitchOrganization(org.id)
+                            }
+                          }}
+                          aria-disabled={Boolean(switchingOrgId)}
+                          className={`px-3 py-2 flex items-center justify-between rounded-input transition-colors ${
+                            isActive ? '' : 'hover:bg-surface-muted cursor-pointer'
+                          } ${switchingOrgId && !isActive ? 'opacity-60' : ''}`}
+                        >
+                          <span className={`text-sm truncate ${isActive ? 'font-semibold text-heading' : 'font-medium text-heading'}`}>
+                            {org.name}
+                          </span>
+                          {isActive && <Check size={16} className="text-accent shrink-0" />}
+                        </div>
+                      )
+                    })}
+                    {orgSwitchError && (
+                      <p className="px-3 py-1.5 text-xs text-danger">{orgSwitchError}</p>
+                    )}
+                  </>
+                ) : (
+                  <div className="px-3 py-2 flex items-center justify-between hover:bg-surface-muted rounded-input cursor-pointer transition-colors">
+                    <span className="text-sm font-semibold text-heading truncate">{tenantName}</span>
+                    <Check size={16} className="text-accent shrink-0" />
+                  </div>
+                )}
                 <div className="px-3 py-2 flex items-center gap-3 text-sm font-semibold text-accent hover:bg-surface-muted rounded-input cursor-pointer transition-colors mt-1">
                   <Plus size={16} />
                   Create New Workspace
