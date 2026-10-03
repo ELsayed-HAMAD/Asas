@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Search, ChevronDown, Download,
   TrendingUp, AlertTriangle, Pencil, Mail, Calendar,
-  Banknote, Briefcase, Network, History,
+  Banknote, Briefcase, Network, History, Trash2,
 } from 'lucide-react'
 import TopBarActions from '../../../components/TopBarActions'
 import QueryState from '../../../components/common/QueryState'
@@ -12,6 +12,8 @@ import { queryKeys } from '../../../lib/queryKeys'
 import { formatMoney, formatDate } from '../../../lib/format'
 import { exportsApi } from '../../../lib/api/exports'
 import FormDialog from '../../../components/common/FormDialog'
+import ConfirmDialog from '../../../components/common/ConfirmDialog'
+import { useActiveMemberRole } from '../../../lib/authClient'
 
 function initials(name = '') {
   return name
@@ -33,12 +35,23 @@ export default function EmployeeDirectory() {
   const [search, setSearch] = useState('')
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', title: '', email: '', location: '' })
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const { data: activeMemberRole } = useActiveMemberRole()
+  const canDelete = activeMemberRole === 'OWNER' || activeMemberRole === 'ADMIN'
   const exportMutation = useMutation({ mutationFn: () => exportsApi.createJob({ kind: 'employees' }) })
   const editMutation = useMutation({
     mutationFn: () => hrApi.updateEmployee(selectedId, editForm),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.hr.employees.all() })
       setEditOpen(false)
+    },
+  })
+  const deleteMutation = useMutation({
+    mutationFn: () => hrApi.deleteEmployee(selectedId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.hr.employees.all() })
+      setDeleteOpen(false)
+      setSelectedId(null)
     },
   })
 
@@ -194,9 +207,14 @@ export default function EmployeeDirectory() {
           ) : (
             <>
               <div className="border border-border-default rounded-card-sm p-6 relative">
-                <button type="button" onClick={() => { setEditForm({ name: selected.name || '', title: selected.title || '', email: selected.email || '', location: selected.location || '' }); setEditOpen(true) }} className="absolute top-4 right-4 p-1.5 border border-border-default rounded-input text-caption hover:text-body-light hover:bg-surface-muted transition-colors" aria-label="Edit profile">
-                  <Pencil size={14} />
-                </button>
+                <div className="absolute top-4 right-4 flex gap-2">
+                  <button type="button" onClick={() => { setEditForm({ name: selected.name || '', title: selected.title || '', email: selected.email || '', location: selected.location || '' }); setEditOpen(true) }} className="p-1.5 border border-border-default rounded-input text-caption hover:text-body-light hover:bg-surface-muted transition-colors" aria-label="Edit profile">
+                    <Pencil size={14} />
+                  </button>
+                  <button type="button" disabled={!canDelete} title={canDelete ? 'Delete employee' : 'Requires the ADMIN role'} onClick={() => setDeleteOpen(true)} className="p-1.5 border border-border-default rounded-input text-danger hover:bg-danger-light transition-colors disabled:opacity-40" aria-label="Delete employee">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
                 <div className="flex flex-col items-center">
                   <div className="w-20 h-20 bg-surface-strong rounded-full mb-4 overflow-hidden border border-border-subtle flex items-center justify-center text-lg font-bold text-heading">
                     {selected.avatarUrl ? (
@@ -317,6 +335,7 @@ export default function EmployeeDirectory() {
           {['name', 'title', 'email', 'location'].map(field => <label key={field} className="block text-sm font-medium text-body"><span className="mb-1 block capitalize">{field}</span><input value={editForm[field]} onChange={event => setEditForm(current => ({ ...current, [field]: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" /></label>)}
         </div>
       </FormDialog>
+      <ConfirmDialog open={deleteOpen} onClose={() => setDeleteOpen(false)} onConfirm={() => deleteMutation.mutate()} title="Delete employee?" description={`This permanently removes ${selected?.name || 'this employee'} and associated records.`} confirmLabel="Delete employee" busy={deleteMutation.isPending} danger />
     </div>
   )
 }
