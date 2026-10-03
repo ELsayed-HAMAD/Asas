@@ -31,4 +31,5 @@ export const financeApi = {
   /** POST /finance/payables/:id/status — approve, schedule, pay, or reject an invoice. */
   updatePayableStatus: (id, status) => http.post(`/finance/payables/${id}/status`, { body: { status } }),
   updateExpenseStatus: (id, status) => http.post(`/finance/expenses/${id}/status`, { body: { status } }),
+  updateReceivableStatus: (id, status) => http.post(`/finance/receivables/${id}/status`, { body: { status } }),
 }
