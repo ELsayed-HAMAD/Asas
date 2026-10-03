@@ -50,8 +50,8 @@ export default function TimeAttendance() {
     date: item.startDate,
     type: LEAVE_TYPE_LABELS[item.type] || item.type,
   }));
-  const timesheets = [];
-  const summary = data?.summary ?? { exceptionCount: 0, onLeaveCount: 0, attendanceRate: null };
+  const timesheets = data?.timesheets ?? [];
+  const summary = data?.summary ?? { exceptionCount: 0, onLeaveCount: 0, attendanceRate: null, timesheetCount: 0, overtimeHours: 0 };
 
   // Auto-select first exception or leave request if none is selected
   useEffect(() => {
@@ -108,7 +108,7 @@ export default function TimeAttendance() {
         <div className="grid grid-cols-4 gap-4">
           <div className="border border-border-default rounded-button p-4 bg-surface-raised shadow-card">
             <p className="text-[11px] font-semibold text-muted mb-2">Total Timesheets</p>
-            <p className="text-2xl font-bold text-heading">—</p>
+            <p className="text-2xl font-bold text-heading">{summary.timesheetCount}</p>
           </div>
           <div className="border border-border-default rounded-button p-4 bg-surface-raised shadow-card">
             <p className="text-[11px] font-semibold text-muted mb-2">Total Exceptions</p>
@@ -116,7 +116,7 @@ export default function TimeAttendance() {
           </div>
           <div className="border border-border-default rounded-button p-4 bg-surface-raised shadow-card">
             <p className="text-[11px] font-semibold text-muted mb-2">Total Overtime</p>
-            <p className="text-2xl font-bold text-heading">—</p>
+            <p className="text-2xl font-bold text-heading">{summary.overtimeHours}h</p>
           </div>
           <div className="border border-border-default rounded-button p-4 bg-surface-raised shadow-card">
             <p className="text-[11px] font-semibold text-muted mb-2">On-Time Rate</p>
