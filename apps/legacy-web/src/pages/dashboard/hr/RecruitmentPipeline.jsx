@@ -9,6 +9,7 @@ import { hrApi } from '../../../lib/api/hr'
 import { queryKeys } from '../../../lib/queryKeys'
 import { useActiveMemberRole } from '../../../lib/authClient'
 import FormDialog from '../../../components/common/FormDialog'
+import QueryState from '../../../components/common/QueryState'
 
 function initials(name = '') {
   return name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase()).join('') || '?'
@@ -406,21 +407,14 @@ export default function RecruitmentPipeline() {
 
         {/* Data Table */}
         <div className="flex-1 overflow-auto">
-          {isLoading && (
-            <div className="flex items-center justify-center p-10 text-muted">
-              <Loader2 className="animate-spin mr-2" size={20} /> Loading candidates...
-            </div>
-          )}
-          {isError && (
-            <div className="p-10 text-danger">{error?.message || 'Error loading candidates'}</div>
-          )}
-          {!isLoading && candidates.length === 0 && (
-            <div className="p-10 text-center text-muted">
-              <p className="text-sm">No candidates found.</p>
-              <p className="text-xs mt-2">Add a candidate or load the sample pack to see data.</p>
-            </div>
-          )}
-          {candidates.length > 0 && (
+          <QueryState
+            isLoading={isLoading}
+            isError={isError}
+            error={error}
+            isEmpty={!candidates.length}
+            emptyTitle="No candidates found"
+            emptyDescription="Add a candidate or load the sample pack to see data."
+          >
             <table className="w-full text-left border-collapse">
               <thead className="bg-surface-muted/80 sticky top-0 z-10 backdrop-blur-sm">
                 <tr>
@@ -470,7 +464,7 @@ export default function RecruitmentPipeline() {
                 })}
               </tbody>
             </table>
-          )}
+          </QueryState>
         </div>
       </div>
 
