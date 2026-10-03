@@ -276,7 +276,7 @@ export async function getBurndown(
         to_char(w.day, 'YYYY-MM-DD') AS date,
         (SELECT count(*) FROM "Issue"
           WHERE "tenantId" = ${tenantId} AND "sprintId" = ${sprintId}
-            AND status = 'DONE'
+            AND "status"::text = 'DONE'
             AND ("updatedAt" AT TIME ZONE 'UTC')::date <= w.day) AS completed
       FROM window w
       ORDER BY w.day

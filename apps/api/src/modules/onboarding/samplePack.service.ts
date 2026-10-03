@@ -669,7 +669,7 @@ export async function applyEnterpriseSamplePack(
       where: { id: tenantId },
       data: { onboardingStatus: 'SAMPLE_LOADED' },
     })
-  })
+  }, { timeout: 300000 })
 
   return summary
 }
@@ -803,7 +803,7 @@ export async function clearSamplePack(
       cleared[model] = result.count
     }
     await tx.tenant.update({ where: { id: tenantId }, data: { onboardingStatus: 'PENDING' } })
-  })
+  }, { timeout: 300000 })
 
   return { cleared, onboardingStatus: 'PENDING' }
 }
@@ -859,7 +859,7 @@ export async function importEmployees(
     }
     await tx.tenant.update({ where: { id: tenantId }, data: { onboardingStatus: 'IMPORTED' } })
     return count
-  })
+  }, { timeout: 300000 })
 
   return { imported }
 }

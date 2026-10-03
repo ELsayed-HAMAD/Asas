@@ -49,7 +49,13 @@ export async function resolveAuthContext(
   const session = sessionData.session as (typeof sessionData.session & {
     activeOrganizationId?: string | null
   })
-  const tenantId = session?.activeOrganizationId
+  let tenantId = session?.activeOrganizationId
+  if (!tenantId) {
+    const members = await prisma.member.findMany({ where: { userId: sessionData.user.id } })
+    if (members.length === 1) {
+      tenantId = members[0]?.tenantId
+    }
+  }
   if (!tenantId) return null
 
   const member = await prisma.member.findUnique({
