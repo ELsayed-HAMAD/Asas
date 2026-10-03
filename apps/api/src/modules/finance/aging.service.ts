@@ -34,7 +34,7 @@ export async function computeAgingBuckets(
       sum("amount") AS total
     FROM "ReceivableInvoice"
     WHERE "tenantId" = ${tenantId}
-      AND "status" IN (${Prisma.join([...UNPAID_RECEIVABLE_STATUSES])})
+      AND "status"::text IN (${Prisma.join([...UNPAID_RECEIVABLE_STATUSES])})
     GROUP BY 1
   `
 
