@@ -329,20 +329,17 @@ export default function RecruitmentPipeline() {
 
   const selectedCandidate = candidates.find(c => c.id === selectedId)
 
-  // High-level stats from the stage tally; time-to-hire and offer-acceptance had no data source
-  // in the old UI (hardcoded "mocked trend" strings) and are kept as-is.
+  // High-level stats from the loaded candidate records. The API does not expose time-to-hire or
+  // offer-acceptance aggregates, so those KPIs stay explicitly unavailable.
   const totalActive = Object.entries(stageCounts)
     .filter(([code]) => code !== 'HIRED' && code !== 'REJECTED')
     .reduce((acc, [, count]) => acc + count, 0)
   const totalHired = stageCounts['HIRED'] || 0
-  const timeToHire = '14d' // Mocked trend (no data source)
-  const offerAcceptance = '85%' // Mocked trend (no data source)
-
   const displayStats = [
-    { label: 'Active Candidates', value: totalActive, trend: 'up', sub: '+12% this month' },
-    { label: 'Total Hired', value: totalHired, trend: 'up', sub: `+${Math.max(0, Math.floor(totalHired / 3))} this month` },
-    { label: 'Avg Time to Hire', value: timeToHire, trend: 'down', sub: '-2 days vs avg' },
-    { label: 'Offer Acceptance', value: offerAcceptance, trend: 'up', sub: '+5% vs avg' },
+    { label: 'Active Candidates', value: totalActive, trend: 'neutral', sub: 'Current pipeline' },
+    { label: 'Total Hired', value: totalHired, trend: 'neutral', sub: 'All time' },
+    { label: 'Avg Time to Hire', value: '—', trend: 'neutral', sub: 'Not available' },
+    { label: 'Offer Acceptance', value: '—', trend: 'neutral', sub: 'Not available' },
   ]
 
   return (
