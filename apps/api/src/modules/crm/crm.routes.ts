@@ -10,6 +10,10 @@ import {
   idParamSchema,
   overviewResponseSchema,
   salesPerformanceResponseSchema,
+  agendaListResponseSchema,
+  agendaItemSchema,
+  agendaItemWriteSchema,
+  agendaItemUpdateSchema,
 } from '@asas/contracts'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
@@ -96,6 +100,31 @@ export async function crmRoutes(app: FastifyInstance): Promise<void> {
       return { data: result }
     },
   )
+
+  server.get('/agenda', {
+    preHandler: requireRole('MEMBER'),
+    schema: { response: { 200: envelope(agendaListResponseSchema), ...errorResponses } },
+  }, async request => {
+    const { tenantId } = requireAuthContext(request)
+    return { data: await crmController.listAgenda(request.server.prisma, tenantId) }
+  })
+
+  server.post('/agenda', {
+    preHandler: requirePermission('deal.write'),
+    schema: { body: agendaItemWriteSchema, response: { 201: envelope(agendaItemSchema), ...errorResponses } },
+  }, async (request, reply) => {
+    const { tenantId } = requireAuthContext(request)
+    reply.code(201)
+    return { data: await crmController.createAgenda(request.server.prisma, tenantId, request.body) }
+  })
+
+  server.patch('/agenda/:id', {
+    preHandler: requirePermission('deal.write'),
+    schema: { params: idParamSchema, body: agendaItemUpdateSchema, response: { 200: envelope(agendaItemSchema), ...errorResponses } },
+  }, async request => {
+    const { tenantId } = requireAuthContext(request)
+    return { data: await crmController.updateAgenda(request.server.prisma, tenantId, request.params.id, request.body) }
+  })
 
   server.get(
     '/deals/:id',

@@ -28,6 +28,7 @@ import { onboardingRoutes } from './modules/onboarding/onboarding.routes.js'
 import { inventoryRoutes } from './modules/inventory/inventory.routes.js'
 import { projectsRoutes } from './modules/projects/projects.routes.js'
 import { settingsRoutes } from './modules/settings/settings.routes.js'
+import { supportRoutes } from './modules/support/support.routes.js'
 import { betterAuthPlugin } from './plugins/betterAuth.js'
 import { correlationPlugin } from './plugins/correlation.js'
 import { prismaPlugin } from './plugins/prisma.js'
@@ -257,6 +258,7 @@ export async function buildApp(
     await app.register(projectsRoutes, { prefix: '/api/v1/projects' })
     await app.register(inventoryRoutes, { prefix: '/api/v1/inventory' })
     await app.register(settingsRoutes, { prefix: '/api/v1/settings' })
+    await app.register(supportRoutes, { prefix: '/api/v1/support' })
     await app.register(onboardingRoutes, { prefix: '/api/v1/onboarding' })
     await app.register(exportRoutes, { prefix: '/api/v1/exports' })
   }

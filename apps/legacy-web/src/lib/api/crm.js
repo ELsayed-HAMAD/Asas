@@ -10,6 +10,9 @@ import { http } from '../api/http'
  * drive; the rest stay visually intact but disabled.
  */
 export const crmApi = {
+  listAgenda: () => http.get('/crm/agenda'),
+  createAgenda: (body) => http.post('/crm/agenda', { body }),
+  updateAgenda: (id, body) => http.patch(`/crm/agenda/${id}`, { body }),
   /** Pipeline KPIs + zero-filled 5-stage funnel (server-side SQL aggregates). */
   getOverview: () => http.get('/crm/overview'),
 
