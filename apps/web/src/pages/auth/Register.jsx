@@ -25,12 +25,28 @@ export default function Register() {
       // The old form collected only name/email/password; the workspace (tenant) is created
       // from the person's name so the three-field UI stays exactly as it was.
       const workspaceName = name || 'My Workspace'
-      await signUp.email({ email: form.email, password: form.password, name: name || undefined })
-      const org = await authClient.organization.create({ name: workspaceName, slug: toSlug(workspaceName) })
-      await authClient.organization.setActive({ organizationId: org.id })
+      const signUpResult = await signUp.email({ email: form.email, password: form.password, name: name || undefined })
+      if (signUpResult?.error) {
+        throw new Error(signUpResult.error.message || 'Could not create your account.')
+      }
+
+      const organizationResult = await authClient.organization.create({
+        name: workspaceName,
+        slug: toSlug(workspaceName),
+      })
+      if (organizationResult?.error || !organizationResult?.data?.id) {
+        throw new Error(organizationResult?.error?.message || 'Could not create your workspace.')
+      }
+
+      const activeResult = await authClient.organization.setActive({
+        organizationId: organizationResult.data.id,
+      })
+      if (activeResult?.error) {
+        throw new Error(activeResult.error.message || 'Could not activate your workspace.')
+      }
       navigate('/onboarding')
     } catch (requestError) {
-      setError(requestError?.error?.message || 'Unable to create your workspace.')
+      setError(requestError?.message || requestError?.error?.message || 'Unable to create your workspace.')
     } finally {
       setIsLoading(false)
     }
