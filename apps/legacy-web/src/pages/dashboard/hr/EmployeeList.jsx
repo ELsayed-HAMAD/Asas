@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import {
   Search, ChevronDown, Download,
   TrendingUp, AlertTriangle, Pencil, Mail, Calendar,
@@ -10,6 +10,7 @@ import QueryState from '../../../components/common/QueryState'
 import { hrApi } from '../../../lib/api/hr'
 import { queryKeys } from '../../../lib/queryKeys'
 import { formatMoney, formatDate } from '../../../lib/format'
+import { exportsApi } from '../../../lib/api/exports'
 
 function initials(name = '') {
   return name
@@ -28,6 +29,7 @@ const STATUS_LABELS = {
 export default function EmployeeDirectory() {
   const [selectedId, setSelectedId] = useState(null)
   const [search, setSearch] = useState('')
+  const exportMutation = useMutation({ mutationFn: () => exportsApi.createJob({ kind: 'employees' }) })
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.hr.employees.list({ search: search || undefined }),
@@ -69,8 +71,8 @@ export default function EmployeeDirectory() {
           <button type="button" disabled className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm hover:bg-surface-muted transition-colors disabled:opacity-60">
             Department: All <ChevronDown size={14} className="text-caption" />
           </button>
-          <button type="button" disabled className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors disabled:opacity-60">
-            <Download size={16} /> Export Directory
+          <button type="button" disabled={exportMutation.isPending} onClick={() => exportMutation.mutate()} className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors disabled:opacity-60">
+            <Download size={16} /> {exportMutation.isPending ? 'Exporting...' : 'Export Directory'}
           </button>
         </div>
       </TopBarActions>
