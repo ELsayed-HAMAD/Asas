@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Search, ChevronDown, Download,
   TrendingUp, AlertTriangle, Pencil, Mail, Calendar,
@@ -11,6 +11,7 @@ import { hrApi } from '../../../lib/api/hr'
 import { queryKeys } from '../../../lib/queryKeys'
 import { formatMoney, formatDate } from '../../../lib/format'
 import { exportsApi } from '../../../lib/api/exports'
+import FormDialog from '../../../components/common/FormDialog'
 
 function initials(name = '') {
   return name
@@ -27,9 +28,19 @@ const STATUS_LABELS = {
 }
 
 export default function EmployeeDirectory() {
+  const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState(null)
   const [search, setSearch] = useState('')
+  const [editOpen, setEditOpen] = useState(false)
+  const [editForm, setEditForm] = useState({ name: '', title: '', email: '', location: '' })
   const exportMutation = useMutation({ mutationFn: () => exportsApi.createJob({ kind: 'employees' }) })
+  const editMutation = useMutation({
+    mutationFn: () => hrApi.updateEmployee(selectedId, editForm),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.hr.employees.all() })
+      setEditOpen(false)
+    },
+  })
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.hr.employees.list({ search: search || undefined }),
@@ -183,7 +194,7 @@ export default function EmployeeDirectory() {
           ) : (
             <>
               <div className="border border-border-default rounded-card-sm p-6 relative">
-                <button type="button" disabled className="absolute top-4 right-4 p-1.5 border border-border-default rounded-input text-caption hover:text-body-light hover:bg-surface-muted transition-colors disabled:opacity-60" aria-label="Edit profile">
+                <button type="button" onClick={() => { setEditForm({ name: selected.name || '', title: selected.title || '', email: selected.email || '', location: selected.location || '' }); setEditOpen(true) }} className="absolute top-4 right-4 p-1.5 border border-border-default rounded-input text-caption hover:text-body-light hover:bg-surface-muted transition-colors" aria-label="Edit profile">
                   <Pencil size={14} />
                 </button>
                 <div className="flex flex-col items-center">
@@ -300,6 +311,12 @@ export default function EmployeeDirectory() {
           )}
         </div>
       </div>
+
+      <FormDialog open={editOpen} onClose={() => setEditOpen(false)} title="Edit employee" subtitle="Update the employee profile fields." busy={editMutation.isPending} onConfirm={() => editMutation.mutate()} confirmLabel="Save changes">
+        <div className="space-y-4">
+          {['name', 'title', 'email', 'location'].map(field => <label key={field} className="block text-sm font-medium text-body"><span className="mb-1 block capitalize">{field}</span><input value={editForm[field]} onChange={event => setEditForm(current => ({ ...current, [field]: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" /></label>)}
+        </div>
+      </FormDialog>
     </div>
   )
 }
