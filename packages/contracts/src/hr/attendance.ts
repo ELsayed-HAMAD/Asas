@@ -1,0 +1,87 @@
+/**
+ * HR / Attendance contract — the wire shape for the attendance + leave-request surface.
+ *
+ * The key fix from the rebuild plan (Phase 2): the legacy `listAttendance` *derived* exceptions
+ * from `new Date('2000-01-01 ' + day.clockIn)` and emitted `'late'`/`'early_out'` — neither of
+ * which exists in the `AttendanceExceptionType` enum (`MISSING_IN|MISSING_OUT|OVERTIME`). This
+ * contract reads the real `AttendanceException` table instead, and the attendance rate is a SQL
+ * aggregate computed server-side, never a client-side division on a broken `late` flag.
+ */
+import { z } from 'zod'
+import {
+  attendanceExceptionTypeSchema,
+  leaveTypeSchema,
+  leaveRequestStatusSchema,
+} from '../enums.generated.js'
+import { idSchema, isoDateSchema, isoDateTimeSchema, shortTextSchema, boundedText } from '../primitives/ids.js'
+
+// ── Attendance exceptions (real rows, not derived) ──────────────────────────
+
+export const attendanceExceptionSchema = z.object({
+  id: idSchema,
+  employeeId: idSchema,
+  employeeName: z.string(),
+  employeeAvatar: z.string().nullable(),
+  type: attendanceExceptionTypeSchema,
+  label: z.string(),
+  date: isoDateSchema,
+  alert: z.boolean(),
+  createdAt: isoDateTimeSchema,
+})
+export type AttendanceExceptionRow = z.infer<typeof attendanceExceptionSchema>
+
+// ── Leave requests ────────────────────────────────────────────────────────────
+
+export const leaveRequestSchema = z.object({
+  id: idSchema,
+  employeeId: idSchema,
+  employeeName: z.string(),
+  employeeAvatar: z.string().nullable(),
+  type: leaveTypeSchema,
+  startDate: isoDateSchema,
+  endDate: isoDateSchema.nullable(),
+  status: leaveRequestStatusSchema,
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
+})
+export type LeaveRequestRow = z.infer<typeof leaveRequestSchema>
+
+export const leaveRequestWriteSchema = z.object({
+  employeeId: idSchema,
+  type: leaveTypeSchema,
+  startDate: isoDateSchema,
+  endDate: isoDateSchema.optional().nullable(),
+})
+export type LeaveRequestWriteInput = z.infer<typeof leaveRequestWriteSchema>
+
+// ── Attendance summary (server-computed rate) ────────────────────────────────
+
+export const attendanceSummarySchema = z.object({
+  /** Total attendance exceptions across the tenant (SQL count). */
+  exceptionCount: z.int().min(0),
+  /** Employees currently on leave (SQL count of `Employee.status === 'ON_LEAVE'`). */
+  onLeaveCount: z.int().min(0),
+  /**
+   * Attendance rate as a percentage (0–100), computed server-side:
+   * `100 * (1 - exceptionCount / totalExpectedDays)`.
+   *
+   * `null` when there is no timesheet data to compute from (a new tenant, or one that has not
+   * logged any timesheets yet). The UI shows "—" in that case, not "0%" or "NaN%".
+   */
+  attendanceRate: z.number().min(0).max(100).nullable(),
+})
+export type AttendanceSummary = z.infer<typeof attendanceSummarySchema>
+
+// ── Full attendance response ─────────────────────────────────────────────────
+
+export const attendanceResponseSchema = z.object({
+  exceptions: z.array(attendanceExceptionSchema),
+  leaveRequests: z.array(leaveRequestSchema),
+  summary: attendanceSummarySchema,
+})
+export type AttendanceResponse = z.infer<typeof attendanceResponseSchema>
+
+export const leaveRequestListResponseSchema = z.object({
+  items: z.array(leaveRequestSchema),
+})
+export type LeaveRequestListResponse = z.infer<typeof leaveRequestListResponseSchema>

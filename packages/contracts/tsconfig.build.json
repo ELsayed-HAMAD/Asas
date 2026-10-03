@@ -1,0 +1,10 @@
+{
+  // Emit config. Tests and codegen scripts are excluded so `dist/` holds only shipped code.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"]
+}
