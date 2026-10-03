@@ -11,7 +11,7 @@ import {
   Download,
   Loader2
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../../../lib/api/finance';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney } from '../../../lib/format';
@@ -34,6 +34,7 @@ function sumMoney(items) {
 }
 
 export default function AccountsPayable() {
+  const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState(null);
 
   const { data, isLoading, isError } = useQuery({
@@ -76,6 +77,10 @@ export default function AccountsPayable() {
   }
 
   const selectedRecord = items.find(i => i.id === selectedId);
+  const statusMutation = useMutation({
+    mutationFn: (status) => financeApi.updatePayableStatus(selectedId, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.finance.payables.all() }),
+  });
   const needsApproval = items.filter(i => i.status === 'PENDING');
   const scheduled = items.filter(i => i.status === 'SCHEDULED' || i.status === 'APPROVED');
 
@@ -315,13 +320,13 @@ export default function AccountsPayable() {
               </div>
 
               <div className="grid grid-cols-3 gap-3">
-                <button disabled className="bg-primary text-white py-2 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
+                <button disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'PENDING'} onClick={() => statusMutation.mutate('APPROVED')} className="bg-primary text-white py-2 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
                   Approve
                 </button>
                 <button disabled className="border border-border-default text-body py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60">
                   Request Changes
                 </button>
-                <button disabled className="border border-border-default text-danger py-2 rounded-input text-sm font-medium hover:bg-danger-light transition-colors disabled:opacity-60">
+                <button disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status === 'PAID'} onClick={() => statusMutation.mutate('REJECTED')} className="border border-border-default text-danger py-2 rounded-input text-sm font-medium hover:bg-danger-light transition-colors disabled:opacity-60">
                   Reject
                 </button>
               </div>
