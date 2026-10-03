@@ -3,9 +3,10 @@ import { useQuery } from '@tanstack/react-query'
 import {
   Search, ChevronDown, Download,
   TrendingUp, AlertTriangle, Pencil, Mail, Calendar,
-  Banknote, Briefcase, Network, History, Loader2,
+  Banknote, Briefcase, Network, History,
 } from 'lucide-react'
 import TopBarActions from '../../../components/TopBarActions'
+import QueryState from '../../../components/common/QueryState'
 import { hrApi } from '../../../lib/api/hr'
 import { queryKeys } from '../../../lib/queryKeys'
 import { formatMoney, formatDate } from '../../../lib/format'
@@ -114,30 +115,14 @@ export default function EmployeeDirectory() {
             <span className="text-sm font-medium text-body-light">A-Z Sort: Name A-Z</span>
           </div>
 
-          {isLoading && (
-            <div className="flex-1 flex items-center justify-center gap-2 text-muted text-sm">
-              <Loader2 size={16} className="animate-spin" /> Loading employees…
-            </div>
-          )}
-
-          {isError && (
-            <div className="flex-1 flex items-center justify-center text-sm text-danger px-6 text-center">
-              {error?.message || 'Unable to load employees.'}
-            </div>
-          )}
-
-          {!isLoading && !isError && employees.length === 0 && (
-            <div className="flex-1 flex items-center justify-center px-6">
-              <div className="text-center max-w-sm">
-                <p className="text-base font-semibold text-heading mb-1">No employees yet</p>
-                <p className="text-sm text-muted">
-                  This workspace is empty. Add people manually or reload sample data from onboarding.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {!isLoading && !isError && employees.length > 0 && (
+          <QueryState
+            isLoading={isLoading}
+            isError={isError}
+            error={error}
+            isEmpty={!employees.length}
+            emptyTitle="No employees yet"
+            emptyDescription="This workspace is empty. Add people manually or reload sample data from onboarding."
+          >
             <table className="w-full text-left border-collapse flex-1">
               <thead className="bg-surface-muted/50 sticky top-0 z-10">
                 <tr>
@@ -185,7 +170,7 @@ export default function EmployeeDirectory() {
                 })}
               </tbody>
             </table>
-          )}
+          </QueryState>
         </div>
 
         <div className="w-[420px] bg-surface-raised border-l border-border-default overflow-y-auto p-6 flex-shrink-0 space-y-6">

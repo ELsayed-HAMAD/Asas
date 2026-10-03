@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom'
 import {
-  ArrowUpRight, ArrowDownRight, Users,
+  Users,
   AlertCircle, Clock, TrendingUp, CreditCard, Rocket, Loader2
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useQuery } from '@tanstack/react-query'
 import TopBarActions from '../../components/TopBarActions'
+import StatCard from '../../components/common/StatCard'
 import { dashboardApi } from '../../lib/api/dashboard'
 import { queryKeys } from '../../lib/queryKeys'
 import { formatMoney } from '../../lib/format'
@@ -28,36 +29,6 @@ function sprintSubtitle(sprint) {
   if (days > 0) return `${days} ${days === 1 ? 'Day' : 'Days'} Remaining • ${pct}`
   if (days === 0) return `Ends today • ${pct}`
   return `Past end date • ${pct}`
-}
-
-// ── Components ──────────────────────────────────────────────
-
-function StatCard({ stat }) {
-  const isUp = stat.trend === 'up'
-  const isDown = stat.trend === 'down'
-
-  return (
-    <div className="bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card hover:shadow-card-hover transition-shadow">
-      <div className="flex items-center justify-between mb-4">
-        <div className="w-10 h-10 rounded-card-sm bg-surface-muted flex items-center justify-center border border-border-subtle">
-          <stat.icon size={18} className="text-body-light" />
-        </div>
-        <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-input ${
-          isUp ? 'text-success-text bg-success-light' :
-          isDown ? 'text-info bg-info-light' :
-          'text-body-light bg-surface-muted'
-        }`}>
-          {isUp && <ArrowUpRight size={14} />}
-          {isDown && <ArrowDownRight size={14} />}
-          {stat.change}
-        </div>
-      </div>
-      <div>
-        <p className="text-sm font-medium text-muted mb-1">{stat.label}</p>
-        <p className="text-3xl font-bold text-heading tracking-tight">{stat.value}</p>
-      </div>
-    </div>
-  )
 }
 
 export default function DashboardOverview() {
@@ -212,8 +183,8 @@ export default function DashboardOverview() {
 
       {/* ── KPI Grid ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-grid-lg">
-        {stats.map((stat, i) => (
-          <StatCard key={i} stat={stat} />
+        {stats.map((stat) => (
+          <StatCard key={stat.label} {...stat} />
         ))}
       </div>
 
