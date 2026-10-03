@@ -99,6 +99,15 @@ importers:
 
   apps/legacy-web:
     dependencies:
+      '@dnd-kit/core':
+        specifier: ^6.3.1
+        version: 6.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@dnd-kit/utilities':
+        specifier: ^3.2.2
+        version: 3.2.2(react@19.2.8)
+      '@sentry/react':
+        specifier: ^9.47.1
+        version: 9.47.1(react@19.2.8)
       '@tanstack/react-query':
         specifier: ^5.67.2
         version: 5.102.8(react@19.2.8)
