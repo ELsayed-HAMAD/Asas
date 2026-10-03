@@ -19,13 +19,14 @@ import {
   Code2,
   Loader2
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { projectsApi } from '../../../lib/api/projects';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatDate } from '../../../lib/format';
 import TopBarActions from '../../../components/TopBarActions';
 
 export default function ActiveSprints() {
+  const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState(null);
 
   const { data: sprintsData, isLoading, isError } = useQuery({
@@ -77,6 +78,10 @@ export default function ActiveSprints() {
   }
 
   const selectedIssue = issues.find(i => i.id === selectedId);
+  const issueMutation = useMutation({
+    mutationFn: (status) => projectsApi.updateIssue(selectedId, { status }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.projects.issues.all() }),
+  });
 
   // Custom Icon for 'In Progress' (Half filled circle)
   const HalfCircleIcon = ({ className }) => (
@@ -347,9 +352,15 @@ export default function ActiveSprints() {
 
                     {/* Tags */}
                     <div className="flex items-center gap-2 mb-8">
-                      <span className="inline-flex items-center gap-1.5 bg-[#eff6ff] text-[#3b82f6] px-2.5 py-1 rounded-full text-xs font-bold">
-                        <HalfCircleIcon className="w-3.5 h-3.5" /> {selectedIssue.status.replace('_', ' ')}
-                      </span>
+                      <label className="inline-flex items-center gap-1.5 bg-[#eff6ff] text-[#3b82f6] px-2.5 py-1 rounded-full text-xs font-bold">
+                        <HalfCircleIcon className="w-3.5 h-3.5" />
+                        <select value={selectedIssue.status} disabled={issueMutation.isPending} onChange={event => issueMutation.mutate(event.target.value)} className="bg-transparent uppercase outline-none">
+                          <option value="TODO">To Do</option>
+                          <option value="IN_PROGRESS">In Progress</option>
+                          <option value="IN_REVIEW">In Review</option>
+                          <option value="DONE">Done</option>
+                        </select>
+                      </label>
                       {selectedIssue.priority === 'HIGH' || selectedIssue.priority === 'URGENT' ? (
                         <span className="inline-flex items-center gap-1 bg-danger-light text-danger px-2.5 py-1 rounded-full text-xs font-bold">
                           <ChevronsUp size={14} strokeWidth={3} /> High Priority
