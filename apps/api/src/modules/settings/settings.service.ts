@@ -16,6 +16,10 @@ import type {
   NotificationSettings,
   NotificationSettingsUpdateInput,
   QuietHours,
+  BackupSchedule,
+  BackupScheduleUpdateInput,
+  BackupScheduleWriteInput,
+  BillingSettings,
 } from '@asas/contracts'
 import { AppError } from '../../utils/errors.js'
 
@@ -293,6 +297,71 @@ export async function updateIntegration(
     },
   })
   return mapIntegration(integration)
+}
+
+// ── Billing and backups ────────────────────────────────────────────────────
+
+export async function getBillingSettings(prisma: PrismaClient, tenantId: string): Promise<BillingSettings> {
+  const [subscriptions, paymentMethods, invoices] = await Promise.all([
+    prisma.subscription.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } }),
+    prisma.paymentMethod.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } }),
+    prisma.billingInvoice.findMany({ where: { tenantId }, orderBy: { date: 'desc' } }),
+  ])
+
+  return {
+    subscriptions: subscriptions.map(row => ({
+      id: row.id,
+      planName: row.planName,
+      priceMonthly: row.priceMonthly.toString(),
+      status: row.status,
+      renewsOn: row.renewsOn?.toISOString() ?? null,
+      seatsUsed: row.seatsUsed,
+      seatLimit: row.seatLimit,
+      storageUsedGb: row.storageUsedGb,
+      storageLimitGb: row.storageLimitGb,
+    })),
+    paymentMethods: paymentMethods.map(row => ({
+      id: row.id,
+      brand: row.brand,
+      last4: row.last4,
+      expires: row.expires,
+    })),
+    invoices: invoices.map(row => ({
+      id: row.id,
+      date: row.date.toISOString(),
+      description: row.description,
+      amount: row.amount.toString(),
+      status: row.status,
+    })),
+  }
+}
+
+function mapBackupSchedule(row: { id: string; name: string; schedule: string; enabled: boolean; createdAt: Date }): BackupSchedule {
+  return { id: row.id, name: row.name, schedule: row.schedule, enabled: row.enabled, createdAt: row.createdAt.toISOString() }
+}
+
+export async function listBackupSchedules(prisma: PrismaClient, tenantId: string): Promise<{ items: BackupSchedule[] }> {
+  const rows = await prisma.backupSchedule.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } })
+  return { items: rows.map(mapBackupSchedule) }
+}
+
+export async function createBackupSchedule(prisma: PrismaClient, tenantId: string, input: BackupScheduleWriteInput): Promise<BackupSchedule> {
+  const row = await prisma.backupSchedule.create({ data: { tenantId, name: input.name, schedule: input.schedule, enabled: input.enabled ?? true } })
+  return mapBackupSchedule(row)
+}
+
+export async function updateBackupSchedule(prisma: PrismaClient, tenantId: string, id: string, input: BackupScheduleUpdateInput): Promise<BackupSchedule> {
+  const existing = await prisma.backupSchedule.findFirst({ where: { id, tenantId } })
+  if (!existing) throw new AppError(404, 'Backup schedule not found')
+  const row = await prisma.backupSchedule.update({
+    where: { id },
+    data: {
+      ...(input.name !== undefined && { name: input.name }),
+      ...(input.schedule !== undefined && { schedule: input.schedule }),
+      ...(input.enabled !== undefined && { enabled: input.enabled }),
+    },
+  })
+  return mapBackupSchedule(row)
 }
 
 // ── Shared ──────────────────────────────────────────────────────────────────

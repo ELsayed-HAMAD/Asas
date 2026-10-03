@@ -1,7 +1,11 @@
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import TopBarActions from '../../../components/TopBarActions';
 import SettingsTabs from './SettingsTabs';
+import { settingsApi } from '../../../lib/api/settings';
+import { queryKeys } from '../../../lib/queryKeys';
+import QueryState from '../../../components/common/QueryState';
 
 /**
  * Billing & Plans — the legacy page read a `subscriptions` list from `/settings/billing` and
@@ -12,6 +16,9 @@ import SettingsTabs from './SettingsTabs';
  * Nothing here is presented as live data beyond what the old page did.
  */
 export default function SettingsBilling() {
+  const query = useQuery({ queryKey: queryKeys.settings.billing(), queryFn: settingsApi.getBilling })
+  const subscription = query.data?.subscriptions?.[0]
+
   return (
     <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
       <TopBarActions>
@@ -39,25 +46,24 @@ export default function SettingsBilling() {
 
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 overflow-y-auto p-8 space-y-6">
-          <p className="text-sm text-muted">
-            Plan data is stored on this workspace only. Card checkout and invoices via Stripe are not enabled yet.
-          </p>
-
-          <div className="bg-surface-raised border border-border-default rounded-card-sm p-card shadow-card">
-            <h2 className="text-xl font-bold text-heading mb-1">No subscription on file</h2>
-            <p className="text-sm text-body-light">
-              This tenant has no Subscription rows yet. Load sample data or keep using the workspace without a billed plan.
-            </p>
-          </div>
+          <QueryState isLoading={query.isLoading} isError={query.isError} error={query.error} isEmpty={!subscription} emptyTitle="No subscription on file" emptyDescription="This workspace has no active plan record yet." >
+            <div className="bg-surface-raised border border-border-default rounded-card-sm p-card shadow-card">
+              <h2 className="text-xl font-bold text-heading mb-1">{subscription.planName}</h2>
+              <p className="text-sm text-body-light">{subscription.priceMonthly} monthly · {subscription.status}</p>
+              <p className="mt-3 text-sm text-muted">{subscription.seatsUsed} of {subscription.seatLimit} seats used · {subscription.storageUsedGb} of {subscription.storageLimitGb} GB used</p>
+            </div>
+            {query.data?.invoices?.length > 0 && <div className="bg-surface-raised border border-border-default rounded-card-sm p-card shadow-card"><h2 className="text-lg font-bold text-heading mb-4">Billing history</h2>{query.data.invoices.map(invoice => <div key={invoice.id} className="flex justify-between border-b border-border-subtle py-3 text-sm"><span>{invoice.description}</span><span className="text-muted">{invoice.amount} · {invoice.status}</span></div>)}</div>}
+          </QueryState>
         </div>
 
         <div className="w-[340px] bg-surface-muted border-l border-border-default p-8 flex flex-col flex-shrink-0">
           <h3 className="text-[10px] font-bold text-caption uppercase tracking-widest mb-4">Payments</h3>
           <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card mb-6">
-            <h4 className="text-sm font-bold text-heading mb-2">Stripe later</h4>
+            <h4 className="text-sm font-bold text-heading mb-2">Payment methods</h4>
             <p className="text-xs text-body-light mb-4 leading-relaxed">
-              Checkout, customer portal, and webhooks are deferred. This page only shows records already stored for the tenant.
+              Checkout is not connected yet. Existing payment method records are shown below.
             </p>
+            {query.data?.paymentMethods?.map(method => <p key={method.id} className="text-sm text-heading">{method.brand} ending in {method.last4}</p>)}
           </div>
         </div>
       </div>

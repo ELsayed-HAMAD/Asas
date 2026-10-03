@@ -136,6 +136,8 @@ export const queryKeys = {
   settings: {
     ...settingsBase,
     general: () => [...settingsBase.all(), 'general'],
+    billing: () => [...settingsBase.all(), 'billing'],
+    backups: () => [...settingsBase.all(), 'backups'],
     notifications: () => [...settingsBase.all(), 'notifications'],
     integrations: resourceKeys([...settingsBase.all(), 'integrations']),
   },

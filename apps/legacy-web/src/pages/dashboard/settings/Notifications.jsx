@@ -252,7 +252,7 @@ export default function SettingsNotifications() {
                     {preview.desc}
                   </p>
 
-                  <button className="w-full bg-primary text-on-primary text-xs font-semibold py-2.5 rounded-input hover:bg-primary-hover transition-colors">
+                  <button disabled title="Notification actions are not connected yet" className="w-full bg-primary text-on-primary text-xs font-semibold py-2.5 rounded-input hover:bg-primary-hover transition-colors disabled:opacity-60">
                     {preview.btn}
                   </button>
                 </div>
@@ -260,19 +260,19 @@ export default function SettingsNotifications() {
               </div>
             </div>
 
-            {/* 30-Day Volume Card (no backend endpoint — kept as the legacy page had it) */}
+            {/* Notification volume is not exposed by the current API. */}
             <div className="bg-surface-raised border border-border-default rounded-card-sm p-6 shadow-card">
               <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-6">30-Day Volume</h3>
 
               <div className="space-y-4">
                 <div className="flex justify-between items-end border-b border-border-subtle pb-4">
                   <span className="text-sm font-medium text-body-light">Total Sent</span>
-                  <span className="text-lg font-black text-heading tracking-tight">1,402</span>
+                  <span className="text-lg font-black text-heading tracking-tight">—</span>
                 </div>
 
                 <div className="flex justify-between items-end">
                   <span className="text-sm font-medium text-body-light">Unread In-App</span>
-                  <span className="text-lg font-black text-heading tracking-tight">14</span>
+                  <span className="text-lg font-black text-heading tracking-tight">—</span>
                 </div>
               </div>
             </div>

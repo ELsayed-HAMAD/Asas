@@ -10,6 +10,11 @@ import {
   integrationWriteSchema,
   notificationSettingsSchema,
   notificationSettingsUpdateSchema,
+  billingSettingsSchema,
+  backupSchedulesResponseSchema,
+  backupScheduleSchema,
+  backupScheduleWriteSchema,
+  backupScheduleUpdateSchema,
 } from '@asas/contracts'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
@@ -70,6 +75,41 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       return { data: settings }
     },
   )
+
+  // ── Billing and backups ──────────────────────────────────────────────────
+
+  server.get('/billing', {
+    preHandler: requireRole('MEMBER'),
+    schema: { response: { 200: envelope(billingSettingsSchema), ...errorResponses } },
+  }, async request => {
+    const { tenantId } = requireAuthContext(request)
+    return { data: await settingsController.getBilling(request.server.prisma, tenantId) }
+  })
+
+  server.get('/backups', {
+    preHandler: requireRole('MEMBER'),
+    schema: { response: { 200: envelope(backupSchedulesResponseSchema), ...errorResponses } },
+  }, async request => {
+    const { tenantId } = requireAuthContext(request)
+    return { data: await settingsController.listBackups(request.server.prisma, tenantId) }
+  })
+
+  server.post('/backups', {
+    preHandler: requirePermission('settings.billing.write'),
+    schema: { body: backupScheduleWriteSchema, response: { 201: envelope(backupScheduleSchema), ...errorResponses } },
+  }, async (request, reply) => {
+    const { tenantId } = requireAuthContext(request)
+    reply.code(201)
+    return { data: await settingsController.createBackup(request.server.prisma, tenantId, request.body) }
+  })
+
+  server.patch('/backups/:id', {
+    preHandler: requirePermission('settings.billing.write'),
+    schema: { params: idParamSchema, body: backupScheduleUpdateSchema, response: { 200: envelope(backupScheduleSchema), ...errorResponses } },
+  }, async request => {
+    const { tenantId } = requireAuthContext(request)
+    return { data: await settingsController.updateBackup(request.server.prisma, tenantId, request.params.id, request.body) }
+  })
 
   // ── Notifications ─────────────────────────────────────────────────────────
 
