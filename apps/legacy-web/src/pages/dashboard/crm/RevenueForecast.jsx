@@ -307,13 +307,14 @@ export default function RevenueForecast() {
           {/* Alerts & Shortfall */}
           <div className="col-span-4 flex flex-col gap-4">
 
-            {/* Warning Banner — marketing-style element with no data source in the old UI; kept as-is */}
-            <div className="bg-[#fef9c3] border border-[#fde047] rounded-xl p-4 flex items-center gap-3 shadow-sm">
-              <AlertTriangle size={20} className="text-[#a16207]" />
-              <p className="text-sm font-bold text-[#854d0e]">
-                At Risk: Acme Corp Upgrade ($218k) stalled.
-              </p>
-            </div>
+            {expectedShortfall > 0 && (
+              <div className="bg-[#fef9c3] border border-[#fde047] rounded-xl p-4 flex items-center gap-3 shadow-sm">
+                <AlertTriangle size={20} className="text-[#a16207]" />
+                <p className="text-sm font-bold text-[#854d0e]">
+                  Pipeline is below quota by {formatCurrency(expectedShortfall)}.
+                </p>
+              </div>
+            )}
 
             {/* Expected Shortfall Card — real: quota − closed-won */}
             <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex-1 flex flex-col justify-center relative overflow-hidden">
