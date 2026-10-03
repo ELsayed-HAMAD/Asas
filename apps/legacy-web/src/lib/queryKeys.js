@@ -107,6 +107,7 @@ export const queryKeys = {
     deals: resourceKeys(crmDealsBase),
     forecast: () => [...crmBase.all(), 'forecast'],
     salesPerformance: () => [...crmBase.all(), 'sales-performance'],
+    agenda: () => [...crmBase.all(), 'agenda'],
   },
 
   projects: {
@@ -149,6 +150,7 @@ export const queryKeys = {
 
   support: {
     ...supportBase,
+    tickets: () => [...supportBase.all(), 'tickets'],
   },
 
   onboarding: {

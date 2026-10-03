@@ -29,6 +29,9 @@ import type {
   DealStage,
   FunnelStage,
   MonthlyPipelineEntry,
+  AgendaItem,
+  AgendaItemUpdateInput,
+  AgendaItemWriteInput,
 } from '@asas/contracts'
 import { DealStageValues, buildPaginationMeta, toPrismaPage } from '@asas/contracts'
 import { AppError } from '../../utils/errors.js'
@@ -36,6 +39,35 @@ import { AppError } from '../../utils/errors.js'
 /** Stages that count as "open" pipeline — everything except the two terminal states. */
 const OPEN_STAGES: readonly DealStage[] = ['LEADS', 'PROPOSAL', 'NEGOTIATION']
 const CLOSED_STAGES: readonly DealStage[] = ['CLOSED_WON', 'CLOSED_LOST']
+
+function mapAgendaItem(row: { id: string; title: string; timeLabel: string | null; priority: string | null; done: boolean; createdAt: Date }): AgendaItem {
+  return { id: row.id, title: row.title, timeLabel: row.timeLabel, priority: row.priority, done: row.done, createdAt: row.createdAt.toISOString() }
+}
+
+export async function listAgendaItems(prisma: PrismaClient, tenantId: string): Promise<{ items: AgendaItem[] }> {
+  const rows = await prisma.agendaItem.findMany({ where: { tenantId }, orderBy: [{ done: 'asc' }, { createdAt: 'desc' }] })
+  return { items: rows.map(mapAgendaItem) }
+}
+
+export async function createAgendaItem(prisma: PrismaClient, tenantId: string, input: AgendaItemWriteInput): Promise<AgendaItem> {
+  const row = await prisma.agendaItem.create({ data: { tenantId, title: input.title, timeLabel: input.timeLabel ?? null, priority: input.priority ?? null, done: input.done ?? false } })
+  return mapAgendaItem(row)
+}
+
+export async function updateAgendaItem(prisma: PrismaClient, tenantId: string, id: string, input: AgendaItemUpdateInput): Promise<AgendaItem> {
+  const existing = await prisma.agendaItem.findFirst({ where: { id, tenantId } })
+  if (!existing) throw new AppError(404, 'Agenda item not found')
+  const row = await prisma.agendaItem.update({
+    where: { id },
+    data: {
+      ...(input.title !== undefined && { title: input.title }),
+      ...(input.timeLabel !== undefined && { timeLabel: input.timeLabel }),
+      ...(input.priority !== undefined && { priority: input.priority }),
+      ...(input.done !== undefined && { done: input.done }),
+    },
+  })
+  return mapAgendaItem(row)
+}
 
 const dealInclude = {
   company: { select: { name: true } },

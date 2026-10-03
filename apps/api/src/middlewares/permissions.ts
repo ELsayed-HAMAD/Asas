@@ -73,6 +73,7 @@ export const PERMISSIONS = {
   'settings.notifications.update': 'ADMIN',
   'settings.integration.write': 'ADMIN',
   'settings.billing.write': 'ADMIN',
+  'support.ticket.write': 'MEMBER',
 } as const satisfies Record<string, UserRole>
 
 export type Permission = keyof typeof PERMISSIONS

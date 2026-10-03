@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Search,
   Bell,
@@ -7,7 +7,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { crmApi } from '../../../lib/api/crm';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney, formatPercent } from '../../../lib/format';
@@ -27,6 +27,8 @@ const formatCompact = (v) => {
 };
 
 export default function CRMOverview() {
+  const queryClient = useQueryClient()
+  const [agendaTitle, setAgendaTitle] = useState('')
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.crm.overview(),
     queryFn: crmApi.getOverview,
@@ -40,6 +42,11 @@ export default function CRMOverview() {
     queryKey: queryKeys.crm.forecast(),
     queryFn: crmApi.getForecast,
   });
+  const { data: agenda } = useQuery({ queryKey: queryKeys.crm.agenda(), queryFn: crmApi.listAgenda })
+  const createAgenda = useMutation({
+    mutationFn: () => crmApi.createAgenda({ title: agendaTitle.trim() }),
+    onSuccess: () => { setAgendaTitle(''); queryClient.invalidateQueries({ queryKey: queryKeys.crm.agenda() }) },
+  })
 
   if (isLoading) {
     return (
@@ -283,13 +290,14 @@ export default function CRMOverview() {
         {/* ── Bottom Row ── */}
         <div className="grid grid-cols-2 gap-4">
 
-          {/* Daily agenda has no backend source yet. */}
+          {/* Daily agenda backed by tenant-scoped AgendaItem records. */}
           <div className="bg-surface-raised border border-border-default rounded-card-sm shadow-card p-6">
             <h2 className="text-lg font-bold text-heading mb-6">Daily Agenda</h2>
-            <EmptyState
-              title="No agenda items"
-              description="Calendar and task integrations are not connected to this workspace."
-            />
+            <div className="mb-5 flex gap-2">
+              <input value={agendaTitle} onChange={event => setAgendaTitle(event.target.value)} placeholder="Add an agenda item" className="min-w-0 flex-1 rounded-input border border-border-default px-3 py-2 text-sm" />
+              <button type="button" disabled={!agendaTitle.trim() || createAgenda.isPending} onClick={() => createAgenda.mutate()} className="rounded-input bg-primary px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">Add</button>
+            </div>
+            {agenda?.items?.length ? <div className="space-y-3">{agenda.items.map(item => <div key={item.id} className="flex items-center gap-3 border-b border-border-subtle pb-3"><input type="checkbox" checked={item.done} onChange={() => crmApi.updateAgenda(item.id, { done: !item.done }).then(() => queryClient.invalidateQueries({ queryKey: queryKeys.crm.agenda() }))} /><span className={item.done ? 'text-sm text-muted line-through' : 'text-sm font-medium text-heading'}>{item.title}</span></div>)}</div> : <EmptyState title="No agenda items" description="Add a task for this workspace." />}
           </div>
 
           {/* Recent Activity — the CRM API has no activity feed; honest empty state */}

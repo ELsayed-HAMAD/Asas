@@ -16,6 +16,9 @@ import type {
   DealListQuery,
   DealUpdateInput,
   DealWriteInput,
+  AgendaItem,
+  AgendaItemUpdateInput,
+  AgendaItemWriteInput,
 } from '@asas/contracts'
 import * as service from './crm.service.js'
 
@@ -69,4 +72,16 @@ export function updateDeal(
   input: DealUpdateInput,
 ): Promise<Deal> {
   return service.updateDeal(prisma, tenantId, id, input)
+}
+
+export function listAgenda(prisma: PrismaClient, tenantId: string): Promise<{ items: AgendaItem[] }> {
+  return service.listAgendaItems(prisma, tenantId)
+}
+
+export function createAgenda(prisma: PrismaClient, tenantId: string, input: AgendaItemWriteInput): Promise<AgendaItem> {
+  return service.createAgendaItem(prisma, tenantId, input)
+}
+
+export function updateAgenda(prisma: PrismaClient, tenantId: string, id: string, input: AgendaItemUpdateInput): Promise<AgendaItem> {
+  return service.updateAgendaItem(prisma, tenantId, id, input)
 }
