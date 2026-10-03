@@ -26,6 +26,7 @@ export const projectsApi = {
 
   /** GET /projects/sprints/:id/issues — the work items a sprint burndowns. */
   getIssues: (sprintId) => http.get(`/projects/sprints/${sprintId}/issues`),
+  updateIssue: (id, patch) => http.patch(`/projects/issues/${id}`, { body: patch }),
 
   /** GET /projects/roadmap — ordered phases with their dated tasks. */
   getRoadmap: () => http.get('/projects/roadmap'),
