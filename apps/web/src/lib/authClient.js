@@ -7,7 +7,7 @@ import { organizationClient } from 'better-auth/client/plugins'
  * the app root, since better-auth serves everything under that one catch-all route.
  *
  * `credentials: 'include'` is required for the httpOnly session cookie to be sent cross-origin
- * (API on :4000, this app on :5174 in dev) — the replacement for the legacy app's
+ * (API on :4000, this app on :5173 in dev) — the single official frontend's
  * `localStorage` JWT + `Authorization` header.
  */
 export const authClient = createAuthClient({

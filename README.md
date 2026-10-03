@@ -57,7 +57,7 @@ asas/
 | Contracts | Zod → `fastify-type-provider-zod` → shared `@asas/contracts` |
 | Jobs | pg-boss (Postgres-backed) for PDF / export / email |
 | Real-time | SSE push for cross-tab cache invalidation |
-| Testing | Vitest (unit/domain/API), browser verification against `apps/legacy-web` |
+| Testing | Vitest (unit/domain/API), browser verification against `apps/web` |
 
 ### Key Design Decisions
 
@@ -84,7 +84,7 @@ pnpm install
 
 # Copy environment templates
 cp apps/api/.env.example apps/api/.env   # set DATABASE_URL, BETTER_AUTH_SECRET
-cp apps/legacy-web/.env.example apps/legacy-web/.env   # set VITE_API_URL
+cp apps/web/.env.example apps/web/.env   # set VITE_API_URL
 
 # Generate Prisma client
 pnpm --filter @asas/api run prisma:generate
@@ -92,7 +92,7 @@ pnpm --filter @asas/api run prisma:generate
 # Run migrations (requires a running Postgres)
 pnpm --filter @asas/api run prisma:migrate
 
-# Start the dev servers (API on :4000, legacy web on :5174)
+# Start the dev servers (API on :4000, web on :5173)
 pnpm dev
 ```
 
@@ -116,7 +116,7 @@ The following environment variables are required for the API (`apps/api/.env`):
 | `BETTER_AUTH_SECRET` | Secret for session signing (min 32 chars) | (generate with `openssl rand -base64 32`) |
 | `PORT` | API server port | `4000` |
 
-The following environment variables are required for the frontend (`apps/legacy-web/.env`):
+The following environment variables are required for the frontend (`apps/web/.env`):
 
 | Variable | Description | Example |
 |---|---|---|
