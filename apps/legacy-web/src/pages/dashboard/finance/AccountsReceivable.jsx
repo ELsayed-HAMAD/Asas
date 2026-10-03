@@ -4,7 +4,7 @@ import {
   CheckSquare, Square, FileText, Paperclip, Phone,
   CircleDot, Circle, Loader2
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../../../lib/api/finance';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney } from '../../../lib/format';
@@ -16,6 +16,7 @@ const money = (v) => formatMoney(v, { minimumFractionDigits: 0 });
 const DAY = 1000 * 60 * 60 * 24;
 
 export default function AccountsReceivable() {
+  const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState(null);
 
   const { data, isLoading, isError } = useQuery({
@@ -26,6 +27,10 @@ export default function AccountsReceivable() {
   const { data: customersData } = useQuery({
     queryKey: [...queryKeys.finance.all(), 'customers'],
     queryFn: financeApi.listCustomers,
+  });
+  const paymentMutation = useMutation({
+    mutationFn: (invoiceId) => financeApi.updateReceivableStatus(invoiceId, 'PAID'),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.finance.receivables.all() }),
   });
 
   const items = data?.items || [];
@@ -255,7 +260,7 @@ export default function AccountsReceivable() {
                     View History
                   </button>
                 ) : (
-                  <button disabled className="bg-primary text-white px-4 py-2 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60">
+                  <button disabled={!selectedInvoices[0] || paymentMutation.isPending} onClick={() => paymentMutation.mutate(selectedInvoices[0].id)} className="bg-primary text-white px-4 py-2 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60">
                     Log Payment
                   </button>
                 )}
@@ -310,7 +315,7 @@ export default function AccountsReceivable() {
                       </div>
                       <div className="flex items-center gap-4">
                         <span className="text-sm font-bold text-heading tabular-nums">{money(inv.amount)}</span>
-                        <button disabled className="flex items-center gap-1 border border-border-strong rounded px-2.5 py-1 text-xs font-semibold text-body hover:bg-surface-muted transition-colors bg-surface-raised disabled:opacity-60">
+                        <button disabled={paymentMutation.isPending || inv.status === 'PAID'} onClick={() => paymentMutation.mutate(inv.id)} className="flex items-center gap-1 border border-border-strong rounded px-2.5 py-1 text-xs font-semibold text-body hover:bg-surface-muted transition-colors bg-surface-raised disabled:opacity-60">
                           Action <ChevronDown size={12} className="text-caption" />
                         </button>
                       </div>
