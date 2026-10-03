@@ -27,4 +27,7 @@ export const financeApi = {
 
   /** GET /finance/customers — { items } (receivables master data). */
   listCustomers: () => http.get('/finance/customers'),
+
+  /** POST /finance/payables/:id/status — approve, schedule, pay, or reject an invoice. */
+  updatePayableStatus: (id, status) => http.post(`/finance/payables/${id}/status`, { body: { status } }),
 }
