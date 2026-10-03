@@ -50,14 +50,14 @@ const DEFAULT_PREFERENCES = { inApp: true, email: true, slack: false };
 const getPreviewData = (event) => {
   switch (event) {
     case 'sprint':
-      return { title: 'Action Required: Sprint Milestone', desc: 'Q3 Expansion milestone "Beta Release" is due today.', btn: 'View in Jira', icon: 'S', color: 'bg-accent' };
+      return { title: 'Action Required: Sprint Milestone', desc: 'A sprint milestone is ready for review.', btn: 'Review milestone', icon: 'S', color: 'bg-accent' };
     case 'system':
-      return { title: 'Security Alert: New Login', desc: 'A new login was detected from IP 192.168.1.1 in Berlin, DE.', btn: 'Review Activity', icon: '!', color: 'bg-danger' };
+      return { title: 'Security Alert: New Login', desc: 'A new login was detected and needs review.', btn: 'Review activity', icon: '!', color: 'bg-danger' };
     case 'risk':
-      return { title: 'Risk Escalation: Delay', desc: 'Project Alpha has been flagged as high risk due to resource constraints.', btn: 'View Risk Matrix', icon: 'R', color: 'bg-warning' };
+      return { title: 'Risk Escalation: Delay', desc: 'A project risk has been escalated for review.', btn: 'Review risk', icon: 'R', color: 'bg-warning' };
     case 'invoice':
     default:
-      return { title: 'Action Required: Invoice Approval', desc: 'SysTech Automations submitted an invoice for $125,000.', btn: 'Review in Dashboard', icon: 'A', color: 'bg-primary' };
+      return { title: 'Action Required: Invoice Approval', desc: 'An invoice is waiting for approval.', btn: 'Review invoice', icon: 'A', color: 'bg-primary' };
   }
 };
 
