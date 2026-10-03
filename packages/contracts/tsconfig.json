@@ -1,0 +1,10 @@
+{
+  // Editor + `typecheck` config. Covers tests and the codegen scripts so a broken generator
+  // fails CI. `tsconfig.build.json` is the one that emits.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "scripts/**/*.ts"]
+}

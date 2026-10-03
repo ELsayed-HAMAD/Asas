@@ -1,0 +1,48 @@
+{
+  "name": "@asas/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/server.js",
+  "scripts": {
+    "predev": "pnpm --filter @asas/domain build && pnpm --filter @asas/contracts build",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@asas/contracts": "workspace:*",
+    "@asas/domain": "workspace:*",
+    "@fastify/cors": "^11.0.0",
+    "@fastify/helmet": "^13.1.1",
+    "@fastify/rate-limit": "^11.2.0",
+    "@fastify/swagger": "^9.8.1",
+    "@fastify/swagger-ui": "^6.1.1",
+    "@prisma/client": "6.19.3",
+    "@sentry/node": "^9.12.0",
+    "better-auth": "^1.7.2",
+    "dotenv": "16.4.7",
+    "exceljs": "4.4.0",
+    "fastify": "^5.2.1",
+    "fastify-type-provider-zod": "^7.0.0",
+    "pdfkit": "0.17.1",
+    "pg-boss": "10.1.5",
+    "pino": "^10.0.0",
+    "zod": "^4.5.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.0",
+    "prisma": "6.19.3",
+    "tsx": "4.19.3",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}

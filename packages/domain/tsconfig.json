@@ -1,0 +1,10 @@
+{
+  // Editor + `typecheck` config: covers tests too, so a broken assertion type fails CI rather
+  // than sitting unnoticed. `tsconfig.build.json` is the one that emits.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"]
+}

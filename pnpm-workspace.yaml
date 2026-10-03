@@ -1,0 +1,13 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+# These packages ship install scripts required at runtime (Prisma downloads its query engine
+# binary; esbuild needs its native binary). pnpm 11 blocks build scripts by default, so allow
+# the ones this workspace genuinely needs.
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  esbuild: true
+  prisma: true
+minimumReleaseAgeExclude:
+  - zod@4.5.2
