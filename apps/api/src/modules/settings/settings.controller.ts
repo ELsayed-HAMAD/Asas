@@ -8,6 +8,10 @@ import type {
   IntegrationWriteInput,
   NotificationSettings,
   NotificationSettingsUpdateInput,
+  BackupSchedule,
+  BackupScheduleUpdateInput,
+  BackupScheduleWriteInput,
+  BillingSettings,
 } from '@asas/contracts'
 import * as settingsService from './settings.service.js'
 
@@ -65,9 +69,27 @@ export function updateIntegration(
   return settingsService.updateIntegration(prisma, tenantId, id, input)
 }
 
+export function getBilling(prisma: PrismaClient, tenantId: string): Promise<BillingSettings> {
+  return settingsService.getBillingSettings(prisma, tenantId)
+}
+
+export function listBackups(prisma: PrismaClient, tenantId: string): Promise<{ items: BackupSchedule[] }> {
+  return settingsService.listBackupSchedules(prisma, tenantId)
+}
+
+export function createBackup(prisma: PrismaClient, tenantId: string, input: BackupScheduleWriteInput): Promise<BackupSchedule> {
+  return settingsService.createBackupSchedule(prisma, tenantId, input)
+}
+
+export function updateBackup(prisma: PrismaClient, tenantId: string, id: string, input: BackupScheduleUpdateInput): Promise<BackupSchedule> {
+  return settingsService.updateBackupSchedule(prisma, tenantId, id, input)
+}
+
 export type {
   GeneralSettings,
   Integration,
   IntegrationsListResponse,
   NotificationSettings,
+  BackupSchedule,
+  BillingSettings,
 }

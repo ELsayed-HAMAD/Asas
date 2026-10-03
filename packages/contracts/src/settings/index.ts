@@ -188,3 +188,70 @@ export const integrationsListResponseSchema = z.object({
 })
 
 export type IntegrationsListResponse = z.infer<typeof integrationsListResponseSchema>
+
+// ── Billing and backups ────────────────────────────────────────────────────
+
+export const subscriptionSchema = z.object({
+  id: idSchema,
+  planName: shortTextSchema,
+  priceMonthly: z.string(),
+  status: z.string(),
+  renewsOn: isoDateTimeSchema.nullable(),
+  seatsUsed: z.int().min(0),
+  seatLimit: z.int().min(0),
+  storageUsedGb: z.number().min(0),
+  storageLimitGb: z.number().min(0),
+})
+
+export const paymentMethodSchema = z.object({
+  id: idSchema,
+  brand: shortTextSchema,
+  last4: z.string().regex(/^\d{4}$/),
+  expires: z.string().nullable(),
+})
+
+export const billingInvoiceSchema = z.object({
+  id: idSchema,
+  date: isoDateTimeSchema,
+  description: shortTextSchema,
+  amount: z.string(),
+  status: shortTextSchema,
+})
+
+export const billingSettingsSchema = z.object({
+  subscriptions: z.array(subscriptionSchema),
+  paymentMethods: z.array(paymentMethodSchema),
+  invoices: z.array(billingInvoiceSchema),
+})
+
+export type BillingSettings = z.infer<typeof billingSettingsSchema>
+
+export const backupScheduleSchema = z.object({
+  id: idSchema,
+  name: shortTextSchema,
+  schedule: shortTextSchema,
+  enabled: z.boolean(),
+  createdAt: isoDateTimeSchema,
+})
+
+export const backupScheduleWriteSchema = z.object({
+  name: shortTextSchema,
+  schedule: shortTextSchema,
+  enabled: z.boolean().optional(),
+})
+
+export const backupScheduleUpdateSchema = z
+  .object({
+    name: shortTextSchema.optional(),
+    schedule: shortTextSchema.optional(),
+    enabled: z.boolean().optional(),
+  })
+  .refine(value => Object.keys(value).length > 0, { message: 'At least one field is required' })
+
+export const backupSchedulesResponseSchema = z.object({
+  items: z.array(backupScheduleSchema),
+})
+
+export type BackupSchedule = z.infer<typeof backupScheduleSchema>
+export type BackupScheduleWriteInput = z.infer<typeof backupScheduleWriteSchema>
+export type BackupScheduleUpdateInput = z.infer<typeof backupScheduleUpdateSchema>

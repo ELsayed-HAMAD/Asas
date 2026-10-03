@@ -12,6 +12,7 @@ import TopBarActions from '../../../components/TopBarActions';
 import SettingsTabs from './SettingsTabs';
 import { exportsApi } from '../../../lib/api/exports';
 import { queryKeys } from '../../../lib/queryKeys';
+import { settingsApi } from '../../../lib/api/settings';
 
 /**
  * The legacy "Data Scope" options had no 1:1 mapping to the backend's two export kinds
@@ -40,6 +41,11 @@ export default function SettingsDataExport() {
       const items = query.state.data?.items ?? [];
       return items.some((j) => j.status === 'RUNNING' || j.status === 'QUEUED') ? 1500 : false;
     },
+  });
+  const backupsQuery = useQuery({ queryKey: queryKeys.settings.backups(), queryFn: settingsApi.listBackups });
+  const backupMutation = useMutation({
+    mutationFn: () => settingsApi.createBackup({ name: 'Workspace backup', schedule: 'Weekly' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.settings.backups() }),
   });
 
   const createMutation = useMutation({
@@ -186,15 +192,13 @@ export default function SettingsDataExport() {
             </div>
           </div>
 
-          {/* Scheduled Backups Card (no backend endpoint — the legacy page's empty state) */}
+          {/* Scheduled Backups */}
           <div className="bg-surface-raised border border-border-default rounded-card-sm p-card shadow-card">
             <h2 className="text-lg font-bold text-heading mb-6">Scheduled Backups</h2>
 
             <div className="space-y-6">
-              <div className="flex flex-col items-center justify-center text-sm text-muted py-8 text-center">
-                <Calendar size={32} className="opacity-20 mb-3" />
-                No scheduled backups configured.
-              </div>
+              {backupsQuery.data?.items?.length ? backupsQuery.data.items.map(backup => <div key={backup.id} className="flex items-center justify-between border border-border-subtle rounded-button p-4"><div><p className="text-sm font-semibold text-heading">{backup.name}</p><p className="text-xs text-muted">{backup.schedule} · {backup.enabled ? 'Enabled' : 'Disabled'}</p></div><button type="button" onClick={() => settingsApi.updateBackup(backup.id, { enabled: !backup.enabled }).then(() => queryClient.invalidateQueries({ queryKey: queryKeys.settings.backups() }))} className="text-xs font-semibold text-accent">{backup.enabled ? 'Disable' : 'Enable'}</button></div>) : <div className="flex flex-col items-center justify-center text-sm text-muted py-8 text-center"><Calendar size={32} className="opacity-20 mb-3" />No scheduled backups configured.</div>}
+              <button type="button" onClick={() => backupMutation.mutate()} disabled={backupMutation.isPending} className="bg-primary text-on-primary px-4 py-2 rounded-input text-sm font-semibold disabled:opacity-60">{backupMutation.isPending ? 'Creating...' : 'Create weekly backup'}</button>
             </div>
           </div>
 
