@@ -4,8 +4,6 @@ import {
   Bell,
   Moon,
   MoreHorizontal,
-  Square,
-  CheckSquare,
   Loader2
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
@@ -14,6 +12,7 @@ import { crmApi } from '../../../lib/api/crm';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney, formatPercent } from '../../../lib/format';
 import TopBarActions from '../../../components/TopBarActions';
+import EmptyState from '../../../components/common/EmptyState';
 
 // Chart-only number formatters (axis ticks / tooltips). Money arrives as
 // { amount: minor units, currency } — reduce to a major-unit number for the scale.
@@ -284,43 +283,13 @@ export default function CRMOverview() {
         {/* ── Bottom Row ── */}
         <div className="grid grid-cols-2 gap-4">
 
-          {/* Daily Agenda — marketing-style block with no data source in the old UI; kept as-is */}
+          {/* Daily agenda has no backend source yet. */}
           <div className="bg-surface-raised border border-border-default rounded-card-sm shadow-card p-6">
             <h2 className="text-lg font-bold text-heading mb-6">Daily Agenda</h2>
-            <div className="space-y-6">
-
-              <div className="flex items-start gap-4 opacity-50">
-                <CheckSquare size={18} className="text-muted mt-0.5 cursor-pointer" fill="#f3f4f6" />
-                <div>
-                  <p className="text-sm font-medium text-muted mb-1 line-through">Review weekly pipeline report</p>
-                  <span className="text-xs text-caption font-medium">9:00 AM</span>
-                </div>
-              </div>
-
-              <div className="w-full h-px bg-surface-active"></div>
-
-              <div className="flex items-start gap-4">
-                <Square size={18} className="text-faint mt-0.5 cursor-pointer" />
-                <div>
-                  <p className="text-sm font-medium text-heading mb-1">Call Jane Doe regarding Q3 Proposal</p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted font-medium">10:00 AM</span>
-                    <span className="bg-surface-active border border-border-default text-muted text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">High</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="w-full h-px bg-surface-active"></div>
-
-              <div className="flex items-start gap-4">
-                <Square size={18} className="text-faint mt-0.5 cursor-pointer" />
-                <div>
-                  <p className="text-sm font-medium text-heading mb-1">Send updated contract to Acme Corp</p>
-                  <span className="text-xs text-muted font-medium">1:30 PM</span>
-                </div>
-              </div>
-
-            </div>
+            <EmptyState
+              title="No agenda items"
+              description="Calendar and task integrations are not connected to this workspace."
+            />
           </div>
 
           {/* Recent Activity — the CRM API has no activity feed; honest empty state */}
