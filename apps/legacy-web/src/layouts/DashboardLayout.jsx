@@ -257,7 +257,16 @@ function SidebarContent({ navProps, navigate }) {
     setSwitchingOrgId(organizationId)
     setOrgSwitchError('')
     try {
-      await authClient.organization.setActive({ organizationId })
+      // better-fetch resolves (rather than throws) with { data, error } on a
+      // non-OK HTTP response, so a server-side rejection (e.g. 403 not a member)
+      // does NOT hit the catch below — check the resolved error explicitly before
+      // committing to the clear + hard reload.
+      const res = await authClient.organization.setActive({ organizationId })
+      if (res?.error) {
+        setOrgSwitchError(res.error?.message || 'Could not switch workspace')
+        setSwitchingOrgId(null)
+        return
+      }
       queryClient.clear()
       window.location.assign('/dashboard')
     } catch (err) {

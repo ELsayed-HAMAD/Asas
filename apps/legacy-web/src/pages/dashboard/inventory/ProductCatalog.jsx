@@ -228,6 +228,12 @@ export default function Inventory() {
       setMovementError('Quantity must be a whole number greater than 0.');
       return;
     }
+    // The contract keeps stock non-negative (`stock: z.int().min(0)`); the server does not
+    // clamp an over-issue, so surface it here instead of recording a negative on-hand count.
+    if (movementForm.kind === 'issue' && qtyN > selectedProduct.stock) {
+      setMovementError(`Only ${selectedProduct.stock} unit${selectedProduct.stock === 1 ? '' : 's'} on hand — cannot issue ${qtyN}.`);
+      return;
+    }
     recordMovementMutation.mutate({
       productId: selectedProduct.id,
       delta: movementForm.kind === 'receive' ? qtyN : -qtyN,
