@@ -16,6 +16,7 @@ import type {
   AttendanceSummary,
   LeaveRequestRow,
   LeaveRequestWriteInput,
+  TimesheetRow,
 } from '@asas/contracts'
 import { AppError } from '../../utils/errors.js'
 
@@ -72,12 +73,14 @@ async function computeAttendanceSummary(
   prisma: PrismaClient,
   tenantId: string,
 ): Promise<AttendanceSummary> {
-  const [exceptionCount, onLeaveCount, timesheetDayCount] = await Promise.all([
+  const [exceptionCount, onLeaveCount, timesheetDayCount, timesheetCount, overtime] = await Promise.all([
     prisma.attendanceException.count({ where: { tenantId } }),
     prisma.employee.count({ where: { tenantId, status: 'ON_LEAVE' } }),
     prisma.timesheetDay.count({
       where: { timesheet: { tenantId } },
     }),
+    prisma.timesheet.count({ where: { tenantId } }),
+    prisma.timesheet.aggregate({ where: { tenantId }, _sum: { overtimeHours: true } }),
   ])
 
   const attendanceRate =
@@ -85,14 +88,27 @@ async function computeAttendanceSummary(
       ? null
       : Math.round((100 * (1 - exceptionCount / timesheetDayCount)) * 100) / 100
 
-  return { exceptionCount, onLeaveCount, attendanceRate }
+  return { exceptionCount, onLeaveCount, attendanceRate, timesheetCount, overtimeHours: overtime._sum.overtimeHours ?? 0 }
+}
+
+function mapTimesheet(row: Prisma.TimesheetGetPayload<{ include: { employee: { select: { name: true } }; days: true } }>): TimesheetRow {
+  return {
+    id: row.id,
+    employeeId: row.employeeId,
+    employeeName: row.employee.name,
+    weekStart: row.weekStart.toISOString().slice(0, 10),
+    regularHours: row.regularHours,
+    overtimeHours: row.overtimeHours,
+    totalHours: row.totalHours,
+    days: row.days.map(day => ({ id: day.id, dayLabel: day.dayLabel, clockIn: day.clockIn, clockOut: day.clockOut, totalHours: day.totalHours })),
+  }
 }
 
 export async function listAttendance(
   prisma: PrismaClient,
   tenantId: string,
 ): Promise<AttendanceResponse> {
-  const [exceptions, leaveRequests, summary] = await Promise.all([
+  const [exceptions, leaveRequests, timesheets, summary] = await Promise.all([
     prisma.attendanceException.findMany({
       where: { tenantId },
       orderBy: { date: 'desc' },
@@ -105,12 +121,19 @@ export async function listAttendance(
       take: 100,
       include: { employee: { select: { name: true, avatarUrl: true } } },
     }),
+    prisma.timesheet.findMany({
+      where: { tenantId },
+      orderBy: { weekStart: 'desc' },
+      take: 100,
+      include: { employee: { select: { name: true } }, days: true },
+    }),
     computeAttendanceSummary(prisma, tenantId),
   ])
 
   return {
     exceptions: exceptions.map(mapException),
     leaveRequests: leaveRequests.map(mapLeaveRequest),
+    timesheets: timesheets.map(mapTimesheet),
     summary,
   }
 }
