@@ -63,9 +63,9 @@ const DASHBOARD_PATHS = [
   '/dashboard/hr/employees', '/dashboard/hr/payroll', '/dashboard/hr/time-attendance', '/dashboard/hr/recruitment',
   '/dashboard/finance', '/dashboard/finance/accounts-payable', '/dashboard/finance/accounts-receivable', '/dashboard/finance/expenses',
   '/dashboard/crm', '/dashboard/crm/deals', '/dashboard/crm/sales-performance', '/dashboard/crm/revenue-forecast',
-  '/dashboard/inventory',
+  '/dashboard/inventory', '/dashboard/inventory/movements',
   '/dashboard/projects', '/dashboard/projects/sprints', '/dashboard/projects/roadmap',
-  '/dashboard/settings', '/dashboard/settings/billing', '/dashboard/settings/integrations', '/dashboard/settings/notifications', '/dashboard/settings/data-export',
+  '/dashboard/settings', '/dashboard/settings/billing', '/dashboard/settings/integrations', '/dashboard/settings/notifications', '/dashboard/settings/data-export', '/dashboard/exports',
   '/dashboard/support',
 ]
 
@@ -85,6 +85,7 @@ const REAL_PAGES = {
   '/dashboard/crm/sales-performance': SalesPerformance,
   '/dashboard/crm/revenue-forecast': RevenueForecast,
   '/dashboard/inventory': ProductCatalog,
+  '/dashboard/inventory/movements': ProductCatalog,
   '/dashboard/projects': PortfolioOverview,
   '/dashboard/projects/sprints': ActiveSprints,
   '/dashboard/projects/roadmap': Roadmap,
@@ -93,6 +94,7 @@ const REAL_PAGES = {
   '/dashboard/settings/integrations': Integrations,
   '/dashboard/settings/notifications': Notifications,
   '/dashboard/settings/data-export': DataExport,
+  '/dashboard/exports': DataExport,
   '/dashboard/support': HelpCenter,
 }
 

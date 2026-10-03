@@ -11,6 +11,8 @@ import {
   Loader2
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 import { crmApi } from '../../../lib/api/crm';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney, formatDate } from '../../../lib/format';
@@ -59,6 +61,62 @@ const initials = (deal) => {
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[1][0]).toUpperCase();
 };
+
+function DraggableDealRow({ deal, selected, onSelect, disabled }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform) }}
+      {...listeners}
+      {...attributes}
+      onClick={() => onSelect(deal.id)}
+      className={`grid grid-cols-12 items-center px-6 py-4 cursor-grab transition-colors ${
+        selected ? 'bg-surface-raised border-l-4 border-l-blue-600' : 'bg-surface-raised hover:bg-surface-muted border-l-4 border-l-transparent'
+      } ${isDragging || disabled ? 'opacity-60' : ''}`}
+    >
+      <div className="col-span-6 flex items-center gap-3">
+        <div className="w-8 h-8 rounded shrink-0 flex items-center justify-center text-xs font-bold bg-surface-strong text-body">
+          {initials(deal)}
+        </div>
+        <div>
+          <p className="text-sm font-bold text-heading leading-tight">{deal.name}</p>
+          <p className="text-[11px] font-medium text-muted mt-0.5">{deal.company || (deal.owner?.name || 'No company')}</p>
+        </div>
+      </div>
+      <div className="col-span-3 flex justify-center">
+        <span className={`inline-flex px-3 py-1 text-[11px] font-semibold rounded-full border ${getStageBadgeColors(deal.stage)}`}>
+          {STAGE_LABELS[deal.stage] || deal.stage}
+        </span>
+      </div>
+      <div className="col-span-3 text-right">
+        <span className="text-sm font-bold text-heading tabular-nums">{formatMoney(deal.value)}</span>
+      </div>
+    </div>
+  );
+}
+
+function DealStageGroup({ group, selectedId, onSelect, disabled }) {
+  const { setNodeRef, isOver } = useDroppable({ id: group.stage });
+  return (
+    <div ref={setNodeRef} className={isOver ? 'bg-accent-light/40' : ''}>
+      <div className="flex items-center justify-between px-6 py-2 bg-surface-muted/80 border-b border-border-default">
+        <span className="text-[10px] font-bold text-muted uppercase tracking-wider">
+          {STAGE_LABELS[group.stage]} · {group.deals.length} {group.deals.length === 1 ? 'Deal' : 'Deals'}
+        </span>
+        <span className="text-[11px] font-bold text-body-light tabular-nums">
+          {formatMoney({ amount: group.deals.reduce((sum, deal) => sum + (deal.value?.amount ?? 0), 0), currency: group.deals[0].value?.currency })}
+        </span>
+      </div>
+      <div className="divide-y divide-border-subtle">
+        {group.deals.map(deal => (
+          <DraggableDealRow key={deal.id} deal={deal} selected={selectedId === deal.id} onSelect={onSelect} disabled={disabled} />
+        ))}
+        {group.deals.length === 0 && <p className="px-6 py-4 text-center text-xs text-muted">No deals</p>}
+      </div>
+    </div>
+  );
+}
 
 export default function DealsPipeline() {
   const [selectedId, setSelectedId] = useState(null);
@@ -111,6 +169,15 @@ export default function DealsPipeline() {
       });
     },
   });
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+
+  const handleDragEnd = (event) => {
+    if (!canWrite || !event.over) return;
+    const deal = deals.find(item => item.id === event.active.id);
+    const nextStage = event.over.id;
+    if (!deal || !STAGE_ORDER.includes(nextStage) || deal.stage === nextStage) return;
+    stageMutation.mutate({ id: deal.id, stage: nextStage });
+  };
 
   const openNewDealDialog = () => {
     setFormError(null);
@@ -155,14 +222,11 @@ export default function DealsPipeline() {
 
   const deals = data.items || [];
 
-  // Group by real stage (server order), skipping empty stages. Group value is the
-  // page-local sum of stored deal values; count/value badges come from the server
-  // `summary` where it covers the same set (open totals).
+  // Keep every stage visible so an empty column is still a valid drop target.
   const groups = STAGE_ORDER
-    .map((stage) => ({ stage, deals: deals.filter((d) => d.stage === stage) }))
-    .filter((g) => g.deals.length > 0);
+    .map((stage) => ({ stage, deals: deals.filter((d) => d.stage === stage) }));
 
-  const firstDeal = groups.length > 0 ? groups[0].deals[0] : null;
+  const firstDeal = groups.find(group => group.deals.length > 0)?.deals[0] || null;
   const effectiveSelectedId = selectedId || (firstDeal ? firstDeal.id : null);
   const selectedDeal = deals.find((d) => d.id === effectiveSelectedId) || null;
 
@@ -217,57 +281,17 @@ export default function DealsPipeline() {
             {groups.length === 0 ? (
                <div className="p-8 text-center text-muted text-sm">No deals found.</div>
             ) : (
-              groups.map((group) => (
-                <div key={group.stage}>
-                  {/* Group Header */}
-                  <div className="flex items-center justify-between px-6 py-2 bg-surface-muted/80 border-b border-border-default">
-                    <span className="text-[10px] font-bold text-muted uppercase tracking-wider">
-                      {STAGE_LABELS[group.stage]} · {group.deals.length} {group.deals.length === 1 ? 'Deal' : 'Deals'}
-                    </span>
-                    <span className="text-[11px] font-bold text-body-light tabular-nums">
-                      {formatMoney({ amount: group.deals.reduce((sum, d) => sum + (d.value?.amount ?? 0), 0), currency: group.deals[0].value?.currency })}
-                    </span>
-                  </div>
-
-                  {/* Deal Rows */}
-                  <div className="divide-y divide-border-subtle">
-                    {group.deals.map((deal) => {
-                      const isSelected = effectiveSelectedId === deal.id;
-                      return (
-                        <div
-                          key={deal.id}
-                          onClick={() => setSelectedId(deal.id)}
-                          className={`grid grid-cols-12 items-center px-6 py-4 cursor-pointer transition-colors ${
-                            isSelected ? 'bg-surface-raised border-l-4 border-l-blue-600' : 'bg-surface-raised hover:bg-surface-muted border-l-4 border-l-transparent'
-                          }`}
-                        >
-                          <div className="col-span-6 flex items-center gap-3">
-                            <div className="w-8 h-8 rounded shrink-0 flex items-center justify-center text-xs font-bold bg-surface-strong text-body">
-                              {initials(deal)}
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold text-heading leading-tight">{deal.name}</p>
-                              <p className="text-[11px] font-medium text-muted mt-0.5">{deal.company || (deal.owner?.name || 'No company')}</p>
-                            </div>
-                          </div>
-
-                          <div className="col-span-3 flex justify-center">
-                            <span className={`inline-flex px-3 py-1 text-[11px] font-semibold rounded-full border ${getStageBadgeColors(deal.stage)}`}>
-                              {STAGE_LABELS[deal.stage] || deal.stage}
-                            </span>
-                        </div>
-
-                        <div className="col-span-3 text-right">
-                          <span className="text-sm font-bold text-heading tabular-nums">
-                            {formatMoney(deal.value)}
-                          </span>
-                        </div>
-                      </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))
+              <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+                {groups.map(group => (
+                  <DealStageGroup
+                    key={group.stage}
+                    group={group}
+                    selectedId={effectiveSelectedId}
+                    onSelect={setSelectedId}
+                    disabled={stageMutation.isPending || !canWrite}
+                  />
+                ))}
+              </DndContext>
             )}
           </div>
         </div>

@@ -6,7 +6,10 @@ import App from './App'
 import { useSession, useActiveOrganization } from './lib/authClient'
 import { startSse } from './lib/sse'
 import { setFormatDefaults } from './lib/format'
+import { initSentry } from './lib/sentry'
 import './index.css'
+
+initSentry()
 
 class ErrorBoundary extends React.Component {
   constructor(props) {

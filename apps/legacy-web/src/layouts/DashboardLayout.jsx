@@ -60,7 +60,10 @@ const NAV = [
     id: 'inventory',
     label: 'Inventory',
     icon: Package,
-    path: '/dashboard/inventory',
+    children: [
+      { label: 'Product Catalog', path: '/dashboard/inventory' },
+      { label: 'Stock Movements', path: '/dashboard/inventory/movements' },
+    ],
   },
   {
     id: 'projects',
@@ -86,6 +89,12 @@ const BOTTOM_NAV = [
     label: 'Support',
     icon: HelpCircle,
     path: '/dashboard/support',
+  },
+  {
+    id: 'exports',
+    label: 'Exports',
+    icon: Download,
+    path: '/dashboard/exports',
   },
 ]
 
