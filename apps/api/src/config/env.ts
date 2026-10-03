@@ -25,7 +25,7 @@ export interface AsasEnv {
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
   const nodeEnv = source.NODE_ENV || 'development'
-  const frontendOrigin = source.FRONTEND_ORIGIN || 'http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174'
+  const frontendOrigin = source.FRONTEND_ORIGIN || 'http://localhost:5174,http://127.0.0.1:5174'
   return {
     databaseUrl: source.DATABASE_URL ?? '',
     authSecret: source.AUTH_SECRET ?? source.BETTER_AUTH_SECRET ?? '',

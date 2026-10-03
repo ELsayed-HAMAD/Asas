@@ -13,7 +13,7 @@ import http from 'node:http'
 import { PrismaClient } from '@prisma/client'
 
 const BASE = 'http://127.0.0.1:4000'
-const ORIGIN = 'http://localhost:5173'
+const ORIGIN = 'http://localhost:5174'
 const prisma = new PrismaClient()
 
 const stamp = (Math.random() + 1).toString(36).slice(2, 10)

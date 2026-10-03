@@ -16,7 +16,7 @@ async function main() {
   const email = `owner-${Date.now()}@example.com`
   const password = 'correct-horse-battery-staple'
 
-  const origin = { origin: 'http://localhost:5173' }
+  const origin = { origin: 'http://localhost:5174' }
 
   console.log('1. sign-up/email')
   const signUp = await app.inject({

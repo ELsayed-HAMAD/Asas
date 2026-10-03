@@ -25,7 +25,7 @@ import { loadEnv } from '../dist/config/env.js'
 const prisma = new PrismaClient()
 const app = await buildApp(loadEnv(), { prisma, logger: false })
 
-const ORIGIN = { origin: 'http://localhost:5173' }
+const ORIGIN = { origin: 'http://localhost:5174' }
 const stamp = (Math.random() + 1).toString(36).slice(2, 10)
 const results = []
 function check(label, ok, detail = '') {
