@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Navigate } from 'react-router-dom'
 import { Database, FileUp, Loader2, Sparkles, SquarePen } from 'lucide-react'
 import { http } from '../../lib/api/http'
+
+import { useActiveOrganization, useSession, authClient } from '../../lib/authClient'
 
 // The three start paths — the legacy UX, kept verbatim. The API endpoints are the
 // preserved 3-path onboarding flow under `/api/v1/onboarding` (see the API's
@@ -41,15 +43,40 @@ const EXAMPLE_IMPORT = `{
 
 export default function Onboarding() {
   const navigate = useNavigate()
+  const { data: activeOrganization } = useActiveOrganization()
+  const { data: session } = useSession()
   const [selected, setSelected] = useState('sample')
   const [importJson, setImportJson] = useState(EXAMPLE_IMPORT)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
+  if (activeOrganization && activeOrganization.onboardingStatus !== 'PENDING') {
+    return <Navigate to="/dashboard" replace />
+  }
+
   const finish = async () => {
     setError('')
     setIsLoading(true)
     try {
+      let currentOrgId = activeOrganization?.id
+
+      if (!currentOrgId) {
+        const workspaceName = session?.user?.name || 'My Workspace'
+        const slug = workspaceName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || `org-${Date.now()}`
+        
+        const createRes = await authClient.organization.create({
+          name: workspaceName,
+          slug,
+        })
+
+        if (createRes.error) {
+          throw new Error(createRes.error.message || 'Could not create workspace.')
+        }
+
+        currentOrgId = createRes.data.id
+        await authClient.organization.setActive({ organizationId: currentOrgId })
+      }
+
       if (selected === 'empty') {
         await http.post('/onboarding/empty', { body: {} })
       } else if (selected === 'sample') {
@@ -63,7 +90,9 @@ export default function Onboarding() {
         }
         await http.post('/onboarding/import', { body: payload })
       }
-      navigate('/dashboard', { replace: true })
+      
+      // Force a hard reload so the auth client refetches the session and sees the new onboardingStatus
+      window.location.href = '/dashboard'
     } catch (requestError) {
       const message = requestError?.message ?? 'Unable to complete onboarding.'
       setError(message.includes('JSON') ? message : message)

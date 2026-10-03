@@ -288,7 +288,7 @@ async function monthlyOpenPipeline(
            sum("value") AS value
     FROM "Deal"
     WHERE "tenantId" = ${tenantId}
-      AND "stage" IN (${Prisma.join([...OPEN_STAGES])})
+      AND "stage"::text IN (${Prisma.join([...OPEN_STAGES])})
       AND "closeDate" IS NOT NULL
     GROUP BY to_char("closeDate", 'YYYY-MM')
     ORDER BY month
@@ -359,7 +359,7 @@ export async function getSalesPerformance(
            sum("value") AS value
     FROM "Deal"
     WHERE "tenantId" = ${tenantId}
-      AND "stage" = 'CLOSED_WON'
+      AND "stage"::text = 'CLOSED_WON'
       AND "closeDate" IS NOT NULL
     GROUP BY to_char("closeDate", 'YYYY-MM')
     ORDER BY month
