@@ -223,7 +223,7 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
       const candidate = await candidatesService.getCandidate(prisma, tenantId, candidateId)
       const dir = storageDir(tenantId)
       await mkdir(dir, { recursive: true })
-      await writeFile(path.join(dir, `${candidate.id}.pdf`), body)
+      await writeFile(path.join(dir, 'resume.pdf'), body)
 
       const updated = await prisma.candidate.update({
         where: { id: candidate.id },
@@ -257,17 +257,13 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
         return { error: { message: 'No resume has been uploaded for this candidate' } }
       }
 
-      const file = path.join(storageDir(tenantId), `${candidate.id}.pdf`)
+      const file = path.join(storageDir(tenantId), 'resume.pdf')
       let bytes: Buffer
       try {
         bytes = await readFile(file)
       } catch {
-        try {
-          bytes = await readFile(path.join(storageDir(tenantId), 'resume.pdf'))
-        } catch {
-          reply.code(404)
-          return { error: { message: 'Resume file not found' } }
-        }
+        reply.code(404)
+        return { error: { message: 'Resume file not found' } }
       }
 
       reply
