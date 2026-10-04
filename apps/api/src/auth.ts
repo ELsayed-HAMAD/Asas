@@ -48,7 +48,9 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
 
   return betterAuth({
     secret: env.authSecret || undefined,
-    baseURL: `http://${env.host}:${env.port}`,
+    // The process binds 127.0.0.1 by default; the browser must use that same host.
+    // `localhost` on Windows often resolves to ::1 and never reaches this listener.
+    baseURL: process.env.BETTER_AUTH_URL || `http://127.0.0.1:${env.port}`,
     trustedOrigins: env.frontendOrigin.split(',').map(value => value.trim()),
     database: prismaAdapter(prisma, { provider: 'postgresql' }),
     emailAndPassword: {

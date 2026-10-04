@@ -72,7 +72,16 @@ export async function betterAuthPlugin(app: FastifyInstance, auth: Auth): Promis
       }
       const response = await dispatchToBetterAuth(auth, request)
       reply.status(response.status)
-      response.headers.forEach((value, key) => reply.header(key, value))
+      // Set-Cookie is a multi-value header. Iterating Fetch Headers with forEach can
+      // coalesce multiple cookies into one comma-separated value, which browsers may
+      // reject and then the client never acquires the session after a successful login.
+      const setCookies = typeof response.headers.getSetCookie === 'function'
+        ? response.headers.getSetCookie()
+        : [response.headers.get('set-cookie')].filter((value): value is string => Boolean(value))
+      response.headers.forEach((value, key) => {
+        if (key !== 'set-cookie') reply.header(key, value)
+      })
+      if (setCookies.length > 0) reply.header('set-cookie', setCookies)
       const body = response.body ? await response.text() : null
       return reply.send(body)
     },
