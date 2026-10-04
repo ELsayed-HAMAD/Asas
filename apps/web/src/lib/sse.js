@@ -47,7 +47,7 @@ export function startSse({ queryClient, onConnect }) {
     if (disposed) return
     es?.close()
     lastEventAt = Date.now()
-    const source = new EventSource(SSE_URL)
+    const source = new EventSource(SSE_URL, { withCredentials: true })
     es = source
     source.addEventListener('invalidate', handleInvalidate)
     source.onmessage = handleInvalidate
