@@ -1,15 +1,14 @@
+import { useEffect, useState } from 'react'
 import { Outlet, Navigate, useLocation } from 'react-router-dom'
-import { useSession, useActiveOrganization } from '../lib/authClient'
+import { useSession, useActiveOrganization, authClient } from '../lib/authClient'
 
 /**
  * Route guard for authenticated areas (dashboard + onboarding).
  *
- * Port of the legacy `AuthGuard`, rebuilt for better-auth's httpOnly session cookie
- * (the legacy app read a JWT from a localStorage zustand store and refreshed it via
- * `GET /auth/me` — that model is gone; better-auth keeps the session in the cookie and
- * `useSession` reflects it).
+ * Rebuilt for better-auth's httpOnly session cookie. The old JWT / localStorage
+ * `GET /auth/me` model is gone; `useSession` reflects the cookie session.
  *
- * Flow (mirrors apps/web's RequireAuth, which is the working reference):
+ * Flow:
  *   1. session/org still loading        → full-screen "Loading…"
  *   2. no session                       → redirect to /login (remembering where we came from)
  *   3. session but no active organization → redirect to /onboarding (workspace picker /
@@ -25,8 +24,31 @@ export default function RequireAuth() {
   const location = useLocation()
   const { data: session, isPending: sessionPending } = useSession()
   const { data: activeOrganization, isPending: orgPending } = useActiveOrganization()
+  const [isSyncing, setIsSyncing] = useState(false)
 
-  if (sessionPending || orgPending) {
+  // If the server auto-assigned an activeOrganizationId on session creation,
+  // the client may not have picked it up yet. Sync it before deciding to bounce.
+  // `setActive` fires better-auth's org/session signals, so `useActiveOrganization`
+  // refetches on its own — no reload needed (an unconditional reload here would
+  // loop forever whenever the org fetch keeps coming back empty).
+  useEffect(() => {
+    if (activeOrganization) {
+      setIsSyncing(false)
+      return
+    }
+    if (!session?.session?.activeOrganizationId || orgPending || isSyncing) return
+    setIsSyncing(true)
+    authClient.organization
+      .setActive({ organizationId: session.session.activeOrganizationId })
+      .then(res => {
+        // If setActive itself failed (e.g. the membership is gone), stop syncing
+        // and let the /onboarding redirect below take over instead of retrying.
+        if (res?.error) setIsSyncing(false)
+      })
+      .catch(() => setIsSyncing(false))
+  }, [session, activeOrganization, orgPending, isSyncing])
+
+  if (sessionPending || orgPending || isSyncing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface">
         <p className="text-sm text-muted">Loading workspace…</p>
