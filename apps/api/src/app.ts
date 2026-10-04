@@ -218,13 +218,12 @@ export async function buildApp(
   // The CV upload route accepts a raw `application/pdf` body (the browser PUTs the file's
   // bytes straight to the API). Fastify has no built-in PDF parser, so buffer it to a
   // `Buffer` — the route itself enforces the size cap and the `%PDF-` magic-number check.
-  app.addContentTypeParser(
-    'application/pdf',
-    { parseAs: 'buffer', bodyLimit: 5 * 1024 * 1024 },
-    (_request, payload, done) => {
-      done(null, payload)
-    },
-  )
+  app.addContentTypeParser('application/pdf', (request, payload, done) => {
+    const chunks: Buffer[] = []
+    payload.on('data', (chunk: Buffer) => chunks.push(chunk))
+    payload.on('end', () => done(null, Buffer.concat(chunks)))
+    payload.on('error', done)
+  })
 
   if (options.prisma) {
     await prismaPlugin(app, options.prisma)
