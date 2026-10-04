@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import { Database, FileUp, Loader2, Sparkles, SquarePen } from 'lucide-react'
 import { http } from '../../lib/api/http'
 
@@ -42,7 +42,6 @@ const EXAMPLE_IMPORT = `{
 }`
 
 export default function Onboarding() {
-  const navigate = useNavigate()
   const { data: activeOrganization } = useActiveOrganization()
   const { data: session } = useSession()
   const [selected, setSelected] = useState('sample')
@@ -58,7 +57,7 @@ export default function Onboarding() {
     setError('')
     setIsLoading(true)
     try {
-      let currentOrgId = activeOrganization?.id
+      let currentOrgId = activeOrganization?.id || session?.session?.activeOrganizationId
 
       if (!currentOrgId) {
         const workspaceName = session?.user?.name || 'My Workspace'
@@ -74,6 +73,8 @@ export default function Onboarding() {
         }
 
         currentOrgId = createRes.data.id
+        await authClient.organization.setActive({ organizationId: currentOrgId })
+      } else if (!activeOrganization?.id) {
         await authClient.organization.setActive({ organizationId: currentOrgId })
       }
 
@@ -95,7 +96,7 @@ export default function Onboarding() {
       window.location.href = '/dashboard'
     } catch (requestError) {
       const message = requestError?.message ?? 'Unable to complete onboarding.'
-      setError(message.includes('JSON') ? message : message)
+      setError(message)
     } finally {
       setIsLoading(false)
     }
@@ -153,7 +154,7 @@ export default function Onboarding() {
             <textarea
               id="import-json"
               value={importJson}
-              onChange={event => setImportJson(event.value)}
+              onChange={event => setImportJson(event.target.value)}
               rows={10}
               className="w-full px-3 py-2.5 text-xs font-mono border border-border-default rounded-button focus:outline-none focus:ring-4 focus:ring-surface-active bg-surface-muted"
             />
