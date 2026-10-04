@@ -47,11 +47,13 @@ export default function SettingsBilling() {
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 overflow-y-auto p-8 space-y-6">
           <QueryState isLoading={query.isLoading} isError={query.isError} error={query.error} isEmpty={!subscription} emptyTitle="No subscription on file" emptyDescription="This workspace has no active plan record yet." >
-            <div className="bg-surface-raised border border-border-default rounded-card-sm p-card shadow-card">
-              <h2 className="text-xl font-bold text-heading mb-1">{subscription.planName}</h2>
-              <p className="text-sm text-body-light">{subscription.priceMonthly} monthly · {subscription.status}</p>
-              <p className="mt-3 text-sm text-muted">{subscription.seatsUsed} of {subscription.seatLimit} seats used · {subscription.storageUsedGb} of {subscription.storageLimitGb} GB used</p>
-            </div>
+            {subscription && (
+              <div className="bg-surface-raised border border-border-default rounded-card-sm p-card shadow-card">
+                <h2 className="text-xl font-bold text-heading mb-1">{subscription.planName}</h2>
+                <p className="text-sm text-body-light">{subscription.priceMonthly} monthly · {subscription.status}</p>
+                <p className="mt-3 text-sm text-muted">{subscription.seatsUsed} of {subscription.seatLimit} seats used · {subscription.storageUsedGb} of {subscription.storageLimitGb} GB used</p>
+              </div>
+            )}
             {query.data?.invoices?.length > 0 && <div className="bg-surface-raised border border-border-default rounded-card-sm p-card shadow-card"><h2 className="text-lg font-bold text-heading mb-4">Billing history</h2>{query.data.invoices.map(invoice => <div key={invoice.id} className="flex justify-between border-b border-border-subtle py-3 text-sm"><span>{invoice.description}</span><span className="text-muted">{invoice.amount} · {invoice.status}</span></div>)}</div>}
           </QueryState>
         </div>

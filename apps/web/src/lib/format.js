@@ -1,8 +1,8 @@
 /**
- * Formatting helpers for the legacy app.
+ * Formatting helpers for the web app.
  *
- * Ported from `apps/web/src/lib/format.ts`, minus the `@asas/domain` dependency (this app is
- * standalone): the wire formats are handled inline instead of through the `Money` class.
+ * The frontend stays standalone of `@asas/domain`: wire formats are handled inline instead of
+ * through the `Money` class.
  *
  * Two money wire forms exist in the API:
  *   - `{ amount: <integer minor units, e.g. cents>, currency: 'USD' }` — finance / CRM / projects

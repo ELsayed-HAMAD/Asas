@@ -5,12 +5,11 @@
  * `invalidate` frame (after any successful write mutation in the user's tenant), invalidates the
  * matching TanStack Query caches so every open tab self-heals without polling.
  *
- * Ported from `apps/web/src/lib/sse.ts` (TypeScript) to plain JS. The stringified key prefixes
- * in the frames (e.g. `"asas,finance"`) are the `String()` form of the TanStack Query keys built
- * in `queryKeys.js`.
+ * The stringified key prefixes in the frames (e.g. `"asas,finance"`) are the `String()` form of
+ * the TanStack Query keys built in `queryKeys.js`.
  */
 
-const SSE_URL = `${import.meta.env.VITE_API_URL ?? 'http://localhost:4000'}/api/v1/events`
+const SSE_URL = `${import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:4000'}/api/v1/events`
 
 /** No frame (data or keepalive comment) for this long → treat an "open" socket as dead. */
 const STALE_AFTER_MS = 30_000

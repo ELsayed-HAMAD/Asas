@@ -1,11 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom'
 import {
-  LayoutDashboard, Users, DollarSign, Clock, UserPlus,
-  CreditCard, BarChart2, Receipt, Briefcase, TrendingUp,
-  Package, FolderKanban, Settings, HelpCircle, Search,
-  ChevronDown, ChevronRight, Bell, Plus, LogOut, Menu,
-  ArrowDownCircle, ArrowUpCircle, PieChart, Layers, Map, Zap,
+  LayoutDashboard, Users, CreditCard, Briefcase,
+  Package, FolderKanban, Settings, HelpCircle,
+  ChevronDown, ChevronRight, Plus, LogOut, Menu,
   Check, User, Moon, Download
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'

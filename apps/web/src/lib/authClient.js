@@ -7,11 +7,10 @@ import { organizationClient } from 'better-auth/client/plugins'
  * the app root, since better-auth serves everything under that one catch-all route.
  *
  * `credentials: 'include'` is required for the httpOnly session cookie to be sent cross-origin
- * (API on :4000, this app on :5173 in dev) — the single official frontend's
- * `localStorage` JWT + `Authorization` header.
+ * (API on :4000, this app on :5173 in dev).
  */
 export const authClient = createAuthClient({
-  baseURL: `${import.meta.env.VITE_API_URL ?? 'http://localhost:4000'}/api/auth`,
+  baseURL: import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:4000',
   fetchOptions: {
     credentials: 'include',
   },

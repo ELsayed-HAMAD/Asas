@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  ChevronRight,
   Search,
   ChevronDown,
   Rocket,
@@ -10,13 +9,10 @@ import {
   X,
   Circle,
   CheckSquare,
-  Square,
   Eye,
   ChevronsUp,
   Equal,
   Send,
-  MessageSquare,
-  Code2,
   Loader2
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -43,6 +39,11 @@ export default function ActiveSprints() {
     queryKey: queryKeys.projects.issues.list({ sprintId: activeSprint?.id }),
     queryFn: () => projectsApi.getIssues(activeSprint.id),
     enabled: !!activeSprint?.id,
+  });
+
+  const issueMutation = useMutation({
+    mutationFn: (status) => projectsApi.updateIssue(selectedId, { status }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.projects.issues.all() }),
   });
 
   if (isLoading) {
@@ -78,11 +79,6 @@ export default function ActiveSprints() {
   }
 
   const selectedIssue = issues.find(i => i.id === selectedId);
-  const issueMutation = useMutation({
-    mutationFn: (status) => projectsApi.updateIssue(selectedId, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.projects.issues.all() }),
-  });
-
   // Custom Icon for 'In Progress' (Half filled circle)
   const HalfCircleIcon = ({ className }) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>

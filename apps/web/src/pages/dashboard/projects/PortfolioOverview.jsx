@@ -1,14 +1,9 @@
 import React, { useState } from 'react';
 import {
-  ChevronRight,
   Search,
   ChevronDown,
   ChevronsUpDown,
-  CheckCircle2,
   Clock,
-  AlertCircle,
-  AlertTriangle,
-  Info,
   Loader2,
   ClipboardList
 } from 'lucide-react';
@@ -18,12 +13,6 @@ import { projectsApi } from '../../../lib/api/projects';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney } from '../../../lib/format';
 import TopBarActions from '../../../components/TopBarActions';
-
-const formatDate = (dateString) => {
-  if (!dateString) return 'TBD';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-};
 
 const getBadgeStyle = (status) => {
   if (status === 'ACTIVE' || status === 'ON_TRACK') return "bg-success-light text-success-text";

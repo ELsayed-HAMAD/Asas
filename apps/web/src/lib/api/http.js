@@ -3,8 +3,6 @@
  * (see `packages/contracts/src/envelope.ts`). `credentials: 'include'` sends the httpOnly
  * session cookie better-auth issues — the same reason `authClient.js` sets it, and why this
  * app never touches `localStorage` for auth.
- *
- * Ported from `apps/web/src/lib/api/http.ts` (TypeScript) to plain JS for the legacy app.
  */
 export class ApiError extends Error {
   constructor(statusCode, message, details) {
@@ -15,10 +13,10 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE_URL = `${import.meta.env.VITE_API_URL ?? 'http://localhost:4000'}/api/v1`
+const API_BASE_URL = `${import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:4000'}/api/v1`
 
 /** The API origin without the `/api/v1` suffix — for URLs the API hands back as absolute paths. */
-export const API_ORIGIN_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replace(/\/+$/, '')
+export const API_ORIGIN_URL = (import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:4000').replace(/\/+$/, '')
 
 function buildUrl(path, query) {
   const url = new URL(`${API_BASE_URL}${path}`)
@@ -75,7 +73,7 @@ export const http = {
     const response = await fetch(url, {
       method: 'PUT',
       credentials: 'include',
-      headers: { 'content-type': 'application/pdf', ...(headers ?? {}) },
+      headers: { 'content-type': 'application/pdf', ...headers },
       body,
     })
     const payload = await response.json().catch(() => null)

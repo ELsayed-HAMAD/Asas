@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 
 // ── Layouts ────────────────────────────────────────────────
 import MarketingLayout  from './layouts/MarketingLayout'
@@ -17,10 +17,7 @@ import Login    from './pages/auth/Login'
 import Register from './pages/auth/Register'
 import Onboarding from './pages/auth/Onboarding'
 
-// ── Dashboard (placeholders until Phase 3 wires real pages) ──
 import DashboardPlaceholder from './pages/dashboard/DashboardPlaceholder'
-
-// ── Real pages (Phase 3) ──
 import DashboardOverview from './pages/dashboard/DashboardOverview'
 import EmployeeList from './pages/dashboard/hr/EmployeeList'
 import Payroll from './pages/dashboard/hr/Payroll'

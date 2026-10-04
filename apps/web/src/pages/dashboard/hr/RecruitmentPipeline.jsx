@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Search, Filter, Download, X, FileText,
-  Clock, Calendar, CheckCircle2, UserPlus, ArrowRight,
-  Briefcase, MapPin, Mail, Phone, Loader2, Upload, Eye,
+  Calendar, UserPlus, ArrowRight,
+  MapPin, Mail, Loader2, Upload, Eye,
 } from 'lucide-react'
 import { hrApi } from '../../../lib/api/hr'
 import { queryKeys } from '../../../lib/queryKeys'
