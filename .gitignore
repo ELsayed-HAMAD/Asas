@@ -139,3 +139,10 @@ lint_output.txt
 # Local agent/session state — never shared, never committed.
 .claude/settings.local.json
 .monkeyscode/
+
+# =========================
+# Local debug/throwaway scripts — never commit
+# =========================
+apps/api/test-*.ts
+apps/api/test-*.js
+filter-msg.js
