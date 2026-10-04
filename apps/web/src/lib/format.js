@@ -26,6 +26,16 @@ export function getFormatDefaults() {
   return { currency: defaultCurrency, locale: defaultLocale }
 }
 
+const ZERO_DECIMAL_CURRENCIES = new Set(['BIF', 'CLP', 'DJF', 'GNF', 'ISK', 'JPY', 'KMF', 'KRW', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'])
+const THREE_DECIMAL_CURRENCIES = new Set(['BHD', 'IQD', 'JOD', 'KWD', 'LYD', 'OMR', 'TND'])
+
+function getMinorUnitDivisor(currency) {
+  const code = String(currency || '').toUpperCase()
+  if (ZERO_DECIMAL_CURRENCIES.has(code)) return 1
+  if (THREE_DECIMAL_CURRENCIES.has(code)) return 1000
+  return 100
+}
+
 /** True when `value` is a `{ amount, currency }` wire object (minor units). */
 function isMoneyWire(value) {
   return (
@@ -49,9 +59,8 @@ export function formatMoney(value, options = {}) {
   let currencyCode = options.currency || defaultCurrency
 
   if (isMoneyWire(value)) {
-    // Minor units (cents) → major units for display.
-    numericValue = value.amount / 100
     currencyCode = value.currency || currencyCode
+    numericValue = value.amount / getMinorUnitDivisor(currencyCode)
   } else {
     numericValue = Number(value)
     if (Number.isNaN(numericValue)) return '—'

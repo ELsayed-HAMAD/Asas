@@ -31,10 +31,14 @@ function stubAuth(sessionData: { session: { activeOrganizationId: string | null 
   } as unknown as Pick<Auth, 'api'>
 }
 
-function stubPrisma(member: { role: 'OWNER' | 'ADMIN' | 'MEMBER'; employeeId: string | null } | null) {
+function stubPrisma(
+  member: { role: 'OWNER' | 'ADMIN' | 'MEMBER'; employeeId: string | null; tenantId?: string } | null,
+  members: Array<{ tenantId: string; role: 'OWNER' | 'ADMIN' | 'MEMBER'; employeeId: string | null }> = [],
+) {
   return {
     member: {
       findUnique: async () => member,
+      findMany: async () => members,
     },
   } as unknown as PrismaClient
 }
@@ -49,6 +53,14 @@ describe('resolveAuthContext', () => {
     const auth = stubAuth({ session: { activeOrganizationId: null }, user: { id: 'user_1' } })
     const context = await resolveAuthContext(auth, stubPrisma(null), {})
     expect(context).toBeNull()
+  })
+
+  it('falls back to single membership when session has no active organization', async () => {
+    const auth = stubAuth({ session: { activeOrganizationId: null }, user: { id: 'user_1' } })
+    const member = { role: 'ADMIN' as const, employeeId: 'emp_1', tenantId: 'tenant_1' }
+    const prisma = stubPrisma(member, [member])
+    const context = await resolveAuthContext(auth, prisma, {})
+    expect(context).toEqual({ userId: 'user_1', tenantId: 'tenant_1', role: 'ADMIN', employeeId: 'emp_1' })
   })
 
   it('returns null when the user has no membership in the active tenant', async () => {

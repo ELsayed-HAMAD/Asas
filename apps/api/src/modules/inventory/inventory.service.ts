@@ -56,6 +56,18 @@ async function stockByProduct(
   return new Map(rows.map(row => [row.productId, row._sum.delta ?? 0]))
 }
 
+async function singleProductStock(
+  prisma: PrismaClient,
+  tenantId: string,
+  productId: string,
+): Promise<number> {
+  const row = await prisma.stockMovement.aggregate({
+    where: { tenantId, productId },
+    _sum: { delta: true },
+  })
+  return row._sum.delta ?? 0
+}
+
 function mapProduct(
   product: PrismaProduct,
   currentStock: number,
@@ -206,8 +218,8 @@ async function productSummary(prisma: PrismaClient, tenantId: string): Promise<P
 export async function getProduct(prisma: PrismaClient, tenantId: string, id: string): Promise<Product> {
   const product = await prisma.product.findFirst({ where: { id, tenantId } })
   if (!product) throw new AppError(404, 'Product not found')
-  const stockMap = await stockByProduct(prisma, tenantId)
-  return mapProduct(product, derivedStock(product, stockMap.get(id)))
+  const currentStock = await singleProductStock(prisma, tenantId, id)
+  return mapProduct(product, derivedStock(product, currentStock))
 }
 
 export async function createProduct(
@@ -280,8 +292,8 @@ export async function updateProduct(
     },
   })
 
-  const stockMap = await stockByProduct(prisma, tenantId)
-  return mapProduct(product, derivedStock(product, stockMap.get(id)))
+  const currentStock = await singleProductStock(prisma, tenantId, id)
+  return mapProduct(product, derivedStock(product, currentStock))
 }
 
 export async function deleteProduct(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
