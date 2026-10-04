@@ -137,7 +137,5 @@ lint_output.txt
 *backup*/
 *_backup_*
 # Local agent/session state — never shared, never committed.
-.claude/
+.claude/settings.local.json
 .monkeyscode/
-apps/api/test-*.ts
-apps/api/test-*.js
