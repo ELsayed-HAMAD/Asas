@@ -4,7 +4,7 @@ import { requireRole } from '../middlewares/rbac.js'
 /**
  * The string form of a module's query-key *prefix*, e.g. `moduleKeyPrefix('finance')` →
  * `'asas,finance'`. This must match `queryKeys[module].all().toString()` on the web side
- * (`apps/web/src/lib/queryKeys.ts`), which builds `[...root, name]` with `root = ['asas']`.
+ * (`apps/web/src/lib/queryKeys.js`), which builds `[...root, name]` with `root = ['asas']`.
  *
  * It is the unit the server publishes: a mutation that touched any finance row invalidates the
  * whole `finance` namespace in every open tab. If the web-side root or a module name ever
@@ -24,7 +24,7 @@ export function moduleKeyPrefix(moduleName: string): string {
  * its tenant's stream; whenever a *write mutation* succeeds on the server, the route calls
  * {@link publish} with the TanStack Query key prefixes that changed, and every connected
  * subscriber for that tenant receives a single `invalidate` event carrying those prefixes. The
- * web client (`apps/web/src/lib/sse.ts`) then calls `queryClient.invalidateQueries` for each —
+ * web client (`apps/web/src/lib/sse.js`) then calls `queryClient.invalidateQueries` for each —
  * the UI self-heals after any mutation in any tab without polling.
  *
  * Event frame (SSE):

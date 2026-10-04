@@ -183,7 +183,11 @@ export async function buildApp(
 
   // This server only ever emits JSON, so the HTML-oriented helmet directives are inert — they
   // cost nothing and are already correct if an OpenAPI UI is mounted here (it is).
-  await app.register(helmet)
+  await app.register(helmet, {
+    // The SPA on :5173 reads JSON from this API; helmet's default `same-origin` CORP
+    // makes Chromium drop those cross-origin fetches as a network error.
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
 
   await app.register(cors, {
     origin: environment.frontendOrigin.split(',').map(value => value.trim()),

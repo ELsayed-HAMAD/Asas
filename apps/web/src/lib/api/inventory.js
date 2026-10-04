@@ -10,7 +10,7 @@ import { http } from './http'
  *   - listStockAlerts     GET /inventory/stock/alerts    (unpaginated collection)
  *   - listWarehouses      GET /inventory/warehouses      (unpaginated collection)
  *
- * Writes (exposed for future pages; no Phase 3 page wires a mutation):
+ * Writes:
  *   - createProduct       POST   /inventory/products     (stock = opening quantity)
  *   - updateProduct       PATCH  /inventory/products/:id (stock is NOT part of the patch)
  *   - deleteProduct       DELETE /inventory/products/:id (204)

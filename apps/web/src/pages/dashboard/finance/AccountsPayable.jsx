@@ -52,6 +52,11 @@ export default function AccountsPayable() {
   });
   const getVendorAvatar = (vendorId) => vendorAvatar[vendorId] || null;
 
+  const statusMutation = useMutation({
+    mutationFn: (status) => financeApi.updatePayableStatus(selectedId, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.finance.payables.all() }),
+  });
+
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised">
@@ -77,10 +82,6 @@ export default function AccountsPayable() {
   }
 
   const selectedRecord = items.find(i => i.id === selectedId);
-  const statusMutation = useMutation({
-    mutationFn: (status) => financeApi.updatePayableStatus(selectedId, status),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.finance.payables.all() }),
-  });
   const needsApproval = items.filter(i => i.status === 'PENDING');
   const scheduled = items.filter(i => i.status === 'SCHEDULED' || i.status === 'APPROVED');
 

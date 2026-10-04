@@ -27,6 +27,10 @@ export default function Expenses() {
     queryKey: queryKeys.finance.expenses.list({ limit: 100 }),
     queryFn: () => financeApi.listExpenses({ limit: 100 }),
   });
+  const statusMutation = useMutation({
+    mutationFn: (status) => financeApi.updateExpenseStatus(selectedId, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.finance.expenses.all() }),
+  });
 
   if (isLoading) {
     return (
@@ -53,10 +57,6 @@ export default function Expenses() {
   }
 
   const selectedRecord = items.find(r => r.id === selectedId);
-  const statusMutation = useMutation({
-    mutationFn: (status) => financeApi.updateExpenseStatus(selectedId, status),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.finance.expenses.all() }),
-  });
 
   // KPIs from the server summary (full-set aggregates, not page-level reduces).
   // "Reimbursed (MTD)" maps to the APPROVED bucket — the only status with a payment-settled

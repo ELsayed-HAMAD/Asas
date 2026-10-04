@@ -3,6 +3,17 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { signIn } from '../../lib/authClient'
 
+function authErrorMessage(error) {
+  if (!error) return 'Unable to sign in. Please try again.'
+  if (typeof error === 'string') return error
+  if (error.name === 'TypeError' || /failed to fetch|networkerror|load failed/i.test(String(error.message ?? error))) {
+    return 'Cannot reach the API. Start the backend on port 4000 and try again.'
+  }
+  const nested = error.error?.message || error.message
+  if (nested) return nested
+  return 'Unable to sign in. Please try again.'
+}
+
 export default function Login() {
   const navigate = useNavigate()
 
@@ -25,12 +36,17 @@ export default function Login() {
 
     setLoading(true)
     try {
-      await signIn.email({ email: form.email, password: form.password })
+      const result = await signIn.email({ email: form.email, password: form.password })
+      if (result?.error) {
+        setError(authErrorMessage(result.error))
+        return
+      }
       navigate('/dashboard')
     } catch (requestError) {
-      setError(requestError?.error?.message || 'Unable to sign in. Please try again.')
+      setError(authErrorMessage(requestError))
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (

@@ -5,8 +5,6 @@ import {
   ChevronDown,
   X,
   Folder,
-  AlertTriangle,
-  Lock,
   Edit2,
   Loader2,
   Clock

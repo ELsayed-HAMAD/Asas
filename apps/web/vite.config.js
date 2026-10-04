@@ -7,6 +7,9 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
+    // Keep the browser and API on the same site so Better Auth's Lax session cookie
+    // is sent on cross-port requests (both use 127.0.0.1 in local development).
+    host: '127.0.0.1',
     port: 5173,
     strictPort: true,
   },

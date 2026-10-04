@@ -10,9 +10,9 @@
  * keys structurally, so `{ status: 'ACTIVE' }` and `{ status: 'ACTIVE', page: 1 }` are distinct
  * cache entries without any manual string-building.
  *
- * Ported from `apps/web/src/lib/queryKeys.ts` to plain JS. The stringified prefixes of
- * `moduleKeys(name).all()` (e.g. `['asas','finance']` → `"asas,finance"`) must match the API's
- * `moduleKeyPrefix` used by the SSE invalidation stream — see `sse.js`.
+ * The stringified prefixes of `moduleKeys(name).all()` (e.g. `['asas','finance']` →
+ * `"asas,finance"`) must match the API's `moduleKeyPrefix` used by the SSE invalidation
+ * stream — see `sse.js`.
  */
 
 const root = ['asas']
