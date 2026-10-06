@@ -47,7 +47,7 @@ function formatBytes(bytes) {
   return `PDF • ${Math.max(1, Math.round(bytes / 1024))} KB`
 }
 
-function CandidateInspector({ candidate, onClose, canWrite }) {
+function CandidateInspector({ candidate, onClose, canWrite, onMoveStage }) {
   if (!candidate) return null
   const profile = candidate.profile || {}
   const activity = candidate.activity || []
@@ -83,7 +83,7 @@ function CandidateInspector({ candidate, onClose, canWrite }) {
             <button disabled className="flex items-center justify-center gap-1.5 bg-primary text-white text-xs font-medium py-2 rounded-button hover:bg-primary-hover disabled:opacity-60">
               <Calendar size={14} /> Schedule
             </button>
-            <button disabled className="flex items-center justify-center gap-1.5 bg-surface-raised border border-border-default text-body text-xs font-medium py-2 rounded-button hover:bg-surface-muted disabled:opacity-60">
+            <button type="button" disabled={!canWrite} onClick={onMoveStage} className="flex items-center justify-center gap-1.5 bg-surface-raised border border-border-default text-body text-xs font-medium py-2 rounded-button hover:bg-surface-muted disabled:opacity-60">
               <ArrowRight size={14} /> Move Stage
             </button>
           </div>
@@ -266,16 +266,27 @@ function CvSection({ candidate, hasCv, canWrite }) {
 export default function RecruitmentPipeline() {
   const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState(null)
+  const [search, setSearch] = useState('')
+  const [stageOpen, setStageOpen] = useState(false)
+  const [nextStage, setNextStage] = useState('SCREENING')
 
   const { data: activeMemberRole } = useActiveMemberRole()
   const canWrite = activeMemberRole === 'OWNER' || activeMemberRole === 'ADMIN'
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: queryKeys.hr.candidates.list(),
-    queryFn: () => hrApi.listCandidates({ limit: 100 }),
+    queryKey: queryKeys.hr.candidates.list({ search: search || undefined }),
+    queryFn: () => hrApi.listCandidates({ limit: 100, search: search || undefined }),
   })
 
   const candidates = data?.items || []
+  const selectedCandidate = candidates.find(c => c.id === selectedId)
+  const moveStageMutation = useMutation({
+    mutationFn: () => hrApi.updateCandidateStage(selectedId, nextStage),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.hr.candidates.all() })
+      setStageOpen(false)
+    },
+  })
 
   // Add-candidate dialog
   const [addOpen, setAddOpen] = useState(false)
@@ -327,8 +338,6 @@ export default function RecruitmentPipeline() {
       setSelectedId(candidates[0].id)
     }
   }, [candidates, selectedId])
-
-  const selectedCandidate = candidates.find(c => c.id === selectedId)
 
   // High-level stats from the loaded candidate records. The API does not expose time-to-hire or
   // offer-acceptance aggregates, so those KPIs stay explicitly unavailable.
@@ -391,6 +400,8 @@ export default function RecruitmentPipeline() {
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
               <input
                 type="text"
+                value={search}
+                onChange={event => setSearch(event.target.value)}
                 placeholder="Search candidates..."
                 className="pl-9 pr-4 py-1.5 text-sm border border-border-default rounded-button bg-surface-raised w-64 focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
               />
@@ -484,6 +495,7 @@ export default function RecruitmentPipeline() {
             activity: [],
           } : null}
           canWrite={canWrite}
+          onMoveStage={() => { setNextStage(selectedCandidate?.stage === 'APPLIED' ? 'SCREENING' : 'TECH_INTERVIEW'); setStageOpen(true) }}
           onClose={() => setSelectedId(null)}
         />
       )}
@@ -553,6 +565,10 @@ export default function RecruitmentPipeline() {
           </div>
           {formError && <p className="text-xs text-danger">{formError}</p>}
         </div>
+      </FormDialog>
+
+      <FormDialog open={stageOpen} onClose={() => setStageOpen(false)} title="Move candidate stage" subtitle={selectedCandidate?.name} confirmLabel="Save stage" busy={moveStageMutation.isPending} onConfirm={() => moveStageMutation.mutate()}>
+        <label className="block text-sm font-medium text-body">Stage<select value={nextStage} onChange={event => setNextStage(event.target.value)} className="mt-1 w-full rounded-input border border-border-default px-3 py-2">{Object.entries(STAGE_LABELS).filter(([stage]) => stage !== selectedCandidate?.stage).map(([stage, label]) => <option key={stage} value={stage}>{label}</option>)}</select></label>
       </FormDialog>
 
     </div>

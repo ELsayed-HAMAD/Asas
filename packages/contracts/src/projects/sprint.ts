@@ -6,10 +6,12 @@
 import { z } from 'zod'
 import { idSchema, isoDateTimeSchema, boundedText } from '../primitives/ids.js'
 import { collection } from '../primitives/pagination.js'
+import { sprintStatusSchema } from '../enums.generated.js'
 
 export const sprintSchema = z.object({
   id: idSchema,
   name: z.string(),
+  status: sprintStatusSchema,
   projectId: idSchema.nullable(),
   /** `null` when the sprint has no end date set yet. */
   endsAt: isoDateTimeSchema.nullable(),
@@ -35,6 +37,7 @@ export const sprintWriteSchema = z.object({
   name: boundedText(200),
   projectId: idSchema.optional().nullable(),
   endsAt: isoDateTimeSchema.optional().nullable(),
+  status: sprintStatusSchema.optional(),
 })
 
 export type SprintWriteInput = z.infer<typeof sprintWriteSchema>

@@ -189,6 +189,16 @@ export const integrationsListResponseSchema = z.object({
 
 export type IntegrationsListResponse = z.infer<typeof integrationsListResponseSchema>
 
+export const webhookLogSchema = z.object({
+  id: idSchema,
+  statusCode: z.int().min(100).max(599),
+  event: boundedText(200),
+  createdAt: isoDateTimeSchema,
+})
+export type WebhookLog = z.infer<typeof webhookLogSchema>
+export const webhookLogsResponseSchema = z.object({ items: z.array(webhookLogSchema) })
+export type WebhookLogsResponse = z.infer<typeof webhookLogsResponseSchema>
+
 // ── Billing and backups ────────────────────────────────────────────────────
 
 export const subscriptionSchema = z.object({

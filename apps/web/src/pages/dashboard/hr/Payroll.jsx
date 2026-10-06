@@ -67,13 +67,15 @@ function PayslipButton({ runId, lineId, onSelect, onNotifyError }) {
 export default function Payroll() {
   const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState(null)
+  const [selectedRunId, setSelectedRunId] = useState('')
 
   const { data: listData, isLoading: isLoadingList, isError, error } = useQuery({
     queryKey: queryKeys.hr.payrollRuns.list(),
     queryFn: () => hrApi.listPayrollRuns(),
   })
 
-  const activeRun = listData?.items?.[0] || null
+  const runs = listData?.items ?? []
+  const activeRun = runs.find(item => item.id === selectedRunId) || runs[0] || null
   const activeRunId = activeRun?.id || null
 
   // The full run (its lines + per-line tax split) drives the table and the breakdown panel.
@@ -87,18 +89,8 @@ export default function Payroll() {
 
   const records = run?.lines ?? []
 
-  // The active run's KPI totals — summed from that run's lines, exactly as the old page
-  // derived `activeRun.totals`. Money arrives as major-unit decimal strings, so coerce to
-  // Number for display aggregation only.
-  const totals = records.reduce(
-    (acc, line) => {
-      acc.totalGross += Number(line.gross)
-      acc.taxes += Number(line.deductions)
-      acc.totalNet += Number(line.net)
-      return acc
-    },
-    { totalGross: 0, taxes: 0, totalNet: 0 },
-  )
+  // Exact aggregates over every stored line in this run, returned by the API as decimal strings.
+  const totals = run?.totals ?? { gross: '0', deductions: '0', net: '0' }
 
   useEffect(() => {
     if (!records.length) {
@@ -112,10 +104,64 @@ export default function Payroll() {
 
   const selectedRecord = records.find(r => r.id === selectedId)
 
+  const [isLineDialogOpen, setIsLineDialogOpen] = useState(false)
+  const [lineForm, setLineForm] = useState({ baseSalary: '', missedDaysCount: '', missedDaysAmount: '', bonusLabel: '', bonusAmount: '' })
+
+  function exportLedger() {
+    if (activeRun?.status !== 'PAID' || !run) return
+    const rows = [
+      ['Payroll Run', 'Pay Date', 'Employee', 'Base Salary', 'Gross', 'Deductions', 'Net', 'Tax Detail'],
+      ...records.map(line => [activeRun.label, activeRun.payDate || '', line.employee?.name, line.baseSalary || '', line.gross, line.deductions, line.net, line.taxLines.map(tax => `${tax.label}: ${tax.amount}`).join('; ')]),
+    ]
+    const csv = rows.map(row => row.map(value => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\r\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${activeRun.label.trim().replace(/[^a-z0-9-_]+/gi, '-') || 'payroll'}-ledger.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   const approveMutation = useMutation({
     mutationFn: () => hrApi.approvePayrollRun(activeRun.id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.hr.all() }),
   })
+
+  const adjustLineMutation = useMutation({
+    mutationFn: ({ lineId, patch }) => hrApi.patchPayrollLine(activeRun.id, lineId, patch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.hr.payrollRuns.detail(activeRunId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.hr.payrollRuns.list() })
+      setIsLineDialogOpen(false)
+    },
+  })
+
+  function openLineEditor() {
+    if (!selectedRecord || !isAdmin || !activeRun || ['APPROVED', 'PAID'].includes(activeRun.status)) return
+    setLineForm({
+      baseSalary: selectedRecord.baseSalary || '',
+      missedDaysCount: selectedRecord.missedDaysCount == null ? '' : String(selectedRecord.missedDaysCount),
+      missedDaysAmount: selectedRecord.missedDaysAmount || '',
+      bonusLabel: selectedRecord.bonusLabel || '',
+      bonusAmount: selectedRecord.bonusAmount || '',
+    })
+    adjustLineMutation.reset()
+    setIsLineDialogOpen(true)
+  }
+
+  function submitLineAdjustment() {
+    if (!selectedRecord || !activeRun) return
+    if (!lineForm.baseSalary.trim()) return
+    const patch = {
+      baseSalary: lineForm.baseSalary.trim() || null,
+      missedDaysCount: lineForm.missedDaysCount.trim() === '' ? null : Number(lineForm.missedDaysCount),
+      missedDaysAmount: lineForm.missedDaysAmount.trim() || null,
+      bonusLabel: lineForm.bonusLabel.trim() || null,
+      bonusAmount: lineForm.bonusAmount.trim() || null,
+    }
+    if (patch.missedDaysCount !== null && (!Number.isInteger(patch.missedDaysCount) || patch.missedDaysCount < 0)) return
+    adjustLineMutation.mutate({ lineId: selectedRecord.id, patch })
+  }
 
   // ── New payroll run (ADMIN write — employee.write) ──────────────────────────────
   const { data: activeMemberRole } = useActiveMemberRole()
@@ -245,7 +291,8 @@ export default function Payroll() {
           {activeRun?.status === 'PAID' ? (
             <button
               type="button"
-              disabled
+              onClick={exportLedger}
+              disabled={!run}
               className="bg-surface-strong text-heading px-5 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors shadow-card disabled:opacity-60"
             >
               Export Ledger
@@ -270,9 +317,12 @@ export default function Payroll() {
               <button type="button" disabled className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm hover:bg-surface-muted bg-surface-raised shadow-card disabled:opacity-60">
                 Filter: All Depts <ChevronDown size={14} className="text-caption" />
               </button>
-              <button type="button" disabled className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm hover:bg-surface-muted bg-surface-raised shadow-card disabled:opacity-60">
-                Status: {activeRun?.status || 'None'} <ChevronDown size={14} className="text-caption" />
-              </button>
+              <label className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm bg-surface-raised shadow-card">
+                Payroll run
+                <select aria-label="Payroll run" value={activeRun?.id || ''} onChange={event => { setSelectedRunId(event.target.value); setSelectedId(null) }} className="max-w-56 bg-transparent text-sm outline-none">
+                  {runs.map(item => <option key={item.id} value={item.id}>{item.label} · {item.status}</option>)}
+                </select>
+              </label>
             </div>
             <div className="h-4 w-px bg-border-default" />
             <label className="flex items-center gap-2 text-sm text-body cursor-pointer">
@@ -289,15 +339,15 @@ export default function Payroll() {
         <div className="grid grid-cols-3 gap-4">
           <div className="border border-border-default rounded-button p-4 bg-surface-muted/40">
             <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1">Total Gross</p>
-            <p className="text-2xl font-bold text-heading">{formatMoney(totals.totalGross)}</p>
+            <p className="text-2xl font-bold text-heading">{formatMoney(totals.gross)}</p>
           </div>
           <div className="border border-border-default rounded-button p-4 bg-surface-muted/40">
             <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1">Taxes / Deductions</p>
-            <p className="text-2xl font-bold text-heading">{formatMoney(totals.taxes)}</p>
+            <p className="text-2xl font-bold text-heading">{formatMoney(totals.deductions)}</p>
           </div>
           <div className="border border-border-default rounded-button p-4 bg-surface-muted/40">
             <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1">Total Net</p>
-            <p className="text-2xl font-bold text-heading">{formatMoney(totals.totalNet)}</p>
+            <p className="text-2xl font-bold text-heading">{formatMoney(totals.net)}</p>
           </div>
         </div>
       </div>
@@ -385,6 +435,7 @@ export default function Payroll() {
                 <p className="text-xs font-bold text-muted uppercase tracking-wider mb-1">Selected</p>
                 <h2 className="text-xl font-bold text-heading">{selectedRecord.employee?.name}</h2>
                 <p className="text-sm text-muted">{selectedRecord.employee?.title || '—'}</p>
+                <button type="button" onClick={openLineEditor} disabled={!isAdmin || !activeRun || ['APPROVED', 'PAID'].includes(activeRun.status)} title={!isAdmin ? 'Requires the ADMIN role' : 'Adjust inputs and recalculate this line'} className="mt-3 rounded-input border border-border-default px-3 py-1.5 text-sm font-medium text-body hover:bg-surface-muted disabled:opacity-50">Edit payroll inputs</button>
                 <div className="mt-3">
                   <PayslipButton
                     runId={activeRunId}
@@ -555,6 +606,31 @@ export default function Payroll() {
               {dialogError}
             </p>
           )}
+        </div>
+      </FormDialog>
+      <FormDialog
+        open={isLineDialogOpen}
+        onClose={() => setIsLineDialogOpen(false)}
+        title={`Adjust ${selectedRecord?.employee?.name || 'payroll line'}`}
+        subtitle="The server recalculates gross, deductions, and net using this run’s tax rates."
+        confirmLabel="Recalculate line"
+        busy={adjustLineMutation.isPending}
+        onConfirm={submitLineAdjustment}
+        width="max-w-lg"
+      >
+        <div className="space-y-4">
+          {[
+            ['baseSalary', 'Base salary', 'text'],
+            ['missedDaysCount', 'Missed days', 'number'],
+            ['missedDaysAmount', 'Missed days deduction', 'text'],
+            ['bonusLabel', 'Bonus label', 'text'],
+            ['bonusAmount', 'Bonus amount', 'text'],
+          ].map(([field, labelText, type]) => (
+            <label key={field} className="block text-xs font-bold uppercase tracking-wider text-muted">{labelText}
+              <input type={type} min={type === 'number' ? 0 : undefined} step={type === 'number' ? 1 : undefined} inputMode={type === 'text' && field !== 'bonusLabel' ? 'decimal' : undefined} value={lineForm[field]} onChange={event => setLineForm(current => ({ ...current, [field]: event.target.value }))} className={`${DIALOG_INPUT} mt-1 normal-case font-normal tracking-normal`} />
+            </label>
+          ))}
+          {adjustLineMutation.isError && <p role="alert" className="text-sm text-danger">{adjustLineMutation.error?.message || 'Unable to recalculate this line.'}</p>}
         </div>
       </FormDialog>
     </div>

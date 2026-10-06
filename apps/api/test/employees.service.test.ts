@@ -48,6 +48,8 @@ function stubPrisma(options: {
   departmentFindFirst?: unknown | null
   employeeCreate?: unknown
   employeeUpdate?: unknown
+  payrollLineCount?: number
+  timesheetCount?: number
 }) {
   const calls: StubCalls = { countArgs: [] }
   let countIndex = 0
@@ -83,6 +85,8 @@ function stubPrisma(options: {
     department: {
       findFirst: async () => options.departmentFindFirst ?? null,
     },
+    payrollLine: { count: async () => options.payrollLineCount ?? 0 },
+    timesheet: { count: async () => options.timesheetCount ?? 0 },
   } as unknown as PrismaClient
 
   return { prisma, calls }
@@ -180,6 +184,13 @@ describe('deleteEmployee', () => {
   it('deletes once tenant ownership is confirmed', async () => {
     const { prisma, calls } = stubPrisma({ employeeFindFirst: baseRow })
     await deleteEmployee(prisma, 'tenant_1', 'emp_1')
-    expect((calls.deleteArgs as { where: { id: string } }).where.id).toBe('emp_1')
+    expect((calls.deleteArgs as { where: { id_tenantId: { id: string; tenantId: string } } }).where.id_tenantId).toEqual({ id: 'emp_1', tenantId: 'tenant_1' })
+  })
+
+  it('archives employees with payroll history to preserve records', async () => {
+    const { prisma, calls } = stubPrisma({ employeeFindFirst: baseRow, payrollLineCount: 1 })
+    await deleteEmployee(prisma, 'tenant_1', 'emp_1')
+    expect(calls.updateArgs).toMatchObject({ where: { id_tenantId: { id: 'emp_1', tenantId: 'tenant_1' } }, data: { status: 'ARCHIVED' } })
+    expect(calls.deleteArgs).toBeUndefined()
   })
 })

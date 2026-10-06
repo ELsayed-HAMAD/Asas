@@ -109,7 +109,7 @@ export async function updateCandidateStage(
   if (!candidate) throw new AppError(404, 'Candidate not found')
 
   const updated = await prisma.candidate.update({
-    where: { id: candidate.id },
+    where: { id_tenantId: { id: candidate.id, tenantId } },
     data: { stage: input.stage },
   })
   await prisma.candidateActivity.create({

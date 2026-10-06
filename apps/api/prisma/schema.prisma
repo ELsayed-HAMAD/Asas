@@ -30,6 +30,7 @@ enum RecordStatus {
 enum EmployeeStatus {
   ACTIVE
   ON_LEAVE
+  ARCHIVED
 }
 
 enum PayrollRunStatus {
@@ -151,6 +152,11 @@ enum IssuePriority {
   LOW
   MEDIUM
   HIGH
+}
+
+enum SprintStatus {
+  ACTIVE
+  COMPLETED
 }
 
 enum IntegrationStatus {
@@ -355,7 +361,7 @@ model Invitation {
 model AuditLog {
   id         String   @id @default(cuid())
   tenantId   String
-  actorId    String
+  actorId    String?
   action     String
   targetType String?
   targetId   String?
@@ -363,7 +369,7 @@ model AuditLog {
   createdAt  DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  actor  User   @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  actor  User?  @relation(fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, createdAt])
   @@index([tenantId, action])
@@ -437,6 +443,7 @@ model Employee {
   @@index([tenantId])
   @@index([tenantId, departmentId])
   @@index([tenantId, status])
+  @@unique([id, tenantId])
 }
 
 model PayrollRun {
@@ -474,7 +481,7 @@ model PayrollLine {
   updatedAt     DateTime @updatedAt
 
   payrollRun PayrollRun      @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
-  employee   Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee   Employee        @relation(fields: [employeeId], references: [id], onDelete: Restrict)
   taxLines   PayrollTaxLine[]
 
   @@index([tenantId])
@@ -499,11 +506,12 @@ model Timesheet {
   regularHours Float    @default(0)
   overtimeHours Float   @default(0)
   totalHours   Float    @default(0)
+  approvedAt   DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  employee Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee Employee       @relation(fields: [employeeId], references: [id], onDelete: Restrict)
   days     TimesheetDay[]
 
   @@unique([tenantId, employeeId, weekStart])
@@ -513,12 +521,15 @@ model Timesheet {
 model TimesheetDay {
   id          String  @id @default(cuid())
   timesheetId String
+  date        DateTime? @db.Date
   dayLabel    String
   clockIn     String?
   clockOut    String?
   totalHours  Float?
 
   timesheet Timesheet @relation(fields: [timesheetId], references: [id], onDelete: Cascade)
+
+  @@unique([timesheetId, date])
 }
 
 model AttendanceException {
@@ -578,6 +589,7 @@ model Candidate {
 
   @@index([tenantId])
   @@index([tenantId, stage])
+  @@unique([id, tenantId])
 }
 
 model CandidateActivity {
@@ -612,6 +624,7 @@ model PayableInvoice {
   vendorId      String
   invoiceNumber String?
   date          DateTime
+  dueDate       DateTime?
   amount        Decimal       @db.Decimal(19, 4)
   status        PayableStatus @default(PENDING)
   pdfFilename   String?
@@ -624,6 +637,8 @@ model PayableInvoice {
 
   @@index([tenantId])
   @@index([tenantId, status])
+  @@index([tenantId, dueDate])
+  @@unique([id, tenantId])
 }
 
 model PayableLineItem {
@@ -667,6 +682,7 @@ model ReceivableInvoice {
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 model CollectionActivity {
@@ -775,6 +791,7 @@ model Deal {
 
   @@index([tenantId])
   @@index([tenantId, stage])
+  @@unique([id, tenantId])
 }
 
 model DealActivity {
@@ -846,6 +863,7 @@ model Product {
   avgMonthlyUsage Float?
   leadTimeDays    Int?
   minThreshold    Int                @default(10)
+  archivedAt      DateTime?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
@@ -857,6 +875,7 @@ model Product {
   @@unique([tenantId, sku])
   @@unique([id, tenantId])
   @@index([tenantId])
+  @@index([tenantId, archivedAt])
 }
 
 model StockMovement {
@@ -939,6 +958,7 @@ model Project {
   sprints    Sprint[]
 
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 model ProjectMilestone {
@@ -966,6 +986,7 @@ model Sprint {
   tenantId      String
   projectId     String?
   name          String
+  status        SprintStatus @default(ACTIVE)
   endsAt        DateTime?
   completionPct Float     @default(0)
   createdAt     DateTime  @default(now())
@@ -976,6 +997,7 @@ model Sprint {
   issues  Issue[]
 
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 model Issue {
@@ -996,6 +1018,7 @@ model Issue {
   assignees  IssueAssignee[]
 
   @@index([tenantId])
+  @@unique([id, tenantId])
 }
 
 model IssueChecklistItem {

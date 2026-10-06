@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Download,
   ChevronDown,
@@ -27,30 +27,69 @@ const LEAVE_TYPE_LABELS = {
 }
 
 export default function TimeAttendance() {
+  const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState(null);
+  const [needsActionOnly, setNeedsActionOnly] = useState(true)
+  const [autoFlagOvertime, setAutoFlagOvertime] = useState(true)
+  const [departmentId, setDepartmentId] = useState('ALL')
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.hr.attendance.list(),
     queryFn: () => hrApi.listAttendance(),
   })
+  const clockMutation = useMutation({
+    mutationFn: (action) => action === 'IN' ? hrApi.clockIn() : hrApi.clockOut(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.hr.attendance.list() }),
+  })
+  const approveMutation = useMutation({
+    mutationFn: (timesheetId) => hrApi.approveTimesheet(timesheetId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.hr.attendance.list() }),
+  })
+  const approveAllMutation = useMutation({
+    mutationFn: (ids) => hrApi.approveValidTimesheets(ids),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.hr.attendance.list() }),
+  })
+  const { data: departmentData } = useQuery({
+    queryKey: queryKeys.hr.departments.list(),
+    queryFn: hrApi.getDepartments,
+  })
 
   // Normalize the rebuilt wire rows to the field names the (unchanged) markup reads.
   // The endpoint no longer returns per-day timesheets, so that collection is empty and the
   // right-hand timesheet table falls back to its "no days recorded" state.
-  const exceptions = (data?.exceptions ?? []).map(item => ({
+  const exceptions = (data?.exceptions ?? []).filter(item => departmentId === 'ALL' || item.departmentId === departmentId).map(item => ({
     ...item,
     name: item.employeeName,
     avatar: item.employeeAvatar,
   }));
-  const leaveRequests = (data?.leaveRequests ?? []).map(item => ({
+  const leaveRequests = (data?.leaveRequests ?? []).filter(item => departmentId === 'ALL' || item.departmentId === departmentId).map(item => ({
     ...item,
     name: item.employeeName,
     avatar: item.employeeAvatar,
     date: item.startDate,
     type: LEAVE_TYPE_LABELS[item.type] || item.type,
   }));
-  const timesheets = data?.timesheets ?? [];
+  const timesheets = (data?.timesheets ?? []).filter(item => departmentId === 'ALL' || item.departmentId === departmentId);
+  const eligibleTimesheets = timesheets.filter(item => item.approvalEligible);
+  const visibleExceptions = exceptions.filter((item) => !needsActionOnly || item.alert || (autoFlagOvertime && item.type === 'OVERTIME'));
+  const visibleLeaveRequests = leaveRequests.filter((item) => !needsActionOnly || item.status === 'PENDING');
   const summary = data?.summary ?? { exceptionCount: 0, onLeaveCount: 0, attendanceRate: null, timesheetCount: 0, overtimeHours: 0 };
+
+  function exportAttendance() {
+    const rows = [
+      ['Record Type', 'Employee', 'Date', 'Details', 'Status'],
+      ...visibleExceptions.map((item) => ['Exception', item.name, item.date, item.label, item.alert ? 'Needs action' : 'Recorded']),
+      ...visibleLeaveRequests.map((item) => ['Leave request', item.name, item.date, item.type, item.status]),
+      ...timesheets.flatMap((sheet) => sheet.days.map((day) => ['Timesheet', sheet.employeeName, day.dayLabel, `${day.clockIn || ''} - ${day.clockOut || ''} (${day.totalHours ?? 0}h)`, sheet.approvedAt ? 'Approved' : 'Pending'])),
+    ];
+    const csv = rows.map((row) => row.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'attendance.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 
   // Auto-select first exception or leave request if none is selected
   useEffect(() => {
@@ -65,11 +104,23 @@ export default function TimeAttendance() {
 
       <TopBarActions>
         <div className="flex gap-3">
-          <button disabled className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60">
+          {data?.selfClock && (
+            <button
+              disabled={clockMutation.isPending || (Boolean(data.selfClock.clockIn) && Boolean(data.selfClock.clockOut))}
+              onClick={() => clockMutation.mutate(data.selfClock.clockIn && !data.selfClock.clockOut ? 'OUT' : 'IN')}
+              className="bg-primary text-white px-5 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60"
+            >
+              {clockMutation.isPending ? 'Saving...' : data.selfClock.clockIn && !data.selfClock.clockOut ? 'Clock Out' : data.selfClock.clockOut ? 'Shift Complete' : 'Clock In'}
+            </button>
+          )}
+          {clockMutation.isError && <span role="alert" className="self-center text-xs text-danger">{clockMutation.error?.message || 'Could not record attendance.'}</span>}
+          {approveMutation.isError && <span role="alert" className="self-center text-xs text-danger">{approveMutation.error?.message || 'Could not approve this week.'}</span>}
+          {approveAllMutation.isError && <span role="alert" className="self-center text-xs text-danger">{approveAllMutation.error?.message || 'Could not approve valid timesheets.'}</span>}
+          <button onClick={exportAttendance} disabled={isLoading || isError} className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60">
             <Download size={16} /> Export
           </button>
-          <button disabled className="bg-primary text-white px-5 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60">
-            Approve All Valid
+          <button onClick={() => approveAllMutation.mutate(eligibleTimesheets.map(item => item.id))} disabled={!eligibleTimesheets.length || approveAllMutation.isPending} className="bg-primary text-white px-5 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60">
+            {approveAllMutation.isPending ? 'Approving...' : `Approve All Valid${eligibleTimesheets.length ? ` (${eligibleTimesheets.length})` : ''}`}
           </button>
         </div>
       </TopBarActions>
@@ -82,24 +133,28 @@ export default function TimeAttendance() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-sm">
               <span className="text-muted font-medium text-xs tracking-wider uppercase">Filter</span>
-              <button disabled className="flex items-center gap-2 border border-border-strong text-body px-3 py-1.5 rounded-input hover:bg-surface-muted disabled:opacity-60">
-                All Departments <ChevronDown size={14} className="text-caption" />
-              </button>
+              <label className="flex items-center gap-2 border border-border-strong text-body px-3 py-1.5 rounded-input">
+                <select aria-label="Department" value={departmentId} onChange={event => setDepartmentId(event.target.value)} className="max-w-44 bg-transparent text-sm outline-none">
+                  <option value="ALL">All Departments</option>
+                  {(departmentData ?? []).map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
+                </select>
+                <ChevronDown size={14} className="text-caption" />
+              </label>
             </div>
             <div className="flex items-center gap-2 text-sm ml-2">
               <span className="text-muted font-medium text-xs tracking-wider uppercase">Status</span>
-              <div className="flex items-center gap-1.5 border border-border-strong bg-surface-muted text-body px-3 py-1.5 rounded-input">
-                Needs Action <X size={14} className="text-caption cursor-pointer hover:text-body-light" />
-              </div>
+              <button type="button" onClick={() => setNeedsActionOnly((current) => !current)} className="flex items-center gap-1.5 border border-border-strong bg-surface-muted text-body px-3 py-1.5 rounded-input">
+                {needsActionOnly ? 'Needs Action' : 'All Statuses'} {needsActionOnly && <X size={14} className="text-caption" />}
+              </button>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-body">Auto-Flag Overtime</span>
             {/* Custom Toggle Switch */}
-            <div className="w-10 h-5 bg-accent rounded-full relative cursor-pointer flex items-center px-0.5 shadow-panel">
-              <div className="w-4 h-4 bg-surface-raised rounded-full translate-x-5 transition-transform shadow-card" />
-            </div>
+            <button type="button" role="switch" aria-checked={autoFlagOvertime} onClick={() => setAutoFlagOvertime((current) => !current)} className={`w-10 h-5 rounded-full relative flex items-center px-0.5 shadow-panel ${autoFlagOvertime ? 'bg-accent' : 'bg-surface-strong'}`}>
+              <div className={`w-4 h-4 bg-surface-raised rounded-full transition-transform shadow-card ${autoFlagOvertime ? 'translate-x-5' : ''}`} />
+            </button>
           </div>
         </div>
 
@@ -139,7 +194,7 @@ export default function TimeAttendance() {
           {isError && (
             <div className="p-10 text-danger">{error?.message || 'Error loading attendance data'}</div>
           )}
-          {!isLoading && exceptions.length === 0 && leaveRequests.length === 0 && (
+          {!isLoading && visibleExceptions.length === 0 && visibleLeaveRequests.length === 0 && (
             <div className="p-10 text-center text-muted">
               <p className="text-sm">No attendance records found.</p>
               <p className="text-xs mt-2">Load the sample pack to see demo data.</p>
@@ -147,15 +202,15 @@ export default function TimeAttendance() {
           )}
 
           {/* Section: Exceptions */}
-          {exceptions.length > 0 && (
+          {visibleExceptions.length > 0 && (
             <>
               <div className="px-6 py-2.5 bg-surface-muted/80 border-b border-border-default sticky top-0 z-10">
                 <span className="text-[10px] font-bold text-muted uppercase tracking-wider">
-                  Timesheet Exceptions · {exceptions.length} Items
+                  Timesheet Exceptions · {visibleExceptions.length} Items
                 </span>
               </div>
               <div className="divide-y divide-border-subtle">
-                {exceptions.map(item => {
+                {visibleExceptions.map(item => {
                   const isSelected = selectedId === item.id;
                   return (
                     <div
@@ -187,15 +242,15 @@ export default function TimeAttendance() {
           )}
 
           {/* Section: Leave Requests */}
-          {leaveRequests.length > 0 && (
+          {visibleLeaveRequests.length > 0 && (
             <>
               <div className="px-6 py-2.5 bg-surface-muted/80 border-y border-border-default sticky top-0 z-10">
                 <span className="text-[10px] font-bold text-muted uppercase tracking-wider">
-                  Pending Time Off · {leaveRequests.length} Items
+                  Time Off · {visibleLeaveRequests.length} Items
                 </span>
               </div>
               <div className="divide-y divide-border-subtle">
-                {leaveRequests.map(item => {
+                {visibleLeaveRequests.map(item => {
                   const isSelected = selectedId === item.id;
                   const displayDate = item.endDate ? `${formatShortDate(item.date)} - ${formatShortDate(item.endDate)}` : formatShortDate(item.date);
                   return (
@@ -258,8 +313,12 @@ export default function TimeAttendance() {
                       <p className="text-xs text-muted mt-0.5">Employee Details</p>
                     </div>
                   </div>
-                  <button disabled className="bg-primary text-white px-4 py-2 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60">
-                    Approve Week
+                  <button
+                    disabled={!ts || Boolean(ts.approvedAt) || approveMutation.isPending}
+                    onClick={() => ts && approveMutation.mutate(ts.id)}
+                    className="bg-primary text-white px-4 py-2 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60"
+                  >
+                    {approveMutation.isPending ? 'Approving...' : ts?.approvedAt ? 'Week Approved' : 'Approve Week'}
                   </button>
                 </div>
 

@@ -12,6 +12,7 @@ import type {
   IntegrationsListResponse,
   IntegrationUpdateInput,
   IntegrationWriteInput,
+  WebhookLogsResponse,
   NotificationModule,
   NotificationSettings,
   NotificationSettingsUpdateInput,
@@ -248,6 +249,22 @@ export async function getIntegrationSettings(
     // over a client-side array, per the rebuild rules.
     summary: { connectedCount, total },
   }
+}
+
+export async function getIntegrationWebhookLogs(
+  prisma: PrismaClient,
+  tenantId: string,
+  integrationId: string,
+): Promise<WebhookLogsResponse> {
+  const integration = await prisma.integration.findFirst({ where: { id: integrationId, tenantId }, select: { id: true } })
+  if (!integration) throw new AppError(404, 'Integration not found')
+  const rows = await prisma.webhookLog.findMany({
+    where: { integrationId: integration.id, integration: { tenantId } },
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+    select: { id: true, statusCode: true, event: true, createdAt: true },
+  })
+  return { items: rows.map(row => ({ ...row, createdAt: row.createdAt.toISOString() })) }
 }
 
 export async function createIntegration(

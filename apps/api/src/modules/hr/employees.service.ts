@@ -85,7 +85,7 @@ export async function listEmployees(
   query: EmployeeListQuery,
   canReadSalary: boolean,
 ): Promise<EmployeeListResult> {
-  const where: Prisma.EmployeeWhereInput = { tenantId }
+  const where: Prisma.EmployeeWhereInput = { tenantId, status: { not: 'ARCHIVED' } }
   if (query.departmentId) where.departmentId = query.departmentId
   if (query.status === 'Active') where.status = 'ACTIVE'
   if (query.status === 'On Leave') where.status = 'ON_LEAVE'
@@ -103,7 +103,7 @@ export async function listEmployees(
     prisma.employee.findMany({ where, skip, take, orderBy: { name: 'asc' }, include: employeeInclude }),
     prisma.employee.count({ where }),
     prisma.employee.count({ where: { tenantId, status: 'ON_LEAVE' } }),
-    prisma.employee.count({ where: { tenantId } }),
+    prisma.employee.count({ where: { tenantId, status: { not: 'ARCHIVED' } } }),
   ])
 
   return {
@@ -174,7 +174,7 @@ export async function updateEmployee(
   if (input.managerId !== undefined) await assertManagerInTenant(prisma, tenantId, input.managerId)
 
   const employee = await prisma.employee.update({
-    where: { id },
+    where: { id_tenantId: { id, tenantId } },
     data: {
       ...(input.name !== undefined && { name: input.name }),
       ...(input.title !== undefined && { title: input.title }),
@@ -198,5 +198,13 @@ export async function updateEmployee(
 export async function deleteEmployee(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
   const existing = await prisma.employee.findFirst({ where: { id, tenantId } })
   if (!existing) throw new AppError(404, 'Employee not found')
-  await prisma.employee.delete({ where: { id } })
+  const [payrollLines, timesheets] = await Promise.all([
+    prisma.payrollLine.count({ where: { employeeId: id, tenantId } }),
+    prisma.timesheet.count({ where: { employeeId: id, tenantId } }),
+  ])
+  if (payrollLines || timesheets) {
+    await prisma.employee.update({ where: { id_tenantId: { id, tenantId } }, data: { status: 'ARCHIVED' } })
+    return
+  }
+  await prisma.employee.delete({ where: { id_tenantId: { id, tenantId } } })
 }

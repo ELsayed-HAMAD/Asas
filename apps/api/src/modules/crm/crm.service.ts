@@ -229,7 +229,21 @@ export async function getDeal(prisma: PrismaClient, tenantId: string, id: string
 
 export async function getOverview(prisma: PrismaClient, tenantId: string): Promise<CrmOverview> {
   const currency = await getTenantCurrency(prisma, tenantId)
-  const stageMap = await stageAggregates(prisma, tenantId)
+  const [stageMap, createdLast7Days, monthlyOutcomes] = await Promise.all([
+    stageAggregates(prisma, tenantId),
+    prisma.deal.count({ where: { tenantId, stage: { in: [...OPEN_STAGES] }, createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } }),
+    prisma.$queryRaw<Array<{ month: string; stage: string; count: bigint }>>`
+      SELECT to_char("closeDate", 'YYYY-MM') AS month,
+             "stage"::text AS stage,
+             count(*)::bigint AS count
+      FROM "Deal"
+      WHERE "tenantId" = ${tenantId}
+        AND "stage"::text IN (${Prisma.join([...CLOSED_STAGES])})
+        AND "closeDate" IS NOT NULL
+      GROUP BY to_char("closeDate", 'YYYY-MM'), "stage"
+      ORDER BY month
+    `,
+  ])
 
   const rows = DealStageValues.map(stage => {
     const row = stageMap.get(stage)
@@ -255,6 +269,18 @@ export async function getOverview(prisma: PrismaClient, tenantId: string): Promi
   )
   const won = stageMap.get('CLOSED_WON')
   const lost = stageMap.get('CLOSED_LOST')
+  const outcomeMonths = new Map<string, { wonCount: number; lostCount: number }>()
+  for (const row of monthlyOutcomes) {
+    const month = outcomeMonths.get(row.month) ?? { wonCount: 0, lostCount: 0 }
+    if (row.stage === 'CLOSED_WON') month.wonCount = Number(row.count)
+    if (row.stage === 'CLOSED_LOST') month.lostCount = Number(row.count)
+    outcomeMonths.set(row.month, month)
+  }
+  const monthlyWinRate = [...outcomeMonths.entries()].map(([month, counts]) => ({
+    month,
+    ...counts,
+    rate: winRate(counts.wonCount, counts.lostCount),
+  }))
 
   return {
     pipeline: {
@@ -266,6 +292,8 @@ export async function getOverview(prisma: PrismaClient, tenantId: string): Promi
       lostCount: lost?.count ?? 0,
     },
     winRate: winRate(won?.count ?? 0, lost?.count ?? 0),
+    monthlyWinRate,
+    createdLast7Days,
     funnel,
   }
 }
@@ -281,6 +309,7 @@ async function monthlyOpenPipeline(
   prisma: PrismaClient,
   tenantId: string,
   currency: string,
+  year: string,
 ): Promise<MonthlyPipelineEntry[]> {
   const rows = await prisma.$queryRaw<Array<{ month: string; count: bigint; value: Prisma.Decimal }>>`
     SELECT to_char("closeDate", 'YYYY-MM') AS month,
@@ -290,6 +319,8 @@ async function monthlyOpenPipeline(
     WHERE "tenantId" = ${tenantId}
       AND "stage"::text IN (${Prisma.join([...OPEN_STAGES])})
       AND "closeDate" IS NOT NULL
+      AND "closeDate" >= ${new Date(`${year}-01-01T00:00:00.000Z`)}
+      AND "closeDate" < ${new Date(`${Number(year) + 1}-01-01T00:00:00.000Z`)}
     GROUP BY to_char("closeDate", 'YYYY-MM')
     ORDER BY month
   `
@@ -300,23 +331,92 @@ async function monthlyOpenPipeline(
   }))
 }
 
-export async function getForecast(prisma: PrismaClient, tenantId: string): Promise<CrmForecast> {
+async function monthlyCommittedPipeline(
+  prisma: PrismaClient,
+  tenantId: string,
+  currency: string,
+  year: string,
+): Promise<MonthlyPipelineEntry[]> {
+  const rows = await prisma.$queryRaw<Array<{ month: string; count: bigint; value: Prisma.Decimal }>>`
+    SELECT to_char("closeDate", 'YYYY-MM') AS month,
+           count(*)::bigint AS count,
+           sum("value") AS value
+    FROM "Deal"
+    WHERE "tenantId" = ${tenantId}
+      AND "stage"::text IN (${Prisma.join([...OPEN_STAGES])})
+      AND upper("forecastBucket") = 'COMMIT'
+      AND "closeDate" IS NOT NULL
+      AND "closeDate" >= ${new Date(`${year}-01-01T00:00:00.000Z`)}
+      AND "closeDate" < ${new Date(`${Number(year) + 1}-01-01T00:00:00.000Z`)}
+    GROUP BY to_char("closeDate", 'YYYY-MM')
+    ORDER BY month
+  `
+  return rows.map(row => ({ month: row.month, count: Number(row.count), value: toMoneyWire(row.value, currency)! }))
+}
+
+export async function getForecast(prisma: PrismaClient, tenantId: string, year = String(new Date().getFullYear())): Promise<CrmForecast> {
   const currency = await getTenantCurrency(prisma, tenantId)
-  const [snapshots, quotas, monthlyPipeline] = await Promise.all([
-    prisma.forecastSnapshot.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } }),
-    prisma.salesQuota.findMany({ where: { tenantId }, orderBy: { period: 'asc' } }),
-    monthlyOpenPipeline(prisma, tenantId, currency),
+  const [snapshotRows, quotaRows, monthlyPipeline, monthlyCommit, yearRows, totalPipelineRows] = await Promise.all([
+    prisma.forecastSnapshot.findMany({ where: { tenantId, period: { startsWith: year } }, orderBy: { createdAt: 'desc' } }),
+    prisma.salesQuota.findMany({ where: { tenantId, period: { startsWith: year } }, orderBy: { createdAt: 'desc' } }),
+    monthlyOpenPipeline(prisma, tenantId, currency, year),
+    monthlyCommittedPipeline(prisma, tenantId, currency, year),
+    prisma.$queryRaw<Array<{ year: string }>>`
+      SELECT DISTINCT year FROM (
+        SELECT substring("period" from 1 for 4) AS year FROM "ForecastSnapshot"
+          WHERE "tenantId" = ${tenantId} AND "period" ~ '^[0-9]{4}'
+        UNION
+        SELECT substring("period" from 1 for 4) AS year FROM "SalesQuota"
+          WHERE "tenantId" = ${tenantId} AND "period" ~ '^[0-9]{4}'
+        UNION
+        SELECT to_char("closeDate", 'YYYY') AS year FROM "Deal"
+          WHERE "tenantId" = ${tenantId} AND "closeDate" IS NOT NULL
+      ) AS years
+      ORDER BY year DESC
+    `,
+    prisma.$queryRaw<Array<{ value: Prisma.Decimal }>>`
+      SELECT COALESCE(sum("value"), 0) AS value
+      FROM "Deal"
+      WHERE "tenantId" = ${tenantId}
+        AND "stage"::text IN (${Prisma.join([...OPEN_STAGES])})
+        AND "closeDate" >= ${new Date(`${year}-01-01T00:00:00.000Z`)}
+        AND "closeDate" < ${new Date(`${Number(year) + 1}-01-01T00:00:00.000Z`)}
+    `,
   ])
-  const totalPipeline = monthlyPipeline.reduce((total, entry) => total + entry.value.amount, 0)
+  const snapshotKeys = new Set<string>()
+  const snapshots = snapshotRows.filter(row => {
+    const key = `${row.repName}\u0000${row.period}`
+    if (snapshotKeys.has(key)) return false
+    snapshotKeys.add(key)
+    return true
+  })
+  const quotaKeys = new Set<string>()
+  const quotas = quotaRows.filter(row => {
+    const key = `${row.employeeId ?? row.repName}\u0000${row.period}`
+    if (quotaKeys.has(key)) return false
+    quotaKeys.add(key)
+    return true
+  })
+  const totalPipeline = toMoneyWire(totalPipelineRows[0]?.value ?? new Prisma.Decimal(0), currency)?.amount ?? 0
   // `quota.quota` is a major-unit Decimal; `toMoneyWire` normalizes it to the integer minor
   // units (cents) that `totalPipeline` and the wire contract use. Summing `Number(quota.quota)`
   // directly was 100× too large (dollars vs cents), which also corrupted `quotaAttainmentPct`.
-  const totalQuota = quotas.reduce(
-    (total, quota) => total + (toMoneyWire(quota.quota, currency)?.amount ?? 0),
-    0,
-  )
+  const totalQuota = toMoneyWire(
+    quotas.reduce((total, quota) => total.add(quota.quota), new Prisma.Decimal(0)),
+    currency,
+  )?.amount ?? 0
+  const totalCommit = toMoneyWire(
+    snapshots.reduce((total, snapshot) => total.add(snapshot.commit), new Prisma.Decimal(0)),
+    currency,
+  )!
+  const totalBestCase = toMoneyWire(
+    snapshots.reduce((total, snapshot) => total.add(snapshot.bestCase), new Prisma.Decimal(0)),
+    currency,
+  )!
 
   return {
+    year,
+    availableYears: [...new Set([...yearRows.map(row => row.year), year])],
     forecastByRep: snapshots.map(snapshot => ({
       id: snapshot.id,
       repName: snapshot.repName,
@@ -336,9 +436,12 @@ export async function getForecast(prisma: PrismaClient, tenantId: string): Promi
       createdAt: quota.createdAt.toISOString(),
     })),
     monthlyPipeline,
+    monthlyCommit,
     summary: {
       totalPipeline: { amount: totalPipeline, currency },
       totalQuota: { amount: totalQuota, currency },
+      totalCommit,
+      totalBestCase,
       quotaAttainmentPct: totalQuota === 0 ? null : Math.round((totalPipeline / totalQuota) * 10000) / 100,
     },
   }
@@ -349,6 +452,7 @@ export async function getForecast(prisma: PrismaClient, tenantId: string): Promi
 export async function getSalesPerformance(
   prisma: PrismaClient,
   tenantId: string,
+  year = String(new Date().getFullYear()),
 ): Promise<CrmSalesPerformance> {
   const currency = await getTenantCurrency(prisma, tenantId)
 
@@ -364,6 +468,36 @@ export async function getSalesPerformance(
     GROUP BY to_char("closeDate", 'YYYY-MM')
     ORDER BY month
   `
+  const cycleRows = await prisma.$queryRaw<Array<{ value: number | null }>>`
+    SELECT AVG(EXTRACT(EPOCH FROM ("updatedAt" - "createdAt")) / 86400)::float8 AS value
+    FROM "Deal"
+    WHERE "tenantId" = ${tenantId} AND "stage"::text = 'CLOSED_WON'
+  `
+  const yearWonRows = await prisma.$queryRaw<Array<{ value: Prisma.Decimal | null }>>`
+    SELECT COALESCE(sum("value"), 0) AS value
+    FROM "Deal"
+    WHERE "tenantId" = ${tenantId}
+      AND "stage"::text = 'CLOSED_WON'
+      AND "closeDate" >= ${new Date(`${year}-01-01T00:00:00.000Z`)}
+      AND "closeDate" < ${new Date(`${Number(year) + 1}-01-01T00:00:00.000Z`)}
+  `
+  const activityRows = await prisma.$queryRaw<Array<{ week: string; active: bigint; won: bigint; lost: bigint }>>`
+    WITH weeks AS (
+      SELECT generate_series(date_trunc('week', CURRENT_DATE) - INTERVAL '3 weeks',
+                             date_trunc('week', CURRENT_DATE), INTERVAL '1 week') AS week_start
+    )
+    SELECT to_char(weeks.week_start, 'YYYY-MM-DD') AS week,
+      count(deal."id") FILTER (WHERE deal."stage"::text IN (${Prisma.join([...OPEN_STAGES])}))::bigint AS active,
+      count(deal."id") FILTER (WHERE deal."stage"::text = 'CLOSED_WON')::bigint AS won,
+      count(deal."id") FILTER (WHERE deal."stage"::text = 'CLOSED_LOST')::bigint AS lost
+    FROM weeks
+    LEFT JOIN "Deal" AS deal ON deal."tenantId" = ${tenantId}
+      AND date_trunc('week', deal."updatedAt") = weeks.week_start
+    GROUP BY weeks.week_start
+    ORDER BY weeks.week_start
+  `
+  const activityByWeek = new Map(activityRows.map(row => [row.week, { active: Number(row.active), won: Number(row.won), lost: Number(row.lost) }]))
+  const weeklyActivity = [...activityByWeek].map(([week, counts]) => ({ week, ...counts }))
   const monthlyClosedWon = wonByMonth.map(row => ({
     month: row.month,
     count: Number(row.count),
@@ -382,6 +516,32 @@ export async function getSalesPerformance(
     }),
     prisma.employee.findMany({ where: { tenantId }, select: { id: true, name: true } }),
   ])
+  const repActivityRows = await prisma.$queryRaw<Array<{ ownerEmployeeId: string | null; week: string; active: bigint; won: bigint; lost: bigint }>>`
+    WITH weeks AS (
+      SELECT generate_series(date_trunc('week', CURRENT_DATE) - INTERVAL '3 weeks',
+                             date_trunc('week', CURRENT_DATE), INTERVAL '1 week') AS week_start
+    ), owners AS (
+      SELECT DISTINCT "ownerEmployeeId" FROM "Deal" WHERE "tenantId" = ${tenantId}
+    )
+    SELECT owners."ownerEmployeeId",
+      to_char(weeks.week_start, 'YYYY-MM-DD') AS week,
+      count(deal."id") FILTER (WHERE deal."stage"::text IN (${Prisma.join([...OPEN_STAGES])}))::bigint AS active,
+      count(deal."id") FILTER (WHERE deal."stage"::text = 'CLOSED_WON')::bigint AS won,
+      count(deal."id") FILTER (WHERE deal."stage"::text = 'CLOSED_LOST')::bigint AS lost
+    FROM owners CROSS JOIN weeks
+    LEFT JOIN "Deal" AS deal ON deal."tenantId" = ${tenantId}
+      AND deal."ownerEmployeeId" IS NOT DISTINCT FROM owners."ownerEmployeeId"
+      AND date_trunc('week', deal."updatedAt") = weeks.week_start
+    GROUP BY owners."ownerEmployeeId", weeks.week_start
+    ORDER BY weeks.week_start
+  `
+  const activityByOwner = new Map<string, Array<{ week: string; active: number; won: number; lost: number }>>()
+  for (const row of repActivityRows) {
+    const key = row.ownerEmployeeId ?? '__unassigned__'
+    const trend = activityByOwner.get(key) ?? []
+    trend.push({ week: row.week, active: Number(row.active), won: Number(row.won), lost: Number(row.lost) })
+    activityByOwner.set(key, trend)
+  }
   const ownerNameById = new Map(employees.map(employee => [employee.id, employee.name]))
 
   interface RepAccumulator {
@@ -433,7 +593,10 @@ export async function getSalesPerformance(
   const totalLostCount = byRep.reduce((total, rep) => total + rep.lostCount, 0)
 
   return {
+    year,
+    yearWonTotal: toMoneyWire(yearWonRows[0]?.value ?? new Prisma.Decimal(0), currency)!,
     monthlyClosedWon,
+    weeklyActivity,
     byRep: byRep.map(rep => ({
       ownerEmployeeId: rep.ownerEmployeeId,
       ownerName: rep.ownerName,
@@ -444,12 +607,14 @@ export async function getSalesPerformance(
       lostCount: rep.lostCount,
       lostValue: { amount: rep.lostValue, currency },
       winRate: winRate(rep.wonCount, rep.lostCount),
+      weeklyActivity: activityByOwner.get(rep.ownerEmployeeId ?? '__unassigned__') ?? [],
     })),
     summary: {
       totalWon: { amount: totalWon, currency },
       totalWonCount,
       totalLostCount,
       overallWinRate: winRate(totalWonCount, totalLostCount),
+      averageSalesCycleDays: cycleRows[0]?.value ?? null,
     },
   }
 }
@@ -538,7 +703,7 @@ export async function updateDeal(
   if (input.ownerEmployeeId !== undefined) await assertOwnerInTenant(prisma, tenantId, input.ownerEmployeeId)
 
   const deal = await prisma.deal.update({
-    where: { id },
+    where: { id_tenantId: { id, tenantId } },
     data: {
       ...(input.name !== undefined && { name: input.name }),
       ...(input.stage !== undefined && { stage: input.stage }),

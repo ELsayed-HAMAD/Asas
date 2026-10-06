@@ -47,6 +47,7 @@ export type DealStage = z.infer<typeof dealStageSchema>
 export const EmployeeStatusValues = [
   'ACTIVE',
   'ON_LEAVE',
+  'ARCHIVED',
 ] as const satisfies readonly string[]
 
 export const employeeStatusSchema = z.enum(EmployeeStatusValues)
@@ -247,6 +248,15 @@ export const riskSeveritySchema = z.enum(RiskSeverityValues)
 
 export type RiskSeverity = z.infer<typeof riskSeveritySchema>
 
+export const SprintStatusValues = [
+  'ACTIVE',
+  'COMPLETED',
+] as const satisfies readonly string[]
+
+export const sprintStatusSchema = z.enum(SprintStatusValues)
+
+export type SprintStatus = z.infer<typeof sprintStatusSchema>
+
 export const SubscriptionStatusValues = [
   'ACTIVE',
   'PAST_DUE',
@@ -305,6 +315,7 @@ export const prismaEnums = {
   ReceivableStatus: ReceivableStatusValues,
   RecordStatus: RecordStatusValues,
   RiskSeverity: RiskSeverityValues,
+  SprintStatus: SprintStatusValues,
   SubscriptionStatus: SubscriptionStatusValues,
   SupportTicketStatus: SupportTicketStatusValues,
   UserRole: UserRoleValues,

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  ChevronRight, Calendar, Search, Download,
+  Calendar, Search, Download,
   Wallet, RefreshCw, FileText, Flame,
   MoreHorizontal, TrendingUp, Loader2
 } from 'lucide-react';
@@ -8,16 +8,17 @@ import {
   AreaChart, Area, ComposedChart, Bar, Line, XAxis, YAxis,
   CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts'
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../../../lib/api/finance';
 import { queryKeys } from '../../../lib/queryKeys';
-import { formatMoney } from '../../../lib/format';
+import { formatMoney, formatCompactMoney, moneyToMajor } from '../../../lib/format';
 import TopBarActions from '../../../components/TopBarActions';
+import FormDialog from '../../../components/common/FormDialog';
 
 // Display-only conversion of a wire money object ({amount: minor units, currency}) to a
 // major-unit number, used solely to feed recharts' numeric series / axis ticks. Every
 // human-readable figure still goes through formatMoney.
-const major = (money) => (money ? money.amount / 100 : 0);
+const major = (money) => (money ? moneyToMajor(money) : 0);
 
 const EXPENSE_COLORS = [
   'var(--color-info)',
@@ -29,10 +30,20 @@ const EXPENSE_COLORS = [
 ]
 
 export default function FinanceOverview() {
+  const queryClient = useQueryClient()
+  const [invoiceOpen, setInvoiceOpen] = useState(false)
+  const [transactionSearch, setTransactionSearch] = useState('')
+  const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()))
+  const [invoiceForm, setInvoiceForm] = useState({ customerId: '', number: '', amount: '', dueDate: '' })
   const { data, isLoading, isError } = useQuery({
     queryKey: [...queryKeys.finance.all(), 'overview'],
     queryFn: financeApi.getOverview,
   });
+  const { data: customersData } = useQuery({ queryKey: [...queryKeys.finance.all(), 'customers'], queryFn: financeApi.listCustomers })
+  const createInvoice = useMutation({
+    mutationFn: () => financeApi.createReceivable({ ...invoiceForm, number: invoiceForm.number || null, dueDate: invoiceForm.dueDate || null, status: 'CURRENT' }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.finance.all() }); setInvoiceOpen(false); setInvoiceForm({ customerId: '', number: '', amount: '', dueDate: '' }) },
+  })
 
   if (isLoading) {
     return (
@@ -50,12 +61,55 @@ export default function FinanceOverview() {
     );
   }
 
-  const cashFlowData = (data.cashFlow ?? []).map((p) => ({
+  const availableYears = [...new Set([selectedYear, ...(data.cashFlow ?? []).map(point => point.month.slice(0, 4))])].sort((a, b) => b.localeCompare(a))
+  const cashFlowData = (data.cashFlow ?? []).filter(point => point.month.startsWith(`${selectedYear}-`)).map((p) => ({
     month: p.month,
     inflow: major(p.inflow),
     outflow: major(p.outflow),
     net: major(p.net),
   }));
+  const currency = data.cashFlow?.[0]?.inflow?.currency || data.receivableOutstanding?.currency || 'USD'
+  const recentTransactions = (data.recentTransactions ?? []).filter(tx =>
+    tx.date.startsWith(`${selectedYear}-`) && (!transactionSearch || tx.description.toLowerCase().includes(transactionSearch.toLowerCase()) || tx.status.toLowerCase().includes(transactionSearch.toLowerCase())),
+  )
+
+  function downloadCsv(filename, rows) {
+    const quote = value => `"${String(value ?? '').replaceAll('"', '""')}"`
+    const csv = rows.map(row => row.map(quote).join(',')).join('\r\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function downloadFinanceReport() {
+    downloadCsv(`finance-${selectedYear}-${new Date().toISOString().slice(0, 10)}.csv`, [
+      ['Finance report', `Calendar year ${selectedYear}`],
+      ['Metric', 'Amount (minor units)', 'Currency'],
+      ...[['Receivables outstanding', data.receivableOutstanding], ['Payables outstanding', data.payableOutstanding], ['Expenses total', data.expensesTotal], ['Expenses pending', data.expensesPendingTotal]].map(([label, amount]) => [label, amount.amount, amount.currency]),
+      [],
+      ['Month', 'Inflow (minor units)', 'Outflow (minor units)', 'Net (minor units)', 'Currency'],
+      ...cashFlowData.map(point => {
+        const source = data.cashFlow.find(row => row.month === point.month)
+        return [point.month, source.inflow.amount, source.outflow.amount, source.net.amount, source.net.currency]
+      }),
+      [],
+      ['Date', 'Description', 'Amount (minor units)', 'Currency', 'Type', 'Status'],
+      ...recentTransactions.map(tx => [tx.date, tx.description, tx.amount.amount, tx.amount.currency, tx.type, tx.status]),
+    ])
+  }
+
+  function downloadCashFlow() {
+    downloadCsv(`cash-flow-${selectedYear}.csv`, [
+      ['Month', 'Inflow (minor units)', 'Outflow (minor units)', 'Net (minor units)', 'Currency'],
+      ...cashFlowData.map(point => {
+        const source = data.cashFlow.find(row => row.month === point.month)
+        return [point.month, source.inflow.amount, source.outflow.amount, source.net.amount, source.net.currency]
+      }),
+    ])
+  }
 
   // Net cash-flow sparkline for the second KPI card (the old page drew a MRR sparkline here).
   const netSeries = cashFlowData.map((p, i) => ({ v: p.net, id: i }));
@@ -79,26 +133,30 @@ export default function FinanceOverview() {
 
       <TopBarActions>
         <div className="flex items-center gap-3">
-          <button disabled className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60">
+          <label className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors">
             <Calendar size={14} className="text-muted" />
-            Year to Date
-            <ChevronRight size={14} className="text-caption rotate-90" />
-          </button>
+            <span>Year</span>
+            <select aria-label="Finance calendar year" value={selectedYear} onChange={event => setSelectedYear(event.target.value)} className="bg-transparent focus:outline-none">
+              {availableYears.map(year => <option key={year} value={year}>{year}</option>)}
+            </select>
+          </label>
 
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
             <input
               type="text"
               placeholder="Search..."
+              value={transactionSearch}
+              onChange={event => setTransactionSearch(event.target.value)}
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-56 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
           </div>
 
-          <button disabled className="p-1.5 text-muted hover:text-heading transition-colors disabled:opacity-60">
+          <button type="button" onClick={downloadFinanceReport} aria-label="Download finance report" title="Download finance report" className="p-1.5 text-muted hover:text-heading transition-colors">
             <Download size={18} />
           </button>
 
-          <button disabled className="bg-primary text-on-primary px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
+          <button onClick={() => setInvoiceOpen(true)} className="bg-primary text-on-primary px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors">
             Create Invoice
           </button>
         </div>
@@ -179,7 +237,7 @@ export default function FinanceOverview() {
         <div className="bg-surface-raised border border-border-default rounded-card-sm shadow-card overflow-hidden">
           <div className="flex items-center justify-between p-6 pb-2">
             <h2 className="text-lg font-bold text-heading">Cash Flow Analysis</h2>
-            <button className="text-caption hover:text-body">
+              <button type="button" onClick={downloadCashFlow} aria-label="Download cash flow data" title="Download cash flow data" className="text-caption hover:text-body">
               <MoreHorizontal size={20} />
             </button>
           </div>
@@ -190,14 +248,14 @@ export default function FinanceOverview() {
                 <ComposedChart data={cashFlowData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--color-muted)', fontWeight: 500 }} dy={8} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-caption)', fontWeight: 600 }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-caption)', fontWeight: 600 }} tickFormatter={(v) => formatCompactMoney(v, currency)} />
                   <Tooltip
                     contentStyle={{ borderRadius: 'var(--radius-button)', border: '1px solid var(--color-border-default)', boxShadow: 'var(--shadow-card-hover)', fontSize: 13, padding: '12px', lineHeight: '1.5' }}
                     formatter={(value, name) => {
                       const label = name === 'inflow' ? 'Inflow' : name === 'outflow' ? 'Outflow' : 'Net'
                       // Do not use Math.abs() for Net so negative values render correctly in the tooltip
-                      const formattedValue = name === 'net' ? (value / 1000).toFixed(0) : Math.abs(value / 1000).toFixed(0)
-                      return [`$${formattedValue}k`, label]
+                      const formattedValue = name === 'net' ? value : Math.abs(value)
+                      return [formatCompactMoney(formattedValue, currency), label]
                     }}
                     labelStyle={{ fontWeight: 600, color: 'var(--color-heading)' }}
                   />
@@ -219,8 +277,8 @@ export default function FinanceOverview() {
           <div className="col-span-2 bg-surface-raised border border-border-default rounded-card-sm shadow-card overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-border-subtle">
               <h2 className="text-lg font-bold text-heading">Recent Transactions</h2>
-              <button disabled className="text-sm font-semibold text-accent hover:text-accent-hover disabled:opacity-60">
-                View All
+              <button type="button" onClick={() => setTransactionSearch('')} className="text-sm font-semibold text-accent hover:text-accent-hover">
+                Clear Search
               </button>
             </div>
             <div className="flex-1 overflow-auto">
@@ -234,7 +292,7 @@ export default function FinanceOverview() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-faint">
-                  {(data.recentTransactions ?? []).map((tx) => (
+                  {recentTransactions.map((tx) => (
                     <tr key={tx.id} className="hover:bg-surface-muted/50">
                       <td className="px-6 py-4 text-sm text-body-light font-medium">
                         {new Date(tx.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit' })}
@@ -243,7 +301,10 @@ export default function FinanceOverview() {
                       <td className={`px-6 py-4 text-sm font-medium text-right tabular-nums ${
                         tx.type === 'credit' ? 'text-success' : 'text-heading'
                       }`}>
-                        {formatMoney(tx.type === 'debit' ? -tx.amount : tx.amount, { forcePlus: tx.type === 'credit' })}
+                        {formatMoney(tx.type === 'debit' && tx.amount && typeof tx.amount === 'object'
+                          ? { ...tx.amount, amount: -Math.abs(tx.amount.amount) }
+                          : tx.type === 'debit' ? -Number(tx.amount) : tx.amount,
+                          { forcePlus: tx.type === 'credit' })}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
@@ -258,7 +319,7 @@ export default function FinanceOverview() {
                       </td>
                     </tr>
                   ))}
-                  {(data.recentTransactions ?? []).length === 0 && (
+                  {recentTransactions.length === 0 && (
                     <tr>
                       <td colSpan={4} className="px-6 py-8 text-center text-muted text-sm">
                         No recent transactions found.
@@ -320,6 +381,9 @@ export default function FinanceOverview() {
         </div>
 
       </div>
+      <FormDialog open={invoiceOpen} onClose={() => setInvoiceOpen(false)} title="Create invoice" subtitle="Create a receivable invoice for a customer." busy={createInvoice.isPending} onConfirm={() => createInvoice.mutate()} confirmLabel="Create invoice">
+        <div className="space-y-4"><label className="block text-sm font-medium text-body">Customer<select required value={invoiceForm.customerId} onChange={event => setInvoiceForm(current => ({ ...current, customerId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="">Select a customer</option>{(customersData?.items ?? []).map(customer => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label><label className="block text-sm font-medium text-body">Invoice number<input value={invoiceForm.number} onChange={event => setInvoiceForm(current => ({ ...current, number: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Amount<input required type="number" min="0" step="0.01" value={invoiceForm.amount} onChange={event => setInvoiceForm(current => ({ ...current, amount: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Due date<input type="date" value={invoiceForm.dueDate} onChange={event => setInvoiceForm(current => ({ ...current, dueDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div>
+      </FormDialog>
     </div>
   );
 }

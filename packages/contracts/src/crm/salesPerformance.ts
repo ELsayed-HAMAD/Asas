@@ -30,13 +30,30 @@ export const repPerformanceSchema = z.object({
   lostValue: moneySchema,
   /** Won / (won + lost) for this rep, percentage 0–100, or null when they have no closed deals. */
   winRate: z.number().min(0).max(100).nullable(),
+  weeklyActivity: z.array(z.object({
+    week: z.string().length(10),
+    active: z.int().min(0),
+    won: z.int().min(0),
+    lost: z.int().min(0),
+  })),
 })
 
 export type RepPerformance = z.infer<typeof repPerformanceSchema>
 
+export const weeklyActivitySchema = z.object({
+  week: z.string().length(10),
+  active: z.int().min(0),
+  won: z.int().min(0),
+  lost: z.int().min(0),
+})
+
 export const salesPerformanceResponseSchema = z.object({
+  /** Calendar year used for the year-to-date closed-won total. */
+  year: z.string().regex(/^\d{4}$/),
+  yearWonTotal: moneySchema,
   /** Closed-won by month, ascending. Months with no closed-won deals are simply absent. */
   monthlyClosedWon: z.array(monthlyClosedWonSchema),
+  weeklyActivity: z.array(weeklyActivitySchema),
   /** Per-owner breakdown, open pipeline first (largest first), then owners with no open deals. */
   byRep: z.array(repPerformanceSchema),
   summary: z.object({
@@ -44,6 +61,7 @@ export const salesPerformanceResponseSchema = z.object({
     totalWonCount: z.int().min(0),
     totalLostCount: z.int().min(0),
     overallWinRate: z.number().min(0).max(100).nullable(),
+    averageSalesCycleDays: z.number().nonnegative().nullable(),
   }),
 })
 

@@ -306,6 +306,7 @@ export async function getBurndown(
 type SprintWithCount = {
   id: string
   name: string
+  status: 'ACTIVE' | 'COMPLETED'
   projectId: string | null
   endsAt: Date | null
   createdAt: Date
@@ -319,6 +320,7 @@ function mapSprint(sprint: SprintWithCount, doneCount: number): Sprint {
   return {
     id: sprint.id,
     name: sprint.name,
+    status: sprint.status,
     projectId: sprint.projectId,
     endsAt: sprint.endsAt?.toISOString() ?? null,
     completionPct: total === 0 ? 0 : Math.round((done / total) * 100),
@@ -378,6 +380,7 @@ export async function createSprint(
     data: {
       tenantId,
       name: input.name,
+      ...(input.status !== undefined && { status: input.status }),
       projectId: input.projectId ?? null,
       endsAt: input.endsAt ? new Date(input.endsAt) : null,
     },
@@ -397,9 +400,10 @@ export async function updateSprint(
   if (input.projectId !== undefined) await assertProjectInTenant(prisma, tenantId, input.projectId)
 
   const sprint = await prisma.sprint.update({
-    where: { id },
+    where: { id_tenantId: { id, tenantId } },
     data: {
       ...(input.name !== undefined && { name: input.name }),
+      ...(input.status !== undefined && { status: input.status }),
       ...(input.projectId !== undefined && { projectId: input.projectId }),
       ...(input.endsAt !== undefined && { endsAt: input.endsAt ? new Date(input.endsAt) : null }),
     },
@@ -412,7 +416,7 @@ export async function updateSprint(
 export async function deleteSprint(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
   const existing = await prisma.sprint.findFirst({ where: { id, tenantId } })
   if (!existing) throw new AppError(404, 'Sprint not found')
-  await prisma.sprint.delete({ where: { id } })
+  await prisma.sprint.delete({ where: { id_tenantId: { id, tenantId } } })
 }
 
 // ── Issues (work items a sprint burndowns) ──────────────────────────────────────
@@ -488,7 +492,7 @@ export async function updateIssue(
   if (input.sprintId !== undefined) await assertSprintInTenant(prisma, tenantId, input.sprintId)
 
   const issue = await prisma.issue.update({
-    where: { id },
+    where: { id_tenantId: { id, tenantId } },
     data: {
       ...(input.sprintId !== undefined && { sprintId: input.sprintId }),
       ...(input.key !== undefined && { key: input.key }),
@@ -504,7 +508,7 @@ export async function updateIssue(
 export async function deleteIssue(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
   const existing = await prisma.issue.findFirst({ where: { id, tenantId } })
   if (!existing) throw new AppError(404, 'Issue not found')
-  await prisma.issue.delete({ where: { id } })
+  await prisma.issue.delete({ where: { id_tenantId: { id, tenantId } } })
 }
 
 // ── Project writes ──────────────────────────────────────────────────────────────
@@ -548,7 +552,7 @@ export async function updateProject(
   }
 
   const project = await prisma.project.update({
-    where: { id },
+    where: { id_tenantId: { id, tenantId } },
     data: {
       ...(input.name !== undefined && { name: input.name }),
       ...(input.status !== undefined && { status: input.status }),
@@ -564,7 +568,7 @@ export async function updateProject(
 export async function deleteProject(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
   const existing = await prisma.project.findFirst({ where: { id, tenantId } })
   if (!existing) throw new AppError(404, 'Project not found')
-  await prisma.project.delete({ where: { id } })
+  await prisma.project.delete({ where: { id_tenantId: { id, tenantId } } })
 }
 
 // ── Roadmap (the Gantt) ─────────────────────────────────────────────────────────

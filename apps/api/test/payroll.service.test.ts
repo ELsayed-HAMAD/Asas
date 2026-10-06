@@ -56,6 +56,7 @@ interface StubOptions {
   lines?: Row[]
   payrollRunFindFirst?: Row | null
   grossSum?: Prisma.Decimal
+  deductionsSum?: Prisma.Decimal
   netSum?: Prisma.Decimal
   lineCount?: number
 }
@@ -110,7 +111,7 @@ function stubPrisma(options: StubOptions = {}) {
       update: async () => {},
       aggregate: async () => ({
         _count: { _all: options.lineCount ?? 2 },
-        _sum: { gross: options.grossSum ?? dec('220000'), net: options.netSum ?? dec('198000') },
+        _sum: { gross: options.grossSum ?? dec('220000'), deductions: options.deductionsSum ?? dec('22000'), net: options.netSum ?? dec('198000') },
       }),
     },
     payrollTaxLine: { deleteMany: async () => {}, createMany: async () => {} },
@@ -226,5 +227,13 @@ describe('payroll.service', () => {
   it('404s a run the tenant does not own', async () => {
     const prisma = stubPrisma({ payrollRunFindFirst: null })
     await expect(getPayrollRun(prisma, TENANT, 'nope')).rejects.toThrow(/not found/)
+  })
+
+  it('returns exact per-run SQL totals alongside its lines', async () => {
+    const result = await getPayrollRun(stubPrisma({
+      lines: [lineRow(), lineRow({ id: 'line_2', gross: dec('200000.00'), deductions: dec('20000.00'), net: dec('180000.00') })],
+      grossSum: dec('300000.00'), deductionsSum: dec('30000.00'), netSum: dec('270000.00'),
+    }), TENANT, RUN_ID)
+    expect(result.totals).toEqual({ gross: '300000.00', deductions: '30000.00', net: '270000.00' })
   })
 })

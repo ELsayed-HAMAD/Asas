@@ -10,34 +10,30 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { crmApi } from '../../../lib/api/crm';
 import { queryKeys } from '../../../lib/queryKeys';
-import { formatMoney, formatPercent } from '../../../lib/format';
+import { formatMoney, formatPercent, moneyToMajor } from '../../../lib/format';
 import TopBarActions from '../../../components/TopBarActions';
 import EmptyState from '../../../components/common/EmptyState';
+import FormDialog from '../../../components/common/FormDialog';
 
 // Chart-only number formatters (axis ticks / tooltips). Money arrives as
 // { amount: minor units, currency } — reduce to a major-unit number for the scale.
-const toMajor = (money) => (money == null ? 0 : money.amount / 100);
-const formatCompact = (v) => {
-  if (v >= 1000000) {
-    return `$${(v / 1000000).toLocaleString('en-US', { maximumFractionDigits: 2 })}M`;
-  } else if (v >= 1000) {
-    return `$${(v / 1000).toLocaleString('en-US', { maximumFractionDigits: 0 })}k`;
-  }
-  return `$${v}`;
-};
+const toMajor = (money) => (money == null ? 0 : moneyToMajor(money));
+const formatCompact = (v, currency) => new Intl.NumberFormat('en-US', {
+  style: 'currency', currency: currency || 'USD', notation: 'compact', maximumFractionDigits: 1,
+}).format(v);
 
 export default function CRMOverview() {
   const queryClient = useQueryClient()
   const [agendaTitle, setAgendaTitle] = useState('')
+  const [dealOpen, setDealOpen] = useState(false)
+  const [dealForm, setDealForm] = useState({ name: '', value: '', stage: 'LEADS', closeDate: '' })
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.crm.overview(),
     queryFn: crmApi.getOverview,
   });
 
-  // The old page's "Revenue Forecast" area chart and the Total-Pipeline sparkline had no
-  // counterpart in /crm/overview; the real feed for both is /crm/forecast's monthlyPipeline
-  // (open deals grouped by close-date month). No win-rate time series exists on the server,
-  // so the Win Rate sparkline keeps its markup but renders an empty series.
+  // Revenue forecast uses open pipeline grouped by close month; outcome trend uses closed deals
+  // grouped by their recorded close month from the overview endpoint.
   const { data: forecast } = useQuery({
     queryKey: queryKeys.crm.forecast(),
     queryFn: crmApi.getForecast,
@@ -46,6 +42,14 @@ export default function CRMOverview() {
   const createAgenda = useMutation({
     mutationFn: () => crmApi.createAgenda({ title: agendaTitle.trim() }),
     onSuccess: () => { setAgendaTitle(''); queryClient.invalidateQueries({ queryKey: queryKeys.crm.agenda() }) },
+  })
+  const createDeal = useMutation({
+    mutationFn: () => crmApi.createDeal({ ...dealForm, value: dealForm.value || null, closeDate: dealForm.closeDate || null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.crm.all() })
+      setDealOpen(false)
+      setDealForm({ name: '', value: '', stage: 'LEADS', closeDate: '' })
+    },
   })
 
   if (isLoading) {
@@ -83,6 +87,8 @@ export default function CRMOverview() {
 
   const monthly = (forecast?.monthlyPipeline || []).map((row) => ({ month: row.month, value: toMajor(row.value) }));
   const pipelineSpark = monthly.map((row) => ({ v: row.value }));
+  const winRateSpark = (data.monthlyWinRate || []).filter((row) => row.rate != null).map((row) => ({ v: row.rate }));
+  const currency = pipeline.openTotal?.currency || forecast?.summary?.totalPipeline?.currency || 'USD';
 
   // Closed-Won progress bar: closed-won value against the stored quota goal (when any).
   const quotaMajor = toMajor(forecast?.summary?.totalQuota);
@@ -109,7 +115,7 @@ export default function CRMOverview() {
             <Moon size={18} />
           </button>
 
-          <button disabled className="bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
+          <button onClick={() => setDealOpen(true)} className="bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors">
             New Deal
           </button>
         </div>
@@ -147,11 +153,11 @@ export default function CRMOverview() {
 
           {/* Win Rate */}
           <div className="relative overflow-hidden bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card h-28">
-            {/* Background Chart — no win-rate time series exists server-side; empty series */}
+            {/* Background Chart — monthly closed deal outcomes */}
             <div className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none z-0">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={[]} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
-                  <YAxis hide domain={([min, max]) => [min - (max - min) * 3, max]} />
+                <AreaChart data={winRateSpark} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
+                  <YAxis hide domain={[0, 100]} />
                   <defs>
                     <linearGradient id="winrateSparkGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.15} />
@@ -170,13 +176,13 @@ export default function CRMOverview() {
             </div>
           </div>
 
-          {/* Active Deals — the "+3 this week" delta had no data source in the old UI; kept as-is */}
+          {/* Active deal additions over the previous seven days, aggregated by the API. */}
           <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card flex flex-col justify-between h-28">
             <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Active Deals</p>
             <div className="flex items-center gap-3">
               <p className="text-3xl font-bold text-heading tracking-tight">{pipeline.openCount}</p>
               <span className="bg-surface-active text-body-light border border-border-default px-2 py-0.5 rounded text-[11px] font-medium mt-1">
-                +3 this week
+                +{data.createdLast7Days} this week
               </span>
             </div>
           </div>
@@ -220,10 +226,10 @@ export default function CRMOverview() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-muted)', fontWeight: 500 }} dy={8} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-caption)', fontWeight: 500 }} tickFormatter={formatCompact} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-caption)', fontWeight: 500 }} tickFormatter={(value) => formatCompact(value, currency)} />
                   <Tooltip
                     contentStyle={{ borderRadius: 10, border: '1px solid var(--color-border-default)', boxShadow: 'var(--shadow-card-hover)', fontSize: 13 }}
-                    formatter={(value) => [formatCompact(value), 'Revenue']}
+                    formatter={(value) => [formatCompact(value, currency), 'Revenue']}
                     labelStyle={{ fontWeight: 600, color: 'var(--color-heading)' }}
                   />
                   <Area type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={3} fill="url(#crmRevGrad)" dot={false} activeDot={{ r: 5, fill: '#2563eb', strokeWidth: 2, stroke: '#fff' }} animationDuration={1200} />
@@ -323,6 +329,14 @@ export default function CRMOverview() {
 
         </div>
       </div>
+      <FormDialog open={dealOpen} onClose={() => setDealOpen(false)} title="New deal" subtitle="Add a deal to the CRM pipeline." busy={createDeal.isPending} onConfirm={() => createDeal.mutate()} confirmLabel="Create deal">
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-body">Deal name<input required value={dealForm.name} onChange={event => setDealForm(current => ({ ...current, name: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
+          <label className="block text-sm font-medium text-body">Value<input type="number" min="0" step="0.01" value={dealForm.value} onChange={event => setDealForm(current => ({ ...current, value: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
+          <label className="block text-sm font-medium text-body">Stage<select value={dealForm.stage} onChange={event => setDealForm(current => ({ ...current, stage: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="LEADS">Leads</option><option value="PROPOSAL">Proposal</option><option value="NEGOTIATION">Negotiation</option></select></label>
+          <label className="block text-sm font-medium text-body">Expected close date<input type="date" value={dealForm.closeDate} onChange={event => setDealForm(current => ({ ...current, closeDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
+        </div>
+      </FormDialog>
     </div>
   );
 }

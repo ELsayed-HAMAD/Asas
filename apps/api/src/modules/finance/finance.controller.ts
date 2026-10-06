@@ -10,12 +10,16 @@
 import type {
   Customer,
   CustomerWriteInput,
+  CollectionActivity,
+  CollectionActivityWriteInput,
   Expense,
   ExpenseListQuery,
   ExpenseStatus,
   ExpenseUpdateInput,
   ExpenseWriteInput,
   FinanceOverview,
+  PayableDetail,
+  PayableBatchPaymentInput,
   PayableInvoice,
   PayableListQuery,
   PayableStatus,
@@ -54,7 +58,7 @@ export function listPayables(prisma: PrismaClient, tenantId: string, query: Paya
   return service.listPayables(prisma, tenantId, query)
 }
 
-export function getPayable(prisma: PrismaClient, tenantId: string, id: string): Promise<PayableInvoice> {
+export function getPayable(prisma: PrismaClient, tenantId: string, id: string): Promise<PayableDetail> {
   return service.getPayable(prisma, tenantId, id)
 }
 
@@ -80,6 +84,14 @@ export function updatePayableStatus(
   return service.updatePayableStatus(prisma, tenantId, id, status)
 }
 
+export function requestPayableChanges(prisma: PrismaClient, tenantId: string, id: string) {
+  return service.requestPayableChanges(prisma, tenantId, id)
+}
+
+export function payApprovedPayables(prisma: PrismaClient, tenantId: string, input: PayableBatchPaymentInput) {
+  return service.payApprovedPayables(prisma, tenantId, input.ids)
+}
+
 export function deletePayable(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
   return service.deletePayable(prisma, tenantId, id)
 }
@@ -96,6 +108,20 @@ export function createCustomer(
   input: CustomerWriteInput,
 ): Promise<Customer> {
   return service.createCustomer(prisma, tenantId, input)
+}
+
+export function listCollectionActivities(prisma: PrismaClient, tenantId: string, customerId: string): Promise<CollectionActivity[]> {
+  return service.listCollectionActivities(prisma, tenantId, customerId)
+}
+
+export function createCollectionActivity(
+  prisma: PrismaClient,
+  tenantId: string,
+  customerId: string,
+  author: string,
+  input: CollectionActivityWriteInput,
+): Promise<CollectionActivity> {
+  return service.createCollectionActivity(prisma, tenantId, customerId, author, input)
 }
 
 // ── Receivables ─────────────────────────────────────────────────────────────────

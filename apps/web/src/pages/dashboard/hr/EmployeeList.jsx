@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Search, ChevronDown, Download,
+  Search, Download,
   TrendingUp, AlertTriangle, Pencil, Mail, Calendar,
   Banknote, Briefcase, Network, History, Trash2,
 } from 'lucide-react'
@@ -32,13 +32,30 @@ const STATUS_LABELS = {
 export default function EmployeeDirectory() {
   const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState(null)
+  const [selectedIds, setSelectedIds] = useState([])
+  const [sortAscending, setSortAscending] = useState(true)
   const [search, setSearch] = useState('')
+  const [departmentId, setDepartmentId] = useState('')
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createForm, setCreateForm] = useState({ name: '', title: '', email: '', departmentId: '' })
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', title: '', email: '', location: '' })
   const [deleteOpen, setDeleteOpen] = useState(false)
   const { data: activeMemberRole } = useActiveMemberRole()
   const canDelete = activeMemberRole === 'OWNER' || activeMemberRole === 'ADMIN'
   const exportMutation = useMutation({ mutationFn: () => exportsApi.createJob({ kind: 'employees' }) })
+  const { data: departmentsData } = useQuery({
+    queryKey: queryKeys.hr.departments.list(),
+    queryFn: hrApi.getDepartments,
+  })
+  const createMutation = useMutation({
+    mutationFn: () => hrApi.createEmployee({ ...createForm, departmentId: createForm.departmentId || null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.hr.employees.all() })
+      setCreateOpen(false)
+      setCreateForm({ name: '', title: '', email: '', departmentId: '' })
+    },
+  })
   const editMutation = useMutation({
     mutationFn: () => hrApi.updateEmployee(selectedId, editForm),
     onSuccess: () => {
@@ -56,18 +73,25 @@ export default function EmployeeDirectory() {
   })
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: queryKeys.hr.employees.list({ search: search || undefined }),
-    queryFn: () => hrApi.listEmployees({ search: search || undefined, limit: 100 }),
+    queryKey: queryKeys.hr.employees.list({ search: search || undefined, departmentId: departmentId || undefined }),
+    queryFn: () => hrApi.listEmployees({ search: search || undefined, departmentId: departmentId || undefined, limit: 100 }),
   })
 
   const employees = data?.items ?? []
+  const sortedEmployees = useMemo(() => [...employees].sort((a, b) => {
+    const order = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+    return sortAscending ? order : -order
+  }), [employees, sortAscending])
+  const allSelected = employees.length > 0 && employees.every(employee => selectedIds.includes(employee.id))
   const stats = data?.summary ?? { totalHeadcount: 0, onLeaveCount: 0, openRoles: 0 }
 
   useEffect(() => {
     if (!employees.length) {
       setSelectedId(null)
+      setSelectedIds([])
       return
     }
+    setSelectedIds(current => current.filter(id => employees.some(emp => emp.id === id)))
     if (!selectedId || !employees.some(emp => emp.id === selectedId)) {
       setSelectedId(employees[0].id)
     }
@@ -92,9 +116,11 @@ export default function EmployeeDirectory() {
               className="pl-9 pr-12 py-2 text-sm border border-border-default rounded-input bg-surface-muted/50 w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
           </div>
-          <button type="button" disabled className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm hover:bg-surface-muted transition-colors disabled:opacity-60">
-            Department: All <ChevronDown size={14} className="text-caption" />
-          </button>
+          <select value={departmentId} onChange={event => setDepartmentId(event.target.value)} aria-label="Filter by department" className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm hover:bg-surface-muted transition-colors bg-surface-raised">
+            <option value="">Department: All</option>
+            {(departmentsData?.items ?? departmentsData ?? []).map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
+          </select>
+          <button type="button" onClick={() => setCreateOpen(true)} className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors">Add Employee</button>
           <button type="button" disabled={exportMutation.isPending} onClick={() => exportMutation.mutate()} className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors disabled:opacity-60">
             <Download size={16} /> {exportMutation.isPending ? 'Exporting...' : 'Export Directory'}
           </button>
@@ -135,10 +161,10 @@ export default function EmployeeDirectory() {
         <div className="flex-1 overflow-y-auto bg-surface-raised flex flex-col">
           <div className="flex items-center justify-between px-6 py-3 border-b border-border-default bg-surface-muted/50 flex-shrink-0">
             <div className="flex items-center gap-3">
-              <input type="checkbox" className="w-4 h-4 rounded border-border-strong text-accent focus:ring-accent" readOnly />
-              <span className="text-sm font-medium text-body-light">Select All</span>
+              <input type="checkbox" checked={allSelected} onChange={event => setSelectedIds(event.target.checked ? employees.map(employee => employee.id) : [])} aria-label="Select all employees on this page" className="w-4 h-4 rounded border-border-strong text-accent focus:ring-accent" />
+              <span className="text-sm font-medium text-body-light">{selectedIds.length ? `${selectedIds.length} selected` : 'Select All'}</span>
             </div>
-            <span className="text-sm font-medium text-body-light">A-Z Sort: Name A-Z</span>
+            <button type="button" onClick={() => setSortAscending(value => !value)} aria-label={`Sort employee names ${sortAscending ? 'descending' : 'ascending'}`} className="text-sm font-medium text-body-light hover:text-heading">Name {sortAscending ? 'A-Z' : 'Z-A'} ↕</button>
           </div>
 
           <QueryState
@@ -147,7 +173,7 @@ export default function EmployeeDirectory() {
             error={error}
             isEmpty={!employees.length}
             emptyTitle="No employees yet"
-            emptyDescription="This workspace is empty. Add people manually or reload sample data from onboarding."
+            emptyDescription="This workspace is empty. Add an employee or reload sample data from onboarding."
           >
             <table className="w-full text-left border-collapse flex-1">
               <thead className="bg-surface-muted/50 sticky top-0 z-10">
@@ -160,7 +186,7 @@ export default function EmployeeDirectory() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
-                {employees.map(emp => {
+                {sortedEmployees.map(emp => {
                   const isSelected = selectedId === emp.id
                   return (
                     <tr
@@ -173,8 +199,10 @@ export default function EmployeeDirectory() {
                       <td className="px-6 py-4">
                         <input
                           type="checkbox"
-                          checked={isSelected}
-                          readOnly
+                          checked={selectedIds.includes(emp.id)}
+                          aria-label={`Select ${emp.name}`}
+                          onClick={event => event.stopPropagation()}
+                          onChange={event => setSelectedIds(current => event.target.checked ? [...new Set([...current, emp.id])] : current.filter(id => id !== emp.id))}
                           className="w-4 h-4 rounded border-border-strong text-accent focus:ring-accent"
                         />
                       </td>
@@ -228,12 +256,12 @@ export default function EmployeeDirectory() {
                     {selected.title} · Hired {selected.hiredAt ? formatDate(selected.hiredAt, { month: 'short', year: 'numeric' }) : '—'}
                   </p>
                   <div className="flex gap-3 mt-5 w-full justify-center">
-                    <button type="button" disabled className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors disabled:opacity-60">
+                    <a href={selected.email ? `mailto:${encodeURIComponent(selected.email)}?subject=${encodeURIComponent('Hello ' + selected.name)}` : undefined} aria-disabled={!selected.email} title={selected.email ? 'Open a message draft in your mail app' : 'No email address is available'} className={`flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors ${!selected.email ? 'opacity-60 pointer-events-none' : ''}`}>
                       <Mail size={14} /> Message
-                    </button>
-                    <button type="button" disabled className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60">
+                    </a>
+                    <a href={selected.email ? `mailto:${encodeURIComponent(selected.email)}?subject=${encodeURIComponent('Schedule time with ' + selected.name)}&body=${encodeURIComponent(`Hi ${selected.name},\n\nCould you share a few times that work for a meeting?`)}` : undefined} aria-disabled={!selected.email} title={selected.email ? 'Draft a scheduling email in your mail app' : 'No email address is available'} className={`flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors ${!selected.email ? 'opacity-60 pointer-events-none' : ''}`}>
                       <Calendar size={14} /> Schedule
-                    </button>
+                    </a>
                   </div>
                 </div>
               </div>
@@ -333,6 +361,12 @@ export default function EmployeeDirectory() {
       <FormDialog open={editOpen} onClose={() => setEditOpen(false)} title="Edit employee" subtitle="Update the employee profile fields." busy={editMutation.isPending} onConfirm={() => editMutation.mutate()} confirmLabel="Save changes">
         <div className="space-y-4">
           {['name', 'title', 'email', 'location'].map(field => <label key={field} className="block text-sm font-medium text-body"><span className="mb-1 block capitalize">{field}</span><input value={editForm[field]} onChange={event => setEditForm(current => ({ ...current, [field]: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" /></label>)}
+        </div>
+      </FormDialog>
+      <FormDialog open={createOpen} onClose={() => setCreateOpen(false)} title="Add employee" subtitle="Create an employee profile." busy={createMutation.isPending} onConfirm={() => createMutation.mutate()} confirmLabel="Add employee">
+        <div className="space-y-4">
+          {['name', 'title', 'email'].map(field => <label key={field} className="block text-sm font-medium text-body"><span className="mb-1 block capitalize">{field}</span><input type={field === 'email' ? 'email' : 'text'} required={field !== 'email'} value={createForm[field]} onChange={event => setCreateForm(current => ({ ...current, [field]: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" /></label>)}
+          <label className="block text-sm font-medium text-body"><span className="mb-1 block">Department</span><select value={createForm.departmentId} onChange={event => setCreateForm(current => ({ ...current, departmentId: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2"><option value="">No department</option>{(departmentsData?.items ?? departmentsData ?? []).map(department => <option key={department.id} value={department.id}>{department.name}</option>)}</select></label>
         </div>
       </FormDialog>
       <ConfirmDialog open={deleteOpen} onClose={() => setDeleteOpen(false)} onConfirm={() => deleteMutation.mutate()} title="Delete employee?" description={`This permanently removes ${selected?.name || 'this employee'} and associated records.`} confirmLabel="Delete employee" busy={deleteMutation.isPending} danger />

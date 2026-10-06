@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Users,
-  AlertCircle, Clock, TrendingUp, CreditCard, Rocket, Loader2
+  AlertCircle, Clock, TrendingUp, CreditCard, Rocket
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useQuery } from '@tanstack/react-query'
@@ -9,7 +10,7 @@ import TopBarActions from '../../components/TopBarActions'
 import StatCard from '../../components/common/StatCard'
 import { dashboardApi } from '../../lib/api/dashboard'
 import { queryKeys } from '../../lib/queryKeys'
-import { formatMoney } from '../../lib/format'
+import { formatMoney, formatCompactMoney, moneyToMajor } from '../../lib/format'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,7 @@ function sprintSubtitle(sprint) {
 }
 
 export default function DashboardOverview() {
+  const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()))
   // The old page pulled one composed `/dashboard/overview`; the new API exposes no such route, so
   // the page composes the real module aggregates directly — one distinct query (and cache key)
   // per underlying endpoint, all read as MEMBER.
@@ -68,24 +70,8 @@ export default function DashboardOverview() {
     queryFn: dashboardApi.getAttendance,
   })
 
-  if ([employees, crm, finance, sprints, receivables, products, payroll, attendance].some(q => q.isLoading)) {
-    return (
-      <div className="flex h-full items-center justify-center flex-1 p-8">
-        <Loader2 className="animate-spin text-muted" size={32} />
-      </div>
-    )
-  }
-
-  if ([employees, crm, finance, sprints, receivables, products, payroll, attendance].some(q => q.isError)) {
-    return (
-      <div className="flex h-full items-center justify-center flex-1 p-8 text-danger">
-        Failed to load dashboard overview.
-      </div>
-    )
-  }
-
   // ── KPI cards: each value is a real server-side aggregate ──
-  const headcount = employees.data?.summary?.totalHeadcount ?? 0
+  const headcount = employees.isLoading ? '…' : employees.isError ? '—' : employees.data?.summary?.totalHeadcount ?? 0
   const onLeaveCount = employees.data?.summary?.onLeaveCount ?? 0
   const openCount = crm.data?.pipeline?.openCount ?? 0
   const openTotal = crm.data?.pipeline?.openTotal
@@ -102,21 +88,21 @@ export default function DashboardOverview() {
     },
     {
       label: 'Open Pipeline Value',
-      value: formatMoney(openTotal, { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
+      value: crm.isLoading ? '…' : crm.isError ? '—' : formatMoney(openTotal, { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
       change: `${openCount} open deals`,
       trend: 'neutral',
       icon: TrendingUp,
     },
     {
       label: 'Payables Outstanding',
-      value: formatMoney(payableOutstanding, { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
+      value: finance.isLoading ? '…' : finance.isError ? '—' : formatMoney(payableOutstanding, { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
       change: 'Outstanding',
       trend: 'down',
       icon: CreditCard,
     },
     {
       label: 'Active Sprints',
-      value: sprintItems.length.toString(),
+      value: sprints.isLoading ? '…' : sprints.isError ? '—' : sprintItems.length.toString(),
       change: 'Running now',
       trend: 'up',
       icon: Rocket,
@@ -124,9 +110,11 @@ export default function DashboardOverview() {
   ]
 
   // ── Cash-flow chart: real snapshots, wire money → major units for the axis ──
-  const cashFlowData = (finance.data?.cashFlow ?? []).map((point) => ({
+  const availableYears = [...new Set([selectedYear, ...(finance.data?.cashFlow ?? []).map(point => point.month.slice(0, 4))])].sort((a, b) => b.localeCompare(a))
+  const cashFlowData = (finance.data?.cashFlow ?? []).filter(point => point.month.startsWith(`${selectedYear}-`)).map((point) => ({
+    monthKey: point.month,
     month: shortMonth(point.month),
-    value: point.net.amount / 100,
+    value: moneyToMajor(point.net),
   }))
 
   // ── "Requires Attention": real signals, each only when its count is non-zero ──
@@ -143,6 +131,7 @@ export default function DashboardOverview() {
       title: 'Overdue Receivables',
       subtitle: `Accounts receivable • ${overdueCount} ${overdueCount === 1 ? 'invoice' : 'invoices'} past due`,
       amount: formatMoney(overdueTotal),
+      to: '/dashboard/finance/accounts-receivable',
     })
   }
   if (lowStockProducts > 0) {
@@ -151,6 +140,7 @@ export default function DashboardOverview() {
       title: 'Low-Stock Products',
       subtitle: `Inventory • ${lowStockProducts} ${lowStockProducts === 1 ? 'product' : 'products'} below threshold`,
       amount: `${lowStockProducts} item${lowStockProducts === 1 ? '' : 's'}`,
+      to: '/dashboard/inventory',
     })
   }
   if (pendingPayrollRuns > 0) {
@@ -159,6 +149,7 @@ export default function DashboardOverview() {
       title: 'Pending Payroll Runs',
       subtitle: `HR • ${pendingPayrollRuns} ${pendingPayrollRuns === 1 ? 'run' : 'runs'} awaiting approval`,
       amount: 'Approve',
+      to: '/dashboard/hr/payroll',
     })
   }
   if (attendanceExceptions > 0) {
@@ -167,7 +158,36 @@ export default function DashboardOverview() {
       title: 'Attendance Exceptions',
       subtitle: `HR • ${attendanceExceptions} ${attendanceExceptions === 1 ? 'exception' : 'exceptions'} this period`,
       amount: 'Review',
+      to: '/dashboard/hr/time-attendance',
     })
+  }
+
+  function downloadReport() {
+    const quote = value => `"${String(value ?? '').replaceAll('"', '""')}"`
+    const rows = [
+      ['Dashboard report', `Calendar year ${selectedYear}`],
+      ['Metric', 'Value'],
+      ...stats.map(stat => [stat.label, stat.value]),
+      [],
+      ['Cash flow month', 'Net amount (minor units)', 'Currency'],
+      ...cashFlowData.map(point => {
+        const money = finance.data?.cashFlow?.find(row => row.month === point.monthKey)?.net
+        return [point.monthKey, money?.amount ?? '', money?.currency ?? '']
+      }),
+      [],
+      ['Active sprint', 'Completion (%)', 'End date'],
+      ...sprintItems.filter(sprint => sprint.status === 'ACTIVE').map(sprint => [sprint.name, sprint.completionPct, sprint.endsAt ?? '']),
+      [],
+      ['Requires attention', 'Detail', 'Amount / action'],
+      ...attentionItems.map(item => [item.title, item.subtitle, item.amount]),
+    ]
+    const csv = rows.map(row => row.map(quote).join(',')).join('\r\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `dashboard-${selectedYear}-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -175,7 +195,7 @@ export default function DashboardOverview() {
 
       <TopBarActions>
         <div className="flex items-center gap-3">
-          <button disabled className="bg-surface-raised border border-border-default text-body text-sm font-medium px-4 py-2 rounded-button hover:bg-surface-muted transition-colors disabled:opacity-60">
+          <button type="button" onClick={downloadReport} className="bg-surface-raised border border-border-default text-body text-sm font-medium px-4 py-2 rounded-button hover:bg-surface-muted transition-colors">
             Generate Report
           </button>
         </div>
@@ -199,17 +219,16 @@ export default function DashboardOverview() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-lg font-semibold text-heading">Cash Flow Analysis</h2>
-                <p className="text-xs text-muted mt-1">Year to Date</p>
+                <p className="text-xs text-muted mt-1">Calendar year {selectedYear}</p>
               </div>
-              <select className="bg-surface-muted border border-border-default text-xs font-medium text-body rounded-input px-3 py-1.5 focus:outline-none">
-                <option>FY 2026</option>
-                <option>FY 2025</option>
+              <select aria-label="Cash flow calendar year" value={selectedYear} onChange={event => setSelectedYear(event.target.value)} className="bg-surface-muted border border-border-default text-xs font-medium text-body rounded-input px-3 py-1.5 focus:outline-none">
+                {availableYears.map(year => <option key={year} value={year}>Year {year}</option>)}
               </select>
             </div>
 
             {/* Recharts Area Chart */}
             <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              {finance.isLoading || finance.isError ? <div className="flex h-full items-center justify-center text-sm text-muted">{finance.isLoading ? 'Loading cash flow…' : 'Cash flow could not be loaded.'}</div> : <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={cashFlowData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="cashFlowGrad" x1="0" y1="0" x2="0" y2="1">
@@ -219,15 +238,15 @@ export default function DashboardOverview() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-caption)', fontWeight: 500 }} dy={8} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-caption)', fontWeight: 500 }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} dx={-4} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-caption)', fontWeight: 500 }} tickFormatter={(v) => formatCompactMoney(v, finance.data?.cashFlow?.[0]?.net?.currency || 'USD')} dx={-4} />
                   <Tooltip
                     contentStyle={{ borderRadius: 'var(--radius-button)', border: '1px solid var(--color-border-default)', boxShadow: 'var(--shadow-card-hover)', fontSize: 13 }}
-                    formatter={(value) => [`$${(value / 1000).toFixed(0)}k`, 'Net Cash Flow']}
+                    formatter={(value) => [formatCompactMoney(value, finance.data?.cashFlow?.[0]?.net?.currency || 'USD'), 'Net Cash Flow']}
                     labelStyle={{ fontWeight: 600, color: 'var(--color-heading)' }}
                   />
                   <Area type="monotone" dataKey="value" stroke="var(--color-chart-primary)" strokeWidth={3} fill="url(#cashFlowGrad)" dot={false} activeDot={{ r: 5, fill: 'var(--color-chart-primary)', strokeWidth: 2, stroke: '#fff' }} animationDuration={1200} />
                 </AreaChart>
-              </ResponsiveContainer>
+              </ResponsiveContainer>}
             </div>
           </div>
 
@@ -241,11 +260,15 @@ export default function DashboardOverview() {
             </div>
 
             <div className="space-y-3">
-              {sprintItems.length === 0 ? (
+              {sprints.isLoading ? (
+                <p className="text-sm text-muted">Loading sprints…</p>
+              ) : sprints.isError ? (
+                <p className="text-sm text-muted">Sprints could not be loaded.</p>
+              ) : sprintItems.filter(sprint => sprint.status === 'ACTIVE').length === 0 ? (
                 <p className="text-sm text-muted">No active sprints found.</p>
               ) : (
-                sprintItems.map((sprint, i) => (
-                  <div key={sprint.id} className={`p-4 rounded-card-sm border border-border-subtle flex items-center justify-between gap-4 hover:border-border-default transition-colors cursor-pointer${i % 2 === 0 ? ' bg-surface-muted' : ''}`}>
+                sprintItems.filter(sprint => sprint.status === 'ACTIVE').map((sprint, i) => (
+                  <Link to="/dashboard/projects" key={sprint.id} className={`p-4 rounded-card-sm border border-border-subtle flex items-center justify-between gap-4 hover:border-border-default transition-colors cursor-pointer${i % 2 === 0 ? ' bg-surface-muted' : ''}`}>
                     <div className="flex items-center gap-3">
                       <div className={`w-2 h-2 rounded-full ${sprint.completionPct === 100 ? 'bg-success-dot' : 'bg-info-dot'}`} />
                       <div>
@@ -253,7 +276,7 @@ export default function DashboardOverview() {
                         <p className="text-xs text-muted mt-0.5">{sprintSubtitle(sprint)}</p>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))
               )}
             </div>
@@ -273,10 +296,15 @@ export default function DashboardOverview() {
               </div>
             </div>
 
-            {attentionItems.length === 0 ? (
+            {[receivables, products, payroll, attendance].some(query => query.isLoading) && attentionItems.length === 0 ? (
+              <p className="text-sm text-muted">Loading attention indicators…</p>
+            ) : [receivables, products, payroll, attendance].some(query => query.isError) && attentionItems.length === 0 ? (
+              <p className="text-sm text-muted">Attention indicators could not be loaded.</p>
+            ) : attentionItems.length === 0 ? (
               <p className="text-sm text-muted">Nothing needs attention right now.</p>
             ) : (
               <div className="space-y-4">
+                {[receivables, products, payroll, attendance].some(query => query.isError) && <p role="status" className="text-xs text-warning">Some attention indicators could not be loaded.</p>}
                 {attentionItems.map((item) => (
                   <div key={item.id} className="group flex items-start justify-between gap-3 border-b border-border-faint pb-4 last:border-0 last:pb-0">
                     <div>
@@ -289,9 +317,9 @@ export default function DashboardOverview() {
                     </div>
                     <div className="text-right">
                       <p className="text-xs font-semibold text-heading">{item.amount}</p>
-                      <button disabled className="text-[10px] font-medium text-accent hover:text-accent-hover mt-1 disabled:opacity-60">
+                      <Link to={item.to} className="inline-block text-[10px] font-medium text-accent hover:text-accent-hover mt-1">
                         Action
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 ))}

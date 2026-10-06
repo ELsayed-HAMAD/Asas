@@ -105,8 +105,8 @@ export const queryKeys = {
     ...crmBase,
     overview: () => [...crmBase.all(), 'overview'],
     deals: resourceKeys(crmDealsBase),
-    forecast: () => [...crmBase.all(), 'forecast'],
-    salesPerformance: () => [...crmBase.all(), 'sales-performance'],
+    forecast: (year) => year ? [...crmBase.all(), 'forecast', year] : [...crmBase.all(), 'forecast'],
+    salesPerformance: (year) => year ? [...crmBase.all(), 'sales-performance', year] : [...crmBase.all(), 'sales-performance'],
     agenda: () => [...crmBase.all(), 'agenda'],
   },
 
