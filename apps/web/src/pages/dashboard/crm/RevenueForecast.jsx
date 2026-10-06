@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Search,
   ChevronDown,
@@ -15,32 +15,30 @@ import {
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine
+  ResponsiveContainer
 } from 'recharts'
 import { useQuery } from '@tanstack/react-query';
 import { crmApi } from '../../../lib/api/crm';
 import { queryKeys } from '../../../lib/queryKeys';
 import TopBarActions from '../../../components/TopBarActions';
+import { moneyToMajor, formatCompactMoney } from '../../../lib/format';
 
-const toMajor = (money) => (money == null ? 0 : money.amount / 100);
-
-const formatCurrency = (num) => {
-  if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
-  if (num >= 1000) return `$${(num / 1000).toFixed(0)}k`;
-  return `$${num}`;
-};
+const toMajor = (money) => (money == null ? 0 : moneyToMajor(money));
 
 export default function RevenueForecast() {
+  const [search, setSearch] = useState('')
+  const [showAllReps, setShowAllReps] = useState(false)
+  const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()))
   const { data, isLoading, isError } = useQuery({
-    queryKey: queryKeys.crm.forecast(),
-    queryFn: crmApi.getForecast,
+    queryKey: queryKeys.crm.forecast(selectedYear),
+    queryFn: () => crmApi.getForecast(selectedYear),
   });
 
   // Real closed-won total (the forecast endpoint itself has no closed amount —
   // its `quotaAttainmentPct` is pipeline ÷ quota, i.e. coverage).
   const { data: perf } = useQuery({
-    queryKey: queryKeys.crm.salesPerformance(),
-    queryFn: crmApi.getSalesPerformance,
+    queryKey: queryKeys.crm.salesPerformance(selectedYear),
+    queryFn: () => crmApi.getSalesPerformance(selectedYear),
   });
 
   if (isLoading) {
@@ -60,17 +58,16 @@ export default function RevenueForecast() {
   }
 
   const { forecastByRep, quotas, monthlyPipeline, summary } = data;
-  const closedWon = perf?.summary?.totalWon ?? null;
+  const closedWon = perf?.yearWonTotal ?? null;
+  const currency = summary.totalQuota?.currency || 'USD'
 
   // ── KPIs from the server summary ──
   const quotaMajor = toMajor(summary.totalQuota);
   const wonMajor = toMajor(closedWon);
   const wonPctToQuota = quotaMajor > 0 && closedWon != null ? (wonMajor / quotaMajor) * 100 : null;
 
-  // Committed / Best Case: summed from the real ForecastSnapshot rows (— when the
-  // tenant has no forecast snapshots).
-  const committedTotal = forecastByRep.reduce((sum, rep) => sum + toMajor(rep.commit), 0);
-  const bestCaseTotal = forecastByRep.reduce((sum, rep) => sum + toMajor(rep.bestCase), 0);
+  const committedTotal = toMajor(summary.totalCommit)
+  const bestCaseTotal = toMajor(summary.totalBestCase)
 
   // Pipeline coverage — the server's `quotaAttainmentPct` is exactly totalPipeline ÷ totalQuota
   // (a percentage), so coverage in "×" is that value / 100.
@@ -78,20 +75,48 @@ export default function RevenueForecast() {
 
   // ── Chart: real open-pipeline months; the quota reference line amortizes the
   // total stored quota across the months shown (no per-month quota exists server-side). ──
-  const monthCount = Math.max(monthlyPipeline.length, 1);
-  const quotaPerMonth = quotaMajor > 0 ? quotaMajor / monthCount : null;
-  const chartData = monthlyPipeline.map((row) => ({
-    month: row.month,
-    closed: 0,
-    commit: 0,
-    pipeline: toMajor(row.value),
-  }));
+  const wonByMonth = new Map((perf?.monthlyClosedWon || []).filter(row => row.month.startsWith(selectedYear)).map(row => [row.month, row.value.amount]))
+  const commitByMonth = new Map((data.monthlyCommit || []).map(row => [row.month, row.value.amount]))
+  const pipelineByMonth = new Map(monthlyPipeline.map(row => [row.month, row.value.amount]))
+  const months = [...new Set([...pipelineByMonth.keys(), ...wonByMonth.keys(), ...commitByMonth.keys()])].sort()
+  const chartData = months.map(month => {
+    const committed = commitByMonth.get(month) || 0
+    return {
+      month,
+      closed: toMajor({ amount: wonByMonth.get(month) || 0, currency }),
+      commit: toMajor({ amount: committed, currency }),
+      pipeline: toMajor({ amount: Math.max(0, (pipelineByMonth.get(month) || 0) - committed), currency }),
+    }
+  })
 
   // Expected shortfall = quota − closed-won (display arithmetic on two server aggregates).
   const expectedShortfall = quotaMajor > 0 && closedWon != null ? Math.max(0, quotaMajor - wonMajor) : null;
 
   // Quota row per rep, joined by repName (the only rep identity forecastByRep carries).
   const quotaByName = (name) => quotas.find((q) => q.repName === name);
+  const availableYears = [...new Set([selectedYear, ...(data.availableYears || [])])].sort((a, b) => b.localeCompare(a))
+  const formatCurrency = (num) => formatCompactMoney(num, currency)
+  const visibleReps = forecastByRep.filter(rep => rep.repName.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
+  const displayedReps = showAllReps || search.trim() ? visibleReps : visibleReps.slice(0, 5)
+  const exportCsv = () => {
+    const quote = value => `"${String(value ?? '').replaceAll('"', '""')}"`
+    const rows = [
+      ['Rep', 'Period', `Closed (${currency})`, `Commit (${currency})`, `Best Case (${currency})`, 'Quota attainment (%)'],
+      ...visibleReps.map(rep => [rep.repName, rep.period, toMajor(rep.closed), toMajor(rep.commit), toMajor(rep.bestCase), rep.quotaPct]),
+    ]
+    const csv = rows.map(row => row.map(quote).join(',')).join('\r\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `revenue-forecast-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+  const shareForecast = async () => {
+    const text = `Revenue forecast: ${formatCurrency(committedTotal)} committed, ${formatCurrency(bestCaseTotal)} best case.`
+    if (navigator.share) await navigator.share({ title: 'Revenue forecast', text })
+    else await navigator.clipboard.writeText(text)
+  }
 
   return (
     <div className="flex h-full flex-col bg-[#fafafa] overflow-hidden min-w-[1000px]">
@@ -102,23 +127,28 @@ export default function RevenueForecast() {
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search..."
+              value={search}
+              onChange={event => setSearch(event.target.value)}
+              placeholder="Search reps..."
               className="pl-9 pr-12 py-1.5 text-sm border border-gray-200 rounded-md bg-white w-56 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
 
           <div className="h-6 w-px bg-gray-200 mx-1"></div>
 
-          <button className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors bg-white">
-            FY 2026
-            <ChevronDown size={14} className="text-gray-400" />
-          </button>
+          <label className="relative flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium bg-white">
+            <span className="sr-only">Forecast calendar year</span>
+            <select value={selectedYear} onChange={event => setSelectedYear(event.target.value)} className="appearance-none bg-transparent pr-5 outline-none">
+              {availableYears.map(year => <option key={year} value={year}>Year {year}</option>)}
+            </select>
+            <ChevronDown size={14} className="pointer-events-none absolute right-2 text-gray-400" />
+          </label>
 
-          <button disabled className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors disabled:opacity-60">
+          <button onClick={exportCsv} aria-label="Download forecast CSV" title="Download forecast CSV" className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors">
             <Download size={18} />
           </button>
 
-          <button disabled className="flex items-center gap-2 bg-black text-white px-4 py-1.5 rounded-md text-sm font-semibold hover:bg-gray-800 transition-colors shadow-sm disabled:opacity-60">
+          <button onClick={shareForecast} className="flex items-center gap-2 bg-black text-white px-4 py-1.5 rounded-md text-sm font-semibold hover:bg-gray-800 transition-colors shadow-sm">
             <Share2 size={14} />
             Share Forecast
           </button>
@@ -133,7 +163,7 @@ export default function RevenueForecast() {
           {/* Closed Won */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col justify-between h-32">
             <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Closed Won (YTD)</p>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Closed Won ({selectedYear})</p>
               <CheckCircle2 size={16} className="text-gray-400" />
             </div>
             <div>
@@ -195,43 +225,38 @@ export default function RevenueForecast() {
 
         </div>
 
-        {/* ── Main Chart: Revenue Projection ── */}
+        {/* ── Main Chart: Closed Won and Open Pipeline ── */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 flex flex-col w-full overflow-x-auto">
 
           {/* Chart Header & Legend */}
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-bold text-gray-900">Revenue Projection vs. Target</h2>
+            <h2 className="text-lg font-bold text-gray-900">Revenue by Close Month</h2>
             <div className="flex items-center gap-4 text-xs font-semibold text-gray-600">
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-[#0f172a]"></div> Closed</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-[#0f172a]"></div> Closed Won</div>
               <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-[#a5b4fc]"></div> Commit</div>
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-[#e5e7eb]"></div> Pipeline</div>
-              <div className="flex items-center gap-1.5"><div className="w-4 h-0.5 border-t-2 border-dashed border-[#ef4444]"></div> Quota</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-[#e5e7eb]"></div> Other Open</div>
             </div>
           </div>
 
-          {/* Recharts Stacked Bar Chart — real open-deal close months; the Closed/Commit
-              stacks have no per-month server series and stay at 0. */}
+          {/* Closed won, committed, and remaining open deals grouped by close month. */}
           <div className="w-full h-[360px] relative">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280', fontWeight: 500 }} dy={8} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af', fontWeight: 500 }} tickFormatter={(v) => v >= 1000000 ? `$${(v/1000000).toFixed(1)}M` : `$${(v/1000).toFixed(0)}k`} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af', fontWeight: 500 }} tickFormatter={(v) => formatCompactMoney(v, summary.totalQuota?.currency || 'USD')} />
                 <Tooltip
                   contentStyle={{ borderRadius: 10, border: '1px solid #e5e7eb', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', fontSize: 13 }}
                   formatter={(value, name) => {
                     if (value === 0) return [null, name === 'closed' ? 'Closed' : name === 'commit' ? 'Commit' : 'Pipeline'];
                     const label = name === 'closed' ? 'Closed' : name === 'commit' ? 'Commit' : 'Pipeline'
-                    return [value >= 1000000 ? `$${(value/1000000).toFixed(1)}M` : `$${(value/1000).toFixed(0)}k`, label]
+                    return [formatCompactMoney(value, summary.totalQuota?.currency || 'USD'), label]
                   }}
                   labelStyle={{ fontWeight: 600, color: '#111827' }}
                 />
                 <Bar dataKey="closed" stackId="a" fill="#0f172a" radius={[0, 0, 0, 0]} animationDuration={1000} />
                 <Bar dataKey="commit" stackId="a" fill="#a5b4fc" radius={[0, 0, 0, 0]} animationDuration={1000} />
                 <Bar dataKey="pipeline" stackId="a" fill="#e5e7eb" radius={[4, 4, 0, 0]} animationDuration={1000} />
-                {quotaPerMonth != null && (
-                  <ReferenceLine y={quotaPerMonth} stroke="#ef4444" strokeWidth={2} strokeDasharray="6 4" label={{ value: 'Quota', position: 'right', fill: '#ef4444', fontSize: 11, fontWeight: 600 }} />
-                )}
               </BarChart>
             </ResponsiveContainer>
             {chartData.length === 0 && (
@@ -249,8 +274,8 @@ export default function RevenueForecast() {
           <div className="col-span-8 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col">
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
               <h2 className="text-lg font-bold text-gray-900">Forecast by Rep</h2>
-              <button className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors">
-                View All
+              <button onClick={() => setShowAllReps(value => !value)} className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+                {showAllReps ? 'Show Top 5' : `View All (${visibleReps.length})`}
               </button>
             </div>
             <table className="w-full text-left border-collapse">
@@ -264,14 +289,14 @@ export default function RevenueForecast() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {forecastByRep.length === 0 ? (
+                {displayedReps.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-10 text-center text-sm text-gray-400">
                       No forecast snapshots recorded yet.
                     </td>
                   </tr>
                 ) : (
-                  forecastByRep.map((rep) => {
+                  displayedReps.map((rep) => {
                     const quotaRow = quotaByName(rep.repName);
                     const quotaVal = quotaRow ? toMajor(quotaRow.quota) : null;
                     const repQuotaPct = rep.quotaPct != null ? rep.quotaPct : (quotaVal && toMajor(rep.closed) > 0 ? Math.min(100, (toMajor(rep.closed) / quotaVal) * 100) : null);

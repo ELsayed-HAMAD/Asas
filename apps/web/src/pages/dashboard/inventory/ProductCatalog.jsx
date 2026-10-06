@@ -20,6 +20,7 @@ import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney, formatDate } from '../../../lib/format';
 import { useActiveMemberRole } from '../../../lib/authClient';
 import FormDialog from '../../../components/common/FormDialog';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import TopBarActions from '../../../components/TopBarActions';
 
 export default function Inventory() {
@@ -28,6 +29,13 @@ export default function Inventory() {
   const [activeTab, setActiveTab] = useState('overview');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
+  const [stockFilter, setStockFilter] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [purchaseOrderOpen, setPurchaseOrderOpen] = useState(false);
+  const [purchaseQuantity, setPurchaseQuantity] = useState('1');
+  const [purchaseOrderError, setPurchaseOrderError] = useState('');
+  const [createdOrder, setCreatedOrder] = useState(null);
 
   // Debounce the top-bar search into the list query's `search` param.
   useEffect(() => {
@@ -36,8 +44,8 @@ export default function Inventory() {
   }, [searchInput]);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: queryKeys.inventory.products.list({ search: search || undefined, limit: 100 }),
-    queryFn: () => inventoryApi.listProducts({ search: search || undefined, limit: 100 }),
+    queryKey: queryKeys.inventory.products.list({ search: search || undefined, status: stockFilter || undefined, archived: showArchived, limit: 100 }),
+    queryFn: () => inventoryApi.listProducts({ search: search || undefined, status: stockFilter || undefined, archived: showArchived, limit: 100 }),
   });
 
   const products = data?.items ?? [];
@@ -58,6 +66,11 @@ export default function Inventory() {
     enabled: activeTab === 'history' && !!selectedProduct,
   });
   const movements = movementData?.items ?? [];
+  const { data: suppliersData, isLoading: isSuppliersLoading, isError: isSuppliersError } = useQuery({
+    queryKey: [...queryKeys.inventory.all(), 'productSuppliers', selectedId],
+    queryFn: () => inventoryApi.listProductSuppliers(selectedId),
+    enabled: activeTab === 'suppliers' && !!selectedProduct,
+  });
 
   const queryClient = useQueryClient();
   const { data: activeMemberRole } = useActiveMemberRole();
@@ -113,6 +126,24 @@ export default function Inventory() {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.movements.all() });
     },
     onError: (error) => setMovementError(error?.message || 'Could not record movement.'),
+  });
+  const purchaseOrderMutation = useMutation({
+    mutationFn: () => inventoryApi.createPurchaseOrder({ productId: selectedProduct.id, quantity: Number(purchaseQuantity) }),
+    onSuccess: order => {
+      setCreatedOrder(order);
+      setPurchaseOrderOpen(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all() });
+    },
+    onError: error => setPurchaseOrderError(error?.message || 'Could not create purchase order.'),
+  });
+  const archiveMutation = useMutation({
+    mutationFn: () => inventoryApi.setProductArchived(selectedProduct.id, !showArchived),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all() });
+      setArchiveDialogOpen(false);
+      setSelectedId(null);
+      setManualDeselect(false);
+    },
   });
 
   // Reset the transient on-hand override when a different product is inspected.
@@ -308,12 +339,21 @@ export default function Inventory() {
           {/* Section Header */}
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold text-heading">Product Catalog</h1>
-            <button
-              disabled
-              className="flex items-center gap-2 border border-border-default bg-surface-raised text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors shadow-card disabled:opacity-60"
-            >
-              <Filter size={16} /> Filter
-            </button>
+            <div className="flex items-center gap-3">
+            <select value={showArchived ? 'archived' : 'active'} onChange={event => setShowArchived(event.target.value === 'archived')} aria-label="Show active or archived products" className="border border-border-default bg-surface-raised text-body px-3 py-2 rounded-input text-sm font-medium shadow-card">
+              <option value="active">Active products</option>
+              <option value="archived">Archived products</option>
+            </select>
+            <div className="relative">
+              <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+              <select value={stockFilter} onChange={event => setStockFilter(event.target.value)} aria-label="Filter products by stock status" className="appearance-none border border-border-default bg-surface-raised text-body pl-9 pr-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors shadow-card">
+                <option value="">All Stock</option>
+                <option value="IN_STOCK">In Stock</option>
+                <option value="LOW_STOCK">Low Stock</option>
+                <option value="OUT_OF_STOCK">Out of Stock</option>
+              </select>
+            </div>
+            </div>
           </div>
 
           {/* Catalog Table */}
@@ -403,6 +443,7 @@ export default function Inventory() {
                     <X size={20} />
                   </button>
                 </div>
+                {selectedProduct.archivedAt && <p className="mb-4 rounded-button bg-surface-muted px-3 py-2 text-xs font-semibold text-muted">Archived {formatDate(selectedProduct.archivedAt)}</p>}
 
                 {/* Tabs */}
                 <div className="flex items-center gap-6">
@@ -417,8 +458,8 @@ export default function Inventory() {
                     Overview
                   </button>
                   <button
-                    disabled
-                    className="text-sm font-medium text-muted hover:text-heading pb-2 disabled:opacity-60 cursor-not-allowed"
+                    onClick={() => setActiveTab('suppliers')}
+                    className={`pb-2 text-sm transition-colors ${activeTab === 'suppliers' ? 'font-bold text-heading border-b-2 border-black' : 'font-medium text-muted hover:text-heading'}`}
                   >
                     Suppliers
                   </button>
@@ -479,6 +520,10 @@ export default function Inventory() {
                       <p className="text-lg font-bold text-heading">{selectedProduct.leadTimeDays || 0} Days</p>
                     </div>
                   </div>
+                </div>
+              ) : activeTab === 'suppliers' ? (
+                <div className="flex-1 overflow-y-auto p-6">
+                  {isSuppliersLoading ? <div className="flex h-full items-center justify-center"><Loader2 className="animate-spin text-muted" size={20} /></div> : isSuppliersError ? <p className="text-sm text-danger">Suppliers could not be loaded.</p> : (suppliersData?.items ?? []).length === 0 ? <div className="flex h-full items-center justify-center text-sm text-muted text-center">No suppliers are linked to this product yet.</div> : <ul className="space-y-3">{suppliersData.items.map(supplier => <li key={supplier.id} className="rounded-button border border-border-default bg-surface-muted px-4 py-3 text-sm font-semibold text-heading">{supplier.name}</li>)}</ul>}
                 </div>
               ) : (
                 <div className="flex-1 overflow-y-auto p-6">
@@ -554,19 +599,25 @@ export default function Inventory() {
                   <button
                     type="button"
                     onClick={openAdjustDialog}
-                    disabled={!canWrite}
-                    title={canWrite ? undefined : noRoleTitle}
+                    disabled={!canWrite || Boolean(selectedProduct.archivedAt)}
+                    title={selectedProduct.archivedAt ? 'Restore this product before adjusting stock' : canWrite ? undefined : noRoleTitle}
                     className="flex items-center justify-center gap-2 bg-primary text-white px-4 py-2.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
                   >
                     <ArrowDownUp size={15} /> Adjust Stock
                   </button>
                 </div>
                 <button
-                  disabled
+                  type="button"
+                  onClick={() => { setPurchaseQuantity('1'); setPurchaseOrderError(''); setPurchaseOrderOpen(true); }}
+                  disabled={!canWrite || Boolean(selectedProduct.archivedAt)}
+                  title={selectedProduct.archivedAt ? 'Restore this product before creating an order' : canWrite ? undefined : noRoleTitle}
                   className="w-full flex items-center justify-center gap-2 bg-primary text-white py-3 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
                 >
                   <ShoppingCart size={16} />
                   Create Purchase Order
+                </button>
+                <button type="button" onClick={() => setArchiveDialogOpen(true)} disabled={!canWrite || archiveMutation.isPending} title={canWrite ? undefined : noRoleTitle} className="mt-3 w-full rounded-input border border-border-default py-2 text-sm font-semibold text-body hover:bg-surface-muted disabled:opacity-60">
+                  {showArchived ? 'Restore Product' : 'Archive Product'}
                 </button>
               </div>
             </>
@@ -669,6 +720,18 @@ export default function Inventory() {
             )}
           </div>
         </FormDialog>
+
+        <FormDialog open={purchaseOrderOpen} onClose={() => !purchaseOrderMutation.isPending && setPurchaseOrderOpen(false)} title="Create purchase order" subtitle={selectedProduct ? `Create a draft order for ${selectedProduct.name}.` : undefined} busy={purchaseOrderMutation.isPending} onConfirm={() => {
+          const quantity = Number(purchaseQuantity);
+          if (!Number.isSafeInteger(quantity) || quantity < 1) { setPurchaseOrderError('Quantity must be a whole number greater than 0.'); return; }
+          setPurchaseOrderError('');
+          purchaseOrderMutation.mutate();
+        }} confirmLabel="Create draft order">
+          <label className="block text-sm font-medium text-body">Quantity<input type="number" min={1} step={1} value={purchaseQuantity} onChange={event => setPurchaseQuantity(event.target.value)} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
+          {purchaseOrderError && <p role="alert" className="mt-3 text-sm text-danger">{purchaseOrderError}</p>}
+        </FormDialog>
+        <ConfirmDialog open={archiveDialogOpen} onClose={() => !archiveMutation.isPending && setArchiveDialogOpen(false)} onConfirm={() => archiveMutation.mutate()} title={showArchived ? 'Restore product?' : 'Archive product?'} description={showArchived ? `Restore ${selectedProduct?.name || 'this product'} to the active catalog?` : `Archive ${selectedProduct?.name || 'this product'}? Its stock history and purchase order records will be retained.`} confirmLabel={showArchived ? 'Restore product' : 'Archive product'} busy={archiveMutation.isPending} />
+        {createdOrder && <div role="status" className="fixed bottom-4 right-4 z-40 rounded-button border border-success-border bg-success-light px-4 py-3 text-sm text-success-text shadow-card">Draft purchase order created for {createdOrder.quantity} × {createdOrder.productName}.</div>}
 
         {/* ── Adjust Stock (movement) dialog ── */}
         <FormDialog

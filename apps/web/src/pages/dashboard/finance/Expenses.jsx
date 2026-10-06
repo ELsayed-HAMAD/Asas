@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Search,
   ChevronDown,
@@ -11,10 +11,12 @@ import {
   ZoomIn,
   ZoomOut,
   ChevronLeft,
+  Download,
   Loader2
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../../../lib/api/finance';
+import { hrApi } from '../../../lib/api/hr';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney } from '../../../lib/format';
 import TopBarActions from '../../../components/TopBarActions';
@@ -22,15 +24,52 @@ import TopBarActions from '../../../components/TopBarActions';
 export default function Expenses() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState(null);
+  const [search, setSearch] = useState('');
+  const [departmentId, setDepartmentId] = useState('')
+  const [sort, setSort] = useState('desc')
+  const [receiptZoom, setReceiptZoom] = useState(100)
+  const { data: departmentsData } = useQuery({ queryKey: queryKeys.hr.departments.list(), queryFn: hrApi.getDepartments })
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: queryKeys.finance.expenses.list({ limit: 100 }),
-    queryFn: () => financeApi.listExpenses({ limit: 100 }),
+    queryKey: queryKeys.finance.expenses.list({ limit: 100, search: search || undefined, departmentId: departmentId || undefined, sort }),
+    queryFn: () => financeApi.listExpenses({ limit: 100, search: search || undefined, departmentId: departmentId || undefined, sort }),
   });
+  useEffect(() => {
+    const rows = data?.items || []
+    if (!rows.some(row => row.id === selectedId)) setSelectedId(rows[0]?.id ?? null)
+  }, [data?.items, selectedId])
   const statusMutation = useMutation({
     mutationFn: (status) => financeApi.updateExpenseStatus(selectedId, status),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.finance.expenses.all() }),
   });
+  const exportMutation = useMutation({
+    mutationFn: async () => {
+      const rows = []
+      let page = 1
+      let pages = 1
+      while (page <= pages) {
+        const result = await financeApi.listExpenses({ page, limit: 100, search: search || undefined, departmentId: departmentId || undefined, sort })
+        rows.push(...result.items)
+        pages = result.pagination.pages
+        page += 1
+      }
+      return rows
+    },
+    onSuccess: rows => {
+      const quote = value => `"${String(value ?? '').replaceAll('"', '""')}"`
+      const header = ['Expense ID', 'Employee', 'Expense', 'Merchant', 'Category', 'Date', 'Amount (minor units)', 'Currency', 'Status', 'Policy Match']
+      const records = rows.map(row => [row.id, row.employee, row.name, row.merchant, row.category, row.date, row.amount.amount, row.amount.currency, row.status, row.policyMatch])
+      const csv = [header, ...records].map(row => row.map(quote).join(',')).join('\r\n')
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `expenses-${new Date().toISOString().slice(0, 10)}.csv`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    },
+  })
 
   if (isLoading) {
     return (
@@ -51,11 +90,6 @@ export default function Expenses() {
   const items = data.items || [];
   const summary = data.summary || {};
 
-  // Set initial selected item if not set
-  if (!selectedId && items.length > 0) {
-    setSelectedId(items[0].id);
-  }
-
   const selectedRecord = items.find(r => r.id === selectedId);
 
   // KPIs from the server summary (full-set aggregates, not page-level reduces).
@@ -75,17 +109,25 @@ export default function Expenses() {
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
             <input
               type="text"
+              value={search}
+              onChange={event => setSearch(event.target.value)}
               placeholder="Search..."
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-56 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
           </div>
-          <button disabled className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60">
-            All Teams <ChevronDown size={14} className="text-caption" />
-          </button>
-          <button disabled className="bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
-            Export CSV
+          <label className="relative flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised">
+            <span className="sr-only">Filter expenses by department</span>
+            <select value={departmentId} onChange={event => setDepartmentId(event.target.value)} className="appearance-none bg-transparent pr-5 outline-none">
+                <option value="">All Depts</option>
+              {(departmentsData?.items ?? departmentsData ?? []).map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
+            </select>
+            <ChevronDown size={14} className="pointer-events-none absolute right-2 text-caption" />
+          </label>
+          <button disabled={exportMutation.isPending} onClick={() => exportMutation.mutate()} className="flex items-center gap-2 bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
+            <Download size={14} /> {exportMutation.isPending ? 'Exporting...' : 'Export CSV'}
           </button>
         </div>
+        {exportMutation.isError && <p role="alert" className="mt-2 text-xs text-danger">{exportMutation.error?.message || 'Could not export expenses.'}</p>}
       </TopBarActions>
 
       {/* ── KPIs Row ── */}
@@ -105,12 +147,12 @@ export default function Expenses() {
 
           <div className="border border-border-default rounded-card-sm p-5 bg-surface-raised shadow-card flex flex-col justify-between">
             <div className="flex justify-between items-start mb-2">
-              <p className="text-[11px] font-semibold text-muted tracking-wide">Reimbursed (MTD)</p>
+              <p className="text-[11px] font-semibold text-muted tracking-wide">Approved Expenses</p>
             </div>
             <div className="flex justify-between items-end">
               <p className="text-3xl font-bold text-heading">{formatMoney(reimbursedAmount)}</p>
               <span className="bg-accent-light text-accent px-2.5 py-1 rounded-input text-[10px] font-bold uppercase tracking-wider">
-                On track
+                {summary.approvedCount ?? 0} Reports
               </span>
             </div>
           </div>
@@ -122,7 +164,7 @@ export default function Expenses() {
             <div className="flex justify-between items-end">
               <p className="text-3xl font-bold text-heading">{formatMoney(violationAmount)}</p>
               <span className="flex items-center gap-1 bg-danger-light text-danger-hover px-2.5 py-1 rounded-input text-[10px] font-bold uppercase tracking-wider">
-                <AlertTriangle size={12} strokeWidth={3} /> Requires Review
+                <AlertTriangle size={12} strokeWidth={3} /> {summary.flaggedCount ?? 0} Reports
               </span>
             </div>
           </div>
@@ -139,10 +181,10 @@ export default function Expenses() {
           <div className="flex items-center justify-between px-6 py-3 border-b border-border-default bg-surface-raised flex-shrink-0">
             <div className="flex items-center gap-3 text-sm text-body-light font-medium">
               <Square size={16} className="text-faint" />
-              12 selected
+              {selectedId ? '1 selected' : '0 selected'}
             </div>
-            <button className="flex items-center gap-1.5 text-sm font-medium text-body-light hover:text-heading transition-colors">
-              Sort: Oldest First <ChevronDown size={14} className="text-caption" />
+            <button type="button" onClick={() => setSort(value => value === 'desc' ? 'asc' : 'desc')} aria-label={`Sort expenses: ${sort === 'desc' ? 'newest first' : 'oldest first'}`} className="flex items-center gap-1.5 text-sm font-medium text-body-light hover:text-heading transition-colors">
+              Sort: {sort === 'desc' ? 'Newest First' : 'Oldest First'} <ChevronDown size={14} className="text-caption" />
             </button>
           </div>
 
@@ -258,7 +300,7 @@ export default function Expenses() {
             <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card">
               <div className="flex items-center gap-2 mb-4">
                 <Sparkles size={16} className="text-accent" />
-                <h3 className="text-xs font-bold text-heading">AI Data Extraction</h3>
+                <h3 className="text-xs font-bold text-heading">Expense details</h3>
               </div>
 
               <div className="grid grid-cols-2 gap-y-5 gap-x-4">
@@ -294,12 +336,12 @@ export default function Expenses() {
               <div className="flex items-center justify-between px-4 py-3 bg-surface-raised border-b border-border-subtle">
                 <div className="flex items-center gap-2 text-body">
                   <FileText size={14} className="text-caption" />
-                  <span className="text-xs font-medium">{selectedRecord.merchant || 'receipt'}_Receipt.pdf</span>
+                  <span className="text-xs font-medium">Expense summary</span>
                 </div>
                 <div className="flex items-center gap-3 text-muted text-xs font-medium">
-                  <button className="hover:text-heading transition-colors"><ZoomOut size={14} /></button>
-                  <span>100%</span>
-                  <button className="hover:text-heading transition-colors"><ZoomIn size={14} /></button>
+                  <button type="button" aria-label="Zoom out receipt" disabled={receiptZoom <= 50} onClick={() => setReceiptZoom(value => Math.max(50, value - 25))} className="hover:text-heading transition-colors disabled:opacity-40"><ZoomOut size={14} /></button>
+                  <span>{receiptZoom}%</span>
+                  <button type="button" aria-label="Zoom in receipt" disabled={receiptZoom >= 200} onClick={() => setReceiptZoom(value => Math.min(200, value + 25))} className="hover:text-heading transition-colors disabled:opacity-40"><ZoomIn size={14} /></button>
                 </div>
               </div>
 
@@ -312,7 +354,7 @@ export default function Expenses() {
                 </div>
 
                 {/* Receipt Visual */}
-                <div className="bg-surface-raised w-[320px] shadow-elevated rounded-sm p-6 flex flex-col relative z-0 mt-4 h-[350px]">
+                <div style={{ zoom: `${receiptZoom}%` }} className="bg-surface-raised w-[320px] shadow-elevated rounded-sm p-6 flex flex-col relative z-0 mt-4 h-[350px]">
 
                   {/* Background watermark simulation */}
                   <div className="absolute top-4 right-4 opacity-10">
@@ -322,15 +364,15 @@ export default function Expenses() {
                   </div>
 
                   <div className="text-right mb-6">
-                    <h3 className="text-lg font-black text-heading uppercase tracking-widest">Receipt</h3>
-                    <p className="text-[10px] text-muted mt-1">REC-2023-064</p>
+                    <h3 className="text-lg font-black text-heading uppercase tracking-widest">Expense Summary</h3>
+                    <p className="text-[10px] text-muted mt-1">{selectedRecord.id}</p>
                     <p className="text-[10px] text-muted">{new Date(selectedRecord.date).toLocaleDateString()}</p>
                   </div>
 
                   <div className="mb-8">
-                    <p className="text-[8px] font-bold text-caption uppercase tracking-wider mb-1">Billed To</p>
+                    <p className="text-[8px] font-bold text-caption uppercase tracking-wider mb-1">Claimed By</p>
                     <p className="text-xs font-bold text-heading">{selectedRecord.employee || 'Unassigned'}</p>
-                    <p className="text-[10px] text-muted">Asas Enterprise</p>
+                    <p className="text-[10px] text-muted">Internal expense record</p>
                   </div>
 
                   <div className="flex justify-between items-end border-b border-border-subtle pb-2 mb-3">
@@ -346,7 +388,7 @@ export default function Expenses() {
                   </div>
 
                   <div className="pt-4 border-t-2 border-gray-900 flex justify-between items-center mt-8">
-                    <span className="text-xs font-bold text-heading">Total USD</span>
+                    <span className="text-xs font-bold text-heading">Total {selectedRecord.amount?.currency || 'USD'}</span>
                     <span className="text-sm font-black text-heading tabular-nums">{formatMoney(selectedRecord.amount)}</span>
                   </div>
                 </div>

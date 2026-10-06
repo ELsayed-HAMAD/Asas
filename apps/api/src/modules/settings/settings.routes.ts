@@ -8,6 +8,7 @@ import {
   integrationsListResponseSchema,
   integrationUpdateSchema,
   integrationWriteSchema,
+  webhookLogsResponseSchema,
   notificationSettingsSchema,
   notificationSettingsUpdateSchema,
   billingSettingsSchema,
@@ -165,6 +166,17 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       return { data: result }
     },
   )
+
+  server.get('/integrations/:id/webhook-logs', {
+    preHandler: requireRole('MEMBER'),
+    schema: {
+      params: idParamSchema,
+      response: { 200: envelope(webhookLogsResponseSchema), ...errorResponses },
+    },
+  }, async request => {
+    const { tenantId } = requireAuthContext(request)
+    return { data: await settingsController.getIntegrationWebhookLogs(request.server.prisma, tenantId, request.params.id) }
+  })
 
   server.post(
     '/integrations',

@@ -69,6 +69,7 @@ export const payableInvoiceSchema = z.object({
   vendor: z.string(),
   invoiceNumber: z.string().nullable(),
   date: isoDateTimeSchema,
+  dueDate: isoDateTimeSchema.nullable(),
   amount: moneySchema,
   status: payableStatusSchema,
   lineItemCount: z.int().min(0),
@@ -77,6 +78,19 @@ export const payableInvoiceSchema = z.object({
 })
 
 export type PayableInvoice = z.infer<typeof payableInvoiceSchema>
+
+export const payableLineItemSchema = z.object({
+  id: idSchema,
+  description: z.string(),
+  periodOrUsage: z.string().nullable(),
+  amount: moneySchema,
+})
+
+export const payableDetailSchema = payableInvoiceSchema.extend({
+  lineItems: z.array(payableLineItemSchema),
+})
+
+export type PayableDetail = z.infer<typeof payableDetailSchema>
 
 export const payableListQuerySchema = paginationQuerySchema.extend({
   status: payableStatusSchema.optional(),
@@ -101,6 +115,9 @@ export const payableSummarySchema = z.object({
   approvedTotal: moneySchema,
   paidCount: z.int().min(0),
   paidTotal: moneySchema,
+  pastDueTotal: moneySchema,
+  dueIn7DaysTotal: moneySchema,
+  paidThisMonthTotal: moneySchema,
 })
 
 export type PayableSummary = z.infer<typeof payableSummarySchema>
@@ -114,6 +131,7 @@ export const payableWriteSchema = z.object({
   invoiceNumber: boundedText(64).optional().nullable(),
   /** Calendar date the invoice is dated, `YYYY-MM-DD`. */
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a date such as '2026-09-01'"),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a date such as '2026-09-01'").optional().nullable(),
   /** Major-unit decimal string in the tenant's currency, e.g. '1250.00'. */
   amount: decimalStringSchema,
   status: payableStatusSchema.optional(),
@@ -124,6 +142,7 @@ export type PayableWriteInput = z.infer<typeof payableWriteSchema>
 export const payableUpdateSchema = z.object({
   invoiceNumber: boundedText(64).optional().nullable(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a date such as '2026-09-01'").optional(),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a date such as '2026-09-01'").optional().nullable(),
   amount: decimalStringSchema.optional(),
   status: payableStatusSchema.optional(),
 })
@@ -137,6 +156,16 @@ export const payableStatusUpdateSchema = z.object({
 
 export type PayableStatusUpdateInput = z.infer<typeof payableStatusUpdateSchema>
 
+export const payableChangeRequestSchema = z.object({
+  reason: z.string().trim().min(1).max(2000),
+})
+export type PayableChangeRequestInput = z.infer<typeof payableChangeRequestSchema>
+
+export const payableBatchPaymentSchema = z.object({
+  ids: z.array(idSchema).min(1).max(100).refine(ids => new Set(ids).size === ids.length, 'Invoice IDs must be unique'),
+})
+export type PayableBatchPaymentInput = z.infer<typeof payableBatchPaymentSchema>
+
 // ── Customers (accounts receivable master data) ────────────────────────────────────────
 
 export const customerSchema = z.object({
@@ -145,6 +174,7 @@ export const customerSchema = z.object({
   avatarUrl: z.string().nullable(),
   collectionStatus: receivableStatusSchema,
   openBalance: moneySchema,
+  oldestOverdueDays: z.int().min(0),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 })
@@ -161,6 +191,22 @@ export const customerWriteSchema = z.object({
 })
 
 export type CustomerWriteInput = z.infer<typeof customerWriteSchema>
+
+export const collectionActivitySchema = z.object({
+  id: idSchema,
+  customerId: idSchema,
+  title: shortTextSchema,
+  author: z.string().nullable(),
+  body: z.string().nullable(),
+  date: isoDateTimeSchema,
+})
+export type CollectionActivity = z.infer<typeof collectionActivitySchema>
+export const collectionActivityListResponseSchema = collection(collectionActivitySchema)
+export const collectionActivityWriteSchema = z.object({
+  title: shortTextSchema,
+  body: boundedText(5000),
+})
+export type CollectionActivityWriteInput = z.infer<typeof collectionActivityWriteSchema>
 
 // ── Receivable invoices (accounts receivable) ──────────────────────────────────────────
 
@@ -265,6 +311,8 @@ export const expenseListQuerySchema = paginationQuerySchema.extend({
   status: expenseStatusSchema.optional(),
   category: expenseCategorySchema.optional(),
   employeeId: idSchema.optional(),
+  departmentId: idSchema.optional(),
+  sort: z.enum(['asc', 'desc']).default('desc'),
   search: boundedText(200, 0).optional(),
 })
 
@@ -338,6 +386,15 @@ export const cashFlowPointSchema = z.object({
 
 export type CashFlowPoint = z.infer<typeof cashFlowPointSchema>
 
+export const recentTransactionSchema = z.object({
+  id: idSchema,
+  date: isoDateTimeSchema,
+  description: z.string(),
+  amount: moneySchema,
+  type: z.enum(['credit', 'debit']),
+  status: z.string(),
+})
+
 export const financeOverviewResponseSchema = z.object({
   /** Value still to pay out (open payables). */
   payableOutstanding: moneySchema,
@@ -349,6 +406,7 @@ export const financeOverviewResponseSchema = z.object({
   expensesPendingTotal: moneySchema,
   /** `CashFlowSnapshot` rows, ascending by month. Empty until snapshots exist. */
   cashFlow: z.array(cashFlowPointSchema),
+  recentTransactions: z.array(recentTransactionSchema),
 })
 
 export type FinanceOverview = z.infer<typeof financeOverviewResponseSchema>

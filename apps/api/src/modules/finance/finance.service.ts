@@ -26,6 +26,8 @@ import type {
 import type {
   Customer,
   CustomerWriteInput,
+  CollectionActivity,
+  CollectionActivityWriteInput,
   Expense,
   ExpenseListQuery,
   ExpenseSummary,
@@ -33,6 +35,7 @@ import type {
   ExpenseWriteInput,
   FinanceOverview,
   PayableInvoice,
+  PayableDetail,
   PayableListQuery,
   PayableSummary,
   PayableUpdateInput,
@@ -165,6 +168,11 @@ async function payableAggregates(
 function buildPayableSummary(
   statusMap: Map<string, { count: number; total: Prisma.Decimal }>,
   currency: string,
+  dateTotals = {
+    pastDue: new Prisma.Decimal(0),
+    dueIn7Days: new Prisma.Decimal(0),
+    paidThisMonth: new Prisma.Decimal(0),
+  },
 ): PayableSummary {
   let openOutstanding = new Prisma.Decimal(0)
   for (const status of PAYABLE_OPEN_STATUSES) {
@@ -180,6 +188,9 @@ function buildPayableSummary(
     approvedTotal: moneyWire(statusMap.get('APPROVED')?.total ?? new Prisma.Decimal(0), currency),
     paidCount: statusMap.get('PAID')?.count ?? 0,
     paidTotal: moneyWire(statusMap.get('PAID')?.total ?? new Prisma.Decimal(0), currency),
+    pastDueTotal: moneyWire(dateTotals.pastDue, currency),
+    dueIn7DaysTotal: moneyWire(dateTotals.dueIn7Days, currency),
+    paidThisMonthTotal: moneyWire(dateTotals.paidThisMonth, currency),
   }
 }
 
@@ -207,7 +218,10 @@ export async function listPayables(
   }
 
   const { skip, take } = toPrismaPage(query)
-  const [items, total, statusMap] = await Promise.all([
+  const now = new Date()
+  const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+  const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+  const [items, total, statusMap, pastDue, dueIn7Days, paidThisMonth] = await Promise.all([
     prisma.payableInvoice.findMany({
       where,
       skip,
@@ -217,12 +231,19 @@ export async function listPayables(
     }),
     prisma.payableInvoice.count({ where: { tenantId } }),
     payableAggregates(prisma, tenantId),
+    prisma.payableInvoice.aggregate({ where: { tenantId, status: { in: ['PENDING', 'APPROVED'] }, dueDate: { lt: now } }, _sum: { amount: true } }),
+    prisma.payableInvoice.aggregate({ where: { tenantId, status: { in: ['PENDING', 'APPROVED', 'SCHEDULED'] }, dueDate: { gte: now, lte: nextWeek } }, _sum: { amount: true } }),
+    prisma.payableInvoice.aggregate({ where: { tenantId, status: 'PAID', updatedAt: { gte: startOfMonth } }, _sum: { amount: true } }),
   ])
 
   return {
     items: items.map(item => mapPayable(item, currency)),
     pagination: buildPaginationMeta(query, total),
-    summary: buildPayableSummary(statusMap, currency),
+    summary: buildPayableSummary(statusMap, currency, {
+      pastDue: pastDue._sum.amount ?? new Prisma.Decimal(0),
+      dueIn7Days: dueIn7Days._sum.amount ?? new Prisma.Decimal(0),
+      paidThisMonth: paidThisMonth._sum.amount ?? new Prisma.Decimal(0),
+    }),
   }
 }
 
@@ -240,6 +261,7 @@ function mapPayable(
     vendor: invoice.vendor?.name ?? null,
     invoiceNumber: invoice.invoiceNumber,
     date: invoice.date.toISOString(),
+    dueDate: invoice.dueDate?.toISOString() ?? null,
     amount: moneyWire(invoice.amount, currency),
     status: invoice.status,
     lineItemCount: invoice._count.lineItems,
@@ -248,14 +270,22 @@ function mapPayable(
   }
 }
 
-export async function getPayable(prisma: PrismaClient, tenantId: string, id: string): Promise<PayableInvoice> {
+export async function getPayable(prisma: PrismaClient, tenantId: string, id: string): Promise<PayableDetail> {
   const currency = await getTenantCurrency(prisma, tenantId)
   const invoice = await prisma.payableInvoice.findFirst({
     where: { id, tenantId },
-    include: { vendor: true, _count: { select: { lineItems: true } } },
+    include: { vendor: true, lineItems: { orderBy: { id: 'asc' } }, _count: { select: { lineItems: true } } },
   })
   if (!invoice) throw new AppError(404, 'Invoice not found')
-  return mapPayable(invoice, currency)
+  return {
+    ...mapPayable(invoice, currency),
+    lineItems: invoice.lineItems.map(item => ({
+      id: item.id,
+      description: item.description,
+      periodOrUsage: item.periodOrUsage,
+      amount: moneyWire(item.amount, currency),
+    })),
+  }
 }
 
 /** Throws unless `vendorId` names a vendor in this tenant. */
@@ -283,6 +313,7 @@ export async function createPayable(
       vendorId: input.vendorId,
       invoiceNumber: input.invoiceNumber ?? null,
       date: dayToDate(input.date),
+      dueDate: input.dueDate ? dayToDate(input.dueDate) : null,
       amount: toStoredDecimal(input.amount, currency),
       status: input.status ?? 'PENDING',
     },
@@ -302,10 +333,11 @@ export async function updatePayable(
 
   const currency = await getTenantCurrency(prisma, tenantId)
   const invoice = await prisma.payableInvoice.update({
-    where: { id },
+    where: { id_tenantId: { id, tenantId } },
     data: {
       ...(input.invoiceNumber !== undefined && { invoiceNumber: input.invoiceNumber }),
       ...(input.date !== undefined && { date: dayToDate(input.date) }),
+      ...(input.dueDate !== undefined && { dueDate: input.dueDate ? dayToDate(input.dueDate) : null }),
       ...(input.amount !== undefined && { amount: toStoredDecimal(input.amount, currency) }),
       ...(input.status !== undefined && { status: input.status }),
     },
@@ -326,28 +358,78 @@ export async function updatePayableStatus(
   if (!existing) throw new AppError(404, 'Invoice not found')
 
   const invoice = await prisma.payableInvoice.update({
-    where: { id },
+    where: { id_tenantId: { id, tenantId } },
     data: { status },
     include: { vendor: true, _count: { select: { lineItems: true } } },
   })
   return mapPayable(invoice, currency)
 }
 
+/** Return an approved/scheduled payable to the review queue; the route writes the reason to the immutable audit log. */
+export async function requestPayableChanges(prisma: PrismaClient, tenantId: string, id: string): Promise<PayableInvoice> {
+  const currency = await getTenantCurrency(prisma, tenantId)
+  const existing = await prisma.payableInvoice.findFirst({ where: { id, tenantId } })
+  if (!existing) throw new AppError(404, 'Invoice not found')
+  if (!['APPROVED', 'SCHEDULED'].includes(existing.status)) {
+    throw new AppError(409, 'Changes can only be requested for an approved or scheduled invoice')
+  }
+  const invoice = await prisma.payableInvoice.update({
+    where: { id_tenantId: { id, tenantId } },
+    data: { status: 'PENDING' },
+    include: { vendor: true, _count: { select: { lineItems: true } } },
+  })
+  return mapPayable(invoice, currency)
+}
+
+/** Mark a selected set of approved or scheduled invoices paid as one atomic operation. */
+export async function payApprovedPayables(prisma: PrismaClient, tenantId: string, ids: string[]): Promise<PayableInvoice[]> {
+  const currency = await getTenantCurrency(prisma, tenantId)
+  await prisma.$transaction(async tx => {
+    const eligible = await tx.payableInvoice.count({
+      where: { tenantId, id: { in: ids }, status: { in: ['APPROVED', 'SCHEDULED'] } },
+    })
+    if (eligible !== ids.length) throw new AppError(409, 'Every selected invoice must be approved or scheduled before payment')
+    const updated = await tx.payableInvoice.updateMany({
+      where: { tenantId, id: { in: ids }, status: { in: ['APPROVED', 'SCHEDULED'] } },
+      data: { status: 'PAID' },
+    })
+    if (updated.count !== ids.length) throw new AppError(409, 'One or more invoices changed while processing the batch')
+  }, { isolationLevel: 'Serializable' })
+  const rows = await prisma.payableInvoice.findMany({
+    where: { tenantId, id: { in: ids } },
+    include: { vendor: true, _count: { select: { lineItems: true } } },
+    orderBy: { id: 'asc' },
+  })
+  return rows.map(row => mapPayable(row, currency))
+}
+
 export async function deletePayable(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
   const existing = await prisma.payableInvoice.findFirst({ where: { id, tenantId } })
   if (!existing) throw new AppError(404, 'Invoice not found')
-  await prisma.payableInvoice.delete({ where: { id } })
+  await prisma.payableInvoice.delete({ where: { id_tenantId: { id, tenantId } } })
 }
 
 // ── Customers ───────────────────────────────────────────────────────────────────
 
 export async function listCustomers(prisma: PrismaClient, tenantId: string): Promise<Customer[]> {
   const currency = await getTenantCurrency(prisma, tenantId)
-  const [rows, balanceByCustomer] = await Promise.all([
+  const today = new Date()
+  today.setUTCHours(0, 0, 0, 0)
+  const [rows, balanceByCustomer, oldestDueByCustomer] = await Promise.all([
     prisma.customer.findMany({ where: { tenantId }, orderBy: { name: 'asc' } }),
     openReceivableBalanceByCustomer(prisma, tenantId),
+    prisma.receivableInvoice.groupBy({
+      by: ['customerId'],
+      where: { tenantId, status: { in: [...RECEIVABLE_OPEN_STATUSES] }, dueDate: { lt: today } },
+      _min: { dueDate: true },
+    }),
   ])
-  return rows.map(row => mapCustomer(row, balanceByCustomer.get(row.id) ?? new Prisma.Decimal(0), currency))
+  const oldestDue = new Map(oldestDueByCustomer.map(row => [row.customerId, row._min.dueDate]))
+  return rows.map(row => {
+    const date = oldestDue.get(row.id)
+    const oldestOverdueDays = date ? Math.max(1, Math.ceil((today.getTime() - new Date(date).setUTCHours(0, 0, 0, 0)) / 86_400_000)) : 0
+    return mapCustomer(row, balanceByCustomer.get(row.id) ?? new Prisma.Decimal(0), currency, oldestOverdueDays)
+  })
 }
 
 export async function createCustomer(
@@ -362,13 +444,44 @@ export async function createCustomer(
   const customer = await prisma.customer.create({
     data: { tenantId, name: input.name, avatarUrl: input.avatarUrl ?? null },
   })
-  return mapCustomer(customer, new Prisma.Decimal(0), currency)
+  return mapCustomer(customer, new Prisma.Decimal(0), currency, 0)
+}
+
+function mapCollectionActivity(row: { id: string; customerId: string; title: string; author: string | null; body: string | null; createdAt: Date }): CollectionActivity {
+  return { id: row.id, customerId: row.customerId, title: row.title, author: row.author, body: row.body, date: row.createdAt.toISOString() }
+}
+
+export async function listCollectionActivities(prisma: PrismaClient, tenantId: string, customerId: string): Promise<CollectionActivity[]> {
+  const customer = await prisma.customer.findFirst({ where: { id: customerId, tenantId }, select: { id: true } })
+  if (!customer) throw new AppError(404, 'Customer not found')
+  const rows = await prisma.collectionActivity.findMany({
+    where: { tenantId, customerId },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: 100,
+  })
+  return rows.map(mapCollectionActivity)
+}
+
+export async function createCollectionActivity(
+  prisma: PrismaClient,
+  tenantId: string,
+  customerId: string,
+  author: string,
+  input: CollectionActivityWriteInput,
+): Promise<CollectionActivity> {
+  const customer = await prisma.customer.findFirst({ where: { id: customerId, tenantId }, select: { id: true } })
+  if (!customer) throw new AppError(404, 'Customer not found')
+  const row = await prisma.collectionActivity.create({
+    data: { tenantId, customerId, title: input.title, body: input.body, author },
+  })
+  return mapCollectionActivity(row)
 }
 
 function mapCustomer(
   customer: PrismaCustomer,
   openBalance: Prisma.Decimal,
   currency: string,
+  oldestOverdueDays: number,
 ): Customer {
   return {
     id: customer.id,
@@ -376,6 +489,7 @@ function mapCustomer(
     avatarUrl: customer.avatarUrl,
     collectionStatus: customer.collectionStatus,
     openBalance: moneyWire(openBalance, currency),
+    oldestOverdueDays,
     createdAt: customer.createdAt.toISOString(),
     updatedAt: customer.updatedAt.toISOString(),
   }
@@ -568,7 +682,7 @@ export async function updateReceivable(
 
   const currency = await getTenantCurrency(prisma, tenantId)
   const invoice = await prisma.receivableInvoice.update({
-    where: { id },
+    where: { id_tenantId: { id, tenantId } },
     data: {
       ...(input.number !== undefined && { number: input.number }),
       ...(input.amount !== undefined && { amount: toStoredDecimal(input.amount, currency) }),
@@ -592,7 +706,7 @@ export async function updateReceivableStatus(
   if (!existing) throw new AppError(404, 'Invoice not found')
 
   const invoice = await prisma.receivableInvoice.update({
-    where: { id },
+    where: { id_tenantId: { id, tenantId } },
     data: { status },
     include: { customer: true },
   })
@@ -602,7 +716,7 @@ export async function updateReceivableStatus(
 export async function deleteReceivable(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
   const existing = await prisma.receivableInvoice.findFirst({ where: { id, tenantId } })
   if (!existing) throw new AppError(404, 'Invoice not found')
-  await prisma.receivableInvoice.delete({ where: { id } })
+  await prisma.receivableInvoice.delete({ where: { id_tenantId: { id, tenantId } } })
 }
 
 // ── Expenses ────────────────────────────────────────────────────────────────────
@@ -664,6 +778,7 @@ export async function listExpenses(
   if (query.status) where.status = query.status
   if (query.category) where.category = query.category
   if (query.employeeId) where.employeeId = query.employeeId
+  if (query.departmentId) where.employee = { is: { tenantId, departmentId: query.departmentId } }
   if (query.search) {
     where.OR = [
       { name: { contains: query.search, mode: 'insensitive' } },
@@ -677,10 +792,10 @@ export async function listExpenses(
       where,
       skip,
       take,
-      orderBy: { date: 'desc' },
+      orderBy: { date: query.sort },
       include: { employee: { select: { name: true } } },
     }),
-    prisma.expense.count({ where: { tenantId } }),
+    prisma.expense.count({ where }),
     expenseAggregates(prisma, tenantId),
   ])
 
@@ -818,12 +933,13 @@ export async function deleteExpense(prisma: PrismaClient, tenantId: string, id: 
 export async function getOverview(prisma: PrismaClient, tenantId: string): Promise<FinanceOverview> {
   const currency = await getTenantCurrency(prisma, tenantId)
 
-  const [payableMap, receivableMap, expenseMap, cashFlow, receivableAging] = await Promise.all([
+  const [payableMap, receivableMap, expenseMap, cashFlow, receivableAging, transactions] = await Promise.all([
     payableAggregates(prisma, tenantId),
     receivableAggregates(prisma, tenantId),
     expenseAggregates(prisma, tenantId),
     prisma.cashFlowSnapshot.findMany({ where: { tenantId }, orderBy: { month: 'asc' } }),
     computeAgingBuckets(prisma, tenantId, currency),
+    prisma.ledgerTransaction.findMany({ where: { tenantId }, orderBy: [{ date: 'desc' }, { id: 'desc' }], take: 20 }),
   ])
 
   const payableOutstanding = buildPayableSummary(payableMap, currency).openOutstanding
@@ -841,6 +957,14 @@ export async function getOverview(prisma: PrismaClient, tenantId: string): Promi
       inflow: moneyWire(row.inflow, currency),
       outflow: moneyWire(row.outflow, currency),
       net: moneyWire(row.net, currency),
+    })),
+    recentTransactions: transactions.map(row => ({
+      id: row.id,
+      date: row.date.toISOString(),
+      description: row.description,
+      amount: moneyWire(row.amount, currency),
+      type: row.isCredit ? 'credit' : 'debit',
+      status: row.status,
     })),
   }
 }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Search,
   Calendar,
@@ -16,7 +16,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { crmApi } from '../../../lib/api/crm';
 import { queryKeys } from '../../../lib/queryKeys';
-import { formatMoney, formatPercent } from '../../../lib/format';
+import { formatMoney, formatPercent, moneyToMajor } from '../../../lib/format';
 import TopBarActions from '../../../components/TopBarActions';
 
 const REP_SPARK_COLORS = ['#10b981', '#3b82f6', '#ef4444']
@@ -31,9 +31,14 @@ const initials = (name) => {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 };
 
-const toMajor = (money) => (money == null ? 0 : money.amount / 100);
+const toMajor = (money) => (money == null ? 0 : moneyToMajor(money));
 
 export default function SalesPerformance() {
+  const [search, setSearch] = useState('')
+  const [dealsPeriod, setDealsPeriod] = useState('MONTH')
+  const [showAllDeals, setShowAllDeals] = useState(false)
+  const [repSort, setRepSort] = useState('PIPELINE')
+  const [repMenuOpen, setRepMenuOpen] = useState(false)
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.crm.salesPerformance(),
     queryFn: crmApi.getSalesPerformance,
@@ -76,7 +81,7 @@ export default function SalesPerformance() {
   // Team quota attainment = closed-won ÷ stored quota (both server aggregates;
   // forecast.summary.quotaAttainmentPct is pipeline ÷ quota, i.e. coverage — not attainment).
   const quotaMajor = toMajor(forecast?.summary?.totalQuota);
-  const attainmentPct = quotaMajor > 0 ? (toMajor(summary.totalWon) / quotaMajor) * 100 : null;
+  const attainmentPct = quotaMajor > 0 ? (toMajor(data.yearWonTotal) / quotaMajor) * 100 : null;
   const attainmentWidth = attainmentPct == null ? 0 : Math.min(100, attainmentPct);
 
   const closedTotal = summary.totalWonCount + summary.totalLostCount;
@@ -84,11 +89,48 @@ export default function SalesPerformance() {
     { name: 'Won', value: Math.round(summary.overallWinRate), color: '#10b981' },
     { name: 'Lost', value: Math.round(100 - summary.overallWinRate), color: '#f87171' },
   ];
+  const weeklyActivity = data.weeklyActivity || []
+  const maxWeeklyActivity = Math.max(1, ...weeklyActivity.map(week => week.active + week.won + week.lost))
 
-  const topDeals = ((dealsData?.items || [])
+  const matchesSearch = (value) => !search.trim() || String(value || '').toLowerCase().includes(search.trim().toLowerCase())
+  const filteredReps = (byRep || [])
+    .filter(rep => matchesSearch(rep.ownerName || 'Unassigned'))
     .slice()
-    .sort((a, b) => (b.value?.amount ?? 0) - (a.value?.amount ?? 0)))
-    .slice(0, 3);
+    .sort((a, b) => {
+      if (repSort === 'REVENUE') return b.wonValue.amount - a.wonValue.amount
+      if (repSort === 'WIN_RATE') return (b.winRate ?? -1) - (a.winRate ?? -1)
+      return b.openValue.amount - a.openValue.amount
+    })
+  const sortedTopDeals = (dealsData?.items || [])
+    .filter(deal => matchesSearch(`${deal.name} ${deal.company || ''} ${deal.owner?.name || ''}`))
+    .filter(deal => {
+      if (dealsPeriod === 'ALL') return true
+      if (!deal.closeDate) return false
+      const closeDate = new Date(deal.closeDate)
+      const now = new Date()
+      return closeDate.getFullYear() === now.getFullYear() && closeDate.getMonth() === now.getMonth()
+    })
+    .slice()
+    .sort((a, b) => (b.value?.amount ?? 0) - (a.value?.amount ?? 0))
+  const topDeals = showAllDeals ? sortedTopDeals : sortedTopDeals.slice(0, 3)
+
+  function downloadReport() {
+    const rows = [
+      ['Section', 'Period / Owner', 'Metric', 'Value'],
+      ...monthlyClosedWon.map(row => ['Closed won', row.month, 'Count', row.count]),
+      ...monthlyClosedWon.map(row => ['Closed won', row.month, 'Value', formatMoney(row.value)]),
+      ...weeklyActivity.map(row => ['Weekly activity', row.week, 'Open / won / lost', `${row.active} / ${row.won} / ${row.lost}`]),
+      ...byRep.map(rep => ['Representative', rep.ownerName || 'Unassigned', 'Won value', formatMoney(rep.wonValue)]),
+      ...byRep.map(rep => ['Representative', rep.ownerName || 'Unassigned', 'Win rate', formatPercent(rep.winRate)]),
+    ]
+    const csv = rows.map(row => row.map(value => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\r\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'sales-performance.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
@@ -100,21 +142,23 @@ export default function SalesPerformance() {
             <input
               type="text"
               placeholder="Search..."
+              value={search}
+              onChange={event => setSearch(event.target.value)}
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-56 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
           </div>
 
-          <button className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors">
+          <button onClick={() => { setDealsPeriod(value => value === 'MONTH' ? 'ALL' : 'MONTH'); setShowAllDeals(false) }} className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors">
             <Calendar size={14} className="text-muted" />
-            This Month
+            {dealsPeriod === 'MONTH' ? 'This Month' : 'All Dates'}
             <ChevronDown size={14} className="text-caption" />
           </button>
 
-          <button disabled className="p-1.5 text-muted hover:text-heading transition-colors disabled:opacity-60">
+          <button onClick={downloadReport} className="p-1.5 text-muted hover:text-heading transition-colors" aria-label="Download sales report">
             <Download size={18} />
           </button>
 
-          <button disabled className="bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
+          <button onClick={downloadReport} className="bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors">
             Download Report
           </button>
         </div>
@@ -145,7 +189,7 @@ export default function SalesPerformance() {
               <p className="text-[11px] font-bold text-muted uppercase tracking-wider">Total Closed Won</p>
               <TrendingUp size={16} className="text-success-dot" />
             </div>
-            <p className="text-3xl font-extrabold text-heading tracking-tight relative z-10">{formatMoney(summary.totalWon)}</p>
+              <p className="text-3xl font-extrabold text-heading tracking-tight relative z-10">{formatMoney(summary.totalWon)}</p>
             {/* Sparkline Area Chart — real closed-won value by month */}
             <div className="absolute bottom-0 left-0 w-full h-14">
               <ResponsiveContainer width="100%" height="100%">
@@ -162,16 +206,16 @@ export default function SalesPerformance() {
             </div>
           </div>
 
-          {/* Avg Sales Cycle — no server source; kept as the old page had it */}
+          {/* Average time from deal creation to last update for closed-won deals. */}
           <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card flex flex-col justify-between h-28">
             <div className="flex items-center justify-between">
               <p className="text-[11px] font-bold text-muted uppercase tracking-wider">Avg Sales Cycle</p>
               <Clock size={16} className="text-caption" />
             </div>
             <div className="flex items-center gap-3">
-              <p className="text-3xl font-extrabold text-heading tracking-tight">18 Days</p>
+              <p className="text-3xl font-extrabold text-heading tracking-tight">{summary.averageSalesCycleDays == null ? '—' : `${Math.round(summary.averageSalesCycleDays)} Days`}</p>
               <span className="bg-success-light text-success-text px-2 py-0.5 rounded text-[10px] font-bold tracking-wider mt-1.5">
-                ↓ 2 days faster
+                Closed won
               </span>
             </div>
           </div>
@@ -185,9 +229,18 @@ export default function SalesPerformance() {
           <div className="col-span-7 bg-surface-raised border border-border-default rounded-card-sm shadow-card flex flex-col">
             <div className="flex items-center justify-between px-6 py-5 border-b border-border-subtle">
               <h2 className="text-lg font-bold text-heading">Rep Leaderboard</h2>
-              <button className="text-caption hover:text-body transition-colors">
-                <MoreHorizontal size={20} />
-              </button>
+              <div className="relative">
+                <button type="button" aria-label="Sort rep leaderboard" aria-expanded={repMenuOpen} onClick={() => setRepMenuOpen(open => !open)} className="text-caption hover:text-body transition-colors">
+                  <MoreHorizontal size={20} />
+                </button>
+                {repMenuOpen && <div role="menu" className="absolute right-0 top-full z-20 mt-1 min-w-44 rounded-input border border-border-default bg-surface-raised p-1 shadow-card">
+                  {[
+                    ['PIPELINE', 'Highest pipeline'],
+                    ['REVENUE', 'Highest revenue'],
+                    ['WIN_RATE', 'Highest win rate'],
+                  ].map(([value, label]) => <button key={value} type="button" role="menuitemradio" aria-checked={repSort === value} onClick={() => { setRepSort(value); setRepMenuOpen(false) }} className="block w-full rounded px-3 py-2 text-left text-xs font-medium text-body hover:bg-surface-muted">{label}</button>)}
+                </div>}
+              </div>
             </div>
             <table className="w-full text-left border-collapse">
               <thead className="bg-surface-raised">
@@ -200,14 +253,14 @@ export default function SalesPerformance() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
-                {(byRep || []).length === 0 ? (
+                {filteredReps.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-10 text-center text-sm text-muted">
                       No rep data yet.
                     </td>
                   </tr>
                 ) : (
-                  (byRep || []).map((rep, idx) => (
+                  filteredReps.map((rep, idx) => (
                     <tr key={rep.ownerEmployeeId || `unassigned-${idx}`} className="hover:bg-surface-muted">
                       <td className="px-6 py-4 text-sm text-body-light font-semibold">{idx + 1}</td>
                       <td className="px-2 py-4 flex items-center gap-3">
@@ -219,10 +272,10 @@ export default function SalesPerformance() {
                       <td className="px-6 py-4 text-right text-sm text-body-light font-semibold">{formatPercent(rep.winRate)}</td>
                       <td className="px-6 py-4 text-right text-sm font-bold text-heading tabular-nums">{formatMoney(rep.wonValue)}</td>
                       <td className="px-6 py-4 text-right">
-                        {/* No per-rep time series exists server-side — empty series */}
+                        {/* Recent weekly deal updates for this representative, aggregated server-side. */}
                         <div className="w-10 h-5 inline-block">
                           <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={[]} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
+                            <AreaChart data={(rep.weeklyActivity || []).map(week => ({ v: week.active + week.won + week.lost }))} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
                               <Area type="monotone" dataKey="v" stroke={REP_SPARK_COLORS[idx % REP_SPARK_COLORS.length]} strokeWidth={1.5} fill={REP_SPARK_COLORS[idx % REP_SPARK_COLORS.length]} fillOpacity={0.15} dot={false} animationDuration={600} />
                             </AreaChart>
                           </ResponsiveContainer>
@@ -235,14 +288,14 @@ export default function SalesPerformance() {
             </table>
           </div>
 
-          {/* Activity Breakdown — no server source; kept as the old page had it */}
+          {/* Activity Breakdown — weekly counts come from tenant-scoped SQL aggregates. */}
           <div className="col-span-5 bg-surface-raised border border-border-default rounded-card-sm shadow-card p-6 flex flex-col">
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-lg font-bold text-heading">Activity Breakdown</h2>
               <div className="flex items-center gap-3 text-[10px] text-muted font-medium uppercase tracking-wider">
-                <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-primary"></div> Meetings</span>
-                <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-gray-300"></div> Emails</span>
-                <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-accent"></div> Calls</span>
+                <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-primary"></div> Open</span>
+                <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-gray-300"></div> Won</span>
+                <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-accent"></div> Lost</span>
               </div>
             </div>
 
@@ -254,36 +307,17 @@ export default function SalesPerformance() {
                 <div className="absolute top-2/4 w-full border-t border-border-subtle z-0"></div>
                 <div className="absolute top-3/4 w-full border-t border-border-subtle z-0"></div>
 
-                {/* Bar W1 */}
-                <div className="flex flex-col justify-end w-10 h-full relative z-10">
-                  <div className="w-full bg-primary h-12"></div>
-                  <div className="w-full bg-gray-300 h-16"></div>
-                  <div className="w-full bg-accent h-12"></div>
-                </div>
-                {/* Bar W2 */}
-                <div className="flex flex-col justify-end w-10 h-full relative z-10">
-                  <div className="w-full bg-primary h-6"></div>
-                  <div className="w-full bg-gray-300 h-14"></div>
-                  <div className="w-full bg-accent h-10"></div>
-                </div>
-                {/* Bar W3 */}
-                <div className="flex flex-col justify-end w-10 h-full relative z-10">
-                  <div className="w-full bg-primary h-16"></div>
-                  <div className="w-full bg-gray-300 h-[72px]"></div>
-                  <div className="w-full bg-accent h-[52px]"></div>
-                </div>
-                {/* Bar W4 */}
-                <div className="flex flex-col justify-end w-10 h-full relative z-10">
-                  <div className="w-full bg-primary h-10"></div>
-                  <div className="w-full bg-gray-300 h-20"></div>
-                  <div className="w-full bg-accent h-12"></div>
-                </div>
+                {weeklyActivity.map(week => {
+                  const scale = 176 / maxWeeklyActivity
+                  return <div key={week.week} className="flex flex-col justify-end w-10 h-full relative z-10" title={`${week.active + week.won + week.lost} deal updates`}>
+                    <div className="w-full bg-primary" style={{ height: `${week.active * scale}px` }} />
+                    <div className="w-full bg-gray-300" style={{ height: `${week.won * scale}px` }} />
+                    <div className="w-full bg-accent" style={{ height: `${week.lost * scale}px` }} />
+                  </div>
+                })}
               </div>
               <div className="flex justify-around text-[10px] font-semibold text-muted pt-3 uppercase tracking-wider">
-                <span>W1</span>
-                <span>W2</span>
-                <span>W3</span>
-                <span>W4</span>
+                {weeklyActivity.map(week => <span key={week.week}>{week.week.slice(5)}</span>)}
               </div>
             </div>
           </div>
@@ -351,9 +385,9 @@ export default function SalesPerformance() {
           {/* Top Deals This Month — real deals, highest stored value first */}
           <div className="col-span-5 bg-surface-raised border border-border-default rounded-card-sm shadow-card flex flex-col">
             <div className="flex items-center justify-between px-6 py-5 border-b border-border-subtle">
-              <h2 className="text-lg font-bold text-heading">Top Deals This Month</h2>
-              <button className="text-xs font-semibold text-accent hover:text-accent-hover transition-colors">
-                View All
+              <h2 className="text-lg font-bold text-heading">{dealsPeriod === 'MONTH' ? 'Top Deals This Month' : 'Top Deals · All Dates'}</h2>
+              <button onClick={() => setShowAllDeals(current => !current)} className="text-xs font-semibold text-accent hover:text-accent-hover transition-colors">
+                {showAllDeals ? 'Show Top 3' : 'View All'}
               </button>
             </div>
 

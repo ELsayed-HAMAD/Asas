@@ -15,6 +15,14 @@ import { http } from '../api/http'
  * `{ amount: minorUnits, currency }` wire form handled by `formatMoney`.
  */
 export const projectsApi = {
+  createProject: (body) => http.post('/projects/projects', { body }),
+  createSprint: (body) => http.post('/projects/sprints', { body }),
+  updateSprint: (id, body) => http.patch(`/projects/sprints/${id}`, { body }),
+  createIssue: (body) => http.post('/projects/issues', { body }),
+  listProjects: (params) => http.get('/projects/projects', { query: params }),
+  createRoadmapPhase: (body) => http.post('/projects/roadmap/phases', { body }),
+  createRoadmapTask: (body) => http.post('/projects/roadmap/tasks', { body }),
+  updateRoadmapTask: (id, body) => http.patch(`/projects/roadmap/tasks/${id}`, { body }),
   /** GET /projects/portfolio — portfolio utilization rows + tenant-wide summary. */
   getPortfolio: () => http.get('/projects/portfolio'),
 

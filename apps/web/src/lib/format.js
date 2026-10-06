@@ -37,6 +37,28 @@ function isMoneyWire(value) {
   )
 }
 
+function currencyDigits(currency) {
+  try {
+    return new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits
+  } catch {
+    return 2
+  }
+}
+
+export function moneyToMajor(value) {
+  if (!isMoneyWire(value)) return Number(value) || 0
+  const currency = value.currency || defaultCurrency
+  return value.amount / (10 ** currencyDigits(currency))
+}
+
+export function formatCompactMoney(value, currency = defaultCurrency, locale = defaultLocale) {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return '—'
+  return new Intl.NumberFormat(locale, {
+    style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1,
+  }).format(number)
+}
+
 /**
  * Format money values safely.
  * Accepts a wire object ({ amount: minor units, currency }), a major-unit number, or a
@@ -49,9 +71,10 @@ export function formatMoney(value, options = {}) {
   let currencyCode = options.currency || defaultCurrency
 
   if (isMoneyWire(value)) {
-    // Minor units (cents) → major units for display.
-    numericValue = value.amount / 100
     currencyCode = value.currency || currencyCode
+    // Wire amount is expressed in the ISO currency's minor units (JPY has none;
+    // KWD has three), not always cents.
+    numericValue = value.amount / (10 ** currencyDigits(currencyCode))
   } else {
     numericValue = Number(value)
     if (Number.isNaN(numericValue)) return '—'
@@ -71,14 +94,14 @@ export function formatMoney(value, options = {}) {
       currency: currencyCode,
       notation: compact ? 'compact' : 'standard',
       minimumFractionDigits: minimumFractionDigits ?? (compact ? 0 : undefined),
-      maximumFractionDigits: maximumFractionDigits ?? (compact ? 1 : 2),
+      maximumFractionDigits: maximumFractionDigits ?? (compact ? 1 : currencyDigits(currencyCode)),
     }).format(numericValue)
 
     if (forcePlus && numericValue > 0) return `+${formatted}`
     return formatted
   } catch {
     // Fallback if locale or currency throws in exotic browser environments
-    return `${numericValue.toFixed(2)} ${currencyCode}`
+    return `${numericValue.toFixed(currencyDigits(currencyCode))} ${currencyCode}`
   }
 }
 

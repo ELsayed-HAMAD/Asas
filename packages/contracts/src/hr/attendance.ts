@@ -22,6 +22,8 @@ export const attendanceExceptionSchema = z.object({
   employeeId: idSchema,
   employeeName: z.string(),
   employeeAvatar: z.string().nullable(),
+  departmentId: idSchema.nullable(),
+  departmentName: z.string().nullable(),
   type: attendanceExceptionTypeSchema,
   label: z.string(),
   date: isoDateSchema,
@@ -37,6 +39,8 @@ export const leaveRequestSchema = z.object({
   employeeId: idSchema,
   employeeName: z.string(),
   employeeAvatar: z.string().nullable(),
+  departmentId: idSchema.nullable(),
+  departmentName: z.string().nullable(),
   type: leaveTypeSchema,
   startDate: isoDateSchema,
   endDate: isoDateSchema.nullable(),
@@ -58,13 +62,23 @@ export const timesheetSchema = z.object({
   id: idSchema,
   employeeId: idSchema,
   employeeName: z.string(),
+  departmentId: idSchema.nullable(),
+  departmentName: z.string().nullable(),
   weekStart: isoDateSchema,
   regularHours: z.number(),
   overtimeHours: z.number(),
   totalHours: z.number(),
+  approvedAt: isoDateTimeSchema.nullable(),
+  approvalEligible: z.boolean(),
   days: z.array(timesheetDaySchema),
 })
 export type TimesheetRow = z.infer<typeof timesheetSchema>
+
+export const timesheetApprovalResponseSchema = z.object({ id: idSchema, approvedAt: isoDateTimeSchema })
+export const timesheetBatchApprovalSchema = z.object({
+  ids: z.array(idSchema).min(1).max(100).refine(ids => new Set(ids).size === ids.length, 'Timesheet IDs must be unique'),
+})
+export const timesheetBatchApprovalResponseSchema = z.object({ ids: z.array(idSchema), approvedAt: isoDateTimeSchema })
 
 export const leaveRequestWriteSchema = z.object({
   employeeId: idSchema,
@@ -101,8 +115,15 @@ export const attendanceResponseSchema = z.object({
   leaveRequests: z.array(leaveRequestSchema),
   timesheets: z.array(timesheetSchema),
   summary: attendanceSummarySchema,
+  selfClock: z.object({
+    employeeId: idSchema,
+    clockIn: z.string().nullable(),
+    clockOut: z.string().nullable(),
+  }).nullable(),
 })
 export type AttendanceResponse = z.infer<typeof attendanceResponseSchema>
+
+export const attendanceClockResponseSchema = attendanceResponseSchema.shape.selfClock.unwrap()
 
 export const leaveRequestListResponseSchema = z.object({
   items: z.array(leaveRequestSchema),

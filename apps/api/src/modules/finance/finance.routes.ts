@@ -2,6 +2,9 @@ import {
   customerListResponseSchema,
   customerSchema,
   customerWriteSchema,
+  collectionActivityListResponseSchema,
+  collectionActivitySchema,
+  collectionActivityWriteSchema,
   envelope,
   errorResponses,
   expenseListQuerySchema,
@@ -14,11 +17,14 @@ import {
   idParamSchema,
   noContentSchema,
   payableInvoiceSchema,
+  payableDetailSchema,
   payableListQuerySchema,
   payableListResponseSchema,
   payableStatusUpdateSchema,
   payableUpdateSchema,
   payableWriteSchema,
+  payableBatchPaymentSchema,
+  payableChangeRequestSchema,
   receivableInvoiceSchema,
   receivableListQuerySchema,
   receivableListResponseSchema,
@@ -31,6 +37,7 @@ import {
 } from '@asas/contracts'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
+import { z } from 'zod'
 import { requireAuthContext, requireRole } from '../../middlewares/rbac.js'
 import { requirePermission } from '../../middlewares/permissions.js'
 import { recordAuditLog } from '../../services/auditLog.js'
@@ -148,7 +155,7 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
       preHandler: requireRole('MEMBER'),
       schema: {
         params: idParamSchema,
-        response: { 200: envelope(payableInvoiceSchema), ...errorResponses },
+        response: { 200: envelope(payableDetailSchema), ...errorResponses },
       },
     },
     async request => {
@@ -246,6 +253,51 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
   )
 
+  server.post('/payables/:id/request-changes', {
+    preHandler: requirePermission('finance.invoice.write'),
+    schema: {
+      params: idParamSchema,
+      body: payableChangeRequestSchema,
+      response: { 200: envelope(payableInvoiceSchema), ...errorResponses },
+    },
+  }, async request => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const invoice = await financeController.requestPayableChanges(request.server.prisma, tenantId, request.params.id)
+    await recordAuditLog(request.server.prisma, {
+      tenantId,
+      actorId: userId,
+      action: 'finance.payable.request_changes',
+      targetType: 'PayableInvoice',
+      targetId: invoice.id,
+      metadata: { status: invoice.status, reason: request.body.reason },
+    })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
+    return { data: invoice }
+  })
+
+  server.post('/payables/batch-payment', {
+    preHandler: requirePermission('finance.invoice.write'),
+    schema: {
+      body: payableBatchPaymentSchema,
+      response: { 200: envelope(z.array(payableInvoiceSchema)), ...errorResponses },
+    },
+  }, async request => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const invoices = await financeController.payApprovedPayables(request.server.prisma, tenantId, request.body)
+    for (const invoice of invoices) {
+      await recordAuditLog(request.server.prisma, {
+        tenantId,
+        actorId: userId,
+        action: 'finance.payable.batch_paid',
+        targetType: 'PayableInvoice',
+        targetId: invoice.id,
+        metadata: { status: invoice.status },
+      })
+    }
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
+    return { data: invoices }
+  })
+
   server.delete(
     '/payables/:id',
     {
@@ -307,6 +359,36 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       reply.code(201)
       return { data: customer }
+    },
+  )
+
+  server.get(
+    '/customers/:id/activities',
+    {
+      preHandler: requireRole('MEMBER'),
+      schema: { params: idParamSchema, response: { 200: envelope(collectionActivityListResponseSchema), ...errorResponses } },
+    },
+    async request => {
+      const { tenantId } = requireAuthContext(request)
+      const items = await financeController.listCollectionActivities(request.server.prisma, tenantId, request.params.id)
+      return { data: { items } }
+    },
+  )
+
+  server.post(
+    '/customers/:id/activities',
+    {
+      preHandler: requirePermission('finance.invoice.write'),
+      schema: { params: idParamSchema, body: collectionActivityWriteSchema, response: { 201: envelope(collectionActivitySchema), ...errorResponses } },
+    },
+    async (request, reply) => {
+      const { tenantId, userId } = requireAuthContext(request)
+      const user = await request.server.prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
+      const activity = await financeController.createCollectionActivity(request.server.prisma, tenantId, request.params.id, user?.name ?? 'Workspace member', request.body)
+      await recordAuditLog(request.server.prisma, { tenantId, actorId: userId, action: 'finance.collection_activity.create', targetType: 'Customer', targetId: request.params.id })
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
+      reply.code(201)
+      return { data: activity }
     },
   )
 

@@ -28,6 +28,7 @@ export const settingsApi = {
 
   /** GET /settings/integrations → { items: Integration[], summary: { connectedCount, total } }. */
   getIntegrations: () => http.get('/settings/integrations'),
+  getIntegrationWebhookLogs: (id) => http.get(`/settings/integrations/${id}/webhook-logs`),
 
   /**
    * POST /settings/integrations — create one. `body.credential` (the raw secret) is the single

@@ -6,6 +6,7 @@ import type {
   IntegrationsListResponse,
   IntegrationUpdateInput,
   IntegrationWriteInput,
+  WebhookLogsResponse,
   NotificationSettings,
   NotificationSettingsUpdateInput,
   BackupSchedule,
@@ -50,6 +51,10 @@ export function updateNotifications(
 
 export function getIntegrations(prisma: PrismaClient, tenantId: string): Promise<IntegrationsListResponse> {
   return settingsService.getIntegrationSettings(prisma, tenantId)
+}
+
+export function getIntegrationWebhookLogs(prisma: PrismaClient, tenantId: string, integrationId: string): Promise<WebhookLogsResponse> {
+  return settingsService.getIntegrationWebhookLogs(prisma, tenantId, integrationId)
 }
 
 export function createIntegration(

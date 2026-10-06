@@ -1,0 +1,2 @@
+CREATE TYPE "SprintStatus" AS ENUM ('ACTIVE', 'COMPLETED');
+ALTER TABLE "Sprint" ADD COLUMN "status" "SprintStatus" NOT NULL DEFAULT 'ACTIVE';

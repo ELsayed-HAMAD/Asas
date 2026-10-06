@@ -31,10 +31,13 @@ const SCOPE_TO_KIND = {
 export default function SettingsDataExport() {
   const queryClient = useQueryClient();
   const [scope, setScope] = useState('Full Workspace');
+  const [jobSearch, setJobSearch] = useState('')
+  const [showHistory, setShowHistory] = useState(false)
+  const [historyPage, setHistoryPage] = useState(1)
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: queryKeys.exports.jobs.list({ page: 1, limit: 100 }),
-    queryFn: () => exportsApi.listJobs({ page: 1, limit: 100 }),
+    queryKey: queryKeys.exports.jobs.list({ page: historyPage, limit: 100 }),
+    queryFn: () => exportsApi.listJobs({ page: historyPage, limit: 100 }),
     // Keep polling while any job is still QUEUED/RUNNING so a just-created job flips to DONE and
     // lands in Available Downloads without a manual refresh.
     refetchInterval: (query) => {
@@ -70,8 +73,9 @@ export default function SettingsDataExport() {
   }
 
   const jobs = data.items ?? [];
-  const liveJobs = jobs.filter((j) => j.status === 'RUNNING' || j.status === 'QUEUED');
-  const availableDownloads = jobs.filter((j) => j.status === 'DONE');
+  const searchJobs = jobs.filter(job => !jobSearch || `${job.filename ?? ''} ${job.kind} ${job.status}`.toLowerCase().includes(jobSearch.toLowerCase()))
+  const liveJobs = searchJobs.filter((j) => j.status === 'RUNNING' || j.status === 'QUEUED');
+  const availableDownloads = searchJobs.filter((j) => j.status === 'DONE');
 
   const handleDownload = async (job) => {
     try {
@@ -99,6 +103,8 @@ export default function SettingsDataExport() {
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
             <input
               type="text"
+              value={jobSearch}
+              onChange={event => setJobSearch(event.target.value)}
               placeholder="Search..."
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
@@ -108,7 +114,7 @@ export default function SettingsDataExport() {
 
           <button
             type="button"
-            disabled
+            onClick={() => setShowHistory(true)}
             className="bg-surface-muted border border-border-default text-body px-5 py-1.5 rounded-input text-sm font-semibold hover:bg-surface-active transition-colors whitespace-nowrap disabled:opacity-60"
           >
             View Export History
@@ -208,7 +214,29 @@ export default function SettingsDataExport() {
         <div className="w-[360px] bg-surface-raised border-l border-border-default flex flex-col flex-shrink-0 z-10">
 
           <div className="flex-1 overflow-y-auto p-8 space-y-6">
-            <h2 className="text-lg font-bold text-heading mb-2">Recent Exports</h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-bold text-heading">{showHistory ? 'Export History' : 'Recent Exports'}</h2>
+              {showHistory && <button onClick={() => setShowHistory(false)} className="text-xs font-semibold text-accent hover:text-accent-hover">Recent</button>}
+            </div>
+
+            {showHistory ? (
+              <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card space-y-4">
+                {searchJobs.length ? searchJobs.map(job => (
+                  <div key={job.id} className="flex items-start justify-between gap-3 border-b border-border-subtle pb-3 last:border-b-0 last:pb-0">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-heading truncate">{job.filename || `${job.kind} export`}</p>
+                      <p className="text-[11px] text-muted">{job.kind} · {job.status} · {new Date(job.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    {job.status === 'DONE' && <button type="button" onClick={() => handleDownload(job)} className="text-[11px] font-semibold text-accent hover:text-accent-hover">Download</button>}
+                  </div>
+                )) : <p className="text-xs text-muted">No matching export jobs.</p>}
+                <div className="flex items-center justify-between pt-2 text-xs text-muted">
+                  <button disabled={historyPage <= 1} onClick={() => setHistoryPage(page => Math.max(1, page - 1))} className="disabled:opacity-40 hover:text-heading">Previous</button>
+                  <span>Page {data.pagination.page} of {Math.max(1, data.pagination.pages)}</span>
+                  <button disabled={historyPage >= data.pagination.pages} onClick={() => setHistoryPage(page => page + 1)} className="disabled:opacity-40 hover:text-heading">Next</button>
+                </div>
+              </div>
+            ) : <>
 
             {/* Live Jobs Card */}
             <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card">
@@ -263,6 +291,7 @@ export default function SettingsDataExport() {
                 )}
               </div>
             </div>
+            </>}
 
           </div>
         </div>

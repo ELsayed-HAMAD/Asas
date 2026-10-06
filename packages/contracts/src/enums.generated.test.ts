@@ -50,7 +50,7 @@ describe('Generated Prisma Enums Contract', () => {
   })
 
   it('provides a complete registry object in prismaEnums', () => {
-    expect(Object.keys(prismaEnums).length).toBe(25)
+    expect(Object.keys(prismaEnums).length).toBe(26)
     expect(prismaEnums.UserRole).toEqual(['OWNER', 'ADMIN', 'MEMBER'])
   })
 })
