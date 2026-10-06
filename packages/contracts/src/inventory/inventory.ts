@@ -48,15 +48,37 @@ export const productSchema = z.object({
   leadTimeDays: z.int().nonnegative().nullable(),
   /** Reorder point: a product is `LOW_STOCK` when its quantity on hand falls to this level. */
   minThreshold: z.int().min(0),
+  archivedAt: isoDateTimeSchema.nullable(),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 })
 
 export type Product = z.infer<typeof productSchema>
 
+export const productSupplierSchema = z.object({ id: idSchema, name: shortTextSchema })
+export const productSupplierListResponseSchema = collection(productSupplierSchema)
+export type ProductSupplier = z.infer<typeof productSupplierSchema>
+
+export const purchaseOrderWriteSchema = z.object({
+  productId: idSchema,
+  quantity: z.int().min(1),
+})
+export type PurchaseOrderWriteInput = z.infer<typeof purchaseOrderWriteSchema>
+export const purchaseOrderSchema = z.object({
+  id: idSchema,
+  status: z.literal('DRAFT'),
+  createdAt: isoDateTimeSchema,
+  productId: idSchema,
+  productName: z.string(),
+  sku: z.string(),
+  quantity: z.int().min(1),
+})
+export type PurchaseOrder = z.infer<typeof purchaseOrderSchema>
+
 export const productListQuerySchema = paginationQuerySchema.extend({
   search: boundedText(200, 0).optional(),
   status: productStockStatusSchema.optional(),
+  archived: z.enum(['true', 'false']).transform(value => value === 'true').optional().transform(value => value ?? false),
 })
 
 export type ProductListQuery = z.infer<typeof productListQuerySchema>
@@ -107,6 +129,9 @@ export const productUpdateSchema = z.object({
 })
 
 export type ProductUpdateInput = z.infer<typeof productUpdateSchema>
+
+export const productArchiveInputSchema = z.object({ archived: z.boolean() })
+export type ProductArchiveInput = z.infer<typeof productArchiveInputSchema>
 
 /**
  * A product and its live stock level. `currentStock` is the sum of the tenant's

@@ -22,10 +22,10 @@ export const crmApi = {
   getDeal: (id) => http.get(`/crm/deals/${id}`),
 
   /** `forecastByRep` (ForecastSnapshot rows) + `quotas` + real open-deal `monthlyPipeline`. */
-  getForecast: () => http.get('/crm/forecast'),
+  getForecast: (year) => http.get('/crm/forecast', { query: year ? { year } : undefined }),
 
   /** Closed-won by month + per-rep leaderboard (ownerName / won / lost / winRate). */
-  getSalesPerformance: () => http.get('/crm/sales-performance'),
+  getSalesPerformance: (year) => http.get('/crm/sales-performance', { query: year ? { year } : undefined }),
 
   /** Body: `{ name, stage?, value? (major-unit string), companyId?, ownerEmployeeId?, ... } */
   createDeal: (body) => http.post('/crm/deals', { body }),

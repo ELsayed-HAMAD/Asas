@@ -20,10 +20,13 @@ import { projectsApi } from '../../../lib/api/projects';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatDate } from '../../../lib/format';
 import TopBarActions from '../../../components/TopBarActions';
+import FormDialog from '../../../components/common/FormDialog';
 
 export default function ActiveSprints() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState(null);
+  const [issueOpen, setIssueOpen] = useState(false)
+  const [issueTitle, setIssueTitle] = useState('')
 
   const { data: sprintsData, isLoading, isError } = useQuery({
     queryKey: queryKeys.projects.sprints.list({}),
@@ -33,7 +36,7 @@ export default function ActiveSprints() {
   // A Sprint does not embed its issues on the wire, so the board is a second read
   // scoped to the selected (first) sprint.
   const sprints = sprintsData?.items || [];
-  const activeSprint = sprints.length > 0 ? sprints[0] : null;
+  const activeSprint = sprints.find(sprint => sprint.status === 'ACTIVE') || sprints[0] || null;
 
   const { data: issuesData } = useQuery({
     queryKey: queryKeys.projects.issues.list({ sprintId: activeSprint?.id }),
@@ -45,6 +48,19 @@ export default function ActiveSprints() {
     mutationFn: (status) => projectsApi.updateIssue(selectedId, { status }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.projects.issues.all() }),
   });
+  const completeSprint = useMutation({
+    mutationFn: () => projectsApi.updateSprint(activeSprint.id, { status: 'COMPLETED' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.projects.all() }),
+  })
+  const createIssue = useMutation({
+    mutationFn: () => projectsApi.createIssue({ title: issueTitle.trim(), sprintId: activeSprint.id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.issues.all() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.sprints.all() })
+      setIssueOpen(false)
+      setIssueTitle('')
+    },
+  })
 
   if (isLoading) {
     return (
@@ -101,8 +117,10 @@ export default function ActiveSprints() {
             />
           </div>
 
+          <button onClick={() => setIssueOpen(true)} disabled={!activeSprint || activeSprint.status !== 'ACTIVE'} className="bg-surface-raised border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60">New Issue</button>
           <button
-            disabled
+            onClick={() => completeSprint.mutate()}
+            disabled={!activeSprint || activeSprint.status !== 'ACTIVE' || completeSprint.isPending}
             className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60"
           >
             Group: Status <ChevronDown size={14} className="text-caption" />
@@ -413,6 +431,9 @@ export default function ActiveSprints() {
           No active sprints found.
         </div>
       )}
+      <FormDialog open={issueOpen} onClose={() => setIssueOpen(false)} title="New issue" subtitle={activeSprint?.name} busy={createIssue.isPending} onConfirm={() => createIssue.mutate()} confirmLabel="Create issue">
+        <label className="block text-sm font-medium text-body">Issue title<input required value={issueTitle} onChange={event => setIssueTitle(event.target.value)} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
+      </FormDialog>
     </div>
   );
 }

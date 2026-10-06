@@ -5,9 +5,13 @@ import {
   noContentSchema,
   productListQuerySchema,
   productListResponseSchema,
+  productArchiveInputSchema,
   productSchema,
+  productSupplierListResponseSchema,
   productUpdateSchema,
   productWriteSchema,
+  purchaseOrderSchema,
+  purchaseOrderWriteSchema,
   stockAlertListResponseSchema,
   stockLevelListResponseSchema,
   stockMovementListQuerySchema,
@@ -73,6 +77,34 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
     },
   )
 
+  server.get('/products/:id/suppliers', {
+    preHandler: requireRole('MEMBER'),
+    schema: { params: idParamSchema, response: { 200: envelope(productSupplierListResponseSchema), ...errorResponses } },
+  }, async request => {
+    const { tenantId } = requireAuthContext(request)
+    const items = await inventoryController.listProductSuppliers(request.server.prisma, tenantId, request.params.id)
+    return { data: { items } }
+  })
+
+  server.post('/purchase-orders', {
+    preHandler: requirePermission('inventory.write'),
+    schema: { body: purchaseOrderWriteSchema, response: { 201: envelope(purchaseOrderSchema), ...errorResponses } },
+  }, async (request, reply) => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const order = await inventoryController.createPurchaseOrder(request.server.prisma, tenantId, request.body)
+    await recordAuditLog(request.server.prisma, {
+      tenantId,
+      actorId: userId,
+      action: 'inventory.purchase-order.create',
+      targetType: 'PurchaseOrder',
+      targetId: order.id,
+      metadata: { productId: order.productId, quantity: order.quantity },
+    })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
+    reply.code(201)
+    return { data: order }
+  })
+
   server.post(
     '/products',
     {
@@ -129,6 +161,27 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
     },
   )
 
+  server.patch('/products/:id/archive', {
+    preHandler: requirePermission('inventory.write'),
+    schema: {
+      params: idParamSchema,
+      body: productArchiveInputSchema,
+      response: { 200: envelope(productSchema), ...errorResponses },
+    },
+  }, async request => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const product = await inventoryController.setProductArchived(request.server.prisma, tenantId, request.params.id, request.body)
+    await recordAuditLog(request.server.prisma, {
+      tenantId,
+      actorId: userId,
+      action: request.body.archived ? 'inventory.product.archive' : 'inventory.product.restore',
+      targetType: 'Product',
+      targetId: product.id,
+    })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
+    return { data: product }
+  })
+
   server.delete(
     '/products/:id',
     {
@@ -144,7 +197,7 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
       await recordAuditLog(request.server.prisma, {
         tenantId,
         actorId: userId,
-        action: 'inventory.product.delete',
+        action: 'inventory.product.archive',
         targetType: 'Product',
         targetId: request.params.id,
       })

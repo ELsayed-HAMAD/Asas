@@ -29,6 +29,10 @@ export const hrApi = {
 
   // Attendance + leave
   listAttendance: () => http.get('/hr/attendance'),
+  clockIn: () => http.post('/hr/attendance/clock-in'),
+  clockOut: () => http.post('/hr/attendance/clock-out'),
+  approveTimesheet: (id) => http.post(`/hr/attendance/timesheets/${id}/approve`),
+  approveValidTimesheets: (ids) => http.post('/hr/attendance/timesheets/approve-valid', { body: { ids } }),
   createLeaveRequest: (body) => http.post('/hr/leave-requests', { body }),
 
   // Candidates

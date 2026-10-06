@@ -44,15 +44,16 @@ export function getOverview(prisma: PrismaClient, tenantId: string): Promise<Crm
   return service.getOverview(prisma, tenantId)
 }
 
-export function getForecast(prisma: PrismaClient, tenantId: string): Promise<CrmForecast> {
-  return service.getForecast(prisma, tenantId)
+export function getForecast(prisma: PrismaClient, tenantId: string, year?: string): Promise<CrmForecast> {
+  return service.getForecast(prisma, tenantId, year)
 }
 
 export function getSalesPerformance(
   prisma: PrismaClient,
   tenantId: string,
+  year?: string,
 ): Promise<CrmSalesPerformance> {
-  return service.getSalesPerformance(prisma, tenantId)
+  return service.getSalesPerformance(prisma, tenantId, year)
 }
 
 // ── Writes ────────────────────────────────────────────────────────────────────────

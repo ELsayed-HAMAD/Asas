@@ -9,15 +9,20 @@ import { financeApi } from '../../../lib/api/finance';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney } from '../../../lib/format';
 import TopBarActions from '../../../components/TopBarActions';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 // The old page rendered receivable money with no forced decimals (e.g. $320,000) — keep that.
 const money = (v) => formatMoney(v, { minimumFractionDigits: 0 });
 
-const DAY = 1000 * 60 * 60 * 24;
-
 export default function AccountsReceivable() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState(null);
+  const [activityBody, setActivityBody] = useState('')
+  const [activityType, setActivityType] = useState('Note')
+  const [search, setSearch] = useState('')
+  const [ageFilter, setAgeFilter] = useState('all')
+  const [oldestFirst, setOldestFirst] = useState(true)
+  const [paymentTargetId, setPaymentTargetId] = useState(null)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.finance.receivables.list({ limit: 100 }),
@@ -30,37 +35,42 @@ export default function AccountsReceivable() {
   });
   const paymentMutation = useMutation({
     mutationFn: (invoiceId) => financeApi.updateReceivableStatus(invoiceId, 'PAID'),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.finance.receivables.all() }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.receivables.all() })
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.finance.all(), 'customers'] })
+      setPaymentTargetId(null)
+    },
   });
+  const { data: activitiesData } = useQuery({
+    queryKey: [...queryKeys.finance.all(), 'customer-activities', selectedId],
+    queryFn: () => financeApi.listCollectionActivities(selectedId),
+    enabled: Boolean(selectedId),
+  })
+  const activityMutation = useMutation({
+    mutationFn: () => financeApi.createCollectionActivity(selectedId, { title: activityType === 'Call' ? 'Call logged' : 'Note', body: activityBody.trim() }),
+    onSuccess: () => {
+      setActivityBody('')
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.finance.all(), 'customer-activities', selectedId] })
+    },
+  })
 
   const items = data?.items || [];
   const customers = customersData?.items || [];
   const summary = data?.summary || {};
-  const now = new Date();
-
-  const displayItems = React.useMemo(() => {
-    // Oldest-days-overdue per customer, from that customer's unpaid invoices.
-    const oldest = {};
-    for (const inv of items) {
-      if (inv.status === 'PAID' || !inv.dueDate) continue;
-      const diff = now - new Date(inv.dueDate);
-      if (diff > 0) {
-        const days = Math.ceil(diff / DAY);
-        oldest[inv.customerId] = Math.max(oldest[inv.customerId] ?? 0, days);
-      }
-    }
-    return customers
+  const displayItems = React.useMemo(() => customers
       .map(c => ({
         id: c.id,
         name: c.name,
         avatar: c.avatarUrl,
         openBalance: c.openBalance,
         status: c.collectionStatus,
-        oldest: oldest[c.id] || 0,
+        oldest: c.oldestOverdueDays,
       }))
       .filter(c => c.openBalance && c.openBalance.amount > 0)
-      .sort((a, b) => b.oldest - a.oldest);
-  }, [items, customers]);
+      .filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase()))
+      .filter(c => ageFilter === 'all' || (ageFilter === 'overdue' ? c.oldest > 0 : c.oldest === 0))
+      .sort((a, b) => oldestFirst ? b.oldest - a.oldest : a.oldest - b.oldest),
+  [customers, search, ageFilter, oldestFirst]);
 
   // Sync selectedId with the filtered list
   React.useEffect(() => {
@@ -102,6 +112,7 @@ export default function AccountsReceivable() {
   const selectedInvoices = selectedRecord
     ? items.filter(r => r.customerId === selectedRecord.id && r.status !== 'PAID')
     : [];
+  const paymentTarget = items.find(invoice => invoice.id === paymentTargetId)
 
   return (
     <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-[1000px]">
@@ -112,6 +123,8 @@ export default function AccountsReceivable() {
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
             <input
               type="text"
+              value={search}
+              onChange={event => setSearch(event.target.value)}
               placeholder="Search..."
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
@@ -159,12 +172,12 @@ export default function AccountsReceivable() {
           <div className="flex items-center justify-between px-6 py-3 border-b border-border-default bg-surface-muted/50 flex-shrink-0">
             <div className="flex items-center gap-4">
               <Square size={16} className="text-faint" />
-              <button className="flex items-center gap-1.5 text-sm font-medium text-body-light hover:text-heading transition-colors">
-                <Filter size={14} /> Filter <ChevronDown size={14} className="text-caption" />
+              <button onClick={() => setAgeFilter(current => current === 'all' ? 'overdue' : current === 'overdue' ? 'current' : 'all')} className="flex items-center gap-1.5 text-sm font-medium text-body-light hover:text-heading transition-colors">
+                <Filter size={14} /> {ageFilter === 'all' ? 'All' : ageFilter === 'overdue' ? 'Overdue' : 'Current'} <ChevronDown size={14} className="text-caption" />
               </button>
             </div>
-            <button className="flex items-center gap-1.5 text-sm font-medium text-body-light hover:text-heading transition-colors">
-              Sort: Oldest First <ChevronDown size={14} className="text-caption" />
+            <button onClick={() => setOldestFirst(current => !current)} className="flex items-center gap-1.5 text-sm font-medium text-body-light hover:text-heading transition-colors">
+              Sort: {oldestFirst ? 'Oldest First' : 'Newest First'} <ChevronDown size={14} className="text-caption" />
             </button>
           </div>
 
@@ -260,7 +273,7 @@ export default function AccountsReceivable() {
                     View History
                   </button>
                 ) : (
-                  <button disabled={!selectedInvoices[0] || paymentMutation.isPending} onClick={() => paymentMutation.mutate(selectedInvoices[0].id)} className="bg-primary text-white px-4 py-2 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60">
+                  <button disabled={!selectedInvoices[0] || paymentMutation.isPending} onClick={() => setPaymentTargetId(selectedInvoices[0].id)} className="bg-primary text-white px-4 py-2 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60">
                     Log Payment
                   </button>
                 )}
@@ -315,7 +328,7 @@ export default function AccountsReceivable() {
                       </div>
                       <div className="flex items-center gap-4">
                         <span className="text-sm font-bold text-heading tabular-nums">{money(inv.amount)}</span>
-                        <button disabled={paymentMutation.isPending || inv.status === 'PAID'} onClick={() => paymentMutation.mutate(inv.id)} className="flex items-center gap-1 border border-border-strong rounded px-2.5 py-1 text-xs font-semibold text-body hover:bg-surface-muted transition-colors bg-surface-raised disabled:opacity-60">
+                        <button disabled={paymentMutation.isPending || inv.status === 'PAID'} onClick={() => setPaymentTargetId(inv.id)} className="flex items-center gap-1 border border-border-strong rounded px-2.5 py-1 text-xs font-semibold text-body hover:bg-surface-muted transition-colors bg-surface-raised disabled:opacity-60">
                           Action <ChevronDown size={12} className="text-caption" />
                         </button>
                       </div>
@@ -342,25 +355,28 @@ export default function AccountsReceivable() {
                 <div className="border border-border-default rounded-button bg-surface focus-within:bg-surface-raised focus-within:border-border-strong transition-colors mb-6">
                   <textarea
                     placeholder="Add a note or log a call..."
+                    value={activityBody}
+                    onChange={event => setActivityBody(event.target.value)}
                     className="w-full bg-transparent text-sm p-3 outline-none resize-none h-20 text-body placeholder-gray-400"
                   />
                   <div className="flex items-center justify-between p-2 border-t border-border-subtle">
                     <div className="flex items-center gap-2 text-caption px-2">
                       <button disabled className="hover:text-body-light transition-colors disabled:opacity-60"><Paperclip size={16} /></button>
-                      <button disabled className="hover:text-body-light transition-colors disabled:opacity-60"><Phone size={16} /></button>
+                      <button type="button" aria-label={activityType === 'Call' ? 'Log a call' : 'Add a note'} onClick={() => setActivityType(current => current === 'Note' ? 'Call' : 'Note')} className={`transition-colors ${activityType === 'Call' ? 'text-accent' : 'hover:text-body-light'}`}><Phone size={16} /></button>
                     </div>
-                    <button disabled className="bg-primary text-white text-xs font-semibold px-4 py-1.5 rounded hover:bg-primary-hover transition-colors disabled:opacity-60">
-                      Post
+                    <button disabled={!activityBody.trim() || activityMutation.isPending} onClick={() => activityMutation.mutate()} className="bg-primary text-white text-xs font-semibold px-4 py-1.5 rounded hover:bg-primary-hover transition-colors disabled:opacity-60">
+                      {activityMutation.isPending ? 'Posting...' : 'Post'}
                     </button>
                   </div>
                 </div>
+                {activityMutation.isError && <p role="alert" className="mb-4 text-xs text-danger">{activityMutation.error?.message || 'Could not post activity.'}</p>}
 
                 {/* Timeline */}
                 <div className="relative pl-3 space-y-6">
                   {/* Continuous Line */}
                   <div className="absolute left-[17px] top-2 bottom-6 w-px bg-surface-strong"></div>
 
-                  {selectedRecord.activities && selectedRecord.activities.map((act, index) => (
+                  {(activitiesData?.items ?? []).map((act, index) => (
                     <div key={act.id} className="relative z-10 flex gap-4">
                       <div className="bg-surface-raised ring-4 ring-white mt-1">
                         {index === 0 ? (
@@ -384,7 +400,7 @@ export default function AccountsReceivable() {
                     </div>
                   ))}
 
-                  {(!selectedRecord.activities || selectedRecord.activities.length === 0) && (
+                  {(!activitiesData?.items || activitiesData.items.length === 0) && (
                     <div className="text-center text-muted text-sm py-4">
                       No activity recorded.
                     </div>
@@ -396,6 +412,15 @@ export default function AccountsReceivable() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={Boolean(paymentTargetId)}
+        onClose={() => setPaymentTargetId(null)}
+        onConfirm={() => paymentTargetId && paymentMutation.mutate(paymentTargetId)}
+        title="Record payment?"
+        description={paymentTarget ? `Mark invoice ${paymentTarget.number || paymentTarget.id} as paid? This updates the receivable status and customer balance.` : 'Mark this invoice as paid?'}
+        confirmLabel="Mark as paid"
+        busy={paymentMutation.isPending}
+      />
     </div>
   );
 }

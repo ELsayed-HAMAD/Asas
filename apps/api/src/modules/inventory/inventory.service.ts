@@ -21,7 +21,11 @@ import type {
 import type {
   Product,
   ProductListQuery,
+  ProductArchiveInput,
+  ProductSupplier,
   ProductSummary,
+  PurchaseOrder,
+  PurchaseOrderWriteInput,
   ProductUpdateInput,
   ProductWriteInput,
   StockAlert,
@@ -73,6 +77,7 @@ function mapProduct(
     avgMonthlyUsage: product.avgMonthlyUsage,
     leadTimeDays: product.leadTimeDays,
     minThreshold: product.minThreshold,
+    archivedAt: product.archivedAt?.toISOString() ?? null,
     createdAt: product.createdAt.toISOString(),
     updatedAt: product.updatedAt.toISOString(),
   }
@@ -96,6 +101,37 @@ export interface ProductListResult {
   summary: ProductSummary
 }
 
+export async function listProductSuppliers(prisma: PrismaClient, tenantId: string, productId: string): Promise<ProductSupplier[]> {
+  const product = await prisma.product.findFirst({
+    where: { id: productId, tenantId },
+    select: { suppliers: { select: { supplier: { select: { id: true, name: true } } } } },
+  })
+  if (!product) throw new AppError(404, 'Product not found')
+  return product.suppliers.map(({ supplier }) => supplier)
+}
+
+export async function createPurchaseOrder(prisma: PrismaClient, tenantId: string, input: PurchaseOrderWriteInput): Promise<PurchaseOrder> {
+  return prisma.$transaction(async tx => {
+    const product = await tx.product.findFirst({ where: { id: input.productId, tenantId, archivedAt: null }, select: { id: true } })
+    if (!product) throw new AppError(404, 'Product not found')
+    const order = await tx.purchaseOrder.create({
+      data: { tenantId, status: 'DRAFT', lines: { create: { productId: product.id, quantity: input.quantity } } },
+      include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+    })
+    const line = order.lines[0]
+    if (!line) throw new AppError(500, 'Purchase order line was not created')
+    return {
+      id: order.id,
+      status: 'DRAFT',
+      createdAt: order.createdAt.toISOString(),
+      productId: line.product.id,
+      productName: line.product.name,
+      sku: line.product.sku,
+      quantity: line.quantity,
+    }
+  })
+}
+
 /**
  * Build the product-list `WHERE` clause as a parameterized `Prisma.Sql` fragment, so the page and
  * its `total` count are filtered *identically, in SQL*. Every dynamic value (the search term) is
@@ -106,7 +142,10 @@ export interface ProductListResult {
  * cannot express.
  */
 function buildProductWhere(tenantId: string, query: ProductListQuery): Prisma.Sql {
-  const clauses: Prisma.Sql[] = [Prisma.sql`"tenantId" = ${tenantId}`]
+  const clauses: Prisma.Sql[] = [
+    Prisma.sql`"tenantId" = ${tenantId}`,
+    query.archived ? Prisma.sql`"archivedAt" IS NOT NULL` : Prisma.sql`"archivedAt" IS NULL`,
+  ]
 
   if (query.search) {
     const pattern = `%${query.search}%`
@@ -133,6 +172,7 @@ interface RawProductRow {
   avgMonthlyUsage: number | null
   leadTimeDays: number | null
   minThreshold: number
+  archivedAt: Date | null
   createdAt: Date
   updatedAt: Date
 }
@@ -147,7 +187,7 @@ export async function listProducts(
 
   const [rows, countRow] = await Promise.all([
     prisma.$queryRaw<RawProductRow[]>`
-      SELECT "id","name","sku","price","stock","warehouse","aisle","bin",
+      SELECT "id","name","sku","price","stock","warehouse","aisle","bin","archivedAt",
              "avgMonthlyUsage","leadTimeDays","minThreshold","createdAt","updatedAt"
       FROM "Product"
       WHERE ${whereClause}
@@ -174,6 +214,7 @@ export async function listProducts(
       avgMonthlyUsage: row.avgMonthlyUsage,
       leadTimeDays: row.leadTimeDays,
       minThreshold: row.minThreshold,
+      archivedAt: row.archivedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     })),
@@ -189,15 +230,15 @@ async function productSummary(prisma: PrismaClient, tenantId: string): Promise<P
   // way to aggregate. `totalUnitsOnHand` is a `_sum`, and `lowStockProducts` is a `count` of
   // products whose on-hand has fallen to their reorder point.
   const [totalUnitsAgg, lowStockCount] = await Promise.all([
-    prisma.product.aggregate({ where: { tenantId }, _sum: { stock: true } }),
+    prisma.product.aggregate({ where: { tenantId, archivedAt: null }, _sum: { stock: true } }),
     prisma.$queryRaw<{ count: bigint }[]>`
       SELECT count(*) AS count FROM "Product"
-      WHERE "tenantId" = ${tenantId} AND "stock" <= "minThreshold"
+      WHERE "tenantId" = ${tenantId} AND "archivedAt" IS NULL AND "stock" <= "minThreshold"
     `,
   ])
 
   return {
-    totalProducts: await prisma.product.count({ where: { tenantId } }),
+    totalProducts: await prisma.product.count({ where: { tenantId, archivedAt: null } }),
     totalUnitsOnHand: totalUnitsAgg._sum.stock ?? 0,
     lowStockProducts: Number(lowStockCount[0]?.count ?? 0n),
   }
@@ -208,6 +249,15 @@ export async function getProduct(prisma: PrismaClient, tenantId: string, id: str
   if (!product) throw new AppError(404, 'Product not found')
   const stockMap = await stockByProduct(prisma, tenantId)
   return mapProduct(product, derivedStock(product, stockMap.get(id)))
+}
+
+export async function setProductArchived(prisma: PrismaClient, tenantId: string, id: string, input: ProductArchiveInput): Promise<Product> {
+  const result = await prisma.product.updateMany({
+    where: { id, tenantId },
+    data: { archivedAt: input.archived ? new Date() : null },
+  })
+  if (!result.count) throw new AppError(404, 'Product not found')
+  return getProduct(prisma, tenantId, id)
 }
 
 export async function createProduct(
@@ -287,14 +337,14 @@ export async function updateProduct(
 export async function deleteProduct(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
   const existing = await prisma.product.findFirst({ where: { id, tenantId } })
   if (!existing) throw new AppError(404, 'Product not found')
-  await prisma.product.delete({ where: { id } })
+  await prisma.product.update({ where: { id }, data: { archivedAt: new Date() } })
 }
 
 // ── Stock levels & alerts (unpaginated, derived) ───────────────────────────────
 
 export async function listStockLevels(prisma: PrismaClient, tenantId: string): Promise<StockLevel[]> {
   const [products, stockMap] = await Promise.all([
-    prisma.product.findMany({ where: { tenantId }, orderBy: { name: 'asc' } }),
+    prisma.product.findMany({ where: { tenantId, archivedAt: null }, orderBy: { name: 'asc' } }),
     stockByProduct(prisma, tenantId),
   ])
   return products.map(product => {
@@ -308,7 +358,7 @@ export async function listStockLevels(prisma: PrismaClient, tenantId: string): P
 
 export async function listStockAlerts(prisma: PrismaClient, tenantId: string): Promise<StockAlert[]> {
   const [products, stockMap] = await Promise.all([
-    prisma.product.findMany({ where: { tenantId }, orderBy: { name: 'asc' } }),
+    prisma.product.findMany({ where: { tenantId, archivedAt: null }, orderBy: { name: 'asc' } }),
     stockByProduct(prisma, tenantId),
   ])
   return products
@@ -329,7 +379,7 @@ export async function listStockAlerts(prisma: PrismaClient, tenantId: string): P
 export async function listWarehouses(prisma: PrismaClient, tenantId: string): Promise<Warehouse[]> {
   const rows = await prisma.product.groupBy({
     by: ['warehouse'],
-    where: { tenantId, warehouse: { not: null } },
+    where: { tenantId, archivedAt: null, warehouse: { not: null } },
     _count: { _all: true },
   })
   return rows
@@ -405,7 +455,7 @@ export async function recordStockMovement(
   tenantId: string,
   input: StockMovementWriteInput,
 ): Promise<StockMovementRecorded> {
-  const product = await prisma.product.findFirst({ where: { id: input.productId, tenantId } })
+  const product = await prisma.product.findFirst({ where: { id: input.productId, tenantId, archivedAt: null } })
   if (!product) throw new AppError(404, 'Product not found')
 
   const result = await prisma.$transaction(async tx => {

@@ -119,6 +119,12 @@ export const payrollRunSchema = z.object({
   /** The tax rates this run was priced with, so the split is reproducible and auditable. */
   taxRates: z.array(payrollTaxRateSchema),
   lines: z.array(payrollLineSchema),
+  /** Exact database aggregates over this run's lines, returned as major-unit decimals. */
+  totals: z.object({
+    gross: decimalStringSchema,
+    deductions: decimalStringSchema,
+    net: decimalStringSchema,
+  }),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 })

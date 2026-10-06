@@ -8,11 +8,12 @@ import {
   ClipboardList
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { projectsApi } from '../../../lib/api/projects';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney } from '../../../lib/format';
 import TopBarActions from '../../../components/TopBarActions';
+import FormDialog from '../../../components/common/FormDialog';
 
 const getBadgeStyle = (status) => {
   if (status === 'ACTIVE' || status === 'ON_TRACK') return "bg-success-light text-success-text";
@@ -35,7 +36,12 @@ const formatStatus = (status) => {
 const pct = (value) => (value == null ? '—' : `${Math.round(value)}%`);
 
 export default function PortfolioOverview() {
+  const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState(null);
+  const [projectOpen, setProjectOpen] = useState(false)
+  const [sprintOpen, setSprintOpen] = useState(false)
+  const [projectForm, setProjectForm] = useState({ name: '', budget: '' })
+  const [sprintForm, setSprintForm] = useState({ name: '', endsAt: '' })
 
   const { data: responseData, isLoading, isError } = useQuery({
     queryKey: queryKeys.projects.portfolio.list({}),
@@ -49,6 +55,14 @@ export default function PortfolioOverview() {
     queryKey: queryKeys.projects.sprints.list({}),
     queryFn: projectsApi.getSprints,
   });
+  const createProject = useMutation({
+    mutationFn: () => projectsApi.createProject({ name: projectForm.name.trim(), budget: projectForm.budget || null }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.projects.all() }); setProjectOpen(false); setProjectForm({ name: '', budget: '' }) },
+  })
+  const createSprint = useMutation({
+    mutationFn: () => projectsApi.createSprint({ name: sprintForm.name.trim(), projectId: selectedProject?.id, endsAt: sprintForm.endsAt ? new Date(`${sprintForm.endsAt}T00:00:00`).toISOString() : null }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.projects.all() }); setSprintOpen(false); setSprintForm({ name: '', endsAt: '' }) },
+  })
 
   if (isLoading) {
     return (
@@ -111,10 +125,10 @@ export default function PortfolioOverview() {
           </div>
 
           <button
-            disabled
+            onClick={() => setProjectOpen(true)}
             className="bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
           >
-            Generate Report
+            New Project
           </button>
         </div>
       </TopBarActions>
@@ -276,7 +290,7 @@ export default function PortfolioOverview() {
                       </div>
                       <p className="text-sm font-medium text-body-light mb-4">No sprints for this project.</p>
                       <button
-                        disabled
+                        onClick={() => setSprintOpen(true)}
                         className="border border-border-default text-body px-4 py-1.5 rounded-button text-[11px] font-bold hover:bg-surface-muted transition-colors uppercase tracking-wider disabled:opacity-60"
                       >
                         + Add Sprint
@@ -294,6 +308,12 @@ export default function PortfolioOverview() {
 
         </div>
       </div>
+      <FormDialog open={projectOpen} onClose={() => setProjectOpen(false)} title="New project" subtitle="Add a project to the portfolio." busy={createProject.isPending} onConfirm={() => createProject.mutate()} confirmLabel="Create project">
+        <div className="space-y-4"><label className="block text-sm font-medium text-body">Project name<input required value={projectForm.name} onChange={event => setProjectForm(current => ({ ...current, name: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Budget<input type="number" min="0" step="0.01" value={projectForm.budget} onChange={event => setProjectForm(current => ({ ...current, budget: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div>
+      </FormDialog>
+      <FormDialog open={sprintOpen} onClose={() => setSprintOpen(false)} title="Add sprint" subtitle={selectedProject?.name} busy={createSprint.isPending} onConfirm={() => createSprint.mutate()} confirmLabel="Create sprint">
+        <div className="space-y-4"><label className="block text-sm font-medium text-body">Sprint name<input required value={sprintForm.name} onChange={event => setSprintForm(current => ({ ...current, name: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">End date<input type="date" value={sprintForm.endsAt} onChange={event => setSprintForm(current => ({ ...current, endsAt: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div>
+      </FormDialog>
     </div>
   );
 }

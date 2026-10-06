@@ -64,6 +64,7 @@ const getPreviewData = (event) => {
 export default function SettingsNotifications() {
   const queryClient = useQueryClient();
   const [previewEvent, setPreviewEvent] = useState('invoice');
+  const [search, setSearch] = useState('')
 
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.settings.notifications(),
@@ -105,6 +106,15 @@ export default function SettingsNotifications() {
   };
 
   const preview = getPreviewData(previewEvent);
+  const visibleEventRows = EVENT_ROWS.filter(row => `${row.group} ${row.name} ${row.eventType}`.toLowerCase().includes(search.toLowerCase()))
+  const savePreferences = () => {
+    const modulesPatch = {}
+    for (const row of EVENT_ROWS) {
+      modulesPatch[row.module] ??= {}
+      modulesPatch[row.module][row.eventType] = modules[row.module]?.[row.eventType] ?? DEFAULT_PREFERENCES
+    }
+    updateMutation.mutate({ modules: modulesPatch, quietHours })
+  }
 
   return (
     <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
@@ -115,6 +125,8 @@ export default function SettingsNotifications() {
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
             <input
               type="text"
+              value={search}
+              onChange={event => setSearch(event.target.value)}
               placeholder="Search..."
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
@@ -124,10 +136,11 @@ export default function SettingsNotifications() {
 
           <button
             type="button"
-            disabled
+            disabled={updateMutation.isPending}
+            onClick={savePreferences}
             className="bg-primary text-on-primary px-5 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card whitespace-nowrap disabled:opacity-60"
           >
-            Save Preferences
+            {updateMutation.isPending ? 'Saving...' : updateMutation.isError ? 'Retry Save' : 'Save Preferences'}
           </button>
         </div>
       </TopBarActions>
@@ -197,7 +210,7 @@ export default function SettingsNotifications() {
 
               {/* Table Body */}
               <div className="divide-y divide-border-subtle">
-                {EVENT_ROWS.map((row) => {
+                {visibleEventRows.map((row) => {
                   const prefs = modules[row.module]?.[row.eventType] ?? DEFAULT_PREFERENCES;
                   return (
                     <div

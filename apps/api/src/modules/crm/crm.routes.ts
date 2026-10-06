@@ -7,6 +7,7 @@ import {
   envelope,
   errorResponses,
   forecastResponseSchema,
+  forecastQuerySchema,
   idParamSchema,
   overviewResponseSchema,
   salesPerformanceResponseSchema,
@@ -59,11 +60,11 @@ export async function crmRoutes(app: FastifyInstance): Promise<void> {
     '/forecast',
     {
       preHandler: requireRole('MEMBER'),
-      schema: { response: { 200: envelope(forecastResponseSchema), ...errorResponses } },
+      schema: { querystring: forecastQuerySchema, response: { 200: envelope(forecastResponseSchema), ...errorResponses } },
     },
     async request => {
       const { tenantId } = requireAuthContext(request)
-      const result = await crmController.getForecast(request.server.prisma, tenantId)
+      const result = await crmController.getForecast(request.server.prisma, tenantId, request.query.year)
       return { data: result }
     },
   )
@@ -74,11 +75,11 @@ export async function crmRoutes(app: FastifyInstance): Promise<void> {
     '/sales-performance',
     {
       preHandler: requireRole('MEMBER'),
-      schema: { response: { 200: envelope(salesPerformanceResponseSchema), ...errorResponses } },
+      schema: { querystring: forecastQuerySchema, response: { 200: envelope(salesPerformanceResponseSchema), ...errorResponses } },
     },
     async request => {
       const { tenantId } = requireAuthContext(request)
-      const result = await crmController.getSalesPerformance(request.server.prisma, tenantId)
+      const result = await crmController.getSalesPerformance(request.server.prisma, tenantId, request.query.year)
       return { data: result }
     },
   )

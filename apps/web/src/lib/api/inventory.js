@@ -20,10 +20,12 @@ import { http } from './http'
  * inner payload (`{ items, pagination, summary }` for lists, the entity for detail/mutations).
  */
 export const inventoryApi = {
-  listProducts: ({ page = 1, limit = 25, search, status } = {}) =>
-    http.get('/inventory/products', { query: { page, limit, search, status } }),
+  listProducts: ({ page = 1, limit = 25, search, status, archived = false } = {}) =>
+    http.get('/inventory/products', { query: { page, limit, search, status, archived } }),
 
   getProduct: (id) => http.get(`/inventory/products/${id}`),
+  listProductSuppliers: (id) => http.get(`/inventory/products/${id}/suppliers`),
+  createPurchaseOrder: (body) => http.post('/inventory/purchase-orders', { body }),
 
   listStockMovements: ({ page = 1, limit = 25, productId, warehouse, type } = {}) =>
     http.get('/inventory/stock/movements', { query: { page, limit, productId, warehouse, type } }),
@@ -34,6 +36,7 @@ export const inventoryApi = {
 
   createProduct: (body) => http.post('/inventory/products', { body }),
   updateProduct: (id, patch) => http.patch(`/inventory/products/${id}`, { body: patch }),
+  setProductArchived: (id, archived) => http.patch(`/inventory/products/${id}/archive`, { body: { archived } }),
   deleteProduct: (id) => http.delete(`/inventory/products/${id}`),
   recordStockMovement: (body) => http.post('/inventory/stock/movements', { body }),
 }

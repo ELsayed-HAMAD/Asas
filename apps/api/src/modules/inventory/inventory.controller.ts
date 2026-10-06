@@ -11,8 +11,12 @@ import type { PrismaClient } from '@prisma/client'
 import type {
   Product,
   ProductListQuery,
+  ProductArchiveInput,
+  ProductSupplier,
   ProductUpdateInput,
   ProductWriteInput,
+  PurchaseOrder,
+  PurchaseOrderWriteInput,
   StockAlert,
   StockLevel,
   StockMovementListQuery,
@@ -23,6 +27,14 @@ import type {
 import * as service from './inventory.service.js'
 
 export type { ProductListResult, StockMovementListResult } from './inventory.service.js'
+
+export function listProductSuppliers(prisma: PrismaClient, tenantId: string, productId: string): Promise<ProductSupplier[]> {
+  return service.listProductSuppliers(prisma, tenantId, productId)
+}
+
+export function createPurchaseOrder(prisma: PrismaClient, tenantId: string, input: PurchaseOrderWriteInput): Promise<PurchaseOrder> {
+  return service.createPurchaseOrder(prisma, tenantId, input)
+}
 
 // ── Products ─────────────────────────────────────────────────────────────────────
 
@@ -36,6 +48,10 @@ export function listProducts(
 
 export function getProduct(prisma: PrismaClient, tenantId: string, id: string): Promise<Product> {
   return service.getProduct(prisma, tenantId, id)
+}
+
+export function setProductArchived(prisma: PrismaClient, tenantId: string, id: string, input: ProductArchiveInput): Promise<Product> {
+  return service.setProductArchived(prisma, tenantId, id, input)
 }
 
 export function createProduct(

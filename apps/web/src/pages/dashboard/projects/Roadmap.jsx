@@ -9,14 +9,22 @@ import {
   Loader2,
   Clock
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { projectsApi } from '../../../lib/api/projects';
 import { queryKeys } from '../../../lib/queryKeys';
 import TopBarActions from '../../../components/TopBarActions';
+import FormDialog from '../../../components/common/FormDialog';
 
 export default function Roadmap() {
+  const queryClient = useQueryClient()
   const [isInspectorOpen, setInspectorOpen] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
+  const [phaseOpen, setPhaseOpen] = useState(false)
+  const [taskOpen, setTaskOpen] = useState(false)
+  const [timelineOpen, setTimelineOpen] = useState(false)
+  const [phaseTitle, setPhaseTitle] = useState('')
+  const [taskForm, setTaskForm] = useState({ title: '', phaseId: '' })
+  const [timelineForm, setTimelineForm] = useState({ startDate: '', endDate: '', progressPct: 0 })
 
   const { data: responseData, isLoading, isError } = useQuery({
     queryKey: queryKeys.projects.roadmap(),
@@ -43,6 +51,10 @@ export default function Roadmap() {
   // The new endpoint already ships ordered phases with dated, pre-computed tasks, so we
   // render them as-is.
   const phases = responseData.phases || [];
+  const refreshRoadmap = () => queryClient.invalidateQueries({ queryKey: queryKeys.projects.roadmap() })
+  const createPhase = useMutation({ mutationFn: () => projectsApi.createRoadmapPhase({ title: phaseTitle.trim(), sortOrder: phases.length }), onSuccess: () => { setPhaseOpen(false); setPhaseTitle(''); refreshRoadmap() } })
+  const createTask = useMutation({ mutationFn: () => projectsApi.createRoadmapTask({ title: taskForm.title.trim(), phaseId: taskForm.phaseId || phases[0]?.id }), onSuccess: () => { setTaskOpen(false); setTaskForm({ title: '', phaseId: '' }); refreshRoadmap() } })
+  const updateTimeline = useMutation({ mutationFn: () => projectsApi.updateRoadmapTask(selectedTask.id, { ...timelineForm, startDate: timelineForm.startDate || null, endDate: timelineForm.endDate || null }), onSuccess: () => { setTimelineOpen(false); refreshRoadmap() } })
 
   // Find selected task directly from phases
   let selectedTask = null;
@@ -69,10 +81,12 @@ export default function Roadmap() {
               placeholder="Search..."
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
+          <button type="button" onClick={() => setPhaseOpen(true)} className="border border-border-default bg-surface-raised text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted">New Phase</button>
+          <button type="button" disabled={!phases.length} onClick={() => { setTaskForm({ title: '', phaseId: phases[0]?.id || '' }); setTaskOpen(true) }} className="border border-border-default bg-surface-raised text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted disabled:opacity-60">New Task</button>
           </div>
 
-          <button
-            disabled
+              <button
+                onClick={() => { setTimelineForm({ startDate: selectedTask.startDate?.slice(0, 10) || '', endDate: selectedTask.endDate?.slice(0, 10) || '', progressPct: selectedTask.progressPct || 0 }); setTimelineOpen(true) }}
             className="bg-primary text-white px-5 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
           >
             Export
@@ -287,6 +301,9 @@ export default function Roadmap() {
         )}
 
       </div>
+      <FormDialog open={phaseOpen} onClose={() => setPhaseOpen(false)} title="New roadmap phase" busy={createPhase.isPending} onConfirm={() => createPhase.mutate()} confirmLabel="Create phase"><label className="block text-sm font-medium text-body">Phase name<input required value={phaseTitle} onChange={event => setPhaseTitle(event.target.value)} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></FormDialog>
+      <FormDialog open={taskOpen} onClose={() => setTaskOpen(false)} title="New roadmap task" busy={createTask.isPending} onConfirm={() => createTask.mutate()} confirmLabel="Create task"><div className="space-y-4"><label className="block text-sm font-medium text-body">Task name<input required value={taskForm.title} onChange={event => setTaskForm(current => ({ ...current, title: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Phase<select value={taskForm.phaseId || phases[0]?.id || ''} onChange={event => setTaskForm(current => ({ ...current, phaseId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2">{phases.map(phase => <option key={phase.id} value={phase.id}>{phase.title}</option>)}</select></label></div></FormDialog>
+      <FormDialog open={timelineOpen} onClose={() => setTimelineOpen(false)} title="Edit task timeline" subtitle={selectedTask?.title} busy={updateTimeline.isPending} onConfirm={() => updateTimeline.mutate()} confirmLabel="Save timeline"><div className="space-y-4"><label className="block text-sm font-medium text-body">Start date<input type="date" value={timelineForm.startDate} onChange={event => setTimelineForm(current => ({ ...current, startDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">End date<input type="date" value={timelineForm.endDate} onChange={event => setTimelineForm(current => ({ ...current, endDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Progress (%)<input type="number" min="0" max="100" value={timelineForm.progressPct} onChange={event => setTimelineForm(current => ({ ...current, progressPct: Number(event.target.value) }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div></FormDialog>
     </div>
   );
 }

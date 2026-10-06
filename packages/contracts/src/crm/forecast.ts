@@ -13,6 +13,10 @@ import { z } from 'zod'
 import { idSchema, isoDateTimeSchema } from '../primitives/ids.js'
 import { moneySchema } from '../primitives/money.js'
 
+export const forecastQuerySchema = z.object({
+  year: z.string().regex(/^\d{4}$/).optional(),
+})
+
 export const forecastSnapshotSchema = z.object({
   id: idSchema,
   repName: z.string(),
@@ -51,15 +55,25 @@ export const monthlyPipelineEntrySchema = z.object({
 export type MonthlyPipelineEntry = z.infer<typeof monthlyPipelineEntrySchema>
 
 export const forecastResponseSchema = z.object({
+  /** Calendar year used to filter snapshots, quotas, and close-month pipeline. */
+  year: z.string().regex(/^\d{4}$/),
+  /** Calendar years with forecast, quota, or dated deal data for this tenant. */
+  availableYears: z.array(z.string().regex(/^\d{4}$/)),
   /** Latest `ForecastSnapshot` rows, or [] when none exist for the tenant. */
   forecastByRep: z.array(forecastSnapshotSchema),
   /** `SalesQuota` rows, or [] when none exist for the tenant. */
   quotas: z.array(salesQuotaSchema),
   /** Open deals by close-date month, ascending. Empty when no open deal has a close date. */
   monthlyPipeline: z.array(monthlyPipelineEntrySchema),
+  /** Open deals marked as COMMIT, grouped over the entire tenant by their stored close month. */
+  monthlyCommit: z.array(monthlyPipelineEntrySchema),
   summary: z.object({
     totalPipeline: moneySchema,
     totalQuota: moneySchema,
+    /** Latest per-rep/per-period committed snapshot amount, in minor units. */
+    totalCommit: moneySchema,
+    /** Latest per-rep/per-period best-case snapshot amount, in minor units. */
+    totalBestCase: moneySchema,
     quotaAttainmentPct: z.number().min(0).nullable(),
   }),
 })

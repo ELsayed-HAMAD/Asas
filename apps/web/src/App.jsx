@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route } from 'react-router-dom'
 
 // ── Layouts ────────────────────────────────────────────────
@@ -17,30 +18,30 @@ import Login    from './pages/auth/Login'
 import Register from './pages/auth/Register'
 import Onboarding from './pages/auth/Onboarding'
 
-import DashboardPlaceholder from './pages/dashboard/DashboardPlaceholder'
-import DashboardOverview from './pages/dashboard/DashboardOverview'
-import EmployeeList from './pages/dashboard/hr/EmployeeList'
-import Payroll from './pages/dashboard/hr/Payroll'
-import TimeAttendance from './pages/dashboard/hr/TimeAttendance'
-import RecruitmentPipeline from './pages/dashboard/hr/RecruitmentPipeline'
-import FinanceOverview from './pages/dashboard/finance/FinanceOverview'
-import AccountsPayable from './pages/dashboard/finance/AccountsPayable'
-import AccountsReceivable from './pages/dashboard/finance/AccountsReceivable'
-import Expenses from './pages/dashboard/finance/Expenses'
-import CRMOverview from './pages/dashboard/crm/CRMOverview'
-import DealsPipeline from './pages/dashboard/crm/DealsPipeline'
-import SalesPerformance from './pages/dashboard/crm/SalesPerformance'
-import RevenueForecast from './pages/dashboard/crm/RevenueForecast'
-import ProductCatalog from './pages/dashboard/inventory/ProductCatalog'
-import PortfolioOverview from './pages/dashboard/projects/PortfolioOverview'
-import ActiveSprints from './pages/dashboard/projects/ActiveSprints'
-import Roadmap from './pages/dashboard/projects/Roadmap'
-import SettingsGeneral from './pages/dashboard/settings/SettingsGeneral'
-import BillingPlans from './pages/dashboard/settings/BillingPlans'
-import Integrations from './pages/dashboard/settings/Integrations'
-import Notifications from './pages/dashboard/settings/Notifications'
-import DataExport from './pages/dashboard/settings/DataExport'
-import HelpCenter from './pages/dashboard/support/HelpCenter'
+const DashboardPlaceholder = lazy(() => import('./pages/dashboard/DashboardPlaceholder'))
+const DashboardOverview = lazy(() => import('./pages/dashboard/DashboardOverview'))
+const EmployeeList = lazy(() => import('./pages/dashboard/hr/EmployeeList'))
+const Payroll = lazy(() => import('./pages/dashboard/hr/Payroll'))
+const TimeAttendance = lazy(() => import('./pages/dashboard/hr/TimeAttendance'))
+const RecruitmentPipeline = lazy(() => import('./pages/dashboard/hr/RecruitmentPipeline'))
+const FinanceOverview = lazy(() => import('./pages/dashboard/finance/FinanceOverview'))
+const AccountsPayable = lazy(() => import('./pages/dashboard/finance/AccountsPayable'))
+const AccountsReceivable = lazy(() => import('./pages/dashboard/finance/AccountsReceivable'))
+const Expenses = lazy(() => import('./pages/dashboard/finance/Expenses'))
+const CRMOverview = lazy(() => import('./pages/dashboard/crm/CRMOverview'))
+const DealsPipeline = lazy(() => import('./pages/dashboard/crm/DealsPipeline'))
+const SalesPerformance = lazy(() => import('./pages/dashboard/crm/SalesPerformance'))
+const RevenueForecast = lazy(() => import('./pages/dashboard/crm/RevenueForecast'))
+const ProductCatalog = lazy(() => import('./pages/dashboard/inventory/ProductCatalog'))
+const PortfolioOverview = lazy(() => import('./pages/dashboard/projects/PortfolioOverview'))
+const ActiveSprints = lazy(() => import('./pages/dashboard/projects/ActiveSprints'))
+const Roadmap = lazy(() => import('./pages/dashboard/projects/Roadmap'))
+const SettingsGeneral = lazy(() => import('./pages/dashboard/settings/SettingsGeneral'))
+const BillingPlans = lazy(() => import('./pages/dashboard/settings/BillingPlans'))
+const Integrations = lazy(() => import('./pages/dashboard/settings/Integrations'))
+const Notifications = lazy(() => import('./pages/dashboard/settings/Notifications'))
+const DataExport = lazy(() => import('./pages/dashboard/settings/DataExport'))
+const HelpCenter = lazy(() => import('./pages/dashboard/support/HelpCenter'))
 
 // ── 404 ────────────────────────────────────────────────────
 function NotFound() {
@@ -100,13 +101,13 @@ export default function App() {
     <Routes>
 
       {/* ── Marketing ── */}
-      <Route element={<MarketingLayout />}>
+      <Route element={<Suspense fallback={<div className="flex h-screen items-center justify-center text-muted">Loading…</div>}><MarketingLayout /></Suspense>}>
         <Route path="/" element={<Landing />} />
       </Route>
 
       {/* ── Auth (only for guests — redirect to dashboard if already logged in) ── */}
       <Route element={<GuestGuard />}>
-        <Route element={<AuthLayout />}>
+        <Route element={<Suspense fallback={<div className="flex h-screen items-center justify-center text-muted">Loading…</div>}><AuthLayout /></Suspense>}>
           <Route path="/login"    element={<Login />} />
           <Route path="/register" element={<Register />} />
         </Route>
@@ -122,7 +123,7 @@ export default function App() {
         {/* The layout route has NO path (matches the legacy App.jsx) so the absolute
             child paths below are valid — React Router 7 forbids absolute children under
             a pathed parent. */}
-        <Route element={<DashboardLayout />}>
+        <Route element={<Suspense fallback={<div className="flex h-screen items-center justify-center text-muted">Loading…</div>}><DashboardLayout /></Suspense>}>
           {DASHBOARD_PATHS.map(p => {
             const Page = REAL_PAGES[p] ?? DashboardPlaceholder
             return <Route key={p} path={p} element={<Page />} />

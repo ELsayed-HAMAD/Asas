@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Search,
   Calendar,
@@ -17,30 +17,50 @@ import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney } from '../../../lib/format';
 import { http } from '../../../lib/api/http';
 import TopBarActions from '../../../components/TopBarActions';
-
-// Sum a set of wire money objects ({amount: minor units, currency}) into one object.
-// Used for the date-bucket KPIs that have no server-side aggregate; the currency is taken
-// from the first row so no major/minor unit arithmetic is done in page code.
-function sumMoney(items) {
-  let minor = 0;
-  let currency;
-  for (const it of items) {
-    if (it.amount) {
-      minor += it.amount.amount;
-      currency = it.amount.currency;
-    }
-  }
-  return { amount: minor, currency: currency ?? 'USD' };
-}
+import FormDialog from '../../../components/common/FormDialog';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 export default function AccountsPayable() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState(null);
+  const [billOpen, setBillOpen] = useState(false)
+  const [changeRequestOpen, setChangeRequestOpen] = useState(false)
+  const [changeRequestReason, setChangeRequestReason] = useState('')
+  const [changeRequestSaved, setChangeRequestSaved] = useState(false)
+  const [search, setSearch] = useState('')
+  const [pdfZoom, setPdfZoom] = useState(100)
+  const [pdfUrl, setPdfUrl] = useState(null)
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [batchConfirmOpen, setBatchConfirmOpen] = useState(false)
+  const [dateFilter, setDateFilter] = useState('ALL')
+  useEffect(() => setSelectedIds(new Set()), [search, dateFilter])
+  const emptyBillForm = () => ({ vendorId: '', invoiceNumber: '', date: new Date().toISOString().slice(0, 10), dueDate: new Date().toISOString().slice(0, 10), amount: '' })
+  const [billForm, setBillForm] = useState(emptyBillForm)
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: queryKeys.finance.payables.list({ limit: 100 }),
-    queryFn: () => financeApi.listPayables({ limit: 100 }),
+    queryKey: queryKeys.finance.payables.list({ limit: 100, search: search || undefined }),
+    queryFn: () => financeApi.listPayables({ limit: 100, search: search || undefined }),
   });
+  const { data: detailData } = useQuery({
+    queryKey: [...queryKeys.finance.payables.all(), 'detail', selectedId],
+    queryFn: () => financeApi.getPayable(selectedId),
+    enabled: Boolean(selectedId),
+  })
+  const { data: pdfBlob, isLoading: pdfLoading, isError: pdfError } = useQuery({
+    queryKey: [...queryKeys.finance.payables.all(), 'pdf', selectedId],
+    queryFn: () => http.binary(`/finance/payables/${selectedId}/pdf`),
+    enabled: Boolean(selectedId),
+  })
+  useEffect(() => {
+    if (!pdfBlob) {
+      setPdfUrl(null)
+      return
+    }
+    const url = URL.createObjectURL(pdfBlob)
+    setPdfUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [pdfBlob])
+  useEffect(() => setChangeRequestSaved(false), [selectedId])
 
   const { data: vendorsData } = useQuery({
     queryKey: [...queryKeys.finance.all(), 'vendors'],
@@ -56,6 +76,33 @@ export default function AccountsPayable() {
     mutationFn: (status) => financeApi.updatePayableStatus(selectedId, status),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.finance.payables.all() }),
   });
+  const createBill = useMutation({
+    mutationFn: () => financeApi.createPayable({ ...billForm, invoiceNumber: billForm.invoiceNumber || null, status: 'PENDING' }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.finance.payables.all() }); setBillOpen(false); setBillForm(emptyBillForm()) },
+  })
+  const requestChanges = useMutation({
+    mutationFn: ({ id, reason }) => financeApi.requestPayableChanges(id, reason),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.finance.payables.all() })
+      setChangeRequestOpen(false)
+      setChangeRequestReason('')
+      setChangeRequestSaved(true)
+    },
+  })
+  const batchPayment = useMutation({
+    mutationFn: () => financeApi.batchPayApprovedPayables([...selectedIds]),
+    onSuccess: () => {
+      setSelectedIds(new Set())
+      setBatchConfirmOpen(false)
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.payables.all() })
+    },
+  })
+  const toggleInvoiceSelection = (id) => setSelectedIds(current => {
+    const next = new Set(current)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    return next
+  })
 
   if (isLoading) {
     return (
@@ -73,7 +120,12 @@ export default function AccountsPayable() {
     );
   }
 
-  const items = data.items || [];
+  const allItems = data.items || [];
+  const items = dateFilter === 'ALL' ? allItems : allItems.filter(item => {
+    const date = new Date(item.date)
+    const now = new Date()
+    return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()
+  });
   const summary = data.summary || {};
 
   // Set initial selected item if not set
@@ -82,21 +134,13 @@ export default function AccountsPayable() {
   }
 
   const selectedRecord = items.find(i => i.id === selectedId);
+  const selectedDetail = detailData?.id === selectedId ? detailData : null
   const needsApproval = items.filter(i => i.status === 'PENDING');
   const scheduled = items.filter(i => i.status === 'SCHEDULED' || i.status === 'APPROVED');
 
-  const now = new Date();
-
-  const pastDueItems = items.filter(i => (i.status === 'PENDING' || i.status === 'APPROVED') && new Date(i.date) < now);
-  const pastDueTotal = sumMoney(pastDueItems);
-
-  const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const dueIn7DaysItems = items.filter(i => (i.status === 'PENDING' || i.status === 'APPROVED' || i.status === 'SCHEDULED') && new Date(i.date) >= now && new Date(i.date) <= nextWeek);
-  const dueIn7DaysTotal = sumMoney(dueIn7DaysItems);
-
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const paidThisMonthItems = items.filter(i => i.status === 'PAID' && new Date(i.date) >= startOfMonth);
-  const paidThisMonthTotal = sumMoney(paidThisMonthItems);
+  const pastDueTotal = summary.pastDueTotal
+  const dueIn7DaysTotal = summary.dueIn7DaysTotal
+  const paidThisMonthTotal = summary.paidThisMonthTotal
 
   // Download the real invoice PDF (GET /finance/payables/:id/pdf, streamed binary).
   const handleDownloadPdf = async () => {
@@ -122,20 +166,21 @@ export default function AccountsPayable() {
             <input
               type="text"
               placeholder="Search invoices..."
+              value={search}
+              onChange={event => setSearch(event.target.value)}
               className="pl-9 pr-4 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
           </div>
-          <button disabled className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60">
+          <button onClick={() => setDateFilter(current => current === 'ALL' ? 'MONTH' : 'ALL')} className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors">
             <Calendar size={14} className="text-muted" />
-            This Month
+            {dateFilter === 'ALL' ? 'All Dates' : 'This Month'}
           </button>
-          <button disabled className="border border-border-default text-body px-4 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60">
-            Batch Payment
+          <button disabled={!selectedIds.size || batchPayment.isPending} onClick={() => setBatchConfirmOpen(true)} className="border border-border-default text-body px-4 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60">
+            Batch Payment {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
           </button>
+          <button onClick={() => setBillOpen(true)} className="bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors">New Bill</button>
           <div className="w-px h-6 bg-surface-strong mx-1"></div>
-          <button className="text-muted hover:text-body transition-colors">
-            <Filter size={18} />
-          </button>
+          <button onClick={() => setDateFilter(current => current === 'ALL' ? 'MONTH' : 'ALL')} aria-label="Toggle date filter" title={`Date filter: ${dateFilter === 'ALL' ? 'all dates' : 'this month'}`} className="text-muted hover:text-body transition-colors"><Filter size={18} /></button>
           <button className="text-muted hover:text-body transition-colors">
             <MoreVertical size={18} />
           </button>
@@ -176,7 +221,7 @@ export default function AccountsPayable() {
             <thead className="bg-surface-raised sticky top-0 z-10">
               <tr>
                 <th className="px-6 py-3 border-b border-border-default w-12">
-                  <Square size={16} className="text-faint" />
+                  <input type="checkbox" disabled={!['APPROVED', 'SCHEDULED'].includes(item.status)} aria-label={`Select ${item.vendor} invoice`} checked={selectedIds.has(item.id)} onChange={() => toggleInvoiceSelection(item.id)} onClick={event => event.stopPropagation()} className="accent-blue-600 disabled:opacity-30" />
                 </th>
                 <th className="px-2 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-default">Vendor</th>
                 <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-default text-left">Due Date</th>
@@ -207,7 +252,7 @@ export default function AccountsPayable() {
                     }`}
                   >
                     <td className="px-6 py-3.5">
-                      <Square size={16} className="text-faint" />
+                      <input type="checkbox" disabled={!['APPROVED', 'SCHEDULED'].includes(item.status)} aria-label={`Select ${item.vendor} invoice`} checked={selectedIds.has(item.id)} onChange={() => toggleInvoiceSelection(item.id)} onClick={event => event.stopPropagation()} className="accent-blue-600 disabled:opacity-30" />
                     </td>
                     <td className="px-2 py-3.5">
                       <div className="flex items-center gap-3">
@@ -222,7 +267,7 @@ export default function AccountsPayable() {
                       </div>
                     </td>
                     <td className="px-6 py-3.5 text-sm text-body-light font-medium">
-                      {new Date(item.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit' })}
+                      {new Date(item.dueDate || item.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit' })}
                     </td>
                     <td className="px-6 py-3.5 text-right text-sm font-bold text-heading tabular-nums">
                       {formatMoney(item.amount)}
@@ -268,7 +313,7 @@ export default function AccountsPayable() {
                       </div>
                     </td>
                     <td className="px-6 py-3.5 text-sm text-body-light font-medium">
-                      {new Date(item.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit' })}
+                      {new Date(item.dueDate || item.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit' })}
                     </td>
                     <td className="px-6 py-3.5 text-right text-sm font-bold text-heading tabular-nums">
                       {formatMoney(item.amount)}
@@ -324,13 +369,14 @@ export default function AccountsPayable() {
                 <button disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'PENDING'} onClick={() => statusMutation.mutate('APPROVED')} className="bg-primary text-white py-2 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
                   Approve
                 </button>
-                <button disabled className="border border-border-default text-body py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60">
+                <button onClick={() => { setChangeRequestReason(''); requestChanges.reset(); setChangeRequestSaved(false); setChangeRequestOpen(true) }} disabled={!selectedRecord || requestChanges.isPending || !['APPROVED', 'SCHEDULED'].includes(selectedRecord.status)} className="border border-border-default text-body py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60">
                   Request Changes
                 </button>
                 <button disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status === 'PAID'} onClick={() => statusMutation.mutate('REJECTED')} className="border border-border-default text-danger py-2 rounded-input text-sm font-medium hover:bg-danger-light transition-colors disabled:opacity-60">
                   Reject
                 </button>
               </div>
+              {changeRequestSaved && <p role="status" className="mt-3 text-xs text-success-text">Change request recorded in the invoice audit history.</p>}
             </div>
 
             {/* Line Items Card */}
@@ -339,15 +385,17 @@ export default function AccountsPayable() {
                 <h3 className="text-[11px] font-bold text-muted uppercase tracking-wider">Line Items</h3>
               </div>
               <div className="p-5 divide-y divide-border-subtle">
-                {/* Line items aren't exposed on the list endpoint (only a count), so the card
-                    shows the invoice total with its real line-item count. */}
-                <div className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
-                  <div>
-                    <p className="text-sm font-semibold text-heading">Service Provided</p>
-                    <p className="text-[11px] text-muted mt-0.5">{selectedRecord.lineItemCount > 1 ? `${selectedRecord.lineItemCount} line items` : 'Standard charge'}</p>
+                {selectedDetail?.lineItems?.length ? selectedDetail.lineItems.map(line => (
+                  <div key={line.id} className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
+                    <div>
+                      <p className="text-sm font-semibold text-heading">{line.description}</p>
+                      {line.periodOrUsage && <p className="text-[11px] text-muted mt-0.5">{line.periodOrUsage}</p>}
+                    </div>
+                    <span className="text-sm font-semibold text-heading tabular-nums">{formatMoney(line.amount)}</span>
                   </div>
-                  <span className="text-sm font-semibold text-heading tabular-nums">{formatMoney(selectedRecord.amount)}</span>
-                </div>
+                )) : (
+                  <p className="py-4 text-sm text-muted">{selectedDetail ? 'No line items recorded for this invoice.' : 'Loading invoice details...'}</p>
+                )}
               </div>
             </div>
 
@@ -359,37 +407,56 @@ export default function AccountsPayable() {
                   <span className="text-xs font-bold">invoice_{selectedRecord.invoiceNumber || 'document'}.pdf</span>
                 </div>
                 <div className="flex items-center gap-3 text-muted">
-                  <button className="hover:text-heading transition-colors"><ZoomIn size={16} /></button>
-                  <button className="hover:text-heading transition-colors"><ZoomOut size={16} /></button>
+                  <button aria-label="Zoom in" disabled={pdfZoom >= 200} onClick={() => setPdfZoom(value => Math.min(200, value + 25))} className="hover:text-heading transition-colors disabled:opacity-40"><ZoomIn size={16} /></button>
+                  <span className="text-[10px] tabular-nums">{pdfZoom}%</span>
+                  <button aria-label="Zoom out" disabled={pdfZoom <= 50} onClick={() => setPdfZoom(value => Math.max(50, value - 25))} className="hover:text-heading transition-colors disabled:opacity-40"><ZoomOut size={16} /></button>
                   <button onClick={handleDownloadPdf} className="hover:text-heading transition-colors"><Download size={16} /></button>
                 </div>
               </div>
 
               {/* Dark PDF Background Area */}
-              <div className="bg-[#4b5563] p-6 flex justify-center items-center rounded-b-lg">
-                {/* Skeleton Document */}
-                <div className="bg-surface-raised w-full h-[280px] shadow-card p-8 flex flex-col gap-6">
-                  <div className="w-32 h-4 bg-surface-strong rounded"></div>
-                  <div className="w-full flex gap-4">
-                    <div className="w-1/2 h-3 bg-surface-strong rounded"></div>
-                    <div className="w-1/2 h-3 bg-surface-strong rounded"></div>
-                  </div>
-                  <div className="w-full h-px bg-surface-strong my-2"></div>
-                  <div className="w-full flex justify-between">
-                    <div className="w-32 h-3 bg-surface-strong rounded"></div>
-                    <div className="w-16 h-3 bg-surface-strong rounded"></div>
-                  </div>
-                  <div className="w-full flex justify-between">
-                    <div className="w-40 h-3 bg-surface-strong rounded"></div>
-                    <div className="w-16 h-3 bg-surface-strong rounded"></div>
-                  </div>
-                </div>
+              <div className="bg-[#4b5563] p-3 flex justify-center items-center rounded-b-lg min-h-[320px]">
+                {pdfUrl ? (
+                  <iframe title={`Invoice ${selectedRecord.invoiceNumber || selectedRecord.id}`} src={`${pdfUrl}#zoom=${pdfZoom}`} className="w-full h-[320px] bg-surface-raised shadow-card" />
+                ) : (
+                  <p className="text-sm text-white">{pdfLoading ? 'Loading invoice PDF...' : pdfError ? 'Invoice preview could not be loaded.' : 'Invoice PDF is unavailable.'}</p>
+                )}
               </div>
             </div>
 
           </div>
         )}
       </div>
+      <FormDialog open={billOpen} onClose={() => setBillOpen(false)} title="New bill" subtitle="Add a vendor invoice to accounts payable." busy={createBill.isPending} onConfirm={() => createBill.mutate()} confirmLabel="Create bill">
+        <div className="space-y-4"><label className="block text-sm font-medium text-body">Vendor<select required value={billForm.vendorId} onChange={event => setBillForm(current => ({ ...current, vendorId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="">Select a vendor</option>{(vendorsData?.items ?? []).map(vendor => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}</select></label><label className="block text-sm font-medium text-body">Invoice number<input value={billForm.invoiceNumber} onChange={event => setBillForm(current => ({ ...current, invoiceNumber: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Invoice date<input type="date" required value={billForm.date} onChange={event => setBillForm(current => ({ ...current, date: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Due date<input type="date" required value={billForm.dueDate} onChange={event => setBillForm(current => ({ ...current, dueDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Amount<input required type="number" min="0" step="0.01" value={billForm.amount} onChange={event => setBillForm(current => ({ ...current, amount: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div>
+      </FormDialog>
+      <FormDialog
+        open={changeRequestOpen}
+        onClose={() => setChangeRequestOpen(false)}
+        title="Request invoice changes"
+        subtitle="The invoice returns to Pending and this reason is recorded in the audit history."
+        busy={requestChanges.isPending}
+        onConfirm={() => {
+          const reason = changeRequestReason.trim()
+          if (selectedRecord && reason) requestChanges.mutate({ id: selectedRecord.id, reason })
+        }}
+        confirmLabel="Record request"
+      >
+        <label className="block text-sm font-medium text-body">Reason
+          <textarea required maxLength={2000} rows={4} value={changeRequestReason} onChange={event => setChangeRequestReason(event.target.value)} className="mt-1 w-full resize-y rounded-input border border-border-default px-3 py-2" placeholder="Describe the correction needed" />
+        </label>
+        {requestChanges.isError && <p role="alert" className="mt-3 text-sm text-danger">{requestChanges.error?.message || 'Could not record the change request.'}</p>}
+      </FormDialog>
+      <ConfirmDialog
+        open={batchConfirmOpen}
+        onClose={() => setBatchConfirmOpen(false)}
+        onConfirm={() => batchPayment.mutate()}
+        title={`Mark ${selectedIds.size} invoices paid?`}
+        description="This records these approved or scheduled invoices as paid in the accounts payable ledger. Confirm that payment has already been made outside this application."
+        confirmLabel="Mark as paid"
+        busy={batchPayment.isPending}
+      />
+      {batchPayment.isError && <div role="alert" className="fixed bottom-4 right-4 z-50 rounded-button border border-danger/30 bg-surface-raised p-3 text-sm text-danger shadow-card">{batchPayment.error?.message || 'Batch payment failed. No invoices were changed.'}<button onClick={() => batchPayment.reset()} className="ml-3 underline">Dismiss</button></div>}
     </div>
   );
 }

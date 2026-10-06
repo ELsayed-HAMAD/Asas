@@ -15,7 +15,7 @@ import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSe
 import { CSS } from '@dnd-kit/utilities';
 import { crmApi } from '../../../lib/api/crm';
 import { queryKeys } from '../../../lib/queryKeys';
-import { formatMoney, formatDate } from '../../../lib/format';
+import { formatMoney, formatDate, moneyToMajor } from '../../../lib/format';
 import { useActiveMemberRole } from '../../../lib/authClient';
 import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
@@ -121,6 +121,8 @@ function DealStageGroup({ group, selectedId, onSelect, disabled }) {
 export default function DealsPipeline() {
   const [selectedId, setSelectedId] = useState(null);
   const [newDealOpen, setNewDealOpen] = useState(false);
+  const [editDealOpen, setEditDealOpen] = useState(false)
+  const [editForm, setEditForm] = useState(EMPTY_DEAL_FORM)
   const [dealForm, setDealForm] = useState(EMPTY_DEAL_FORM);
   const [formError, setFormError] = useState(null);
   // { id, message } so a failed stage move is shown only under the deal it failed for.
@@ -169,6 +171,10 @@ export default function DealsPipeline() {
       });
     },
   });
+  const editMutation = useMutation({
+    mutationFn: () => crmApi.updateDeal(selectedDeal.id, { ...editForm, value: editForm.value || null, closeDate: editForm.closeDate || null, winProbability: editForm.winProbability === '' ? null : Number(editForm.winProbability) }),
+    onSuccess: () => { invalidateCrmDeals(); setEditDealOpen(false) },
+  })
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   const handleDragEnd = (event) => {
@@ -229,6 +235,11 @@ export default function DealsPipeline() {
   const firstDeal = groups.find(group => group.deals.length > 0)?.deals[0] || null;
   const effectiveSelectedId = selectedId || (firstDeal ? firstDeal.id : null);
   const selectedDeal = deals.find((d) => d.id === effectiveSelectedId) || null;
+  const openEditDeal = () => {
+    if (!selectedDeal) return
+    setEditForm({ name: selectedDeal.name, value: String(moneyToMajor(selectedDeal.value)), stage: selectedDeal.stage, closeDate: selectedDeal.closeDate?.slice(0, 10) || '', winProbability: selectedDeal.winProbability == null ? '' : String(selectedDeal.winProbability) })
+    setEditDealOpen(true)
+  }
 
   return (
     <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-[1000px]">
@@ -323,7 +334,7 @@ export default function DealsPipeline() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <button disabled className="flex-1 flex items-center justify-center gap-2 border border-border-default text-body py-2.5 rounded-input text-sm font-semibold hover:bg-surface-muted transition-colors disabled:opacity-60">
+                  <button onClick={openEditDeal} disabled={!canWrite} title={!canWrite ? 'Requires the ADMIN role' : undefined} className="flex-1 flex items-center justify-center gap-2 border border-border-default text-body py-2.5 rounded-input text-sm font-semibold hover:bg-surface-muted transition-colors disabled:opacity-60">
                     <Mail size={16} className="text-muted" /> Email
                   </button>
                   <button disabled className="flex-1 flex items-center justify-center gap-2 border border-border-default text-body py-2.5 rounded-input text-sm font-semibold hover:bg-surface-muted transition-colors disabled:opacity-60">
@@ -484,6 +495,10 @@ export default function DealsPipeline() {
         </div>
 
         {dialogError && <p className="mt-4 text-sm font-medium text-danger">{dialogError}</p>}
+      </FormDialog>
+
+      <FormDialog open={editDealOpen} onClose={() => setEditDealOpen(false)} title="Edit deal" subtitle={selectedDeal?.name} busy={editMutation.isPending} onConfirm={() => editMutation.mutate()} confirmLabel="Save deal">
+        <div className="space-y-4"><label className="block text-sm font-medium text-body">Deal name<input required value={editForm.name} onChange={event => setEditForm(current => ({ ...current, name: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Value<input type="number" min="0" step="0.01" value={editForm.value} onChange={event => setEditForm(current => ({ ...current, value: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Stage<select value={editForm.stage} onChange={event => setEditForm(current => ({ ...current, stage: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2">{STAGE_ORDER.map(stage => <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>)}</select></label><label className="block text-sm font-medium text-body">Close date<input type="date" value={editForm.closeDate} onChange={event => setEditForm(current => ({ ...current, closeDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Win probability (%)<input type="number" min="0" max="100" value={editForm.winProbability} onChange={event => setEditForm(current => ({ ...current, winProbability: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div>
       </FormDialog>
     </div>
   );

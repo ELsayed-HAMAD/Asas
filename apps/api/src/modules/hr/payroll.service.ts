@@ -73,14 +73,20 @@ export async function getPayrollRun(prisma: PrismaClient, tenantId: string, runI
   const run = await prisma.payrollRun.findFirst({ where: { id: runId, tenantId } })
   if (!run) throw new AppError(404, 'Payroll run not found')
 
-  const lines = await prisma.payrollLine.findMany({
-    where: { payrollRunId: run.id, tenantId },
-    orderBy: { employee: { name: 'asc' } },
-    include: {
-      employee: { select: { id: true, name: true, title: true } },
-      taxLines: true,
-    },
-  })
+  const [lines, totals] = await Promise.all([
+    prisma.payrollLine.findMany({
+      where: { payrollRunId: run.id, tenantId },
+      orderBy: { employee: { name: 'asc' } },
+      include: {
+        employee: { select: { id: true, name: true, title: true } },
+        taxLines: true,
+      },
+    }),
+    prisma.payrollLine.aggregate({
+      where: { payrollRunId: run.id, tenantId },
+      _sum: { gross: true, deductions: true, net: true },
+    }),
+  ])
 
   const decoded = readTaxRates(run.taxRates)
   return {
@@ -90,6 +96,11 @@ export async function getPayrollRun(prisma: PrismaClient, tenantId: string, runI
     status: run.status,
     taxRates: decoded.map(rate => ({ label: rate.label, rate: String(rate.weight) })),
     lines: lines.map(mapLine),
+    totals: {
+      gross: totals._sum.gross?.toString() ?? '0',
+      deductions: totals._sum.deductions?.toString() ?? '0',
+      net: totals._sum.net?.toString() ?? '0',
+    },
     createdAt: run.createdAt.toISOString(),
     updatedAt: run.updatedAt.toISOString(),
   }

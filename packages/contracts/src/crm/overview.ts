@@ -39,8 +39,17 @@ export const overviewPipelineSchema = z.object({
 
 export const overviewResponseSchema = z.object({
   pipeline: overviewPipelineSchema,
+  /** Open deals created in the previous seven days. */
+  createdLast7Days: z.int().min(0),
   /** Won / (won + lost) over closed deals, percentage 0–100, or null when nothing has closed. */
   winRate: z.number().min(0).max(100).nullable(),
+  /** Monthly outcomes for deals with a recorded close date. */
+  monthlyWinRate: z.array(z.object({
+    month: z.string().regex(/^\d{4}-\d{2}$/),
+    wonCount: z.int().min(0),
+    lostCount: z.int().min(0),
+    rate: z.number().min(0).max(100).nullable(),
+  })),
   /** All five stages, in schema order, zero-filled. */
   funnel: z.array(funnelStageSchema),
 })
