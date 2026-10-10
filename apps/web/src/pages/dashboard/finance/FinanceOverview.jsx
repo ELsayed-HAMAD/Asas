@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../../../lib/api/finance';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney, formatCompactMoney, moneyToMajor } from '../../../lib/format';
+import { downloadCsv } from '../../../lib/csv';
 import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
 
@@ -36,8 +37,8 @@ export default function FinanceOverview() {
   const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()))
   const [invoiceForm, setInvoiceForm] = useState({ customerId: '', number: '', amount: '', dueDate: '' })
   const { data, isLoading, isError } = useQuery({
-    queryKey: [...queryKeys.finance.all(), 'overview'],
-    queryFn: financeApi.getOverview,
+    queryKey: [...queryKeys.finance.all(), 'overview', selectedYear],
+    queryFn: () => financeApi.getOverview({ year: selectedYear }),
   });
   const { data: customersData } = useQuery({ queryKey: [...queryKeys.finance.all(), 'customers'], queryFn: financeApi.listCustomers })
   const createInvoice = useMutation({
@@ -73,19 +74,10 @@ export default function FinanceOverview() {
     tx.date.startsWith(`${selectedYear}-`) && (!transactionSearch || tx.description.toLowerCase().includes(transactionSearch.toLowerCase()) || tx.status.toLowerCase().includes(transactionSearch.toLowerCase())),
   )
 
-  function downloadCsv(filename, rows) {
-    const quote = value => `"${String(value ?? '').replaceAll('"', '""')}"`
-    const csv = rows.map(row => row.map(quote).join(',')).join('\r\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-    link.click()
-    URL.revokeObjectURL(url)
-  }
+
 
   function downloadFinanceReport() {
-    downloadCsv(`finance-${selectedYear}-${new Date().toISOString().slice(0, 10)}.csv`, [
+    const rows = [
       ['Finance report', `Calendar year ${selectedYear}`],
       ['Metric', 'Amount (minor units)', 'Currency'],
       ...[['Receivables outstanding', data.receivableOutstanding], ['Payables outstanding', data.payableOutstanding], ['Expenses total', data.expensesTotal], ['Expenses pending', data.expensesPendingTotal]].map(([label, amount]) => [label, amount.amount, amount.currency]),
@@ -98,34 +90,43 @@ export default function FinanceOverview() {
       [],
       ['Date', 'Description', 'Amount (minor units)', 'Currency', 'Type', 'Status'],
       ...recentTransactions.map(tx => [tx.date, tx.description, tx.amount.amount, tx.amount.currency, tx.type, tx.status]),
-    ])
+    ]
+    downloadCsv(rows, `finance-${selectedYear}-${new Date().toISOString().slice(0, 10)}.csv`)
   }
 
   function downloadCashFlow() {
-    downloadCsv(`cash-flow-${selectedYear}.csv`, [
+    const rows = [
       ['Month', 'Inflow (minor units)', 'Outflow (minor units)', 'Net (minor units)', 'Currency'],
       ...cashFlowData.map(point => {
         const source = data.cashFlow.find(row => row.month === point.month)
         return [point.month, source.inflow.amount, source.outflow.amount, source.net.amount, source.net.currency]
       }),
-    ])
+    ]
+    downloadCsv(rows, `cash-flow-${selectedYear}.csv`)
   }
 
   // Net cash-flow sparkline for the second KPI card (the old page drew a MRR sparkline here).
   const netSeries = cashFlowData.map((p, i) => ({ v: p.net, id: i }));
-  const lastNet = netSeries.length ? netSeries[netSeries.length - 1].v : 0;
+  const cashFlowDeltaMinor = data.cashFlowComparison.current.net.amount - data.cashFlowComparison.previous.net.amount
+  const fullYearSelected = data.cashFlowComparison.current.endDateExclusive === `${Number(selectedYear) + 1}-01-01`
+  const cashFlowChangeText = `${selectedYear}${fullYearSelected ? ' full year' : ' year-to-date'} vs ${Number(selectedYear) - 1} matching period: ${formatMoney(data.cashFlowComparison.previous.net)} prior, ${cashFlowDeltaMinor > 0 ? '+' : ''}${formatMoney({ amount: cashFlowDeltaMinor, currency: data.cashFlowComparison.current.net.currency })}`
 
-  // Operating-expenses donut: split the real expense total into pending vs already carried.
+  // Operating-expenses donut: split the real expense total into pending vs approved.
   const totalExp = major(data.expensesTotal);
   const pendExp = major(data.expensesPendingTotal);
-  let expenseData = [
-    { name: 'Carried', value: Math.max(0, totalExp - pendExp), pct: totalExp ? Math.round((Math.max(0, totalExp - pendExp) / totalExp) * 100) : 0, color: EXPENSE_COLORS[0] },
-    { name: 'Pending', value: pendExp, pct: totalExp ? Math.round((pendExp / totalExp) * 100) : 0, color: EXPENSE_COLORS[1] },
-  ].filter((s) => s.value > 0);
-
-  // Fallback if no expenses
-  if (expenseData.length === 0) {
-    expenseData.push({ name: 'None', value: 1, pct: 100, color: 'var(--color-caption)' });
+  let expenseData = [];
+  if (totalExp > 0) {
+    const approvedExp = Math.max(0, totalExp - pendExp);
+    const approvedPct = Math.round((approvedExp / totalExp) * 100);
+    const pendingPct = 100 - approvedPct;
+    if (approvedExp > 0) {
+      expenseData.push({ name: 'Approved', value: approvedExp, pct: approvedPct, color: EXPENSE_COLORS[0] });
+    }
+    if (pendExp > 0) {
+      expenseData.push({ name: 'Pending', value: pendExp, pct: pendingPct, color: EXPENSE_COLORS[1] });
+    }
+  } else {
+    expenseData.push({ name: 'No expenses', value: 0, pct: 0, color: 'var(--color-caption)' });
   }
 
   return (
@@ -184,10 +185,11 @@ export default function FinanceOverview() {
           {/* Net Cash Flow (sparkline fed by the real cash-flow series) */}
           <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card relative overflow-hidden">
             <div className="flex justify-between items-start mb-1 relative z-10">
-              <p className="text-[10px] font-bold text-muted uppercase tracking-wider w-3/4">Net Cash Flow</p>
+              <p className="text-[10px] font-bold text-muted uppercase tracking-wider w-3/4">Selected Period Net Cash Flow</p>
               <RefreshCw size={16} className="text-caption" />
             </div>
-            <p className="text-3xl font-extrabold text-heading tracking-tight relative z-10">{formatMoney(lastNet)}</p>
+            <p className="text-3xl font-extrabold text-heading tracking-tight relative z-10">{formatMoney(data.cashFlowComparison.current.net)}</p>
+            <p className={`relative z-10 mt-1 text-[10px] font-medium ${cashFlowDeltaMinor > 0 ? 'text-success-text' : cashFlowDeltaMinor < 0 ? 'text-danger' : 'text-muted'}`} title="Compared with the matching date range in the previous year">{cashFlowChangeText}</p>
             {/* Cash-flow Sparkline */}
             <div className="absolute bottom-0 left-0 w-full h-12">
               <ResponsiveContainer width="100%" height="100%">
@@ -340,7 +342,7 @@ export default function FinanceOverview() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={expenseData}
+                    data={expenseData.some(s => s.value > 0) ? expenseData.filter(s => s.value > 0) : [{ name: 'No expenses', value: 1, color: 'var(--color-border-default)' }]}
                     cx="50%" cy="50%"
                     innerRadius={55} outerRadius={80}
                     paddingAngle={3}
@@ -354,7 +356,7 @@ export default function FinanceOverview() {
                   </Pie>
                   <Tooltip
                     contentStyle={{ borderRadius: 'var(--radius-button)', border: '1px solid var(--color-border-default)', boxShadow: 'var(--shadow-card-hover)', fontSize: 13 }}
-                    formatter={(value) => [formatMoney(value), '']}
+                    formatter={(value, name) => [totalExp > 0 ? formatMoney(value, { currency }) : 'No expenses', name]}
                   />
                 </PieChart>
               </ResponsiveContainer>

@@ -48,6 +48,8 @@ export interface PayslipDoc {
   runLabel: string
   /** ISO `YYYY-MM-DD`, or null when the run has no pay date. */
   payDate: string | null
+  periodStart?: string | null
+  periodEnd?: string | null
   status: string
   currency: string
   employeeName: string
@@ -132,6 +134,10 @@ export function renderPayslipPdf(doc: PayslipDoc): Promise<Buffer> {
       .text(`Pay date: ${formatDateDisplay(doc.payDate)}    Status: ${doc.status}`, LEFT_COL, MARGIN + 70, {
         lineBreak: false,
       })
+
+    if (doc.periodStart && doc.periodEnd) {
+      pdf.text(`Earning period: ${doc.periodStart} – ${doc.periodEnd}`, LEFT_COL, MARGIN + 84, { lineBreak: false })
+    }
 
     // ── Employee ───────────────────────────────────────────────────────────────
     let y = MARGIN + 100

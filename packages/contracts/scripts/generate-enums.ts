@@ -13,7 +13,7 @@ import {
   locateSchema,
   PACKAGE_ROOT,
   parsePrismaEnums,
-} from './prisma-enums.js'
+} from './prisma-enums.ts'
 import { readFileSync } from 'node:fs'
 
 const schemaPath = locateSchema()

@@ -104,6 +104,11 @@ function removeSubscriber(subscriber: Subscriber): void {
  * ancestor, which is where it must live.
  */
 export async function ssePlugin(app: FastifyInstance): Promise<void> {
+  const closeStreams = new Set<() => void>()
+  // Hijacked streams must end before Fastify waits for connections during shutdown.
+  app.addHook('preClose', async () => {
+    for (const close of closeStreams) close()
+  })
   app.get(
     '/events',
     {
@@ -121,6 +126,10 @@ export async function ssePlugin(app: FastifyInstance): Promise<void> {
       }
 
       reply.hijack()
+      // hijack() bypasses normal header flushing, including CORS and security headers.
+      for (const [name, value] of Object.entries(reply.getHeaders())) {
+        if (value !== undefined) reply.raw.setHeader(name, value)
+      }
       reply.raw.writeHead(200, {
         'content-type': 'text/event-stream',
         'cache-control': 'no-cache, no-transform',
@@ -132,9 +141,12 @@ export async function ssePlugin(app: FastifyInstance): Promise<void> {
       reply.raw.write(`: connected ${new Date().toISOString()}\n\n`)
 
       let closed = false
+      let keepalive: ReturnType<typeof setInterval> | undefined
       const close = () => {
         if (closed) return
         closed = true
+        if (keepalive) clearInterval(keepalive)
+        closeStreams.delete(close)
         removeSubscriber(subscriber)
         try {
           reply.raw.end()
@@ -152,10 +164,11 @@ export async function ssePlugin(app: FastifyInstance): Promise<void> {
         close,
       }
       addSubscriber(subscriber)
+      closeStreams.add(close)
 
       // Keepalive every 25 s so idle-connection timeouts (proxies, load balancers) do not
       // silently drop the stream; clients reconnect automatically on close.
-      const keepalive = setInterval(() => {
+      keepalive = setInterval(() => {
         if (closed) return
         try {
           reply.raw.write(`: ping ${Date.now()}\n\n`)
@@ -164,10 +177,7 @@ export async function ssePlugin(app: FastifyInstance): Promise<void> {
         }
       }, 25_000)
 
-      request.raw.on('close', () => {
-        clearInterval(keepalive)
-        close()
-      })
+      reply.raw.on('close', close)
     },
   )
 }

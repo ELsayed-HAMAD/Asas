@@ -13,6 +13,8 @@ import { http } from '../api/http'
  * Billing and backup records are tenant-scoped and read or updated through this same settings API.
  */
 export const settingsApi = {
+  listExchangeRates: (query = {}) => http.get(`/settings/exchange-rates${query.page || query.limit || query.currency ? `?${new URLSearchParams(query)}` : ''}`),
+  createExchangeRate: (body) => http.post('/settings/exchange-rates', { body }),
   getBilling: () => http.get('/settings/billing'),
   listBackups: () => http.get('/settings/backups'),
   createBackup: (body) => http.post('/settings/backups', { body }),

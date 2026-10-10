@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { listCurrencies } from '@asas/domain/money'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -15,6 +16,7 @@ import SettingsTabs from './SettingsTabs'
 import ConfirmDialog from '../../../components/common/ConfirmDialog'
 import { http } from '../../../lib/api/http'
 import { onboardingApi } from '../../../lib/api/onboarding'
+import { settingsApi } from '../../../lib/api/settings'
 import { queryKeys } from '../../../lib/queryKeys'
 
 export default function SettingsGeneral() {
@@ -32,10 +34,17 @@ export default function SettingsGeneral() {
     queryFn: onboardingApi.status,
   })
 
+  const exchangeRateQuery = { page: 1, limit: 20 }
+  const { data: exchangeRates } = useQuery({
+    queryKey: queryKeys.settings.exchangeRates(exchangeRateQuery),
+    queryFn: () => settingsApi.listExchangeRates(exchangeRateQuery),
+  })
+
   // Form fields are seeded from the server response (the old page used uncontrolled
   // defaultValue + a no-op Save button; now Save is a real PATCH).
-  const [form, setForm] = useState({ name: '', supportEmail: '', timezone: '', currency: '', dateFormat: '' })
+  const [form, setForm] = useState({ name: '', supportEmail: '', timezone: '', currency: '', dateFormat: '', overtimeThresholdHours: '8' })
   const [saved, setSaved] = useState(false)
+  const [rateForm, setRateForm] = useState({ currency: '', rateToBase: '', effectiveAt: '', reference: '' })
 
   useEffect(() => {
     if (settings) {
@@ -45,17 +54,32 @@ export default function SettingsGeneral() {
         timezone: settings.timezone ?? '',
         currency: settings.currency ?? '',
         dateFormat: settings.dateFormat ?? '',
+        overtimeThresholdHours: String(settings.overtimeThresholdHours ?? 8),
       })
     }
   }, [settings])
 
   const saveMutation = useMutation({
-    mutationFn: () => http.patch('/settings/general', { body: { ...form } }),
+    // Blank fields: `supportEmail` is nullable (clears it); the rest are non-nullable, so a
+    // blank value is omitted rather than sent as '' (the API's Zod schema rejects empty strings).
+    mutationFn: () => http.patch('/settings/general', {
+      body: {
+        name: form.name.trim() ? form.name : undefined,
+        supportEmail: form.supportEmail.trim() ? form.supportEmail.trim() : null,
+        timezone: form.timezone.trim() ? form.timezone : undefined,
+        currency: !settings?.currencyLockedAt && form.currency.trim() ? form.currency : undefined,
+        dateFormat: form.dateFormat.trim() ? form.dateFormat : undefined,
+        overtimeThresholdHours: form.overtimeThresholdHours.trim() ? Number(form.overtimeThresholdHours) : undefined,
+      },
+    }),
     onSuccess: (updated) => {
       queryClient.setQueryData(queryKeys.settings.general(), updated)
+      // Empty workspaces can change denomination; invalidate money/date displays in other modules.
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'asas' })
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     },
+    onError: () => queryClient.invalidateQueries({ queryKey: queryKeys.settings.general() }),
   })
 
   const clearMutation = useMutation({
@@ -66,6 +90,19 @@ export default function SettingsGeneral() {
       // redirects to /onboarding for the 3-choice flow.
       queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'asas' })
       navigate('/onboarding', { replace: true })
+    },
+  })
+
+  const rateMutation = useMutation({
+    mutationFn: () => settingsApi.createExchangeRate({
+      currency: rateForm.currency || listCurrencies().find(({ code }) => code !== settings.currency)?.code,
+      rateToBase: rateForm.rateToBase.trim(),
+      effectiveAt: new Date(rateForm.effectiveAt).toISOString(),
+      reference: rateForm.reference.trim() || undefined,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.settings.exchangeRates() })
+      setRateForm((current) => ({ ...current, rateToBase: '', reference: '' }))
     },
   })
 
@@ -121,6 +158,7 @@ export default function SettingsGeneral() {
             {saved ? <Check size={14} /> : saveMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : null}
             {saved ? 'Saved' : 'Save Changes'}
           </button>
+          {saveMutation.isError && <p role="alert" className="text-xs text-danger">{saveMutation.error?.message || 'Unable to save settings.'}</p>}
         </div>
       </TopBarActions>
 
@@ -200,18 +238,21 @@ export default function SettingsGeneral() {
                     className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary"
                     value={form.currency || 'USD'}
                     onChange={setField('currency')}
+                    disabled={Boolean(settings.currencyLockedAt)}
+                    title={settings.currencyLockedAt ? 'Base currency is fixed once monetary data exists; relabeling is not FX conversion.' : 'Choose the base currency before entering monetary data.'}
                   >
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
+                    {listCurrencies().map(({ code }) => <option key={code} value={code}>{code === 'USD' ? 'USD ($)' : code === 'EUR' ? 'EUR (€)' : code}</option>)}
                   </select>
                   <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
                 </div>
+                <p className="mt-1.5 text-xs text-muted">{settings.currencyLockedAt ? 'Base currency is fixed to protect existing monetary records. Currency conversion requires an explicit FX workflow.' : 'Choose your base currency before adding salaries, invoices, products or budgets.'}</p>
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-heading mb-1.5">Date Format</label>
-              <div className="relative w-1/2">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-heading mb-1.5">Date Format</label>
+                <div className="relative">
                 <select
                   className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary"
                   value={form.dateFormat || 'MMM d, yyyy'}
@@ -222,7 +263,53 @@ export default function SettingsGeneral() {
                   <option value="dd/MM/yyyy">{format3}</option>
                 </select>
                 <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
+                </div>
               </div>
+              <div>
+                <label className="block text-xs font-bold text-heading mb-1.5">Overtime After (Hours per Day)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="24"
+                  step="0.25"
+                  value={form.overtimeThresholdHours}
+                  onChange={setField('overtimeThresholdHours')}
+                  className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <p className="mt-1.5 text-xs text-muted">New weekly timesheets use this threshold. Existing weeks keep their recorded threshold.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* FX Rate History Card */}
+          <div className="bg-surface-raised border border-border-default rounded-card-sm p-card shadow-card">
+            <h2 className="text-lg font-bold text-heading mb-1">Exchange Rates</h2>
+            <p className="text-sm text-muted mb-5">Enter how many {settings.currency} one unit of foreign currency is worth. Rates are timestamped and retained for audit; adding a quote does not revalue existing records.</p>
+            <form className="grid grid-cols-5 gap-3 items-end mb-5" onSubmit={(event) => { event.preventDefault(); rateMutation.mutate() }}>
+              <div>
+                <label className="block text-xs font-bold text-heading mb-1.5">Currency</label>
+                <select required value={rateForm.currency || listCurrencies().find(({ code }) => code !== settings.currency)?.code || ''} onChange={(event) => setRateForm((current) => ({ ...current, currency: event.target.value }))} className="w-full border border-border-strong rounded-input px-3 py-2 text-sm bg-surface-raised">
+                  {listCurrencies().filter(({ code }) => code !== settings.currency).map(({ code }) => <option key={code} value={code}>{code}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-heading mb-1.5">Rate to {settings.currency}</label>
+                <input required type="text" inputMode="decimal" value={rateForm.rateToBase} onChange={(event) => setRateForm((current) => ({ ...current, rateToBase: event.target.value }))} placeholder="e.g. 1.0875" className="w-full border border-border-strong rounded-input px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-heading mb-1.5">Effective at</label>
+                <input required type="datetime-local" value={rateForm.effectiveAt} onChange={(event) => setRateForm((current) => ({ ...current, effectiveAt: event.target.value }))} className="w-full border border-border-strong rounded-input px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-heading mb-1.5">Reference</label>
+                <input type="text" value={rateForm.reference} onChange={(event) => setRateForm((current) => ({ ...current, reference: event.target.value }))} placeholder="Source or note" className="w-full border border-border-strong rounded-input px-3 py-2 text-sm" />
+              </div>
+              <button type="submit" disabled={rateMutation.isPending} className="bg-primary text-on-primary px-4 py-2 rounded-input text-sm font-semibold disabled:opacity-60">{rateMutation.isPending ? 'Saving…' : 'Add Rate'}</button>
+            </form>
+            {rateMutation.isError && <p role="alert" className="text-xs text-danger mb-3">{rateMutation.error?.message || 'Unable to save exchange rate.'}</p>}
+            <div className="divide-y divide-border-default">
+              {(exchangeRates?.items ?? []).map((rate) => <div key={rate.id} className="flex items-center justify-between py-2 text-sm"><span className="font-medium text-heading">1 {rate.currency} = {rate.rateToBase} {rate.baseCurrency}</span><span className="text-xs text-muted">{new Date(rate.effectiveAt).toLocaleString()} · {rate.reference || 'Manual'} · {rate.createdById || 'System'}</span></div>)}
+              {!exchangeRates?.items?.length && <p className="py-2 text-sm text-muted">No FX quotes recorded yet.</p>}
             </div>
           </div>
 

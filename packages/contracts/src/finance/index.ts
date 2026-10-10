@@ -6,8 +6,17 @@ import {
   receivableStatusSchema,
 } from '../enums.generated.js'
 import { idSchema, isoDateTimeSchema, boundedText, shortTextSchema } from '../primitives/ids.js'
-import { moneySchema, decimalStringSchema } from '../primitives/money.js'
+import {
+  compareDecimalStrings,
+  currencyCodeSchema,
+  decimalStringSchema,
+  moneySchema,
+  nonNegativeDecimalStringSchema,
+  positiveDecimalStringSchema,
+} from '../primitives/money.js'
 import { collection, paginated, paginationQuerySchema } from '../primitives/pagination.js'
+import { formBooleanQueryParamSchema as booleanQueryParamSchema } from '../primitives/query.js'
+export { formBooleanQueryParamSchema as booleanQueryParamSchema } from '../primitives/query.js'
 
 /**
  * Finance contract — the schemas `apps/api`'s finance module and `apps/web` share, so the wire
@@ -18,6 +27,41 @@ import { collection, paginated, paginationQuerySchema } from '../primitives/pagi
  * list endpoint carries in its `summary` is a SQL aggregate over the whole tenant set — never a
  * client-side `.reduce()` over the current page.
  */
+
+// ── Shared finance field primitives ─────────────────────────────────────────────────────
+
+function isRealCalendarDate(value: string): boolean {
+  const [year, month, day] = value.split('-').map(Number) as [number, number, number]
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+}
+
+/**
+ * A real calendar date, `YYYY-MM-DD`. The regex alone would let '2026-02-31' through (which
+ * `Date` silently rolls into March) and '2026-13-01' (an Invalid Date that 500s on write), so the
+ * value must also round-trip through a UTC `Date` with the same components.
+ */
+export const calendarDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a date such as '2026-09-01'")
+  .refine(isRealCalendarDate, 'Expected a real calendar date')
+
+
+const DECIMAL_PATTERN = /^-?\d+(\.\d+)?$/
+
+/** Due date on or after the issue date — only checked when both are present in the payload. */
+function dueOnOrAfterIssue(value: { date?: string | undefined; dueDate?: string | null | undefined }): boolean {
+  return !value.date || !value.dueDate || value.dueDate >= value.date
+}
+
+/** Tax no greater than the amount — only checked when both are present in the payload. */
+function taxWithinAmount(value: { amount?: string | undefined; tax?: string | null | undefined }): boolean {
+  if (value.amount == null || value.tax == null) return true
+  const amount = value.amount.trim()
+  const tax = value.tax.trim()
+  if (!DECIMAL_PATTERN.test(amount) || !DECIMAL_PATTERN.test(tax)) return true
+  return compareDecimalStrings(tax, amount) <= 0
+}
 
 // ── AR aging report ─────────────────────────────────────────────────────────────────────
 
@@ -64,6 +108,7 @@ export type VendorWriteInput = z.infer<typeof vendorWriteSchema>
 
 export const payableInvoiceSchema = z.object({
   id: idSchema,
+  projectId: idSchema.nullable().default(null),
   vendorId: idSchema,
   /** Denormalised vendor name so a list row never needs a second fetch. */
   vendor: z.string(),
@@ -105,7 +150,7 @@ export type PayableListQuery = z.infer<typeof payableListQuerySchema>
  * the sum of what is still owed (`openOutstanding`) sits next to each status's count and sum.
  */
 export const payableSummarySchema = z.object({
-  /** Total value of all non-paid, non-rejected invoices. */
+  /** Total value of pending, approved and scheduled invoices (excludes paid/rejected/void). */
   openOutstanding: moneySchema,
   pendingCount: z.int().min(0),
   pendingTotal: moneySchema,
@@ -117,7 +162,14 @@ export const payableSummarySchema = z.object({
   paidTotal: moneySchema,
   pastDueTotal: moneySchema,
   dueIn7DaysTotal: moneySchema,
-  paidThisMonthTotal: moneySchema,
+  /** Valued AP cash settlements posted in the tenant-local current month, in base currency. */
+  paidThisMonthTotal: moneySchema.nullable(),
+  /** Null prior total means ledger history does not yet cover the comparable month-to-date window. */
+  paidThisMonthComparison: z.object({
+    previousStartDate: calendarDateSchema,
+    previousEndDateExclusive: calendarDateSchema,
+    previousTotal: moneySchema.nullable(),
+  }),
 })
 
 export type PayableSummary = z.infer<typeof payableSummarySchema>
@@ -126,35 +178,51 @@ export const payableListResponseSchema = paginated(payableInvoiceSchema, payable
 
 export type PayableListResponse = z.infer<typeof payableListResponseSchema>
 
-export const payableWriteSchema = z.object({
-  vendorId: idSchema,
-  invoiceNumber: boundedText(64).optional().nullable(),
-  /** Calendar date the invoice is dated, `YYYY-MM-DD`. */
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a date such as '2026-09-01'"),
-  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a date such as '2026-09-01'").optional().nullable(),
-  /** Major-unit decimal string in the tenant's currency, e.g. '1250.00'. */
-  amount: decimalStringSchema,
-  status: payableStatusSchema.optional(),
-})
+/**
+ * Create a bill. There is no `status`: a new bill always starts `PENDING`, and every later
+ * status change goes through the status/request-changes/batch-payment endpoints, which enforce
+ * the workflow. (An extra `status` key from an older client is stripped, not rejected.)
+ */
+export const payableWriteSchema = z
+  .object({
+    vendorId: idSchema,
+    projectId: idSchema.optional().nullable(),
+    invoiceNumber: boundedText(64).optional().nullable(),
+    /** Calendar date the invoice is dated, `YYYY-MM-DD`. */
+    date: calendarDateSchema,
+    dueDate: calendarDateSchema.optional().nullable(),
+    /** Major-unit decimal string in the tenant's currency, e.g. '1250.00'. Must be > 0. */
+    amount: positiveDecimalStringSchema,
+  })
+  .refine(dueOnOrAfterIssue, { message: 'The due date cannot be before the invoice date', path: ['dueDate'] })
 
 export type PayableWriteInput = z.infer<typeof payableWriteSchema>
 
-export const payableUpdateSchema = z.object({
-  invoiceNumber: boundedText(64).optional().nullable(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a date such as '2026-09-01'").optional(),
-  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a date such as '2026-09-01'").optional().nullable(),
-  amount: decimalStringSchema.optional(),
-  status: payableStatusSchema.optional(),
-})
+/** Edit a bill's details. Rejected with 409 once the bill is approved, scheduled, or paid. */
+export const payableUpdateSchema = z
+  .object({
+    invoiceNumber: boundedText(64).optional().nullable(),
+    projectId: idSchema.optional().nullable(),
+    date: calendarDateSchema.optional(),
+    dueDate: calendarDateSchema.optional().nullable(),
+    amount: positiveDecimalStringSchema.optional(),
+  })
+  .refine(dueOnOrAfterIssue, { message: 'The due date cannot be before the invoice date', path: ['dueDate'] })
 
 export type PayableUpdateInput = z.infer<typeof payableUpdateSchema>
 
 /** The status transition a payable can be moved to (e.g. PENDING → APPROVED → PAID). */
 export const payableStatusUpdateSchema = z.object({
-  status: payableStatusSchema,
+  status: payableStatusSchema.exclude(['VOID']),
 })
 
 export type PayableStatusUpdateInput = z.infer<typeof payableStatusUpdateSchema>
+
+/** Cancellation requires a reason and its own endpoint; it is not a payment reversal. */
+export const financeVoidSchema = z.object({
+  reason: z.string().trim().min(1).max(2000),
+})
+export type FinanceVoidInput = z.infer<typeof financeVoidSchema>
 
 export const payableChangeRequestSchema = z.object({
   reason: z.string().trim().min(1).max(2000),
@@ -229,7 +297,7 @@ export const receivableListQuerySchema = paginationQuerySchema.extend({
   status: receivableStatusSchema.optional(),
   customerId: idSchema.optional(),
   /** When true, only invoices whose due date has passed and are not yet paid. */
-  overdueOnly: z.coerce.boolean().optional(),
+  overdueOnly: booleanQueryParamSchema.optional(),
   search: boundedText(200, 0).optional(),
 })
 
@@ -238,6 +306,13 @@ export type ReceivableListQuery = z.infer<typeof receivableListQuerySchema>
 export const receivableSummarySchema = z.object({
   /** Total value of all unpaid invoices (everything except `PAID`). */
   openBalance: moneySchema,
+  /** Tenant-local month-to-date AR collections; null before settlement history coverage. */
+  collectedThisMonthTotal: moneySchema.nullable(),
+  collectedThisMonthComparison: z.object({
+    previousStartDate: calendarDateSchema,
+    previousEndDateExclusive: calendarDateSchema,
+    previousTotal: moneySchema.nullable(),
+  }),
   /**
    * The AR aging report (rebuild plan, Phase 3): the same unpaid set bucketed by days past due —
    * one SQL `CASE WHEN` query, always four zero-filled rows in report order.
@@ -259,29 +334,32 @@ export const receivableListResponseSchema = paginated(receivableInvoiceSchema, r
 
 export type ReceivableListResponse = z.infer<typeof receivableListResponseSchema>
 
+/**
+ * Create a receivable. There is no `status`: a new invoice always starts `CURRENT`; status
+ * changes go through the status endpoint. (An extra `status` key is stripped, not rejected.)
+ */
 export const receivableWriteSchema = z.object({
   customerId: idSchema,
   number: boundedText(64).optional().nullable(),
-  /** Major-unit decimal string in the tenant's currency, e.g. '4800.00'. */
-  amount: decimalStringSchema,
-  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a date such as '2026-10-01'").optional().nullable(),
-  status: receivableStatusSchema.optional(),
+  /** Major-unit decimal string in the tenant's currency, e.g. '4800.00'. Must be > 0. */
+  amount: positiveDecimalStringSchema,
+  dueDate: calendarDateSchema.optional().nullable(),
 })
 
 export type ReceivableWriteInput = z.infer<typeof receivableWriteSchema>
 
+/** Edit a receivable's details. Rejected with 409 once the invoice is paid. */
 export const receivableUpdateSchema = z.object({
   number: boundedText(64).optional().nullable(),
-  amount: decimalStringSchema.optional(),
-  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a date such as '2026-10-01'").optional().nullable(),
-  status: receivableStatusSchema.optional(),
+  amount: positiveDecimalStringSchema.optional(),
+  dueDate: calendarDateSchema.optional().nullable(),
 })
 
 export type ReceivableUpdateInput = z.infer<typeof receivableUpdateSchema>
 
 /** The status transition a receivable can be moved to (e.g. CURRENT → PAID). */
 export const receivableStatusUpdateSchema = z.object({
-  status: receivableStatusSchema,
+  status: receivableStatusSchema.exclude(['VOID']),
 })
 
 export type ReceivableStatusUpdateInput = z.infer<typeof receivableStatusUpdateSchema>
@@ -290,6 +368,7 @@ export type ReceivableStatusUpdateInput = z.infer<typeof receivableStatusUpdateS
 
 export const expenseSchema = z.object({
   id: idSchema,
+  projectId: idSchema.nullable().default(null),
   employeeId: idSchema.nullable(),
   /** Denormalised employee name, or null when the expense has no claimant. */
   employee: z.string().nullable(),
@@ -301,6 +380,11 @@ export const expenseSchema = z.object({
   tax: moneySchema.nullable(),
   policyMatch: z.boolean().nullable(),
   status: expenseStatusSchema,
+  reimbursedAt: isoDateTimeSchema.nullable(),
+  reimbursedById: z.string().nullable(),
+  voidedAt: isoDateTimeSchema.nullable().optional(),
+  voidedById: z.string().nullable().optional(),
+  voidReason: z.string().nullable().optional(),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 })
@@ -329,6 +413,16 @@ export const expenseSummarySchema = z.object({
   processingTotal: moneySchema,
   approvedCount: z.int().min(0),
   approvedTotal: moneySchema,
+  reimbursedCount: z.int().min(0),
+  reimbursedTotal: moneySchema,
+  /** Valued reimbursement settlements posted in the tenant-local current month, in base currency. */
+  reimbursedThisMonthTotal: moneySchema.nullable(),
+  /** Null prior total means ledger history does not cover the comparable window. */
+  reimbursedThisMonthComparison: z.object({
+    previousStartDate: calendarDateSchema,
+    previousEndDateExclusive: calendarDateSchema,
+    previousTotal: moneySchema.nullable(),
+  }),
 })
 
 export type ExpenseSummary = z.infer<typeof expenseSummarySchema>
@@ -337,34 +431,43 @@ export const expenseListResponseSchema = paginated(expenseSchema, expenseSummary
 
 export type ExpenseListResponse = z.infer<typeof expenseListResponseSchema>
 
-export const expenseWriteSchema = z.object({
-  employeeId: idSchema.optional().nullable(),
-  name: shortTextSchema,
-  category: expenseCategorySchema.optional(),
-  merchant: boundedText(200).optional().nullable(),
-  /** Calendar date the expense was incurred, `YYYY-MM-DD`. */
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a date such as '2026-09-01'"),
-  /** Major-unit decimal string in the tenant's currency, e.g. '84.20'. */
-  amount: decimalStringSchema,
-  /** Tax component, same form as `amount`. */
-  tax: decimalStringSchema.optional().nullable(),
-  policyMatch: z.boolean().optional().nullable(),
-  status: expenseStatusSchema.optional(),
-})
+/**
+ * Submit an expense. There is no `status`: a new expense always starts `PENDING`; status
+ * changes go through the status endpoint. (An extra `status` key is stripped, not rejected.)
+ */
+export const expenseWriteSchema = z
+  .object({
+    employeeId: idSchema.optional().nullable(),
+    projectId: idSchema.optional().nullable(),
+    name: shortTextSchema,
+    category: expenseCategorySchema.optional(),
+    merchant: boundedText(200).optional().nullable(),
+    /** Calendar date the expense was incurred, `YYYY-MM-DD`. */
+    date: calendarDateSchema,
+    /** Major-unit decimal string in the tenant's currency, e.g. '84.20'. Must be > 0. */
+    amount: positiveDecimalStringSchema,
+    /** Tax component, same form as `amount`; zero or more, and no more than `amount`. */
+    tax: nonNegativeDecimalStringSchema.optional().nullable(),
+    policyMatch: z.boolean().optional().nullable(),
+  })
+  .refine(taxWithinAmount, { message: 'Tax cannot exceed the expense amount', path: ['tax'] })
 
 export type ExpenseWriteInput = z.infer<typeof expenseWriteSchema>
 
-export const expenseUpdateSchema = z.object({
-  employeeId: idSchema.optional().nullable(),
-  name: shortTextSchema.optional(),
-  category: expenseCategorySchema.optional(),
-  merchant: boundedText(200).optional().nullable(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a date such as '2026-09-01'").optional(),
-  amount: decimalStringSchema.optional(),
-  tax: decimalStringSchema.optional().nullable(),
-  policyMatch: z.boolean().optional().nullable(),
-  status: expenseStatusSchema.optional(),
-})
+/** Edit an expense. Once approved or rejected only `name` stays editable (409 otherwise). */
+export const expenseUpdateSchema = z
+  .object({
+    employeeId: idSchema.optional().nullable(),
+    projectId: idSchema.optional().nullable(),
+    name: shortTextSchema.optional(),
+    category: expenseCategorySchema.optional(),
+    merchant: boundedText(200).optional().nullable(),
+    date: calendarDateSchema.optional(),
+    amount: positiveDecimalStringSchema.optional(),
+    tax: nonNegativeDecimalStringSchema.optional().nullable(),
+    policyMatch: z.boolean().optional().nullable(),
+  })
+  .refine(taxWithinAmount, { message: 'Tax cannot exceed the expense amount', path: ['tax'] })
 
 export type ExpenseUpdateInput = z.infer<typeof expenseUpdateSchema>
 
@@ -386,6 +489,19 @@ export const cashFlowPointSchema = z.object({
 
 export type CashFlowPoint = z.infer<typeof cashFlowPointSchema>
 
+export const cashFlowPeriodSchema = z.object({
+  startDate: calendarDateSchema,
+  endDateExclusive: calendarDateSchema,
+  inflow: moneySchema,
+  outflow: moneySchema,
+  net: moneySchema,
+})
+
+export const cashFlowComparisonSchema = z.object({
+  current: cashFlowPeriodSchema,
+  previous: cashFlowPeriodSchema,
+})
+
 export const recentTransactionSchema = z.object({
   id: idSchema,
   date: isoDateTimeSchema,
@@ -404,9 +520,119 @@ export const financeOverviewResponseSchema = z.object({
   expensesTotal: moneySchema,
   expensesPendingCount: z.int().min(0),
   expensesPendingTotal: moneySchema,
-  /** `CashFlowSnapshot` rows, ascending by month. Empty until snapshots exist. */
+  /** Recorded AP/AR cash settlements, ascending by month. Empty until a settlement is recorded. */
   cashFlow: z.array(cashFlowPointSchema),
+  cashFlowComparison: cashFlowComparisonSchema,
   recentTransactions: z.array(recentTransactionSchema),
 })
 
 export type FinanceOverview = z.infer<typeof financeOverviewResponseSchema>
+
+export const financeOverviewQuerySchema = z.object({
+  year: z.coerce.number().int().min(1900).max(2200).optional(),
+})
+export type FinanceOverviewQuery = z.infer<typeof financeOverviewQuerySchema>
+
+// ── Posted cash settlement journals ─────────────────────────────────────────
+
+export const journalSourceTypeSchema = z.enum(['AP_PAYMENT', 'AR_COLLECTION', 'PAYROLL_PAYMENT', 'EXPENSE_REIMBURSEMENT', 'SETTLEMENT_REVERSAL', 'AP_RECOGNITION', 'AR_RECOGNITION', 'OPENING_BALANCE'])
+export const journalSideSchema = z.enum(['DEBIT', 'CREDIT'])
+export const journalCurrencyProvenanceSchema = z.enum(['DOCUMENT', 'WORKSPACE_FALLBACK', 'MANUAL_BASE'])
+
+export const openingBalanceLineWriteSchema = z.object({
+  code: z.string().trim().regex(/^[A-Z0-9][A-Z0-9._-]{1,31}$/, 'Use 2–32 uppercase letters, numbers, dots, underscores, or hyphens'),
+  name: boundedText(80),
+  kind: z.enum(['ASSET', 'LIABILITY', 'EQUITY', 'EXPENSE', 'INCOME']),
+  side: journalSideSchema,
+  amount: positiveDecimalStringSchema,
+})
+export const openingBalanceWriteSchema = z.object({
+  asOf: calendarDateSchema,
+  description: boundedText(240),
+  lines: z.array(openingBalanceLineWriteSchema).min(2).max(100),
+}).superRefine((input, ctx) => {
+  const seen = new Set<string>()
+  input.lines.forEach((line, index) => {
+    if (seen.has(line.code)) ctx.addIssue({ code: 'custom', message: 'Account codes must be unique within an opening balance', path: ['lines', index, 'code'] })
+    seen.add(line.code)
+  })
+})
+export type OpeningBalanceWriteInput = z.infer<typeof openingBalanceWriteSchema>
+
+export const journalLineSchema = z.object({
+  id: idSchema,
+  accountCode: shortTextSchema,
+  accountName: shortTextSchema,
+  side: journalSideSchema,
+  amount: moneySchema,
+  baseAmount: moneySchema.nullable(),
+})
+
+export const journalEntrySchema = z.object({
+  id: idSchema,
+  sourceType: journalSourceTypeSchema,
+  sourceId: idSchema,
+  currencyProvenance: journalCurrencyProvenanceSchema,
+  amount: moneySchema,
+  baseCurrency: currencyCodeSchema.nullable(),
+  baseAmount: moneySchema.nullable(),
+  exchangeRate: decimalStringSchema.nullable(),
+  description: z.string(),
+  reversalReason: z.string().nullable(),
+  actorId: idSchema.nullable(),
+  postedAt: isoDateTimeSchema,
+  lines: z.array(journalLineSchema).min(2).max(3),
+}).superRefine((entry, ctx) => {
+  const valued = entry.baseCurrency !== null
+  if (valued !== (entry.baseAmount !== null) || valued !== (entry.exchangeRate !== null)) {
+    ctx.addIssue({ code: 'custom', message: 'Journal FX basis fields must be present or absent together', path: ['baseCurrency'] })
+  }
+  for (const [index, line] of entry.lines.entries()) {
+    if (line.amount.currency !== entry.amount.currency) {
+      ctx.addIssue({ code: 'custom', message: 'Journal lines must use the entry denomination', path: ['lines', index, 'amount', 'currency'] })
+    }
+    if (valued && (line.baseAmount === null || line.baseAmount.currency !== entry.baseCurrency)) {
+      ctx.addIssue({ code: 'custom', message: 'Valued journal lines must use the entry base denomination', path: ['lines', index, 'baseAmount'] })
+    }
+    if (!valued && line.baseAmount !== null) {
+      ctx.addIssue({ code: 'custom', message: 'Unvalued legacy journal lines cannot claim a base value', path: ['lines', index, 'baseAmount'] })
+    }
+  }
+  if (entry.baseAmount !== null && entry.baseAmount.currency !== entry.baseCurrency) {
+    ctx.addIssue({ code: 'custom', message: 'Journal base amount must use the base denomination', path: ['baseAmount', 'currency'] })
+  }
+})
+export type JournalEntry = z.infer<typeof journalEntrySchema>
+export type JournalSourceType = z.infer<typeof journalSourceTypeSchema>
+
+export const trialBalanceQuerySchema = z.object({ asOf: calendarDateSchema.optional() })
+export type TrialBalanceQuery = z.infer<typeof trialBalanceQuerySchema>
+export const trialBalanceRowSchema = z.object({
+  accountId: idSchema,
+  accountCode: shortTextSchema,
+  accountName: shortTextSchema,
+  accountKind: z.enum(['ASSET', 'LIABILITY', 'EQUITY', 'EXPENSE', 'INCOME']),
+  currency: currencyCodeSchema,
+  debit: moneySchema,
+  credit: moneySchema,
+  debitBase: moneySchema,
+  creditBase: moneySchema,
+  netDebitBase: moneySchema,
+  netCreditBase: moneySchema,
+})
+export const trialBalanceResponseSchema = z.object({
+  asOf: calendarDateSchema,
+  baseCurrency: currencyCodeSchema,
+  rows: z.array(trialBalanceRowSchema),
+  totalDebitBase: moneySchema,
+  totalCreditBase: moneySchema,
+  unvaluedJournalCount: z.int().min(0),
+  isComplete: z.boolean(),
+})
+export type TrialBalance = z.infer<typeof trialBalanceResponseSchema>
+
+export const journalListQuerySchema = paginationQuerySchema.extend({
+  sourceType: journalSourceTypeSchema.optional(),
+})
+export type JournalListQuery = z.infer<typeof journalListQuerySchema>
+export const journalListResponseSchema = paginated(journalEntrySchema, z.null())

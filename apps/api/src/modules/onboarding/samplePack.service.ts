@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Prisma, type PrismaClient } from '@prisma/client'
@@ -255,16 +256,22 @@ export async function applyEnterpriseSamplePack(
   prisma: PrismaClient,
   tenantId: string,
 ): Promise<Record<string, number>> {
-  const existing = await prisma.employee.count({ where: { tenantId } })
-  if (existing > 0) {
-    throw new AppError(409, 'This workspace already has HR data; the sample pack was not applied.')
-  }
 
   const pack = await readPack('enterprise.json')
-  const currency = await getTenantCurrency(prisma, tenantId)
   const summary: Record<string, number> = {}
 
   await prisma.$transaction(async tx => {
+    const claimed = await tx.tenant.updateMany({
+      where: { id: tenantId, onboardingStatus: 'PENDING' },
+      data: { onboardingStatus: 'SAMPLE_LOADED' },
+    })
+    if (claimed.count !== 1) throw new AppError(409, 'The sample pack can only be applied to a pending workspace')
+    // The claim owns the Tenant row lock; resolve the denomination after acquiring it.
+    const currency = await getTenantCurrency(tx, tenantId)
+    const before = await captureSampleManifest(tx, tenantId)
+    if (Object.values(before).some(section => section.ids.length > 0)) {
+      throw new AppError(409, 'This workspace already has business data; the sample pack was not applied')
+    }
     // ── HR ──────────────────────────────────────────────────────────────────────
     const departmentIds = new Map<string, string>()
     for (const dept of pack.departments ?? []) {
@@ -338,7 +345,8 @@ export async function applyEnterpriseSamplePack(
           ownerEmployeeId: deal.ownerEmployeeKey ? (employeeIds.get(deal.ownerEmployeeKey) ?? null) : null,
           stage: asEnum(DEAL_STAGES, deal.stage, 'LEADS', 'deals'),
           value: new Prisma.Decimal(Money.fromDecimal(String(deal.value), currency, 'HALF_UP').toDecimalString()),
-          winProbability: deal.winProbability ?? null,
+          // This bundled pack explicitly uses fractional probabilities; real API writes use percent.
+          winProbability: deal.winProbability == null ? null : deal.winProbability * 100,
           closeDate: parseDate(deal.closeDate),
           createdAt: parseDate(deal.createdAt) ?? new Date(),
         },
@@ -667,9 +675,9 @@ export async function applyEnterpriseSamplePack(
 
     await tx.tenant.update({
       where: { id: tenantId },
-      data: { onboardingStatus: 'SAMPLE_LOADED' },
+      data: { onboardingStatus: 'SAMPLE_LOADED', sampleDataManifest: await captureSampleManifest(tx, tenantId) },
     })
-  }, { timeout: 300000 })
+  }, { timeout: 300000, isolationLevel: 'Serializable' })
 
   return summary
 }
@@ -756,8 +764,62 @@ const TENANT_BUSINESS_MODELS: readonly TenantBusinessModel[] = [
   'roadmapTask',
 ]
 
+type SampleManifest = Record<TenantBusinessModel, { ids: string[]; hash: string }>
+
+function canonicalJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalJson)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, canonicalJson(item)]))
+  }
+  return value
+}
+
+/** Include cascading children: an added comment or an edited punch makes clearing unsafe too. */
+const SAMPLE_CHILDREN: Partial<Record<TenantBusinessModel, readonly string[]>> = {
+  payrollLine: ['taxLines'], timesheet: ['days'], candidate: ['activities'],
+  payableInvoice: ['lineItems'], customer: ['activities'], deal: ['activities', 'stageHistory'],
+  product: ['suppliers'], purchaseOrder: ['lines'],
+  issue: ['checklist', 'comments', 'assignees'], project: ['milestones', 'risks'],
+  roadmapTask: ['assignees', 'blocking', 'blockedBy'],
+}
+
+export async function captureSampleManifest(tx: Prisma.TransactionClient, tenantId: string): Promise<SampleManifest> {
+  const delegates = tx as unknown as Record<TenantBusinessModel, {
+    findMany: (args: object) => Promise<Array<{ id: string }>>
+  }>
+  const manifest = {} as SampleManifest
+  for (const model of TENANT_BUSINESS_MODELS) {
+    const children = SAMPLE_CHILDREN[model]
+    const rows = await delegates[model].findMany({
+      where: { tenantId }, orderBy: { id: 'asc' },
+      ...(children && { include: Object.fromEntries(children.map(name => [name, { orderBy: { id: 'asc' } }])) }),
+    })
+    // JSON round-trip normalizes Prisma Decimal and Date values before canonicalizing keys.
+    const normalized = JSON.parse(JSON.stringify(rows)) as Array<Record<string, unknown>>
+    // Additive nullable metadata and an empty new relation must not invalidate old provenance.
+    const nullableSnapshotFields: Partial<Record<TenantBusinessModel, string[]>> = {
+      employee: ['salaryBasis', 'currency'],
+      payrollRun: ['periodStart', 'periodEnd', 'payFrequency', 'periodsPerYear', 'salaryBasis', 'prorationMethod', 'currency', 'requestKey', 'requestHash'],
+      payrollLine: ['sourceSalary', 'salaryBasis', 'eligibleDays', 'periodDays'],
+      deal: ['closedAt', 'currency'],
+      payableInvoice: ['currency'], receivableInvoice: ['currency'], expense: ['currency'],
+      ledgerTransaction: ['currency'], cashFlowSnapshot: ['currency'],
+      salesQuota: ['currency'], forecastSnapshot: ['currency'], product: ['currency'], project: ['currency'],
+    }
+    for (const row of normalized) {
+      for (const field of nullableSnapshotFields[model] ?? []) {
+        if (row[field] === null) delete row[field]
+      }
+      if (model === 'deal' && Array.isArray(row.stageHistory) && row.stageHistory.length === 0) delete row.stageHistory
+    }
+    const serialized = canonicalJson(normalized)
+    manifest[model] = { ids: rows.map(row => row.id), hash: createHash('sha256').update(JSON.stringify(serialized)).digest('hex') }
+  }
+  return manifest
+}
+
 /**
- * `DELETE /onboarding/sample-data` — clears the sample pack (or any business data) from the
+ * `DELETE /onboarding/sample-data` — clears an unchanged, provenance-tracked sample pack from the
  * active workspace so the onboarding flow can be re-run (e.g. load the sample to explore,
  * then clear it and import the tenant's real data).
  *
@@ -765,8 +827,8 @@ const TENANT_BUSINESS_MODELS: readonly TenantBusinessModel[] = [
  *  - Only runs when `tenant.onboardingStatus === 'SAMPLE_LOADED'`. A tenant that imported its
  *    own data (`IMPORTED`) or has been edited past the sample (`EMPTY` + manual rows) is
  *    refused with a 409 — this can never wipe real records by accident. The guard reads the
- *    status *and* requires no imported employees, so the only reachable state is a pure
- *    sample workspace.
+ *    status and a snapshot of every seeded row (including cascading children). Legacy or
+ *    modified sample workspaces are refused rather than risking deletion of real records.
  *  - Deletes inside a single `$transaction` in one atomic sweep; the tenant row itself is
  *    never deleted, only its `onboardingStatus` is reset to `PENDING` so the 3-choice
  *    onboarding shows again.
@@ -780,30 +842,29 @@ export async function clearSamplePack(
   prisma: PrismaClient,
   tenantId: string,
 ): Promise<{ cleared: Record<string, number>; onboardingStatus: 'PENDING' }> {
-  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } })
-  if (!tenant) throw new AppError(404, 'Workspace not found')
-
-  if (tenant.onboardingStatus !== 'SAMPLE_LOADED') {
-    throw new AppError(
-      409,
-      'Only a workspace loaded with the sample dataset can be cleared. Import your own data first if you want to replace it.',
-    )
-  }
-
   const cleared: Record<string, number> = {}
   await prisma.$transaction(async tx => {
-    // The union of all tenant-scoped model delegates is indexable by this literal union; the
-    // cast narrows each delegate to the one method the sweep needs (deleteMany by tenantId).
+    await tx.$queryRaw`SELECT "id" FROM "Tenant" WHERE "id" = ${tenantId} FOR UPDATE`
+    const tenant = await tx.tenant.findUnique({ where: { id: tenantId } })
+    if (!tenant) throw new AppError(404, 'Workspace not found')
+    if (tenant.onboardingStatus !== 'SAMPLE_LOADED') throw new AppError(409, 'Only a sample workspace can be cleared')
+    if (!tenant.sampleDataManifest) {
+      throw new AppError(409, 'This legacy sample workspace has no provenance record; automatic clearing is unsafe. Export and review its data before manual cleanup')
+    }
+    const current = await captureSampleManifest(tx, tenantId)
+    if (JSON.stringify(canonicalJson(current)) !== JSON.stringify(canonicalJson(tenant.sampleDataManifest))) {
+      throw new AppError(409, 'Business data has changed since the sample was loaded; automatic clearing would risk real records')
+    }
     const delegates = tx as unknown as Record<
       TenantBusinessModel,
-      { deleteMany: (args: { where: { tenantId: string } }) => Promise<{ count: number }> }
+      { deleteMany: (args: { where: { tenantId: string; id: { in: string[] } } }) => Promise<{ count: number }> }
     >
     for (const model of TENANT_BUSINESS_MODELS) {
-      const result = await delegates[model].deleteMany({ where: { tenantId } })
+      const result = await delegates[model].deleteMany({ where: { tenantId, id: { in: current[model].ids } } })
       cleared[model] = result.count
     }
-    await tx.tenant.update({ where: { id: tenantId }, data: { onboardingStatus: 'PENDING' } })
-  }, { timeout: 300000 })
+    await tx.tenant.update({ where: { id: tenantId }, data: { onboardingStatus: 'PENDING', sampleDataManifest: Prisma.DbNull } })
+  }, { timeout: 300000, isolationLevel: 'Serializable' })
 
   return { cleared, onboardingStatus: 'PENDING' }
 }
@@ -820,10 +881,15 @@ export async function importEmployees(
   tenantId: string,
   input: ImportEmployeesInput,
 ): Promise<{ imported: number }> {
-  const currency = await getTenantCurrency(prisma, tenantId)
   const departmentCache = new Map<string, string>()
 
   const imported = await prisma.$transaction(async tx => {
+    const claimed = await tx.tenant.updateMany({
+      where: { id: tenantId, onboardingStatus: { in: ['PENDING', 'EMPTY'] } },
+      data: { onboardingStatus: 'IMPORTED' },
+    })
+    if (claimed.count !== 1) throw new AppError(409, 'Employees can only be imported during workspace setup')
+    const currency = await getTenantCurrency(tx, tenantId)
     let count = 0
     for (const row of input.employees) {
       let departmentId: string | null = null
@@ -866,7 +932,7 @@ export async function importEmployees(
 
 export type ImportEmployeesInput = ImportEmployeesRequest
 
-async function getTenantCurrency(prisma: PrismaClient, tenantId: string): Promise<string> {
+async function getTenantCurrency(prisma: Pick<PrismaClient, 'tenant'>, tenantId: string): Promise<string> {
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } })
   if (!tenant) throw new AppError(404, 'Tenant not found')
   return tenant.currency

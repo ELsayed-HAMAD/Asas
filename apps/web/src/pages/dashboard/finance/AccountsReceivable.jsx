@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import {
   Search, Send, Filter, ChevronDown,
-  CheckSquare, Square, FileText, Paperclip, Phone,
+  Square, FileText, Paperclip, Phone,
   CircleDot, Circle, Loader2
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../../../lib/api/finance';
 import { queryKeys } from '../../../lib/queryKeys';
-import { formatMoney } from '../../../lib/format';
+import { formatDate, formatMoney } from '../../../lib/format';
 import TopBarActions from '../../../components/TopBarActions';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
@@ -23,6 +23,7 @@ export default function AccountsReceivable() {
   const [ageFilter, setAgeFilter] = useState('all')
   const [oldestFirst, setOldestFirst] = useState(true)
   const [paymentTargetId, setPaymentTargetId] = useState(null)
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
 
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.finance.receivables.list({ limit: 100 }),
@@ -107,12 +108,27 @@ export default function AccountsReceivable() {
   const days1to30 = bucketTotal('1-30');
   const days31to60 = bucketTotal('31-60');
   const days60plus = bucketTotal('60+');
+  const collectedThisMonth = summary.collectedThisMonthTotal;
+  const priorCollections = summary.collectedThisMonthComparison?.previousTotal;
 
   // Outstanding invoices for the selected customer (from the flat invoice list).
   const selectedInvoices = selectedRecord
-    ? items.filter(r => r.customerId === selectedRecord.id && r.status !== 'PAID')
+    ? items.filter(r => r.customerId === selectedRecord.id && ['CURRENT', 'OVERDUE', 'IN_COLLECTIONS'].includes(r.status))
     : [];
   const paymentTarget = items.find(invoice => invoice.id === paymentTargetId)
+
+  const toggleSelection = (id) => {
+    setSelectedIds(current => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBatchRemind = () => {
+    setSelectedIds(new Set());
+  };
 
   return (
     <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-[1000px]">
@@ -129,8 +145,12 @@ export default function AccountsReceivable() {
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
           </div>
-          <button disabled className="flex items-center gap-2 bg-surface-muted0 text-white px-4 py-1.5 rounded-input text-sm font-medium hover:bg-gray-600 transition-colors shadow-card disabled:opacity-60">
-            <Send size={14} /> Send Batch Reminders (0)
+          <button 
+            disabled={selectedIds.size === 0}
+            onClick={handleBatchRemind}
+            className="flex items-center gap-2 bg-surface-muted text-heading px-4 py-1.5 rounded-input text-sm font-medium hover:bg-surface-active transition-colors shadow-card border border-border-default disabled:opacity-60"
+          >
+            <Send size={14} /> Send Batch Reminders ({selectedIds.size})
           </button>
         </div>
       </TopBarActions>
@@ -141,6 +161,12 @@ export default function AccountsReceivable() {
           <div className="border border-border-default rounded-button p-4 bg-surface-raised shadow-card">
             <p className="text-[11px] font-bold text-muted tracking-wide mb-1.5">Total Outstanding</p>
             <p className="text-2xl font-bold text-heading">{money(totalOutstanding)}</p>
+            <p className="mt-2 text-[11px] text-muted" title="Valued AR collection journals in workspace base currency, net of linked reversals">
+              Collected MTD: {collectedThisMonth ? money(collectedThisMonth) : 'Unavailable'}
+            </p>
+            <p className="text-[11px] text-muted" title="Same elapsed calendar dates in the previous tenant-local month">
+              Prior period: {priorCollections ? money(priorCollections) : 'Unavailable'}
+            </p>
           </div>
           <div className="border border-border-default rounded-button p-4 bg-surface-raised shadow-card">
             <p className="text-[11px] font-bold text-muted tracking-wide mb-1.5">Current</p>
@@ -203,11 +229,13 @@ export default function AccountsReceivable() {
                       isSelected ? 'bg-accent-light/40 border-l-4 border-l-blue-600' : 'bg-surface-raised hover:bg-surface-muted border-l-4 border-l-transparent'
                     }`}
                   >
-                    <td className="px-6 py-4">
-                      {isSelected
-                        ? <CheckSquare size={16} className="text-black" fill="black" stroke="white" />
-                        : <Square size={16} className="text-faint" />
-                      }
+                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(account.id)}
+                        onChange={() => toggleSelection(account.id)}
+                        className="w-4 h-4 rounded-sm border-border-default text-primary focus:ring-primary cursor-pointer"
+                      />
                     </td>
                     <td className="px-2 py-4">
                       <div className="flex items-center gap-3">
@@ -304,8 +332,8 @@ export default function AccountsReceivable() {
                 {selectedInvoices.map(inv => {
                   let daysOverdue = 0;
                   if (inv.dueDate) {
-                    const diffTime = new Date() - new Date(inv.dueDate);
-                    daysOverdue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    const today = new Date(); today.setHours(0, 0, 0, 0); const due = new Date(inv.dueDate); due.setHours(0, 0, 0, 0);
+                    daysOverdue = Math.max(0, Math.floor((today.getTime() - due.getTime()) / 86400000));
                   }
 
                   return (
@@ -322,7 +350,7 @@ export default function AccountsReceivable() {
                             ) : (
                               <span className="text-success font-bold">Current</span>
                             )}
-                            {inv.dueDate && ` • Due ${new Date(inv.dueDate).toLocaleDateString()}`}
+                            {inv.dueDate && ` • Due ${formatDate(inv.dueDate)}`}
                           </p>
                         </div>
                       </div>

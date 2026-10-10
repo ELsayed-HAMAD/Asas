@@ -53,7 +53,9 @@ export type LeaveRequestRow = z.infer<typeof leaveRequestSchema>
 export const timesheetDaySchema = z.object({
   id: idSchema,
   dayLabel: z.string(),
+  clockInDate: isoDateSchema.nullable(),
   clockIn: z.string().nullable(),
+  clockOutDate: isoDateSchema.nullable(),
   clockOut: z.string().nullable(),
   totalHours: z.number().nullable(),
 })
@@ -80,33 +82,74 @@ export const timesheetBatchApprovalSchema = z.object({
 })
 export const timesheetBatchApprovalResponseSchema = z.object({ ids: z.array(idSchema), approvedAt: isoDateTimeSchema })
 
+const localClockTimeSchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, 'Use 24-hour HH:MM time')
+export const attendancePunchCorrectionSchema = z.object({
+  clockInDate: isoDateSchema,
+  clockInTime: localClockTimeSchema,
+  clockOutDate: isoDateSchema.nullable(),
+  clockOutTime: localClockTimeSchema.nullable(),
+}).superRefine((value, context) => {
+  if ((value.clockOutDate === null) !== (value.clockOutTime === null)) {
+    context.addIssue({ code: 'custom', path: ['clockOutTime'], message: 'Provide both an out date and time, or leave both empty' })
+  }
+  if (value.clockOutDate && value.clockOutDate < value.clockInDate) {
+    context.addIssue({ code: 'custom', path: ['clockOutDate'], message: 'Clock-out date cannot be before clock-in date' })
+  }
+})
+export type AttendancePunchCorrectionInput = z.infer<typeof attendancePunchCorrectionSchema>
+
+export const attendancePunchCorrectionResponseSchema = z.object({
+  id: idSchema,
+  clockInDate: isoDateSchema,
+  clockInTime: localClockTimeSchema,
+  clockOutDate: isoDateSchema.nullable(),
+  clockOutTime: localClockTimeSchema.nullable(),
+  totalHours: z.number().nonnegative().nullable(),
+})
+
 export const leaveRequestWriteSchema = z.object({
   employeeId: idSchema,
   type: leaveTypeSchema,
   startDate: isoDateSchema,
   endDate: isoDateSchema.optional().nullable(),
+}).refine(value => !value.endDate || value.endDate >= value.startDate, {
+  path: ['endDate'], message: 'Leave end date must be on or after its start date',
 })
 export type LeaveRequestWriteInput = z.infer<typeof leaveRequestWriteSchema>
+
+export const selfLeaveRequestWriteSchema = z.object({
+  type: leaveTypeSchema,
+  startDate: isoDateSchema,
+  endDate: isoDateSchema.optional().nullable(),
+}).refine(value => !value.endDate || value.endDate >= value.startDate, {
+  path: ['endDate'], message: 'Leave end date must be on or after its start date',
+})
+export type SelfLeaveRequestWriteInput = z.infer<typeof selfLeaveRequestWriteSchema>
 
 // ── Attendance summary (server-computed rate) ────────────────────────────────
 
 export const attendanceSummarySchema = z.object({
-  /** Total attendance exceptions across the tenant (SQL count). */
+  /** Exceptions dated in the selected trailing window (SQL count). */
   exceptionCount: z.int().min(0),
+  /** Exceptions dated in the immediately preceding window of the same length. */
+  exceptionCountPreviousPeriod: z.int().min(0),
   /** Employees currently on leave (SQL count of `Employee.status === 'ON_LEAVE'`). */
   onLeaveCount: z.int().min(0),
-  /**
-   * Attendance rate as a percentage (0–100), computed server-side:
-   * `100 * (1 - exceptionCount / totalExpectedDays)`.
-   *
-   * `null` when there is no timesheet data to compute from (a new tenant, or one that has not
-   * logged any timesheets yet). The UI shows "—" in that case, not "0%" or "NaN%".
-   */
+  /** Percentage of punch-started days with both an in and out punch, over the selected range. */
   attendanceRate: z.number().min(0).max(100).nullable(),
+  /** Punch completion rate in the preceding window of the same length. */
+  attendanceRatePreviousPeriod: z.number().min(0).max(100).nullable(),
+  attendanceRateRangeDays: z.int().min(7).max(90),
+  attendanceRateRecordedDays: z.int().min(0),
   timesheetCount: z.int().min(0),
   overtimeHours: z.number().min(0),
 })
 export type AttendanceSummary = z.infer<typeof attendanceSummarySchema>
+
+export const attendanceQuerySchema = z.object({
+  rangeDays: z.enum(['7', '30', '90']).transform(Number).default(30),
+})
+export type AttendanceQuery = z.infer<typeof attendanceQuerySchema>
 
 // ── Full attendance response ─────────────────────────────────────────────────
 
@@ -129,3 +172,35 @@ export const leaveRequestListResponseSchema = z.object({
   items: z.array(leaveRequestSchema),
 })
 export type LeaveRequestListResponse = z.infer<typeof leaveRequestListResponseSchema>
+
+export const leavePolicyTypeParamSchema = z.object({ type: leaveTypeSchema })
+export const leavePolicyWriteSchema = z.object({
+  annualAllowanceDays: z.int().min(0).max(366),
+  weekdaysOnly: z.boolean().default(false),
+})
+export type LeavePolicyWriteInput = z.infer<typeof leavePolicyWriteSchema>
+export const leavePolicySchema = z.object({
+  type: leaveTypeSchema,
+  annualAllowanceDays: z.int().min(0).max(366),
+  weekdaysOnly: z.boolean(),
+})
+export type LeavePolicy = z.infer<typeof leavePolicySchema>
+
+export const leaveBalanceQuerySchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2200).optional(),
+})
+export type LeaveBalanceQuery = z.infer<typeof leaveBalanceQuerySchema>
+export const leaveBalanceSchema = z.object({
+  employeeId: idSchema,
+  employeeName: z.string(),
+  departmentId: idSchema.nullable(),
+  type: leaveTypeSchema,
+  annualAllowanceDays: z.int().min(0).nullable(),
+  approvedDays: z.int().min(0),
+  pendingDays: z.int().min(0),
+  remainingDays: z.int().nullable(),
+  weekdaysOnly: z.boolean().nullable(),
+})
+export const leaveBalanceResponseSchema = z.object({ year: z.int().min(2000).max(2200), items: z.array(leaveBalanceSchema) })
+export type LeaveBalanceResponse = z.infer<typeof leaveBalanceResponseSchema>
+export const leavePolicyListResponseSchema = z.object({ items: z.array(leavePolicySchema) })

@@ -54,10 +54,11 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
     },
     async request => {
       const { tenantId, userId } = requireAuthContext(request)
-      await request.server.prisma.tenant.update({
-        where: { id: tenantId },
+      const changed = await request.server.prisma.tenant.updateMany({
+        where: { id: tenantId, onboardingStatus: 'PENDING' },
         data: { onboardingStatus: 'EMPTY' },
       })
+      if (changed.count !== 1) throw new AppError(409, 'Only a pending workspace can start empty')
       await recordAuditLog(request.server.prisma, {
         tenantId,
         actorId: userId,

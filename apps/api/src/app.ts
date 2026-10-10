@@ -17,6 +17,7 @@ import { z } from 'zod'
 import { type Auth, createAuth } from './auth.js'
 import { loadEnv } from './config/env.js'
 import { errorHandler } from './middlewares/errorHandler.js'
+import { auditLogRoutes } from './modules/auditLog/auditLog.routes.js'
 import { crmRoutes } from './modules/crm/crm.routes.js'
 import { financeRoutes } from './modules/finance/finance.routes.js'
 import { registerExportHandlers, exportRoutes } from './modules/exports/exports.routes.js'
@@ -104,6 +105,19 @@ function generateRequestId(): string {
   return randomUUID()
 }
 
+/** What an inbound `x-request-id` may look like before it is trusted as the request's id. */
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/
+
+/**
+ * Honour a well-formed inbound `x-request-id` (so a proxy/client can thread its own id), but
+ * never trust it verbatim: anything else — too long, newlines, log-forging characters, an array
+ * from a repeated header — is replaced with a fresh UUID, since the id is echoed in the response
+ * header, every log line, and error bodies.
+ */
+export function resolveRequestId(header: string | string[] | undefined): string {
+  return typeof header === 'string' && REQUEST_ID_PATTERN.test(header) ? header : generateRequestId()
+}
+
 const healthResponseSchema = z.object({ data: z.object({ status: z.literal('ok') }) })
 
 /**
@@ -164,11 +178,12 @@ export async function buildApp(
 ) {
   const app = Fastify({
     logger: resolveLogger(options.logger),
-    // The correlation plugin's `onRequest` reads the incoming `x-request-id` header before
-    // Fastify's own id is used; `requestIdHeader` keeps the *response* header the same value
-    // so a client can log "request X" and match it against the server's `reqId` field.
-    requestIdHeader: 'x-request-id',
-    genReqId: req => (req.headers['x-request-id'] as string | undefined) ?? generateRequestId(),
+    // `requestIdHeader` must stay off: when set, Fastify uses the raw header verbatim and only
+    // calls `genReqId` when it is absent. `genReqId` reads and validates the inbound
+    // `x-request-id` itself; the correlation plugin echoes the resulting id on the response so
+    // a client can log "request X" and match it against the server's `reqId` field.
+    requestIdHeader: false,
+    genReqId: req => resolveRequestId(req.headers['x-request-id']),
   }).withTypeProvider<ZodTypeProvider>()
 
   app.setErrorHandler(errorHandler)
@@ -213,17 +228,22 @@ export async function buildApp(
     },
     transform: jsonSchemaTransform,
   })
-  await app.register(swaggerUi, { routePrefix: '/docs' })
+  // The UI (and the `/docs/json` document it serves) maps the whole API surface, so it is not
+  // public in production unless explicitly opted into with `ENABLE_API_DOCS=true`.
+  if (!environment.isProduction || environment.enableApiDocs) {
+    await app.register(swaggerUi, { routePrefix: '/docs' })
+  }
 
   // The CV upload route accepts a raw `application/pdf` body (the browser PUTs the file's
   // bytes straight to the API). Fastify has no built-in PDF parser, so buffer it to a
-  // `Buffer` — the route itself enforces the size cap and the `%PDF-` magic-number check.
-  app.addContentTypeParser('application/pdf', (request, payload, done) => {
-    const chunks: Buffer[] = []
-    payload.on('data', (chunk: Buffer) => chunks.push(chunk))
-    payload.on('end', () => done(null, Buffer.concat(chunks)))
-    payload.on('error', done)
-  })
+  // `Buffer`, capped at 5 MiB (the CV route's own `MAX_RESUME_BYTES`) so an oversized body is
+  // rejected with a 413 while streaming instead of being buffered whole into memory. The
+  // route still enforces the size cap and the `%PDF-` magic-number check.
+  app.addContentTypeParser(
+    'application/pdf',
+    { parseAs: 'buffer', bodyLimit: 5 * 1024 * 1024 },
+    (_request, body, done) => done(null, body),
+  )
 
   if (options.prisma) {
     await prismaPlugin(app, options.prisma)
@@ -252,7 +272,7 @@ export async function buildApp(
       },
     })
     // Register the concrete "render a kind into bytes" handlers before any job can dispatch.
-    registerExportHandlers(app.exportQueue)
+    registerExportHandlers(app.exportQueue, app.prisma)
     await app.register(hrRoutes, { prefix: '/api/v1/hr' })
     await app.register(payrollRoutes, { prefix: '/api/v1/hr' })
     await app.register(candidateRoutes, { prefix: '/api/v1/hr' })
@@ -265,6 +285,7 @@ export async function buildApp(
     await app.register(supportRoutes, { prefix: '/api/v1/support' })
     await app.register(onboardingRoutes, { prefix: '/api/v1/onboarding' })
     await app.register(exportRoutes, { prefix: '/api/v1/exports' })
+    await app.register(auditLogRoutes, { prefix: '/api/v1/audit-logs' })
   }
 
   app.get(

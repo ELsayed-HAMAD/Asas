@@ -12,7 +12,7 @@
  */
 import { z } from 'zod'
 import { projectStatusSchema } from '../enums.generated.js'
-import { idSchema, isoDateSchema } from '../primitives/ids.js'
+import { idSchema, isoDateSchema, isoDateTimeSchema } from '../primitives/ids.js'
 import { moneySchema } from '../primitives/money.js'
 
 // ── Sprint burndown ─────────────────────────────────────────────────────────────
@@ -41,10 +41,14 @@ export type BurndownQuery = z.infer<typeof burndownQuerySchema>
 export const burndownResponseSchema = z.object({
   sprintId: idSchema,
   sprintName: z.string(),
+  /** Null when this legacy sprint has no recorded start date. */
+  startDate: isoDateSchema.nullable(),
   /** Total work in the sprint — the top of the burndown at day 0. */
   totalScope: z.int().min(0),
   /** Issues DONE as of the moment the query ran. */
   completed: z.int().min(0),
+  /** DONE issues with no recorded completion timestamp, omitted from the dated series. */
+  undatedCompleted: z.int().min(0),
   points: z.array(burndownPointSchema),
 })
 
@@ -57,6 +61,7 @@ export const utilizationRowSchema = z.object({
   name: z.string(),
   status: projectStatusSchema,
   spent: moneySchema,
+  unvaluedSettlementCount: z.int().min(0).default(0),
   /** `null` when the project has no budget set. */
   budget: moneySchema.nullable(),
   /** Utilization as a percentage, `null` when there is no budget to divide by. */
@@ -71,9 +76,31 @@ export const portfolioUtilizationResponseSchema = z.object({
     totalProjects: z.int().min(0),
     activeProjects: z.int().min(0),
     totalSpent: moneySchema,
+    unvaluedSettlementCount: z.int().min(0).default(0),
+    unassignedSettlementCount: z.int().min(0).default(0),
     totalBudget: moneySchema.nullable(),
     utilizationPct: z.number().min(0).nullable(),
   }),
 })
 
 export type PortfolioUtilizationResponse = z.infer<typeof portfolioUtilizationResponseSchema>
+
+const sprintVelocityPeriodSchema = z.object({
+  sprintId: idSchema,
+  name: z.string(),
+  startsAt: isoDateTimeSchema,
+  endsAt: isoDateTimeSchema,
+  completedStoryPoints: z.int().min(0).nullable(),
+  estimatedCompletedIssues: z.int().min(0),
+  unestimatedCompletedIssues: z.int().min(0),
+})
+
+export const sprintVelocityComparisonSchema = z.object({
+  projectId: idSchema,
+  current: sprintVelocityPeriodSchema.nullable(),
+  previous: sprintVelocityPeriodSchema.nullable(),
+  deltaStoryPoints: z.int().nullable(),
+  deltaPct: z.number().nullable(),
+})
+
+export type SprintVelocityComparison = z.infer<typeof sprintVelocityComparisonSchema>

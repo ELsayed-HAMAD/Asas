@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useDeferredValue, useState } from 'react';
 import {
   Search,
   LayoutGrid,
@@ -10,7 +10,7 @@ import {
   Circle,
   Loader2
 } from 'lucide-react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { crmApi } from '../../../lib/api/crm';
@@ -39,6 +39,7 @@ const EMPTY_DEAL_FORM = {
   stage: 'LEADS',
   closeDate: '',
   winProbability: '',
+  forecastBucket: 'PIPELINE',
 };
 
 const getStageBadgeColors = (stage) => {
@@ -96,17 +97,23 @@ function DraggableDealRow({ deal, selected, onSelect, disabled }) {
   );
 }
 
-function DealStageGroup({ group, selectedId, onSelect, disabled }) {
+function DealStageGroup({ group, selectedId, onSelect, disabled, onPageChange }) {
   const { setNodeRef, isOver } = useDroppable({ id: group.stage });
+  const summaryKey = group.stage === 'CLOSED_WON' ? 'wonValue' : group.stage === 'CLOSED_LOST' ? 'lostValue' : 'openPipelineValue';
+  const totalValue = group.summary?.[summaryKey];
+  const page = group.pagination?.page ?? 1;
+  const limit = group.pagination?.limit ?? 25;
+  const pages = Math.max(1, group.pagination?.pages ?? 1);
+  const total = group.pagination?.total ?? 0;
+  const first = total === 0 ? 0 : (page - 1) * limit + 1;
+  const last = Math.min(page * limit, total);
   return (
     <div ref={setNodeRef} className={isOver ? 'bg-accent-light/40' : ''}>
       <div className="flex items-center justify-between px-6 py-2 bg-surface-muted/80 border-b border-border-default">
         <span className="text-[10px] font-bold text-muted uppercase tracking-wider">
-          {STAGE_LABELS[group.stage]} · {group.deals.length} {group.deals.length === 1 ? 'Deal' : 'Deals'}
+          {STAGE_LABELS[group.stage]} · {total} {total === 1 ? 'Deal' : 'Deals'}
         </span>
-        <span className="text-[11px] font-bold text-body-light tabular-nums">
-          {formatMoney({ amount: group.deals.reduce((sum, deal) => sum + (deal.value?.amount ?? 0), 0), currency: group.deals[0].value?.currency })}
-        </span>
+        <span className="text-[11px] font-bold text-body-light tabular-nums">{formatMoney(totalValue)}</span>
       </div>
       <div className="divide-y divide-border-subtle">
         {group.deals.map(deal => (
@@ -114,6 +121,14 @@ function DealStageGroup({ group, selectedId, onSelect, disabled }) {
         ))}
         {group.deals.length === 0 && <p className="px-6 py-4 text-center text-xs text-muted">No deals</p>}
       </div>
+      {total > 0 && <div className="flex items-center justify-between border-t border-border-subtle px-6 py-2 text-xs text-muted">
+        <span>Showing {first}–{last} of {total}</span>
+        <div className="flex items-center gap-2">
+          <button type="button" disabled={page <= 1} onClick={() => onPageChange(group.stage, page - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
+          <span>Page {page} of {pages}</span>
+          <button type="button" disabled={page >= pages} onClick={() => onPageChange(group.stage, page + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+        </div>
+      </div>}
     </div>
   );
 }
@@ -127,6 +142,14 @@ export default function DealsPipeline() {
   const [formError, setFormError] = useState(null);
   // { id, message } so a failed stage move is shown only under the deal it failed for.
   const [stageError, setStageError] = useState(null);
+  const [activityDialogType, setActivityDialogType] = useState(null);
+  const [activityTitle, setActivityTitle] = useState('');
+  const [activityBody, setActivityBody] = useState('');
+  const [activityPage, setActivityPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [pageByStage, setPageByStage] = useState(() => Object.fromEntries(STAGE_ORDER.map(stage => [stage, 1])));
+  const deferredSearch = useDeferredValue(search.trim());
+  const pageLimit = 25;
 
   // Deal writes are ADMIN-only server-side (`deal.write` permission); the controls below are
   // rendered disabled for non-OWNER/ADMIN members with a hint explaining why.
@@ -135,11 +158,25 @@ export default function DealsPipeline() {
 
   const queryClient = useQueryClient();
 
-  // One page is the full board — the server's deal ceiling is 100 rows.
-  const { data, isLoading, isError } = useQuery({
-    queryKey: queryKeys.crm.deals.list({ limit: 100 }),
-    queryFn: () => crmApi.listDeals({ limit: 100 }),
+  // Each stage is paginated independently. Counts and totals come from the full filtered server result.
+  const stageQueries = useQueries({ queries: STAGE_ORDER.map(stage => {
+    const filters = { stage, page: pageByStage[stage], limit: pageLimit, ...(deferredSearch && { search: deferredSearch }) };
+    return { queryKey: queryKeys.crm.deals.list(filters), queryFn: () => crmApi.listDeals(filters) };
+  }) });
+  const deals = stageQueries.flatMap(query => query.data?.items ?? []);
+  const { data: selectedDetail } = useQuery({
+    queryKey: queryKeys.crm.deals.detail(selectedId),
+    queryFn: () => crmApi.getDeal(selectedId),
+    enabled: Boolean(selectedId && !deals.some(deal => deal.id === selectedId)),
   });
+  const activityDealId = selectedId ?? deals[0]?.id ?? null;
+  const { data: activityData, isLoading: activitiesLoading, isError: activitiesError } = useQuery({
+    queryKey: queryKeys.crm.deals.activities(activityDealId, { page: activityPage, limit: 10 }),
+    queryFn: () => crmApi.listDealActivities(activityDealId, { page: activityPage, limit: 10 }),
+    enabled: Boolean(activityDealId),
+  });
+  const isLoading = stageQueries.some(query => query.isLoading);
+  const isError = stageQueries.some(query => query.isError);
 
   // Refresh the board (and anything else CRM-shaped) after a successful write; the server's
   // SSE publish covers other open tabs.
@@ -150,8 +187,9 @@ export default function DealsPipeline() {
 
   const createMutation = useMutation({
     mutationFn: (payload) => crmApi.createDeal(payload),
-    onSuccess: () => {
+    onSuccess: (created) => {
       invalidateCrmDeals();
+      if (created?.stage) setPageByStage(current => ({ ...current, [created.stage]: 1 }));
       setNewDealOpen(false);
       setDealForm(EMPTY_DEAL_FORM);
       setFormError(null);
@@ -160,9 +198,10 @@ export default function DealsPipeline() {
 
   const stageMutation = useMutation({
     mutationFn: ({ id, stage }) => crmApi.updateDeal(id, { stage }),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       invalidateCrmDeals();
       setStageError(null);
+      if (variables.sourcePageIsLastSingleRow) setPageByStage(current => ({ ...current, [variables.sourceStage]: Math.max(1, variables.sourcePage - 1) }));
     },
     onError: (error, variables) => {
       setStageError({
@@ -175,15 +214,45 @@ export default function DealsPipeline() {
     mutationFn: () => crmApi.updateDeal(selectedDeal.id, { ...editForm, value: editForm.value || null, closeDate: editForm.closeDate || null, winProbability: editForm.winProbability === '' ? null : Number(editForm.winProbability) }),
     onSuccess: () => { invalidateCrmDeals(); setEditDealOpen(false) },
   })
+  const activityMutation = useMutation({
+    mutationFn: () => crmApi.createDealActivity(activityDealId, { type: activityDialogType, title: activityTitle.trim(), body: activityBody.trim() || null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.crm.deals.activities(activityDealId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.crm.all() });
+      setActivityPage(1);
+      setActivityDialogType(null);
+      setActivityTitle('');
+      setActivityBody('');
+    },
+  });
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
-  const handleDragEnd = (event) => {
-    if (!canWrite || !event.over) return;
-    const deal = deals.find(item => item.id === event.active.id);
-    const nextStage = event.over.id;
-    if (!deal || !STAGE_ORDER.includes(nextStage) || deal.stage === nextStage) return;
-    stageMutation.mutate({ id: deal.id, stage: nextStage });
+  const moveDealToStage = (deal, nextStage) => {
+    if (!canWrite || !deal || !STAGE_ORDER.includes(nextStage) || deal.stage === nextStage) return;
+    const sourceGroup = groups.find(group => group.stage === deal.stage);
+    const sourcePage = pageByStage[deal.stage];
+    stageMutation.mutate({
+      id: deal.id,
+      stage: nextStage,
+      sourceStage: deal.stage,
+      sourcePage,
+      sourcePageIsLastSingleRow: sourcePage > 1 && sourcePage === sourceGroup?.pagination?.pages && sourceGroup?.deals.length === 1,
+    });
   };
+
+  const handleDragEnd = (event) => {
+    if (!event.over) return;
+    const deal = deals.find(item => item.id === event.active.id);
+    moveDealToStage(deal, event.over.id);
+  };
+
+  const openActivityDialog = type => {
+    setActivityDialogType(type)
+    setActivityTitle('')
+    setActivityBody('')
+    activityMutation.reset()
+  }
+  const selectDeal = id => { setSelectedId(id); setActivityPage(1) }
 
   const openNewDealDialog = () => {
     setFormError(null);
@@ -203,6 +272,7 @@ export default function DealsPipeline() {
     if (dealForm.closeDate) payload.closeDate = dealForm.closeDate;
     const winProbability = dealForm.winProbability.trim();
     payload.winProbability = winProbability === '' ? null : Math.min(100, Math.max(0, Number(winProbability)));
+    payload.forecastBucket = dealForm.forecastBucket;
     createMutation.mutate(payload);
   };
 
@@ -218,7 +288,7 @@ export default function DealsPipeline() {
     );
   }
 
-  if (isError || !data) {
+  if (isError) {
     return (
       <div className="flex h-full items-center justify-center bg-surface text-danger">
         Failed to load deals pipeline.
@@ -226,18 +296,24 @@ export default function DealsPipeline() {
     );
   }
 
-  const deals = data.items || [];
-
   // Keep every stage visible so an empty column is still a valid drop target.
-  const groups = STAGE_ORDER
-    .map((stage) => ({ stage, deals: deals.filter((d) => d.stage === stage) }));
+  const groups = STAGE_ORDER.map((stage, index) => ({
+    stage,
+    deals: stageQueries[index]?.data?.items ?? [],
+    pagination: stageQueries[index]?.data?.pagination,
+    summary: stageQueries[index]?.data?.summary,
+  }));
 
   const firstDeal = groups.find(group => group.deals.length > 0)?.deals[0] || null;
   const effectiveSelectedId = selectedId || (firstDeal ? firstDeal.id : null);
-  const selectedDeal = deals.find((d) => d.id === effectiveSelectedId) || null;
+  const selectedDeal = deals.find((d) => d.id === effectiveSelectedId) || (selectedDetail?.id === effectiveSelectedId ? selectedDetail : null);
+  const changeStagePage = (stage, page) => setPageByStage(current => ({ ...current, [stage]: page }));
   const openEditDeal = () => {
     if (!selectedDeal) return
-    setEditForm({ name: selectedDeal.name, value: String(moneyToMajor(selectedDeal.value)), stage: selectedDeal.stage, closeDate: selectedDeal.closeDate?.slice(0, 10) || '', winProbability: selectedDeal.winProbability == null ? '' : String(selectedDeal.winProbability) })
+    const storedBucket = selectedDeal.forecastBucket || ''
+    const normalizedBucket = storedBucket.toUpperCase()
+    const forecastBucket = ['PIPELINE', 'COMMIT', 'BEST_CASE'].includes(normalizedBucket) ? normalizedBucket : (storedBucket || 'PIPELINE')
+    setEditForm({ name: selectedDeal.name, value: String(moneyToMajor(selectedDeal.value)), stage: selectedDeal.stage, closeDate: selectedDeal.closeDate?.slice(0, 10) || '', winProbability: selectedDeal.winProbability == null ? '' : String(selectedDeal.winProbability), forecastBucket })
     setEditDealOpen(true)
   }
 
@@ -250,6 +326,8 @@ export default function DealsPipeline() {
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
             <input
               type="text"
+              value={search}
+              onChange={event => { setSearch(event.target.value); setPageByStage(Object.fromEntries(STAGE_ORDER.map(stage => [stage, 1]))) }}
               placeholder="Search..."
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
@@ -289,21 +367,18 @@ export default function DealsPipeline() {
           </div>
 
           <div className="flex-1 pb-10">
-            {groups.length === 0 ? (
-               <div className="p-8 text-center text-muted text-sm">No deals found.</div>
-            ) : (
-              <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-                {groups.map(group => (
-                  <DealStageGroup
-                    key={group.stage}
-                    group={group}
-                    selectedId={effectiveSelectedId}
-                    onSelect={setSelectedId}
-                    disabled={stageMutation.isPending || !canWrite}
-                  />
-                ))}
-              </DndContext>
-            )}
+            <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+              {groups.map(group => (
+                <DealStageGroup
+                  key={group.stage}
+                  group={group}
+                  selectedId={effectiveSelectedId}
+                    onSelect={selectDeal}
+                  onPageChange={changeStagePage}
+                  disabled={stageMutation.isPending || !canWrite}
+                />
+              ))}
+            </DndContext>
           </div>
         </div>
 
@@ -334,13 +409,13 @@ export default function DealsPipeline() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <button onClick={openEditDeal} disabled={!canWrite} title={!canWrite ? 'Requires the ADMIN role' : undefined} className="flex-1 flex items-center justify-center gap-2 border border-border-default text-body py-2.5 rounded-input text-sm font-semibold hover:bg-surface-muted transition-colors disabled:opacity-60">
-                    <Mail size={16} className="text-muted" /> Email
+                  <button onClick={() => openActivityDialog('EMAIL')} disabled={!canWrite} title={!canWrite ? 'Requires the ADMIN role' : 'Record an email activity'} className="flex-1 flex items-center justify-center gap-2 border border-border-default text-body py-2.5 rounded-input text-sm font-semibold hover:bg-surface-muted transition-colors disabled:opacity-60">
+                    <Mail size={16} className="text-muted" /> Log Email
                   </button>
-                  <button disabled className="flex-1 flex items-center justify-center gap-2 border border-border-default text-body py-2.5 rounded-input text-sm font-semibold hover:bg-surface-muted transition-colors disabled:opacity-60">
+                  <button onClick={() => openActivityDialog('CALL')} disabled={!canWrite} title={!canWrite ? 'Requires the ADMIN role' : 'Record a call activity'} className="flex-1 flex items-center justify-center gap-2 border border-border-default text-body py-2.5 rounded-input text-sm font-semibold hover:bg-surface-muted transition-colors disabled:opacity-60">
                     <Phone size={16} className="text-muted" /> Log Call
                   </button>
-                  <button disabled className="flex-1 flex items-center justify-center gap-2 border border-border-default text-body py-2.5 rounded-input text-sm font-semibold hover:bg-surface-muted transition-colors disabled:opacity-60">
+                  <button onClick={openEditDeal} disabled={!canWrite} title={!canWrite ? 'Requires the ADMIN role' : 'Edit deal'} className="flex-1 flex items-center justify-center gap-2 border border-border-default text-body py-2.5 rounded-input text-sm font-semibold hover:bg-surface-muted transition-colors disabled:opacity-60">
                     <Pencil size={16} className="text-muted" /> Edit
                   </button>
                 </div>
@@ -351,7 +426,7 @@ export default function DealsPipeline() {
                   <select
                     id="deal-stage"
                     value={selectedDeal.stage}
-                    onChange={(event) => stageMutation.mutate({ id: selectedDeal.id, stage: event.target.value })}
+                    onChange={(event) => moveDealToStage(selectedDeal, event.target.value)}
                     disabled={!canWrite || stageMutation.isPending}
                     title={!canWrite ? 'Requires the ADMIN role' : undefined}
                     className="flex-1 px-3 py-2 text-sm font-medium text-body border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-60"
@@ -382,24 +457,29 @@ export default function DealsPipeline() {
                 </div>
               </div>
 
-              {/* Recent Activity Section — no activity endpoint exists for deals; honest empty state */}
+              {/* Recorded deal activity */}
               <div className="p-8">
                 <h3 className="text-[10px] font-bold text-muted uppercase tracking-wider mb-6">Recent Activity</h3>
-
-                <div className="relative pl-3 space-y-7">
-                  {/* Vertical Line */}
+                {activitiesLoading ? <p className="text-sm text-muted">Loading activity…</p> : activitiesError ? <p role="alert" className="text-sm text-danger">Could not load deal activity.</p> : null}
+                {!activitiesLoading && !activitiesError && (activityData?.items?.length ?? 0) === 0 && <p className="text-sm text-muted">No recent activity logged for this deal.</p>}
+                {!activitiesLoading && !activitiesError && (activityData?.items?.length ?? 0) > 0 && <div className="relative pl-3 space-y-6">
                   <div className="absolute left-[19px] top-2 bottom-4 w-px bg-surface-strong"></div>
-
-                  <div className="relative z-10 flex gap-4">
+                  {activityData.items.map(activity => <div key={activity.id} className="relative z-10 flex gap-4">
                     <div className="bg-surface-raised ring-4 ring-white mt-0.5">
-                      <Circle size={18} className="text-faint" strokeWidth={2.5} />
+                      {activity.type === 'EMAIL' ? <Mail size={18} className="text-faint" /> : activity.type === 'CALL' ? <Phone size={18} className="text-faint" /> : <Circle size={18} className="text-faint" strokeWidth={2.5} />}
                     </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-muted">No recent activity logged for this deal.</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-heading">{activity.title}</p>
+                      <p className="mt-0.5 text-[11px] text-muted">{activity.type === 'EMAIL' ? 'Email' : activity.type === 'CALL' ? 'Call' : 'Note'} · {activity.actorName || 'Unknown author'} · {formatDate(activity.createdAt, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                      {activity.body && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-body">{activity.body}</p>}
                     </div>
-                  </div>
-
-                </div>
+                  </div>)}
+                  {(activityData.pagination?.pages ?? 0) > 1 && <div className="flex items-center justify-between pt-2 text-xs text-muted">
+                    <button type="button" disabled={activityPage <= 1} onClick={() => setActivityPage(page => page - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Newer</button>
+                    <span>Page {activityPage} of {activityData.pagination.pages}</span>
+                    <button type="button" disabled={activityPage >= activityData.pagination.pages} onClick={() => setActivityPage(page => page + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Older</button>
+                  </div>}
+                </div>}
               </div>
             </>
           ) : (
@@ -492,13 +572,45 @@ export default function DealsPipeline() {
               />
             </div>
           </div>
+          <div>
+            <label htmlFor="new-deal-forecast-bucket" className="block mb-1.5 text-[10px] font-bold text-muted uppercase tracking-wider">Forecast category</label>
+            <select
+              id="new-deal-forecast-bucket"
+              value={dealForm.forecastBucket}
+              onChange={(event) => setDealForm((f) => ({ ...f, forecastBucket: event.target.value }))}
+              className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+            >
+              <option value="PIPELINE">Pipeline</option>
+              <option value="COMMIT">Commit</option>
+              <option value="BEST_CASE">Best case</option>
+            </select>
+          </div>
         </div>
 
         {dialogError && <p className="mt-4 text-sm font-medium text-danger">{dialogError}</p>}
       </FormDialog>
 
       <FormDialog open={editDealOpen} onClose={() => setEditDealOpen(false)} title="Edit deal" subtitle={selectedDeal?.name} busy={editMutation.isPending} onConfirm={() => editMutation.mutate()} confirmLabel="Save deal">
-        <div className="space-y-4"><label className="block text-sm font-medium text-body">Deal name<input required value={editForm.name} onChange={event => setEditForm(current => ({ ...current, name: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Value<input type="number" min="0" step="0.01" value={editForm.value} onChange={event => setEditForm(current => ({ ...current, value: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Stage<select value={editForm.stage} onChange={event => setEditForm(current => ({ ...current, stage: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2">{STAGE_ORDER.map(stage => <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>)}</select></label><label className="block text-sm font-medium text-body">Close date<input type="date" value={editForm.closeDate} onChange={event => setEditForm(current => ({ ...current, closeDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Win probability (%)<input type="number" min="0" max="100" value={editForm.winProbability} onChange={event => setEditForm(current => ({ ...current, winProbability: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div>
+        <div className="space-y-4"><label className="block text-sm font-medium text-body">Deal name<input required value={editForm.name} onChange={event => setEditForm(current => ({ ...current, name: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Value<input type="number" min="0" step="0.01" value={editForm.value} onChange={event => setEditForm(current => ({ ...current, value: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Stage<select value={editForm.stage} onChange={event => setEditForm(current => ({ ...current, stage: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2">{STAGE_ORDER.map(stage => <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>)}</select></label><label className="block text-sm font-medium text-body">Close date<input type="date" value={editForm.closeDate} onChange={event => setEditForm(current => ({ ...current, closeDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Win probability (%)<input type="number" min="0" max="100" value={editForm.winProbability} onChange={event => setEditForm(current => ({ ...current, winProbability: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Forecast category<select value={editForm.forecastBucket || ''} onChange={event => setEditForm(current => ({ ...current, forecastBucket: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="PIPELINE">Pipeline</option><option value="COMMIT">Commit</option><option value="BEST_CASE">Best case</option>{editForm.forecastBucket && !['PIPELINE', 'COMMIT', 'BEST_CASE'].includes(editForm.forecastBucket.toUpperCase()) && <option value={editForm.forecastBucket}>Legacy: {editForm.forecastBucket}</option>}</select></label></div>
+      </FormDialog>
+      <FormDialog
+        open={Boolean(activityDialogType)}
+        onClose={() => setActivityDialogType(null)}
+        title={activityDialogType === 'EMAIL' ? 'Log email' : 'Log call'}
+        subtitle="Record this activity in the deal timeline. Email logging does not send an email."
+        busy={activityMutation.isPending}
+        onConfirm={() => { if (activityTitle.trim()) activityMutation.mutate() }}
+        confirmLabel={activityDialogType === 'EMAIL' ? 'Save email activity' : 'Save call activity'}
+      >
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-body">Summary
+            <input value={activityTitle} onChange={event => setActivityTitle(event.target.value)} maxLength={160} required className="mt-1 w-full rounded-input border border-border-default px-3 py-2" />
+          </label>
+          <label className="block text-sm font-medium text-body">Details
+            <textarea value={activityBody} onChange={event => setActivityBody(event.target.value)} maxLength={5000} rows={4} className="mt-1 w-full resize-y rounded-input border border-border-default px-3 py-2" />
+          </label>
+          {activityMutation.isError && <p role="alert" className="text-sm text-danger">{activityMutation.error?.message || 'Could not save activity.'}</p>}
+        </div>
       </FormDialog>
     </div>
   );

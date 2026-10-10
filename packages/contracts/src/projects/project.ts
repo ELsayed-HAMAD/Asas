@@ -23,6 +23,8 @@ export const projectSchema = z.object({
   budget: moneySchema.nullable(),
   /** Integer minor units of the tenant's currency; `0` when nothing has been spent. */
   spent: moneySchema,
+  /** Posted settlement rows whose base currency amount is unavailable. */
+  unvaluedSettlementCount: z.int().min(0).default(0),
   /**
    * Budget utilization as a percentage, 0–100+ — a server-computed KPI (spent / budget).
    * `null` when there is no budget to divide by, so the UI renders "—" rather than a fake 0.
@@ -50,6 +52,8 @@ export const projectSummarySchema = z.object({
   /** `null` when no project in the result set carries a budget. */
   totalBudget: moneySchema.nullable(),
   totalSpent: moneySchema,
+  unvaluedSettlementCount: z.int().min(0).default(0),
+  unassignedSettlementCount: z.int().min(0).default(0),
   /** Portfolio utilization as a percentage, `null` when total budget is 0. */
   utilizationPct: z.number().min(0).nullable(),
 })

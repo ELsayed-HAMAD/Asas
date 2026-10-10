@@ -19,6 +19,7 @@ import { financeApi } from '../../../lib/api/finance';
 import { hrApi } from '../../../lib/api/hr';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney } from '../../../lib/format';
+import { downloadCsv } from '../../../lib/csv';
 import TopBarActions from '../../../components/TopBarActions';
 
 export default function Expenses() {
@@ -28,6 +29,7 @@ export default function Expenses() {
   const [departmentId, setDepartmentId] = useState('')
   const [sort, setSort] = useState('desc')
   const [receiptZoom, setReceiptZoom] = useState(100)
+  const [receiptOpen, setReceiptOpen] = useState(true)
   const { data: departmentsData } = useQuery({ queryKey: queryKeys.hr.departments.list(), queryFn: hrApi.getDepartments })
 
   const { data, isLoading, isError } = useQuery({
@@ -40,7 +42,11 @@ export default function Expenses() {
   }, [data?.items, selectedId])
   const statusMutation = useMutation({
     mutationFn: (status) => financeApi.updateExpenseStatus(selectedId, status),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.finance.expenses.all() }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.finance.all() }),
+  });
+  const voidMutation = useMutation({
+    mutationFn: (reason) => financeApi.voidExpense(selectedId, reason),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.finance.all() }),
   });
   const exportMutation = useMutation({
     mutationFn: async () => {
@@ -56,18 +62,9 @@ export default function Expenses() {
       return rows
     },
     onSuccess: rows => {
-      const quote = value => `"${String(value ?? '').replaceAll('"', '""')}"`
       const header = ['Expense ID', 'Employee', 'Expense', 'Merchant', 'Category', 'Date', 'Amount (minor units)', 'Currency', 'Status', 'Policy Match']
       const records = rows.map(row => [row.id, row.employee, row.name, row.merchant, row.category, row.date, row.amount.amount, row.amount.currency, row.status, row.policyMatch])
-      const csv = [header, ...records].map(row => row.map(quote).join(',')).join('\r\n')
-      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `expenses-${new Date().toISOString().slice(0, 10)}.csv`
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      URL.revokeObjectURL(url)
+      downloadCsv([header, ...records], `expenses-${new Date().toISOString().slice(0, 10)}.csv`)
     },
   })
 
@@ -92,12 +89,11 @@ export default function Expenses() {
 
   const selectedRecord = items.find(r => r.id === selectedId);
 
-  // KPIs from the server summary (full-set aggregates, not page-level reduces).
-  // "Reimbursed (MTD)" maps to the APPROVED bucket — the only status with a payment-settled
-  // meaning in the new expense model (there is no REIMBURSED status).
+  // Document-status totals and reimbursement settlement totals come from server aggregates,
+  // not page-level reductions. The MTD settlement value is backed by posted journals.
   const pendingCount = summary.pendingCount ?? 0;
   const pendingAmount = summary.pendingTotal ?? { amount: 0, currency: 'USD' };
-  const reimbursedAmount = summary.approvedTotal ?? { amount: 0, currency: 'USD' };
+  const approvedAmount = summary.approvedTotal ?? { amount: 0, currency: 'USD' };
   const violationAmount = summary.flaggedTotal ?? { amount: 0, currency: 'USD' };
 
   return (
@@ -150,11 +146,14 @@ export default function Expenses() {
               <p className="text-[11px] font-semibold text-muted tracking-wide">Approved Expenses</p>
             </div>
             <div className="flex justify-between items-end">
-              <p className="text-3xl font-bold text-heading">{formatMoney(reimbursedAmount)}</p>
+              <p className="text-3xl font-bold text-heading">{formatMoney(approvedAmount)}</p>
               <span className="bg-accent-light text-accent px-2.5 py-1 rounded-input text-[10px] font-bold uppercase tracking-wider">
                 {summary.approvedCount ?? 0} Reports
               </span>
             </div>
+            <p className="mt-2 text-xs text-muted" title="Valued reimbursement journals in workspace base currency, net of linked reversals.">
+              Reimbursed MTD: {summary.reimbursedThisMonthTotal == null ? 'unavailable' : formatMoney(summary.reimbursedThisMonthTotal)} · Prior period: {summary.reimbursedThisMonthComparison?.previousTotal == null ? 'unavailable' : formatMoney(summary.reimbursedThisMonthComparison.previousTotal)}
+            </p>
           </div>
 
           <div className="border border-border-default rounded-card-sm p-5 bg-surface-raised shadow-card flex flex-col justify-between">
@@ -290,11 +289,22 @@ export default function Expenses() {
                 <button disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'PENDING'} onClick={() => statusMutation.mutate('APPROVED')} className="bg-primary text-white w-full py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
                   Approve
                 </button>
-                <button disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status === 'APPROVED'} onClick={() => statusMutation.mutate('REJECTED')} className="border border-border-default text-body w-full py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60">
+                <button disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'APPROVED'} onClick={() => statusMutation.mutate('REIMBURSED')} title="Records reimbursement after it has been paid outside Asas." className="bg-primary text-white w-full py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
+                  Mark Reimbursed
+                </button>
+                <button disabled={!selectedRecord || statusMutation.isPending || ['APPROVED', 'REIMBURSED', 'REJECTED', 'VOID'].includes(selectedRecord.status)} onClick={() => statusMutation.mutate('REJECTED')} className="border border-border-default text-body w-full py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60">
                   Reject
+                </button>
+                <button disabled={!selectedRecord || voidMutation.isPending || selectedRecord.status === 'VOID'} onClick={() => {
+                  const reason = window.prompt('Reason for voiding this expense:')?.trim()
+                  if (reason) voidMutation.mutate(reason)
+                }} className="border border-danger/40 text-danger w-full py-1.5 rounded-input text-sm font-medium hover:bg-danger/5 transition-colors disabled:opacity-60">
+                  {voidMutation.isPending ? 'Voiding…' : 'Void expense'}
                 </button>
               </div>
             </div>
+            {statusMutation.isError && <p role="alert" className="text-sm text-danger">{statusMutation.error?.message || 'Unable to update the expense status.'}</p>}
+            {voidMutation.isError && <p role="alert" className="text-sm text-danger">{voidMutation.error?.message || 'Unable to void the expense.'}</p>}
 
             {/* AI Data Extraction Card */}
             <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card">
@@ -339,17 +349,23 @@ export default function Expenses() {
                   <span className="text-xs font-medium">Expense summary</span>
                 </div>
                 <div className="flex items-center gap-3 text-muted text-xs font-medium">
-                  <button type="button" aria-label="Zoom out receipt" disabled={receiptZoom <= 50} onClick={() => setReceiptZoom(value => Math.max(50, value - 25))} className="hover:text-heading transition-colors disabled:opacity-40"><ZoomOut size={14} /></button>
-                  <span>{receiptZoom}%</span>
-                  <button type="button" aria-label="Zoom in receipt" disabled={receiptZoom >= 200} onClick={() => setReceiptZoom(value => Math.min(200, value + 25))} className="hover:text-heading transition-colors disabled:opacity-40"><ZoomIn size={14} /></button>
+                  {!receiptOpen ? (
+                    <button type="button" onClick={() => setReceiptOpen(true)} className="hover:text-accent transition-colors text-accent font-semibold">View Receipt</button>
+                  ) : (
+                    <>
+                      <button type="button" aria-label="Zoom out receipt" disabled={receiptZoom <= 50} onClick={() => setReceiptZoom(value => Math.max(50, value - 25))} className="hover:text-heading transition-colors disabled:opacity-40"><ZoomOut size={14} /></button>
+                      <span>{receiptZoom}%</span>
+                      <button type="button" aria-label="Zoom in receipt" disabled={receiptZoom >= 200} onClick={() => setReceiptZoom(value => Math.min(200, value + 25))} className="hover:text-heading transition-colors disabled:opacity-40"><ZoomIn size={14} /></button>
+                    </>
+                  )}
                 </div>
               </div>
 
-              {/* PDF Background Area */}
+              {receiptOpen && (
               <div className="bg-[#e2e8f0] p-6 pb-8 flex justify-center relative min-h-[420px]">
 
                 {/* Pagination/Nav Control overlay */}
-                <div className="absolute left-10 top-16 w-8 h-8 bg-primary rounded-full flex items-center justify-center shadow-elevated z-10 cursor-pointer hover:bg-primary transition-colors">
+                <div onClick={() => setReceiptOpen(false)} className="absolute left-10 top-16 w-8 h-8 bg-primary rounded-full flex items-center justify-center shadow-elevated z-10 cursor-pointer hover:bg-primary transition-colors">
                   <ChevronLeft size={16} className="text-white" />
                 </div>
 
@@ -393,6 +409,7 @@ export default function Expenses() {
                   </div>
                 </div>
               </div>
+              )}
             </div>
 
           </div>

@@ -32,6 +32,16 @@ export const candidateStageSchema = z.enum(CandidateStageValues)
 
 export type CandidateStage = z.infer<typeof candidateStageSchema>
 
+export const DealActivityTypeValues = [
+  'CALL',
+  'EMAIL',
+  'NOTE',
+] as const satisfies readonly string[]
+
+export const dealActivityTypeSchema = z.enum(DealActivityTypeValues)
+
+export type DealActivityType = z.infer<typeof dealActivityTypeSchema>
+
 export const DealStageValues = [
   'LEADS',
   'PROPOSAL',
@@ -74,7 +84,9 @@ export const ExpenseStatusValues = [
   'FLAGGED',
   'PROCESSING',
   'APPROVED',
+  'REIMBURSED',
   'REJECTED',
+  'VOID',
 ] as const satisfies readonly string[]
 
 export const expenseStatusSchema = z.enum(ExpenseStatusValues)
@@ -101,6 +113,16 @@ export const IntegrationStatusValues = [
 export const integrationStatusSchema = z.enum(IntegrationStatusValues)
 
 export type IntegrationStatus = z.infer<typeof integrationStatusSchema>
+
+export const InterviewStatusValues = [
+  'SCHEDULED',
+  'COMPLETED',
+  'CANCELLED',
+] as const satisfies readonly string[]
+
+export const interviewStatusSchema = z.enum(InterviewStatusValues)
+
+export type InterviewStatus = z.infer<typeof interviewStatusSchema>
 
 export const IssuePriorityValues = [
   'LOW',
@@ -179,17 +201,30 @@ export const PayableStatusValues = [
   'APPROVED',
   'PAID',
   'REJECTED',
+  'VOID',
 ] as const satisfies readonly string[]
 
 export const payableStatusSchema = z.enum(PayableStatusValues)
 
 export type PayableStatus = z.infer<typeof payableStatusSchema>
 
+export const PayFrequencyValues = [
+  'MONTHLY',
+  'SEMIMONTHLY',
+  'BIWEEKLY',
+  'WEEKLY',
+] as const satisfies readonly string[]
+
+export const payFrequencySchema = z.enum(PayFrequencyValues)
+
+export type PayFrequency = z.infer<typeof payFrequencySchema>
+
 export const PayrollRunStatusValues = [
   'DRAFT',
   'PENDING',
   'APPROVED',
   'PAID',
+  'VOID',
 ] as const satisfies readonly string[]
 
 export const payrollRunStatusSchema = z.enum(PayrollRunStatusValues)
@@ -223,6 +258,7 @@ export const ReceivableStatusValues = [
   'OVERDUE',
   'IN_COLLECTIONS',
   'PAID',
+  'VOID',
 ] as const satisfies readonly string[]
 
 export const receivableStatusSchema = z.enum(ReceivableStatusValues)
@@ -247,6 +283,15 @@ export const RiskSeverityValues = [
 export const riskSeveritySchema = z.enum(RiskSeverityValues)
 
 export type RiskSeverity = z.infer<typeof riskSeveritySchema>
+
+export const SalaryBasisValues = [
+  'ANNUAL',
+  'MONTHLY',
+] as const satisfies readonly string[]
+
+export const salaryBasisSchema = z.enum(SalaryBasisValues)
+
+export type SalaryBasis = z.infer<typeof salaryBasisSchema>
 
 export const SprintStatusValues = [
   'ACTIVE',
@@ -295,12 +340,14 @@ export type UserRole = z.infer<typeof userRoleSchema>
 export const prismaEnums = {
   AttendanceExceptionType: AttendanceExceptionTypeValues,
   CandidateStage: CandidateStageValues,
+  DealActivityType: DealActivityTypeValues,
   DealStage: DealStageValues,
   EmployeeStatus: EmployeeStatusValues,
   ExpenseCategory: ExpenseCategoryValues,
   ExpenseStatus: ExpenseStatusValues,
   ExportJobStatus: ExportJobStatusValues,
   IntegrationStatus: IntegrationStatusValues,
+  InterviewStatus: InterviewStatusValues,
   IssuePriority: IssuePriorityValues,
   IssueStatus: IssueStatusValues,
   LeaveRequestStatus: LeaveRequestStatusValues,
@@ -309,12 +356,14 @@ export const prismaEnums = {
   MilestoneState: MilestoneStateValues,
   OnboardingStatus: OnboardingStatusValues,
   PayableStatus: PayableStatusValues,
+  PayFrequency: PayFrequencyValues,
   PayrollRunStatus: PayrollRunStatusValues,
   ProductStockStatus: ProductStockStatusValues,
   ProjectStatus: ProjectStatusValues,
   ReceivableStatus: ReceivableStatusValues,
   RecordStatus: RecordStatusValues,
   RiskSeverity: RiskSeverityValues,
+  SalaryBasis: SalaryBasisValues,
   SprintStatus: SprintStatusValues,
   SubscriptionStatus: SubscriptionStatusValues,
   SupportTicketStatus: SupportTicketStatusValues,

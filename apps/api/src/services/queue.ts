@@ -37,13 +37,17 @@ const require = createRequire(import.meta.url)
 /** A pg-boss client, the surface this queue uses (narrow on purpose — test doubles need less). */
 interface BossClient {
   createQueue(name: string, options: unknown): Promise<unknown>
-  work(queue: string, handler: (job: { data: unknown }) => Promise<void>): Promise<void>
+  work(queue: string, handler: (jobs: Array<{ data: unknown }>) => Promise<void>): Promise<unknown>
   send(queue: string, payload: unknown, options: unknown): Promise<unknown>
-  connect(): Promise<void>
-  close(): Promise<void>
+  start(): Promise<unknown>
+  stop(): Promise<void>
 }
 
-/** One unit of queued work. `data` is whatever the handler for this kind needs. */
+/**
+ * One unit of queued work. In boss mode this is JSON-serialised into Postgres, so `data` must
+ * be *plain data only* (no clients, no class instances) — and nothing in it is trusted for
+ * tenant scoping: a handler resolves the tenant from the `ExportJob` row via `jobId`.
+ */
 export interface JobPayload {
   /** The `ExportJob` row id all bookkeeping writes against (and the file address). */
   jobId: string
@@ -55,9 +59,9 @@ export interface JobPayload {
  * A handler renders the export's file and returns its bytes. The queue writes the file
  * (`<jobId>.<ext>`), which is what the download endpoint streams — a handler never touches
  * the filesystem, so "what the worker produces" and "what the job row points at" are the same
- * thing.
+ * thing. `job.jobId` lets the handler read its own row (e.g. the owning `tenantId`).
  */
-export type ExportHandler = (data: unknown) => Promise<Buffer>
+export type ExportHandler = (data: unknown, job: { jobId: string }) => Promise<Buffer>
 
 export interface ExportQueue {
   readonly mode: 'boss' | 'inline'
@@ -106,9 +110,9 @@ export async function createExportQueue(options: CreateExportQueueOptions): Prom
 
   if (url) {
     // Loaded lazily so the inline path (dev/CI/tests) never imports or connects to pg-boss.
-    const pgBossModule = require('pg-boss') as { default: new (cfg: unknown) => BossClient }
-    boss = new pgBossModule.default({ connectionString: url, schema: 'asas_boss' })
-    await boss.connect()
+    const PgBoss = require('pg-boss') as new (cfg: unknown) => BossClient
+    boss = new PgBoss({ connectionString: url, schema: 'asas_boss' })
+    await boss.start()
   }
 
   async function updateRow(jobId: string, patch: { status?: string; progressPct?: number }): Promise<void> {
@@ -127,7 +131,7 @@ export async function createExportQueue(options: CreateExportQueueOptions): Prom
     await updateRow(job.jobId, { status: 'RUNNING', progressPct: 10 })
     try {
       const extension = (KIND_FILENAME[job.kind] ?? { extension: 'xlsx' }).extension
-      const buffer = await handler(job.data)
+      const buffer = await handler(job.data, { jobId: job.jobId })
       const file = exportFilePath(job.jobId, extension)
       await mkdir(path.dirname(file), { recursive: true })
       await writeFile(file, buffer)
@@ -163,13 +167,13 @@ export async function createExportQueue(options: CreateExportQueueOptions): Prom
     async start() {
       if (!boss) return
       await boss.createQueue(BOSS_QUEUE, { retryLimit: 2 })
-      await boss.work(BOSS_QUEUE, async rawJob => {
-        await runJob(rawJob.data as JobPayload)
+      await boss.work(BOSS_QUEUE, async jobs => {
+        for (const job of jobs) await runJob(job.data as JobPayload)
       })
     },
     async close() {
       if (!boss) return
-      await boss.close()
+      await boss.stop()
     },
   }
 }
@@ -191,6 +195,7 @@ export async function exportQueuePlugin(
 ): Promise<void> {
   const queue = await createExportQueue({ url: options.queueUrl, store: options.store })
   app.decorate('exportQueue', queue)
-  await queue.start()
+  // Handlers are registered by buildApp before workers start polling existing jobs.
+  app.addHook('onReady', () => queue.start())
   app.addHook('onClose', () => queue.close())
 }

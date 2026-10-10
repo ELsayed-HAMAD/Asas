@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Outlet, Navigate, useLocation } from 'react-router-dom'
 import { useSession, useActiveOrganization, authClient } from '../lib/authClient'
+import { setQueryScope } from '../lib/queryKeys'
 
 /**
  * Route guard for authenticated areas (dashboard + onboarding).
@@ -63,6 +64,10 @@ export default function RequireAuth() {
   if (!activeOrganization && location.pathname !== '/onboarding') {
     return <Navigate to="/onboarding" replace />
   }
+
+  // Scope query keys to the active workspace before any child renders (and builds its keys);
+  // LiveSync in main.jsx does the same in an effect, which would run only after children.
+  setQueryScope(activeOrganization?.id)
 
   return <Outlet />
 }

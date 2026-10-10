@@ -35,6 +35,7 @@ import type {
   RoadmapTaskWriteInput,
   RoadmapPhaseWriteInput,
   Sprint,
+  SprintVelocityComparison,
   SprintUpdateInput,
   SprintWriteInput,
   UtilizationRow,
@@ -109,8 +110,42 @@ type ProjectWithIncludes = {
   sprints: { id: string; name: string }[]
 }
 
-function mapProject(project: ProjectWithIncludes, currency: string): Project {
-  const spent = toMoneyWire(project.spent, currency)!
+type ProjectSpend = { projectId: string | null; spent: Prisma.Decimal; unvaluedSettlementCount: number; unassignedSettlementCount: number }
+
+/** Spend from posted settlements in workspace base currency, net of recorded reversals. */
+async function loadProjectSpend(prisma: PrismaClient, tenantId: string, projectIds?: string[]): Promise<Map<string, ProjectSpend> & { totals?: ProjectSpend }> {
+  const payableProjectFilter = projectIds === undefined ? Prisma.empty : Prisma.sql`AND p."projectId" = ANY(${projectIds}::text[])`
+  const expenseProjectFilter = projectIds === undefined ? Prisma.empty : Prisma.sql`AND e."projectId" = ANY(${projectIds}::text[])`
+  const rows = await prisma.$queryRaw<Array<{ projectId: string | null; isTotal: boolean; spent: Prisma.Decimal; unvaluedSettlementCount: bigint; unassignedSettlementCount: bigint }>>`
+    WITH settlements AS (
+      SELECT p."projectId", j."baseAmount", r."baseAmount" AS "reversalBaseAmount", r."id" AS "reversalId"
+      FROM "PayableInvoice" p JOIN "JournalEntry" j ON j."payableInvoiceId" = p."id" AND j."tenantId" = p."tenantId" AND j."sourceType" = 'AP_PAYMENT'
+      LEFT JOIN "JournalEntry" r ON r."reversesJournalEntryId" = j."id" AND r."tenantId" = j."tenantId"
+      WHERE p."tenantId" = ${tenantId} ${payableProjectFilter}
+      UNION ALL
+      SELECT e."projectId", j."baseAmount", r."baseAmount" AS "reversalBaseAmount", r."id" AS "reversalId"
+      FROM "Expense" e JOIN "JournalEntry" j ON j."expenseId" = e."id" AND j."tenantId" = e."tenantId" AND j."sourceType" = 'EXPENSE_REIMBURSEMENT'
+      LEFT JOIN "JournalEntry" r ON r."reversesJournalEntryId" = j."id" AND r."tenantId" = j."tenantId"
+      WHERE e."tenantId" = ${tenantId} ${expenseProjectFilter}
+    )
+    SELECT "projectId", GROUPING("projectId") = 1 AS "isTotal",
+      COALESCE(SUM(CASE WHEN "baseAmount" IS NOT NULL AND ("reversalId" IS NULL OR "reversalBaseAmount" IS NOT NULL) THEN "baseAmount" - COALESCE("reversalBaseAmount", 0) ELSE 0 END), 0)::numeric AS spent,
+      COUNT(*) FILTER (WHERE "baseAmount" IS NULL OR ("reversalId" IS NOT NULL AND "reversalBaseAmount" IS NULL))::bigint AS "unvaluedSettlementCount",
+      COUNT(*) FILTER (WHERE "projectId" IS NULL)::bigint AS "unassignedSettlementCount"
+    FROM settlements GROUP BY GROUPING SETS (("projectId"), ())
+  `
+  const result = new Map<string, ProjectSpend>() as Map<string, ProjectSpend> & { totals?: ProjectSpend }
+  for (const row of rows) {
+    const value = { projectId: row.projectId, spent: row.spent, unvaluedSettlementCount: Number(row.unvaluedSettlementCount), unassignedSettlementCount: Number(row.unassignedSettlementCount) }
+    if (row.isTotal) result.totals = value
+    else if (row.projectId === null) result.set('__unassigned__', value)
+    else result.set(row.projectId, value)
+  }
+  return result
+}
+
+function mapProject(project: ProjectWithIncludes, currency: string, spend?: ProjectSpend): Project {
+  const spent = toMoneyWire(spend?.spent ?? new Prisma.Decimal(0), currency)!
   const budget = toMoneyWire(project.budget, currency)
   return {
     id: project.id,
@@ -119,6 +154,7 @@ function mapProject(project: ProjectWithIncludes, currency: string): Project {
     departmentId: project.departmentId,
     budget,
     spent,
+    unvaluedSettlementCount: spend?.unvaluedSettlementCount ?? 0,
     utilizationPct: utilizationPct(spent.amount, budget?.amount ?? null),
     timeline: project.timeline?.toISOString() ?? null,
     sprints: project.sprints.map(s => ({ id: s.id, name: s.name })),
@@ -152,7 +188,10 @@ export async function listProjects(
 
   // KPIs are SQL aggregates over the tenant's whole project set — not a `.reduce()` over the
   // (paginated) page the client happens to be looking at.
-  const [items, totalProjects, activeProjects, budgetSum, spentSum] = await Promise.all([
+  const activeWhere: Prisma.ProjectWhereInput = {
+    AND: [where, { status: { in: [...ACTIVE_STATUSES] } }],
+  }
+  const [items, totalProjects, activeProjects, budgetSum, spends, matchingProjects] = await Promise.all([
     prisma.project.findMany({
       where,
       skip,
@@ -160,36 +199,44 @@ export async function listProjects(
       orderBy: { createdAt: 'desc' },
       include: { sprints: { select: { id: true, name: true } } },
     }),
-    prisma.project.count({ where: { tenantId } }),
-    prisma.project.count({ where: { tenantId, status: { in: [...ACTIVE_STATUSES] } } }),
-    prisma.project.aggregate({ _sum: { budget: true }, where: { tenantId } }),
-    prisma.project.aggregate({ _sum: { spent: true }, where: { tenantId } }),
+    prisma.project.count({ where }),
+    prisma.project.count({ where: activeWhere }),
+    prisma.project.aggregate({ _sum: { budget: true }, where }),
+    loadProjectSpend(prisma, tenantId),
+    prisma.project.findMany({ where, select: { id: true, budget: true } }),
   ])
+  const filteredSpends = await loadProjectSpend(prisma, tenantId, matchingProjects.map(project => project.id))
 
   const totalBudget = toMoneyWire(budgetSum._sum.budget ?? new Prisma.Decimal(0), currency)
-  const totalSpent = toMoneyWire(spentSum._sum.spent ?? new Prisma.Decimal(0), currency)!
+  const totalSpent = toMoneyWire(filteredSpends.totals?.spent ?? new Prisma.Decimal(0), currency)!
+  const budgetedSpent = matchingProjects
+    .filter(project => project.budget !== null)
+    .reduce((acc, project) => acc.add(spends.get(project.id)?.spent ?? new Prisma.Decimal(0)), new Prisma.Decimal(0))
+  const budgetedSpentWire = toMoneyWire(budgetedSpent, currency)!
 
   return {
-    items: items.map(item => mapProject(item, currency)),
+    items: items.map(item => mapProject(item, currency, spends.get(item.id))),
     pagination: buildPaginationMeta(query, totalProjects),
     summary: {
       totalProjects,
       activeProjects,
       totalBudget,
       totalSpent,
-      utilizationPct: utilizationPct(totalSpent.amount, totalBudget?.amount ?? null),
+      unvaluedSettlementCount: filteredSpends.totals?.unvaluedSettlementCount ?? 0,
+      unassignedSettlementCount: spends.totals?.unassignedSettlementCount ?? 0,
+      utilizationPct: utilizationPct(budgetedSpentWire.amount, totalBudget?.amount ?? null),
     },
   }
 }
 
 export async function getProject(prisma: PrismaClient, tenantId: string, id: string): Promise<Project> {
-  const currency = await getTenantCurrency(prisma, tenantId)
+  const [currency, spends] = await Promise.all([getTenantCurrency(prisma, tenantId), loadProjectSpend(prisma, tenantId)])
   const project = await prisma.project.findFirst({
     where: { id, tenantId },
     include: { sprints: { select: { id: true, name: true } } },
   })
   if (!project) throw new AppError(404, 'Project not found')
-  return mapProject(project, currency)
+  return mapProject(project, currency, spends.get(project.id))
 }
 
 /**
@@ -202,31 +249,38 @@ export async function getPortfolioUtilization(
   tenantId: string,
 ): Promise<PortfolioUtilizationResponse> {
   const currency = await getTenantCurrency(prisma, tenantId)
-  const [projects, totals] = await Promise.all([
+  const [projects, totals, spends] = await Promise.all([
     prisma.project.findMany({
       where: { tenantId },
       orderBy: { createdAt: 'asc' },
       select: { id: true, name: true, status: true, budget: true, spent: true },
     }),
-    prisma.project.aggregate({ where: { tenantId }, _sum: { budget: true, spent: true } }),
+    prisma.project.aggregate({ where: { tenantId }, _sum: { budget: true } }),
+    loadProjectSpend(prisma, tenantId),
   ])
   const activeProjects = projects.filter(project => ACTIVE_STATUSES.includes(project.status as (typeof ACTIVE_STATUSES)[number])).length
 
   const items: UtilizationRow[] = projects.map(project => {
-    const spent = toMoneyWire(project.spent, currency)!
+    const projectSpend = spends.get(project.id)
+    const spent = toMoneyWire(projectSpend?.spent ?? new Prisma.Decimal(0), currency)!
     const budget = toMoneyWire(project.budget, currency)
     return {
       projectId: project.id,
       name: project.name,
       status: project.status,
       spent,
+      unvaluedSettlementCount: projectSpend?.unvaluedSettlementCount ?? 0,
       budget,
       utilizationPct: utilizationPct(spent.amount, budget?.amount ?? null),
     }
   })
 
-  const totalSpent = toMoneyWire(totals._sum.spent ?? new Prisma.Decimal(0), currency)!
+  const totalSpent = toMoneyWire(spends.totals?.spent ?? new Prisma.Decimal(0), currency)!
   const totalBudget = toMoneyWire(totals._sum.budget, currency)
+  const budgetedSpent = projects
+    .filter(project => project.budget !== null)
+    .reduce((acc, project) => acc.add(spends.get(project.id)?.spent ?? new Prisma.Decimal(0)), new Prisma.Decimal(0))
+  const budgetedSpentWire = toMoneyWire(budgetedSpent, currency)!
 
   return {
     items,
@@ -234,8 +288,10 @@ export async function getPortfolioUtilization(
       totalProjects: projects.length,
       activeProjects,
       totalSpent,
+      unvaluedSettlementCount: spends.totals?.unvaluedSettlementCount ?? 0,
+      unassignedSettlementCount: spends.totals?.unassignedSettlementCount ?? 0,
       totalBudget,
-      utilizationPct: utilizationPct(totalSpent.amount, totalBudget?.amount ?? null),
+      utilizationPct: utilizationPct(budgetedSpentWire.amount, totalBudget?.amount ?? null),
     },
   }
 }
@@ -243,11 +299,9 @@ export async function getPortfolioUtilization(
 /**
  * Sprint burndown: total scope vs. completed-per-day, the whole series computed in Postgres.
  *
- * The sprint has no `startsAt` column, so the window opens on `createdAt` and closes on
- * `endsAt` (or today, for an open sprint). The per-day completion counts come from one
- * windowed query (`generate_series` × a running `count` of `DONE` issues by `updatedAt`); the
- * headline `totalScope` and `completed` are separate Prisma `count` aggregates. The only
- * client-side arithmetic is the straight ideal line (a linear guide, not a data aggregate).
+ * The window opens on the recorded `startsAt`; legacy sprints with no start date return an
+ * empty series. Per-day scope and completions use issue creation and recorded completion
+ * timestamps. Existing undated DONE issues are disclosed, never assigned a guessed date.
  */
 export async function getBurndown(
   prisma: PrismaClient,
@@ -258,36 +312,46 @@ export async function getBurndown(
   const sprint = await prisma.sprint.findFirst({ where: { id: sprintId, tenantId } })
   if (!sprint) throw new AppError(404, 'Sprint not found')
 
+  const startDate = sprint.startsAt?.toISOString().slice(0, 10) ?? null
+  const [totalScope, completed, undatedCompleted] = await Promise.all([
+    prisma.issue.count({ where: { tenantId, sprintId } }),
+    prisma.issue.count({ where: { tenantId, sprintId, status: 'DONE' } }),
+    prisma.issue.count({ where: { tenantId, sprintId, status: 'DONE', completedAt: null } }),
+  ])
+
+  if (!startDate) {
+    return { sprintId: sprint.id, sprintName: sprint.name, startDate: null, totalScope, completed, undatedCompleted, points: [] }
+  }
+
   const today = new Date().toISOString().slice(0, 10)
-  let start = sprint.createdAt.toISOString().slice(0, 10)
+  let start = startDate
   let end = sprint.endsAt ? sprint.endsAt.toISOString().slice(0, 10) : today
   if (end < start) end = start
   // Cap the returned series to `limit` days, keeping the most recent window.
   if (shiftDateUtc(end, -(query.limit - 1)) > start) start = shiftDateUtc(end, -(query.limit - 1))
 
-  const [totalScope, completed, series] = await Promise.all([
-    prisma.issue.count({ where: { tenantId, sprintId } }),
-    prisma.issue.count({ where: { tenantId, sprintId, status: 'DONE' } }),
-    prisma.$queryRaw<Array<{ date: string; completed: number }>>`
-      WITH window AS (
+  const series = await prisma.$queryRaw<Array<{ date: string; scope: number; completed: number }>>`
+      WITH days AS (
         SELECT generate_series(${start}::date, ${end}::date) AS day
       )
       SELECT
         to_char(w.day, 'YYYY-MM-DD') AS date,
-        (SELECT count(*) FROM "Issue"
-          WHERE "tenantId" = ${tenantId} AND "sprintId" = ${sprintId}
-            AND "status"::text = 'DONE'
-            AND ("updatedAt" AT TIME ZONE 'UTC')::date <= w.day) AS completed
-      FROM window w
+        (SELECT count(*)::int FROM "Issue" i
+          WHERE i."tenantId" = ${tenantId} AND i."sprintId" = ${sprintId}
+            AND (i."createdAt" AT TIME ZONE 'UTC')::date <= w.day) AS scope,
+        (SELECT count(*)::int FROM "Issue" i
+          WHERE i."tenantId" = ${tenantId} AND i."sprintId" = ${sprintId}
+            AND i."completedAt" IS NOT NULL
+            AND (i."completedAt" AT TIME ZONE 'UTC')::date <= w.day) AS completed
+      FROM days w
       ORDER BY w.day
-    `,
-  ])
+    `
 
   const n = series.length
-  const remainingFirst = n > 0 ? totalScope - (series[0]?.completed ?? 0) : totalScope
+  const remainingFirst = n > 0 ? Math.max(0, Number(series[0]?.scope ?? 0) - Number(series[0]?.completed ?? 0)) : 0
   const points = series.map((row, index) => {
-    const completedAtDay = row.completed
-    const remaining = totalScope - completedAtDay
+    const completedAtDay = Number(row.completed)
+    const remaining = Math.max(0, Number(row.scope) - completedAtDay)
     const ideal = n > 1 ? remainingFirst * (1 - index / (n - 1)) : remainingFirst
     return { date: row.date, remaining, ideal: Number(ideal.toFixed(1)) }
   })
@@ -295,10 +359,59 @@ export async function getBurndown(
   return {
     sprintId: sprint.id,
     sprintName: sprint.name,
+    startDate,
     totalScope,
     completed,
+    undatedCompleted,
     points,
   }
+}
+
+/** Compare completed story points in the two most recently ended, fully dated project sprints. */
+export async function getSprintVelocityComparison(
+  prisma: PrismaClient,
+  tenantId: string,
+  projectId: string,
+): Promise<SprintVelocityComparison> {
+  const project = await prisma.project.findFirst({ where: { id: projectId, tenantId }, select: { id: true } })
+  if (!project) throw new AppError(404, 'Project not found')
+  const sprints = await prisma.sprint.findMany({
+    where: { tenantId, projectId, status: 'COMPLETED', startsAt: { not: null }, endsAt: { not: null } },
+    orderBy: [{ endsAt: 'desc' }, { id: 'desc' }],
+    take: 2,
+    select: { id: true, name: true, startsAt: true, endsAt: true },
+  })
+  if (sprints.length === 0) return { projectId, current: null, previous: null, deltaStoryPoints: null, deltaPct: null }
+  const completionRows = await prisma.issue.groupBy({
+    by: ['sprintId'],
+    where: { tenantId, status: 'DONE', completedAt: { not: null }, sprintId: { in: sprints.map(sprint => sprint.id) } },
+    _count: { _all: true, storyPoints: true },
+    _sum: { storyPoints: true },
+  })
+  const completionBySprint = new Map(completionRows.map(row => [row.sprintId ?? '', row]))
+  const periods = sprints.map(sprint => {
+    const completion = completionBySprint.get(sprint.id)
+    const estimated = completion?._count.storyPoints ?? 0
+    const total = completion?._count._all ?? 0
+    return {
+      sprintId: sprint.id,
+      name: sprint.name,
+      startsAt: sprint.startsAt!.toISOString(),
+      endsAt: sprint.endsAt!.toISOString(),
+      completedStoryPoints: estimated > 0 ? completion?._sum.storyPoints ?? 0 : null,
+      estimatedCompletedIssues: estimated,
+      unestimatedCompletedIssues: total - estimated,
+    }
+  })
+  const current = periods[0] ?? null
+  const previous = periods[1] ?? null
+  const deltaStoryPoints = current?.completedStoryPoints != null && previous?.completedStoryPoints != null
+    ? current.completedStoryPoints - previous.completedStoryPoints
+    : null
+  const deltaPct = deltaStoryPoints != null && previous?.completedStoryPoints
+    ? Number(((deltaStoryPoints / previous.completedStoryPoints) * 100).toFixed(1))
+    : null
+  return { projectId, current, previous, deltaStoryPoints, deltaPct }
 }
 
 // ── Sprints ──────────────────────────────────────────────────────────────────────
@@ -308,13 +421,22 @@ type SprintWithCount = {
   name: string
   status: 'ACTIVE' | 'COMPLETED'
   projectId: string | null
+  startsAt: Date | null
   endsAt: Date | null
   createdAt: Date
   updatedAt: Date
   _count: { issues: number }
 }
 
-function mapSprint(sprint: SprintWithCount, doneCount: number): Sprint {
+type SprintVelocity = {
+  completedStoryPoints: number | null
+  estimatedCompletedIssues: number
+  unestimatedCompletedIssues: number
+}
+
+function mapSprint(sprint: SprintWithCount, doneCount: number, velocity: SprintVelocity = {
+  completedStoryPoints: null, estimatedCompletedIssues: 0, unestimatedCompletedIssues: 0,
+}): Sprint {
   const total = sprint._count.issues
   const done = Math.min(doneCount, total)
   return {
@@ -322,9 +444,11 @@ function mapSprint(sprint: SprintWithCount, doneCount: number): Sprint {
     name: sprint.name,
     status: sprint.status,
     projectId: sprint.projectId,
+    startsAt: sprint.startsAt?.toISOString() ?? null,
     endsAt: sprint.endsAt?.toISOString() ?? null,
     completionPct: total === 0 ? 0 : Math.round((done / total) * 100),
     issueCounts: { total, done },
+    velocity,
     createdAt: sprint.createdAt.toISOString(),
     updatedAt: sprint.updatedAt.toISOString(),
   }
@@ -332,7 +456,7 @@ function mapSprint(sprint: SprintWithCount, doneCount: number): Sprint {
 
 /** The Active Sprints board: every tenant sprint with its issue counts (DONE in SQL via groupBy). */
 export async function listSprints(prisma: PrismaClient, tenantId: string): Promise<Sprint[]> {
-  const [sprints, doneBySprint] = await Promise.all([
+  const [sprints, doneBySprint, velocityBySprint] = await Promise.all([
     prisma.sprint.findMany({
       where: { tenantId },
       orderBy: { endsAt: 'asc' },
@@ -343,21 +467,41 @@ export async function listSprints(prisma: PrismaClient, tenantId: string): Promi
       where: { tenantId, status: 'DONE' },
       _count: { id: true },
     }),
+    prisma.issue.groupBy({
+      by: ['sprintId'],
+      where: { tenantId, status: 'DONE', completedAt: { not: null }, sprintId: { not: null } },
+      _count: { _all: true, storyPoints: true },
+      _sum: { storyPoints: true },
+    }),
   ])
   const doneMap = new Map(doneBySprint.map(row => [row.sprintId ?? '', row._count.id]))
-  return sprints.map(sprint => mapSprint(sprint, doneMap.get(sprint.id) ?? 0))
+  const velocityMap = new Map(velocityBySprint.map(row => [row.sprintId ?? '', {
+    completedStoryPoints: row._count.storyPoints > 0 ? row._sum.storyPoints ?? 0 : null,
+    estimatedCompletedIssues: row._count.storyPoints,
+    unestimatedCompletedIssues: row._count._all - row._count.storyPoints,
+  }]))
+  return sprints.map(sprint => mapSprint(sprint, doneMap.get(sprint.id) ?? 0, velocityMap.get(sprint.id)))
 }
 
 export async function getSprint(prisma: PrismaClient, tenantId: string, id: string): Promise<Sprint> {
-  const [sprint, doneCount] = await Promise.all([
+  const [sprint, completion] = await Promise.all([
     prisma.sprint.findFirst({
       where: { id, tenantId },
       include: { _count: { select: { issues: true } } },
     }),
-    prisma.issue.count({ where: { tenantId, sprintId: id, status: 'DONE' } }),
+    prisma.issue.aggregate({
+      where: { tenantId, sprintId: id, status: 'DONE', completedAt: { not: null } },
+      _count: { _all: true, storyPoints: true },
+      _sum: { storyPoints: true },
+    }),
   ])
   if (!sprint) throw new AppError(404, 'Sprint not found')
-  return mapSprint(sprint, doneCount)
+  const doneCount = await prisma.issue.count({ where: { tenantId, sprintId: id, status: 'DONE' } })
+  return mapSprint(sprint, doneCount, {
+    completedStoryPoints: completion._count.storyPoints > 0 ? completion._sum.storyPoints ?? 0 : null,
+    estimatedCompletedIssues: completion._count.storyPoints,
+    unestimatedCompletedIssues: completion._count._all - completion._count.storyPoints,
+  })
 }
 
 async function assertProjectInTenant(
@@ -376,13 +520,17 @@ export async function createSprint(
   input: SprintWriteInput,
 ): Promise<Sprint> {
   await assertProjectInTenant(prisma, tenantId, input.projectId)
+  const startsAt = input.startsAt === null ? null : input.startsAt ? new Date(input.startsAt) : new Date()
+  const endsAt = input.endsAt ? new Date(input.endsAt) : null
+  if (startsAt && endsAt && endsAt < startsAt) throw new AppError(400, 'Sprint end must be on or after its start')
   const sprint = await prisma.sprint.create({
     data: {
       tenantId,
       name: input.name,
       ...(input.status !== undefined && { status: input.status }),
       projectId: input.projectId ?? null,
-      endsAt: input.endsAt ? new Date(input.endsAt) : null,
+      startsAt,
+      endsAt,
     },
     include: { _count: { select: { issues: true } } },
   })
@@ -398,6 +546,9 @@ export async function updateSprint(
   const existing = await prisma.sprint.findFirst({ where: { id, tenantId } })
   if (!existing) throw new AppError(404, 'Sprint not found')
   if (input.projectId !== undefined) await assertProjectInTenant(prisma, tenantId, input.projectId)
+  const startsAt = input.startsAt !== undefined ? (input.startsAt ? new Date(input.startsAt) : null) : existing.startsAt
+  const endsAt = input.endsAt !== undefined ? (input.endsAt ? new Date(input.endsAt) : null) : existing.endsAt
+  if (startsAt && endsAt && endsAt < startsAt) throw new AppError(400, 'Sprint end must be on or after its start')
 
   const sprint = await prisma.sprint.update({
     where: { id_tenantId: { id, tenantId } },
@@ -405,12 +556,24 @@ export async function updateSprint(
       ...(input.name !== undefined && { name: input.name }),
       ...(input.status !== undefined && { status: input.status }),
       ...(input.projectId !== undefined && { projectId: input.projectId }),
-      ...(input.endsAt !== undefined && { endsAt: input.endsAt ? new Date(input.endsAt) : null }),
+      ...(input.startsAt !== undefined && { startsAt }),
+      ...(input.endsAt !== undefined && { endsAt }),
     },
     include: { _count: { select: { issues: true } } },
   })
-  const doneCount = await prisma.issue.count({ where: { tenantId, sprintId: id, status: 'DONE' } })
-  return mapSprint(sprint, doneCount)
+  const [doneCount, completion] = await Promise.all([
+    prisma.issue.count({ where: { tenantId, sprintId: id, status: 'DONE' } }),
+    prisma.issue.aggregate({
+      where: { tenantId, sprintId: id, status: 'DONE', completedAt: { not: null } },
+      _count: { _all: true, storyPoints: true },
+      _sum: { storyPoints: true },
+    }),
+  ])
+  return mapSprint(sprint, doneCount, {
+    completedStoryPoints: completion._count.storyPoints > 0 ? completion._sum.storyPoints ?? 0 : null,
+    estimatedCompletedIssues: completion._count.storyPoints,
+    unestimatedCompletedIssues: completion._count._all - completion._count.storyPoints,
+  })
 }
 
 export async function deleteSprint(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
@@ -424,22 +587,28 @@ export async function deleteSprint(prisma: PrismaClient, tenantId: string, id: s
 function mapIssue(issue: {
   id: string
   sprintId: string | null
+  projectId: string | null
   key: string | null
   title: string
   tag: string | null
   priority: IssuePriority
   status: IssueStatus
+  storyPoints: number | null
+  completedAt: Date | null
   createdAt: Date
   updatedAt: Date
 }): Issue {
   return {
     id: issue.id,
     sprintId: issue.sprintId,
+    projectId: issue.projectId,
     key: issue.key,
     title: issue.title,
     tag: issue.tag,
     priority: issue.priority,
     status: issue.status,
+    storyPoints: issue.storyPoints,
+    completedAt: issue.completedAt?.toISOString() ?? null,
     createdAt: issue.createdAt.toISOString(),
     updatedAt: issue.updatedAt.toISOString(),
   }
@@ -459,23 +628,43 @@ async function assertSprintInTenant(
   prisma: PrismaClient,
   tenantId: string,
   sprintId: string | null | undefined,
-): Promise<void> {
-  if (!sprintId) return
-  const sprint = await prisma.sprint.findFirst({ where: { id: sprintId, tenantId } })
+): Promise<string | null> {
+  if (!sprintId) return null
+  const sprint = await prisma.sprint.findFirst({ where: { id: sprintId, tenantId }, select: { projectId: true } })
   if (!sprint) throw new AppError(400, 'Sprint does not belong to this workspace')
+  return sprint.projectId
+}
+
+async function assertIssueProjectInTenant(
+  prisma: PrismaClient,
+  tenantId: string,
+  projectId: string | null | undefined,
+): Promise<void> {
+  if (!projectId) return
+  const project = await prisma.project.findFirst({ where: { id: projectId, tenantId }, select: { id: true } })
+  if (!project) throw new AppError(400, 'Project does not belong to this workspace')
 }
 
 export async function createIssue(prisma: PrismaClient, tenantId: string, input: IssueWriteInput): Promise<Issue> {
-  await assertSprintInTenant(prisma, tenantId, input.sprintId)
+  const sprintProjectId = await assertSprintInTenant(prisma, tenantId, input.sprintId)
+  if (input.projectId && sprintProjectId && input.projectId !== sprintProjectId) {
+    throw new AppError(400, 'Issue project must match its sprint project')
+  }
+  const projectId = input.projectId ?? sprintProjectId
+  await assertIssueProjectInTenant(prisma, tenantId, projectId)
+  const status = input.status ?? 'TODO'
   const issue = await prisma.issue.create({
     data: {
       tenantId,
       sprintId: input.sprintId ?? null,
+      projectId,
       key: input.key ?? null,
       title: input.title,
       tag: input.tag ?? null,
       priority: input.priority ?? 'MEDIUM',
-      status: input.status ?? 'TODO',
+      status,
+      storyPoints: input.storyPoints ?? null,
+      ...(status === 'DONE' && { completedAt: new Date() }),
     },
   })
   return mapIssue(issue)
@@ -489,17 +678,27 @@ export async function updateIssue(
 ): Promise<Issue> {
   const existing = await prisma.issue.findFirst({ where: { id, tenantId } })
   if (!existing) throw new AppError(404, 'Issue not found')
-  if (input.sprintId !== undefined) await assertSprintInTenant(prisma, tenantId, input.sprintId)
+  const sprintId = input.sprintId !== undefined ? input.sprintId : existing.sprintId
+  const sprintProjectId = input.sprintId !== undefined ? await assertSprintInTenant(prisma, tenantId, input.sprintId) : null
+  const projectId = input.projectId !== undefined ? input.projectId : (sprintProjectId ?? existing.projectId)
+  if (sprintProjectId && projectId !== sprintProjectId) throw new AppError(400, 'Issue project must match its sprint project')
+  if (input.projectId !== undefined) await assertIssueProjectInTenant(prisma, tenantId, projectId)
+  const nextStatus = input.status ?? existing.status
 
   const issue = await prisma.issue.update({
     where: { id_tenantId: { id, tenantId } },
     data: {
-      ...(input.sprintId !== undefined && { sprintId: input.sprintId }),
+      ...(input.sprintId !== undefined && { sprintId }),
+      ...(input.projectId !== undefined || (input.sprintId !== undefined && sprintProjectId) ? { projectId } : {}),
       ...(input.key !== undefined && { key: input.key }),
       ...(input.title !== undefined && { title: input.title }),
       ...(input.tag !== undefined && { tag: input.tag }),
       ...(input.priority !== undefined && { priority: input.priority }),
       ...(input.status !== undefined && { status: input.status }),
+      ...(input.storyPoints !== undefined && { storyPoints: input.storyPoints }),
+      ...(input.status !== undefined && input.status !== existing.status && {
+        completedAt: nextStatus === 'DONE' ? new Date() : null,
+      }),
     },
   })
   return mapIssue(issue)
@@ -526,6 +725,7 @@ export async function createProject(
   const project = await prisma.project.create({
     data: {
       tenantId,
+      currency,
       name: input.name,
       status: input.status ?? 'PLANNING',
       departmentId: input.departmentId ?? null,
@@ -534,7 +734,7 @@ export async function createProject(
     },
     include: { sprints: { select: { id: true, name: true } } },
   })
-  return mapProject(project, currency)
+  return mapProject(project, currency, { projectId: project.id, spent: new Prisma.Decimal(0), unvaluedSettlementCount: 0, unassignedSettlementCount: 0 })
 }
 
 export async function updateProject(
@@ -562,13 +762,18 @@ export async function updateProject(
     },
     include: { sprints: { select: { id: true, name: true } } },
   })
-  return mapProject(project, currency)
+  const spend = await loadProjectSpend(prisma, tenantId)
+  return mapProject(project, currency, spend.get(project.id))
 }
 
 export async function deleteProject(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
   const existing = await prisma.project.findFirst({ where: { id, tenantId } })
   if (!existing) throw new AppError(404, 'Project not found')
-  await prisma.project.delete({ where: { id_tenantId: { id, tenantId } } })
+  await prisma.$transaction(async tx => {
+    await tx.payableInvoice.updateMany({ where: { tenantId, projectId: id }, data: { projectId: null } })
+    await tx.expense.updateMany({ where: { tenantId, projectId: id }, data: { projectId: null } })
+    await tx.project.delete({ where: { id_tenantId: { id, tenantId } } })
+  })
 }
 
 // ── Roadmap (the Gantt) ─────────────────────────────────────────────────────────

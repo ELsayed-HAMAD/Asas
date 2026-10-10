@@ -28,6 +28,7 @@ const FinanceOverview = lazy(() => import('./pages/dashboard/finance/FinanceOver
 const AccountsPayable = lazy(() => import('./pages/dashboard/finance/AccountsPayable'))
 const AccountsReceivable = lazy(() => import('./pages/dashboard/finance/AccountsReceivable'))
 const Expenses = lazy(() => import('./pages/dashboard/finance/Expenses'))
+const TrialBalance = lazy(() => import('./pages/dashboard/finance/TrialBalance'))
 const CRMOverview = lazy(() => import('./pages/dashboard/crm/CRMOverview'))
 const DealsPipeline = lazy(() => import('./pages/dashboard/crm/DealsPipeline'))
 const SalesPerformance = lazy(() => import('./pages/dashboard/crm/SalesPerformance'))
@@ -59,7 +60,7 @@ function NotFound() {
 const DASHBOARD_PATHS = [
   '/dashboard',
   '/dashboard/hr/employees', '/dashboard/hr/payroll', '/dashboard/hr/time-attendance', '/dashboard/hr/recruitment',
-  '/dashboard/finance', '/dashboard/finance/accounts-payable', '/dashboard/finance/accounts-receivable', '/dashboard/finance/expenses',
+  '/dashboard/finance', '/dashboard/finance/accounts-payable', '/dashboard/finance/accounts-receivable', '/dashboard/finance/expenses', '/dashboard/finance/trial-balance',
   '/dashboard/crm', '/dashboard/crm/deals', '/dashboard/crm/sales-performance', '/dashboard/crm/revenue-forecast',
   '/dashboard/inventory', '/dashboard/inventory/movements',
   '/dashboard/projects', '/dashboard/projects/sprints', '/dashboard/projects/roadmap',
@@ -78,6 +79,7 @@ const REAL_PAGES = {
   '/dashboard/finance/accounts-payable': AccountsPayable,
   '/dashboard/finance/accounts-receivable': AccountsReceivable,
   '/dashboard/finance/expenses': Expenses,
+  '/dashboard/finance/trial-balance': TrialBalance,
   '/dashboard/crm': CRMOverview,
   '/dashboard/crm/deals': DealsPipeline,
   '/dashboard/crm/sales-performance': SalesPerformance,

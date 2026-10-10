@@ -25,6 +25,7 @@ import type {
   RoadmapTaskUpdateInput,
   RoadmapTaskWriteInput,
   Sprint,
+  SprintVelocityComparison,
   SprintUpdateInput,
   SprintWriteInput,
 } from '@asas/contracts'
@@ -83,6 +84,10 @@ export function getBurndown(
   query: BurndownQuery,
 ): Promise<BurndownResponse> {
   return service.getBurndown(prisma, tenantId, sprintId, query)
+}
+
+export function getSprintVelocityComparison(prisma: PrismaClient, tenantId: string, projectId: string): Promise<SprintVelocityComparison> {
+  return service.getSprintVelocityComparison(prisma, tenantId, projectId)
 }
 
 // ── Sprints ─────────────────────────────────────────────────────────────────────

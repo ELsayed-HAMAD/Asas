@@ -13,11 +13,21 @@ import { paginated, paginationQuerySchema } from '../primitives/pagination.js'
 
 export const candidateSchema = z.object({
   id: idSchema,
+  employeeId: idSchema.nullable().default(null),
   name: z.string(),
   /** The role the candidate is being screened for (free text — job titles are not a fixed set). */
   role: z.string(),
   stage: candidateStageSchema,
+  stageEnteredAt: isoDateTimeSchema,
   timeInStage: z.string().nullable(),
+  activity: z.array(z.object({
+    id: idSchema,
+    action: z.string(),
+    description: z.string().nullable(),
+    fromStage: candidateStageSchema.nullable(),
+    toStage: candidateStageSchema.nullable(),
+    createdAt: isoDateTimeSchema,
+  })),
   appliedAt: isoDateTimeSchema,
   avatarUrl: z.string().nullable(),
   currentRole: z.string().nullable(),
@@ -50,6 +60,33 @@ export const candidateStageUpdateSchema = z.object({
 })
 export type CandidateStageUpdateInput = z.infer<typeof candidateStageUpdateSchema>
 
+export const candidateInterviewSchema = z.object({
+  id: idSchema,
+  candidateId: idSchema,
+  startsAt: isoDateTimeSchema,
+  durationMin: z.int().min(15).max(480),
+  stage: candidateStageSchema,
+  interviewer: boundedText(160).nullable(),
+  meetingUrl: z.url().refine(value => /^https?:\/\//i.test(value), 'Meeting links must use HTTPS or HTTP').nullable(),
+  notes: boundedText(2000).nullable(),
+  status: z.enum(['SCHEDULED', 'COMPLETED', 'CANCELLED']),
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
+})
+export type CandidateInterview = z.infer<typeof candidateInterviewSchema>
+
+export const candidateInterviewWriteSchema = z.object({
+  startsAt: isoDateTimeSchema,
+  durationMin: z.int().min(15).max(480).default(60),
+  stage: candidateStageSchema,
+  interviewer: boundedText(160).optional().nullable(),
+  meetingUrl: z.url().refine(value => /^https?:\/\//i.test(value), 'Meeting links must use HTTPS or HTTP').optional().nullable(),
+  notes: boundedText(2000).optional().nullable(),
+})
+export type CandidateInterviewWriteInput = z.infer<typeof candidateInterviewWriteSchema>
+
+export const candidateInterviewListSchema = z.array(candidateInterviewSchema)
+
 /** The presigned upload grant: where to PUT the CV file, and the rules of that upload. */
 export const resumeUploadUrlSchema = z.object({
   uploadUrl: z.string(),
@@ -67,5 +104,23 @@ export const candidateListQuerySchema = paginationQuerySchema.extend({
 })
 export type CandidateListQuery = z.infer<typeof candidateListQuerySchema>
 
-export const candidateListResponseSchema = paginated(candidateSchema, z.null())
+export const candidatePipelineSummarySchema = z.object({
+  stageCounts: z.record(candidateStageSchema, z.int().min(0)),
+  activeCandidates: z.int().min(0),
+  totalHired: z.int().min(0),
+  hiredThisPeriod: z.int().min(0),
+  hiredPreviousPeriod: z.int().min(0),
+  averageTimeToHireDays: z.number().nonnegative().nullable(),
+  averageTimeToHireThisPeriod: z.number().nonnegative().nullable(),
+  averageTimeToHirePreviousPeriod: z.number().nonnegative().nullable(),
+  offerAcceptanceRate: z.number().min(0).max(100).nullable(),
+  offerAcceptanceRateThisPeriod: z.number().min(0).max(100).nullable(),
+  offerAcceptanceRatePreviousPeriod: z.number().min(0).max(100).nullable(),
+  offersDecided: z.int().min(0),
+  offersDecidedThisPeriod: z.int().min(0),
+  offersDecidedPreviousPeriod: z.int().min(0),
+})
+export type CandidatePipelineSummary = z.infer<typeof candidatePipelineSummarySchema>
+
+export const candidateListResponseSchema = paginated(candidateSchema, candidatePipelineSummarySchema)
 export type CandidateListResponse = z.infer<typeof candidateListResponseSchema>

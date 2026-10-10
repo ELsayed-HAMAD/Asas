@@ -19,7 +19,12 @@ export const PERMISSIONS = {
   // HR / payroll — the plan's concrete Phase 2 example ("any MEMBER can approve payroll and
   // read every salary" today; this closes that gap).
   'payroll.approve': 'ADMIN',
+  'payroll.pay': 'ADMIN',
   'payroll.line.adjust': 'ADMIN',
+  // Run list/detail carry every line's base/gross/net and tenant-wide money totals, so they
+  // are salary reads. A MEMBER may still fetch their *own* payslip (checked in the route).
+  'payroll.read': 'ADMIN',
+  'payroll.run.create': 'ADMIN',
   'employee.salary.read': 'ADMIN',
   'employee.write': 'ADMIN',
   'employee.delete': 'ADMIN',
@@ -28,6 +33,7 @@ export const PERMISSIONS = {
   // to the recruitment pipeline, gated the same as the other module writes. Reads are open to
   // any MEMBER (requireRole in the route).
   'candidate.write': 'ADMIN',
+  'candidate.export': 'ADMIN',
 
   // Onboarding — the 3-path flow's writes. Applying the sample pack is a bulk write of the
   // whole business surface (HR, finance, CRM, projects, inventory), so it carries the same
@@ -38,6 +44,8 @@ export const PERMISSIONS = {
   'member.role.update': 'ADMIN',
   'member.remove': 'ADMIN',
   'organization.delete': 'OWNER',
+  // The audit trail names actors and targets across every module — an admin surface.
+  'auditLog.read': 'ADMIN',
 
   // CRM — creating deals and moving them (including stage changes) is a write to pipeline
   // money, so it follows the same ADMIN gate as the other module writes.
@@ -81,6 +89,7 @@ export type Permission = keyof typeof PERMISSIONS
 /** Actions attributable enough to belong in the append-only audit log once performed. */
 export const AUDITED_PERMISSIONS: ReadonlySet<Permission> = new Set([
   'payroll.approve',
+  'payroll.pay',
   'payroll.line.adjust',
   'employee.delete',
   'member.role.update',
