@@ -116,29 +116,6 @@ docker run -d --name asas-db -p 5432:5432 \
 
 ---
 
-## Environment Variables
-
-### API (`apps/api/.env`)
-
-| Variable | Required | Description | Example |
-|---|---|---|---|
-| `DATABASE_URL` | Yes | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/asas?schema=public` |
-| `AUTH_SECRET` | Yes | Secret for session signing (min 32 chars) | Generate with `openssl rand -base64 32` |
-| `PORT` | No | API server port (default `4000`) | `4000` |
-| `HOST` | No | API bind address (default `127.0.0.1`) | `127.0.0.1` |
-| `FRONTEND_ORIGIN` | No | Allowed CORS origins (comma-separated) | `http://localhost:5173,http://127.0.0.1:5173` |
-| `QUEUE_URL` | No | Postgres URL for pg-boss job queue. When empty, exports run inline. | Same as `DATABASE_URL` |
-
-### Frontend (`apps/web/.env`)
-
-| Variable | Required | Description | Example |
-|---|---|---|---|
-| `VITE_API_URL` | Yes | API base URL | `http://127.0.0.1:4000` |
-
-> ⚠️ `.env` files are gitignored. Only `.env.example` templates are committed.
-
----
-
 ## Useful Commands
 
 | Command | Purpose |
