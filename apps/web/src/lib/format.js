@@ -1,8 +1,8 @@
 /**
  * Formatting helpers for the web app.
  *
- * The frontend stays standalone of `@asas/domain`: wire formats are handled inline instead of
- * through the `Money` class.
+ * Currency scales come from `@asas/domain`, the same registry that defines API minor units.
+ * Intl supplies locale formatting only; it must not choose the wire amount's exponent.
  *
  * Two money wire forms exist in the API:
  *   - `{ amount: <integer minor units, e.g. cents>, currency: 'USD' }` — finance / CRM / projects
@@ -10,8 +10,12 @@
  * Both render through `formatMoney` below; no other client-side money math is permitted.
  */
 
+import { getCurrency } from '@asas/domain/money'
+
 let defaultCurrency = 'USD'
 let defaultLocale = 'en-US'
+let defaultTimeZone = 'UTC'
+let defaultDateFormat = 'MMM d, yyyy'
 
 export function setFormatDefaults(settings = {}) {
   if (settings.currency && /^[A-Z]{3}$/i.test(String(settings.currency))) {
@@ -20,10 +24,19 @@ export function setFormatDefaults(settings = {}) {
   if (settings.locale) {
     defaultLocale = settings.locale
   }
+  if (settings.timezone) {
+    try {
+      new Intl.DateTimeFormat(defaultLocale, { timeZone: settings.timezone })
+      defaultTimeZone = settings.timezone
+    } catch { /* Keep the last valid workspace timezone. */ }
+  }
+  if (['MMM d, yyyy', 'yyyy-MM-dd', 'dd/MM/yyyy'].includes(settings.dateFormat)) {
+    defaultDateFormat = settings.dateFormat
+  }
 }
 
 export function getFormatDefaults() {
-  return { currency: defaultCurrency, locale: defaultLocale }
+  return { currency: defaultCurrency, locale: defaultLocale, timeZone: defaultTimeZone, dateFormat: defaultDateFormat }
 }
 
 /** True when `value` is a `{ amount, currency }` wire object (minor units). */
@@ -38,25 +51,32 @@ function isMoneyWire(value) {
 }
 
 function currencyDigits(currency) {
-  try {
-    return new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits
-  } catch {
-    return 2
-  }
+  return getCurrency(currency).minorUnitDigits
 }
 
 export function moneyToMajor(value) {
   if (!isMoneyWire(value)) return Number(value) || 0
   const currency = value.currency || defaultCurrency
-  return value.amount / (10 ** currencyDigits(currency))
+  try {
+    if (!Number.isSafeInteger(value.amount)) return NaN
+    return value.amount / (10 ** currencyDigits(currency))
+  } catch {
+    return NaN
+  }
 }
 
 export function formatCompactMoney(value, currency = defaultCurrency, locale = defaultLocale) {
-  const number = Number(value)
-  if (!Number.isFinite(number)) return '—'
-  return new Intl.NumberFormat(locale, {
-    style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1,
-  }).format(number)
+  if (value == null) return '—'
+  try {
+    const code = getCurrency(isMoneyWire(value) ? value.currency : currency).code
+    const number = isMoneyWire(value) ? moneyToMajor(value) : Number(value)
+    if (!Number.isFinite(number)) return '—'
+    return new Intl.NumberFormat(locale, {
+      style: 'currency', currency: code, notation: 'compact', maximumFractionDigits: 1,
+    }).format(number)
+  } catch {
+    return '—'
+  }
 }
 
 /**
@@ -72,12 +92,15 @@ export function formatMoney(value, options = {}) {
 
   if (isMoneyWire(value)) {
     currencyCode = value.currency || currencyCode
-    // Wire amount is expressed in the ISO currency's minor units (JPY has none;
-    // KWD has three), not always cents.
-    numericValue = value.amount / (10 ** currencyDigits(currencyCode))
+    numericValue = moneyToMajor(value)
   } else {
     numericValue = Number(value)
-    if (Number.isNaN(numericValue)) return '—'
+  }
+  if (!Number.isFinite(numericValue)) return '—'
+  try {
+    currencyCode = getCurrency(currencyCode).code
+  } catch {
+    return '—'
   }
 
   const {
@@ -93,7 +116,7 @@ export function formatMoney(value, options = {}) {
       style: 'currency',
       currency: currencyCode,
       notation: compact ? 'compact' : 'standard',
-      minimumFractionDigits: minimumFractionDigits ?? (compact ? 0 : undefined),
+      minimumFractionDigits: minimumFractionDigits ?? (compact ? 0 : Math.min(currencyDigits(currencyCode), maximumFractionDigits ?? currencyDigits(currencyCode))),
       maximumFractionDigits: maximumFractionDigits ?? (compact ? 1 : currencyDigits(currencyCode)),
     }).format(numericValue)
 
@@ -123,9 +146,20 @@ export function formatPercent(value, options = {}) {
   }).format(Number(value) / 100)
 }
 
-export function formatDate(value, options = { dateStyle: 'medium' }, locale = defaultLocale) {
+function formatDatePattern(date, pattern, locale, timeZone) {
+  const month = pattern.includes('MMM') ? 'short' : '2-digit'
+  const parts = new Intl.DateTimeFormat(locale, { timeZone, year: 'numeric', month, day: '2-digit' }).formatToParts(date)
+  const values = Object.fromEntries(parts.filter(part => part.type !== 'literal').map(part => [part.type, part.value]))
+  const tokens = { yyyy: values.year, MMM: values.month, MM: values.month, M: String(Number(values.month)), dd: values.day, d: String(Number(values.day)) }
+  return pattern.replace(/yyyy|MMM|MM|dd|M|d/g, token => tokens[token])
+}
+
+export function formatDate(value, options, locale = defaultLocale, timeZone = defaultTimeZone) {
   if (!value) return '—'
-  const date = typeof value === 'string' ? new Date(value) : value
-  if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat(locale, options).format(date)
+  const dateOnly = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+  const date = dateOnly ? new Date(`${value}T00:00:00.000Z`) : typeof value === 'string' ? new Date(value) : value
+  if (Number.isNaN(date.getTime()) || (dateOnly && date.toISOString().slice(0, 10) !== value)) return '—'
+  const effectiveTimeZone = dateOnly ? 'UTC' : timeZone
+  if (options === undefined) return formatDatePattern(date, defaultDateFormat, locale, effectiveTimeZone)
+  return new Intl.DateTimeFormat(locale, { ...options, timeZone: options.timeZone ?? effectiveTimeZone }).format(date)
 }

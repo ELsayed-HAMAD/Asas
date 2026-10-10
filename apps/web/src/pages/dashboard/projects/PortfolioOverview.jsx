@@ -11,7 +11,7 @@ import { motion } from 'framer-motion';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { projectsApi } from '../../../lib/api/projects';
 import { queryKeys } from '../../../lib/queryKeys';
-import { formatMoney } from '../../../lib/format';
+import { formatDate, formatMoney } from '../../../lib/format';
 import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
 
@@ -54,6 +54,11 @@ export default function PortfolioOverview() {
   const { data: sprintsData } = useQuery({
     queryKey: queryKeys.projects.sprints.list({}),
     queryFn: projectsApi.getSprints,
+  });
+  const { data: velocityComparison } = useQuery({
+    queryKey: [...queryKeys.projects.sprints.list({}), 'velocity-comparison', selectedId],
+    queryFn: () => projectsApi.getSprintVelocityComparison(selectedId),
+    enabled: Boolean(selectedId),
   });
   const createProject = useMutation({
     mutationFn: () => projectsApi.createProject({ name: projectForm.name.trim(), budget: projectForm.budget || null }),
@@ -248,8 +253,9 @@ export default function PortfolioOverview() {
                     <p className="text-2xl font-black text-heading tracking-tight tabular-nums">{formatMoney(selectedProject.budget, { maximumFractionDigits: 0 })}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[11px] font-medium text-muted mb-1">Spent</p>
+            <p className="text-[11px] font-medium text-muted mb-1">Settled Spend</p>
                     <p className="text-2xl font-black text-accent tracking-tight tabular-nums">{formatMoney(selectedProject.spent, { maximumFractionDigits: 0 })}</p>
+            {(selectedProject.unvaluedSettlementCount > 0 || summary.unassignedSettlementCount > 0) && <p className="mt-2 text-xs text-muted">{selectedProject.unvaluedSettlementCount > 0 ? `${selectedProject.unvaluedSettlementCount} settlement${selectedProject.unvaluedSettlementCount === 1 ? '' : 's'} missing base currency value. ` : ''}{summary.unassignedSettlementCount > 0 ? `${summary.unassignedSettlementCount} settlement${summary.unassignedSettlementCount === 1 ? '' : 's'} not assigned to a project.` : ''}</p>}
                   </div>
                 </div>
 
@@ -272,6 +278,17 @@ export default function PortfolioOverview() {
               <div className="bg-surface-raised border border-border-default rounded-card-sm p-6 shadow-card">
                 <h3 className="text-[11px] font-bold text-muted uppercase tracking-widest mb-6">Sprints</h3>
 
+                {velocityComparison?.current && velocityComparison?.previous ? (
+                  <div className="mb-5 rounded-button bg-surface-muted p-3 text-xs text-body">
+                    <p className="font-semibold text-heading">Completed story points</p>
+                    <p className="mt-1">{velocityComparison.current.name}: {velocityComparison.current.completedStoryPoints ?? 'No estimates'} pts ({formatDate(velocityComparison.current.startsAt)} – {formatDate(velocityComparison.current.endsAt)})</p>
+                    <p>{velocityComparison.previous.name}: {velocityComparison.previous.completedStoryPoints ?? 'No estimates'} pts ({formatDate(velocityComparison.previous.startsAt)} – {formatDate(velocityComparison.previous.endsAt)})</p>
+                    <p className="mt-1 font-semibold">{velocityComparison.deltaStoryPoints == null ? 'Comparison unavailable: one or both sprints have no estimated completions.' : `${velocityComparison.deltaStoryPoints > 0 ? '+' : ''}${velocityComparison.deltaStoryPoints} pts${velocityComparison.deltaPct == null ? '' : ` (${velocityComparison.deltaPct > 0 ? '+' : ''}${velocityComparison.deltaPct}%)`}`}</p>
+                  </div>
+                ) : velocityComparison?.current || selectedSprints.length > 0 ? (
+                  <p className="mb-5 rounded-button bg-surface-muted p-3 text-xs text-muted">A comparison needs two completed sprints with recorded estimates.</p>
+                ) : null}
+
                 <div className="space-y-4">
                   {selectedSprints.length > 0 ? (
                     selectedSprints.map(sprint => (
@@ -280,7 +297,13 @@ export default function PortfolioOverview() {
                           <Clock size={18} className="text-accent" />
                           <span className="text-sm font-bold text-heading">{sprint.name}</span>
                         </div>
-                        <span className="text-sm font-medium text-muted">{sprint.completionPct}%</span>
+                        <div className="text-right">
+                          <span className="block text-sm font-medium text-muted">{sprint.completionPct}%</span>
+                          <span className="block text-[11px] text-caption" title={sprint.velocity.unestimatedCompletedIssues ? `${sprint.velocity.unestimatedCompletedIssues} completed issues have no estimate` : undefined}>
+                            {sprint.velocity.completedStoryPoints == null ? 'No estimates' : `${sprint.velocity.completedStoryPoints} pts completed`}
+                            {sprint.velocity.unestimatedCompletedIssues > 0 ? ` · ${sprint.velocity.unestimatedCompletedIssues} unestimated` : ''}
+                          </span>
+                        </div>
                       </div>
                     ))
                   ) : (

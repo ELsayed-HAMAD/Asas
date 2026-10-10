@@ -9,8 +9,11 @@ import { useQuery } from '@tanstack/react-query'
 import TopBarActions from '../../components/TopBarActions'
 import StatCard from '../../components/common/StatCard'
 import { dashboardApi } from '../../lib/api/dashboard'
+import { auditLogApi } from '../../lib/api/auditLog'
 import { queryKeys } from '../../lib/queryKeys'
 import { formatMoney, formatCompactMoney, moneyToMajor } from '../../lib/format'
+import { countActiveSprints } from '../../lib/projectSprint'
+import { downloadCsv } from '../../lib/csv'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -49,6 +52,10 @@ export default function DashboardOverview() {
     queryKey: [...queryKeys.finance.all(), 'overview'],
     queryFn: dashboardApi.getFinanceOverview,
   })
+  const payables = useQuery({
+    queryKey: queryKeys.finance.payables.list({ limit: 1 }),
+    queryFn: () => dashboardApi.listPayables({ limit: 1 }),
+  })
   const sprints = useQuery({
     queryKey: queryKeys.projects.sprints.list({}),
     queryFn: dashboardApi.getSprints,
@@ -69,42 +76,82 @@ export default function DashboardOverview() {
     queryKey: queryKeys.hr.attendance.all(),
     queryFn: dashboardApi.getAttendance,
   })
+  const auditLogs = useQuery({
+    queryKey: ['audit-logs', { limit: 5 }],
+    queryFn: () => auditLogApi.listAuditLogs({ limit: 5 }),
+  })
 
   // ── KPI cards: each value is a real server-side aggregate ──
   const headcount = employees.isLoading ? '…' : employees.isError ? '—' : employees.data?.summary?.totalHeadcount ?? 0
   const onLeaveCount = employees.data?.summary?.onLeaveCount ?? 0
+  const hiredThisMonth = employees.data?.summary?.hiredThisMonth ?? 0
   const openCount = crm.data?.pipeline?.openCount ?? 0
+  const previousOpenCount = crm.data?.pipeline?.openCountComparison?.previousCount
+  const openCountDelta = previousOpenCount == null ? null : openCount - previousOpenCount
   const openTotal = crm.data?.pipeline?.openTotal
+  const previousOpenTotal = crm.data?.pipeline?.openTotalComparison?.previousTotal
+  const openValueDelta = previousOpenTotal == null || openTotal == null
+    ? null
+    : { amount: openTotal.amount - previousOpenTotal.amount, currency: openTotal.currency }
   const payableOutstanding = finance.data?.payableOutstanding
+  const pastDuePayables = payables.data?.summary?.pastDueTotal
+  const dueIn7DaysPayables = payables.data?.summary?.dueIn7DaysTotal
+  const paidThisMonthTotal = payables.data?.summary?.paidThisMonthTotal
+  const paidThisMonthComparison = payables.data?.summary?.paidThisMonthComparison
+
+  const payablesChangeText = (() => {
+    if (pastDuePayables?.amount > 0) {
+      return `${formatMoney(pastDuePayables)} past due${dueIn7DaysPayables?.amount > 0 ? ` · ${formatMoney(dueIn7DaysPayables)} due in 7d` : ''}`
+    }
+    if (dueIn7DaysPayables?.amount > 0) {
+      return `${formatMoney(dueIn7DaysPayables)} due in 7 days`
+    }
+    if (paidThisMonthTotal && paidThisMonthComparison?.previousTotal) {
+      return `${formatMoney(paidThisMonthTotal)} paid MTD (vs ${formatMoney(paidThisMonthComparison.previousTotal)})`
+    }
+    return 'All current'
+  })()
+
   const sprintItems = sprints.data?.items ?? []
+  const activeSprintCount = countActiveSprints(sprintItems)
+  const completedSprintCount = sprintItems.filter(s => s.status === 'COMPLETED').length
+  const sprintChangeText = activeSprintCount > 0
+    ? `${activeSprintCount} active · ${completedSprintCount} completed across portfolio`
+    : completedSprintCount > 0
+    ? `No active sprint · ${completedSprintCount} completed`
+    : 'No sprints planned'
 
   const stats = [
     {
       label: 'Headcount',
       value: headcount.toString(),
-      change: onLeaveCount > 0 ? `${onLeaveCount} on leave` : 'All active',
-      trend: 'up',
+      change: hiredThisMonth > 0
+        ? `+${hiredThisMonth} this month${onLeaveCount > 0 ? ` · ${onLeaveCount} on leave` : ''}`
+        : onLeaveCount > 0 ? `${onLeaveCount} on leave` : 'All active',
+      trend: 'neutral',
       icon: Users,
     },
     {
       label: 'Open Pipeline Value',
       value: crm.isLoading ? '…' : crm.isError ? '—' : formatMoney(openTotal, { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-      change: `${openCount} open deals`,
+      change: openCountDelta == null
+        ? `${openCount} open deals · no historical comparison yet`
+        : `${openCount} open deals · ${openCountDelta > 0 ? '+' : ''}${openCountDelta} vs prior-month snapshot${openValueDelta == null ? '' : ` · ${formatMoney(openValueDelta)} value change`}`,
       trend: 'neutral',
       icon: TrendingUp,
     },
     {
       label: 'Payables Outstanding',
       value: finance.isLoading ? '…' : finance.isError ? '—' : formatMoney(payableOutstanding, { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-      change: 'Outstanding',
-      trend: 'down',
+      change: payablesChangeText,
+      trend: 'neutral',
       icon: CreditCard,
     },
     {
       label: 'Active Sprints',
-      value: sprints.isLoading ? '…' : sprints.isError ? '—' : sprintItems.length.toString(),
-      change: 'Running now',
-      trend: 'up',
+      value: sprints.isLoading ? '…' : sprints.isError ? '—' : activeSprintCount.toString(),
+      change: sprintChangeText,
+      trend: 'neutral',
       icon: Rocket,
     },
   ]
@@ -163,7 +210,6 @@ export default function DashboardOverview() {
   }
 
   function downloadReport() {
-    const quote = value => `"${String(value ?? '').replaceAll('"', '""')}"`
     const rows = [
       ['Dashboard report', `Calendar year ${selectedYear}`],
       ['Metric', 'Value'],
@@ -181,13 +227,7 @@ export default function DashboardOverview() {
       ['Requires attention', 'Detail', 'Amount / action'],
       ...attentionItems.map(item => [item.title, item.subtitle, item.amount]),
     ]
-    const csv = rows.map(row => row.map(quote).join(',')).join('\r\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `dashboard-${selectedYear}-${new Date().toISOString().slice(0, 10)}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
+    downloadCsv(rows, `dashboard-${selectedYear}-${new Date().toISOString().slice(0, 10)}.csv`)
   }
 
   return (
@@ -334,10 +374,31 @@ export default function DashboardOverview() {
               <h2 className="text-lg font-semibold text-heading">Activity Feed</h2>
             </div>
 
-            {/* No activity feed endpoint exists — an honest empty state instead of the old mock rows. */}
-            <div className="space-y-5">
-              <p className="text-sm text-muted">No recent activity</p>
-            </div>
+            {auditLogs.isLoading ? (
+              <div className="space-y-5">
+                <p className="text-sm text-muted">Loading activity...</p>
+              </div>
+            ) : auditLogs.isError ? (
+              <div className="space-y-5">
+                <p className="text-sm text-warning">Could not load activity.</p>
+              </div>
+            ) : auditLogs.data?.items?.length > 0 ? (
+              <div className="space-y-5">
+                {auditLogs.data.items.map((log) => (
+                  <div key={log.id} className="relative pl-4 border-l-2 border-border-faint">
+                    <div className="absolute w-2 h-2 rounded-full bg-accent -left-[5px] top-1.5" />
+                    <p className="text-sm text-heading">{log.action}</p>
+                    <p className="text-[11px] text-muted mt-1">
+                      {log.actorName} • {new Date(log.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-5">
+                <p className="text-sm text-muted">No recent activity</p>
+              </div>
+            )}
           </div>
 
         </div>

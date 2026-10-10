@@ -8,7 +8,8 @@
 import { z } from 'zod'
 import { integrationStatusSchema } from '../enums.generated.js'
 import { boundedText, idSchema, isoDateTimeSchema, shortTextSchema } from '../primitives/ids.js'
-import { currencyCodeSchema } from '../primitives/money.js'
+import { currencyCodeSchema, positiveDecimalStringSchema } from '../primitives/money.js'
+import { paginated, paginationQuerySchema } from '../primitives/pagination.js'
 
 // ── General ─────────────────────────────────────────────────────────────────
 
@@ -19,7 +20,9 @@ export const generalSettingsSchema = z.object({
   logoUrl: z.url().nullable(),
   timezone: boundedText(64),
   currency: currencyCodeSchema,
+  currencyLockedAt: isoDateTimeSchema.nullable(),
   dateFormat: boundedText(32),
+  overtimeThresholdHours: z.number().min(1).max(24),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 })
@@ -38,9 +41,39 @@ export const generalSettingsUpdateSchema = z.object({
   timezone: boundedText(64).optional(),
   currency: currencyCodeSchema.optional(),
   dateFormat: boundedText(32).optional(),
+  overtimeThresholdHours: z.number().min(1).max(24).optional(),
 })
 
 export type GeneralSettingsUpdateInput = z.infer<typeof generalSettingsUpdateSchema>
+
+// ── FX rates ─────────────────────────────────────────────────────────────────
+
+export const exchangeRateSchema = z.object({
+  id: idSchema,
+  currency: currencyCodeSchema,
+  baseCurrency: currencyCodeSchema,
+  rateToBase: positiveDecimalStringSchema,
+  effectiveAt: isoDateTimeSchema,
+  source: z.literal('MANUAL'),
+  reference: boundedText(200).nullable(),
+  createdById: z.string().min(1).max(128).nullable(),
+  createdAt: isoDateTimeSchema,
+})
+export const exchangeRateWriteSchema = z.object({
+  currency: currencyCodeSchema,
+  rateToBase: positiveDecimalStringSchema.max(25).refine(value => {
+    const [whole, fraction = ''] = value.split('.')
+    return whole!.length <= 12 && fraction.length <= 12
+  }, 'An FX rate must fit within 24 digits and 12 decimal places'),
+  effectiveAt: isoDateTimeSchema,
+  reference: boundedText(200).optional().nullable(),
+})
+export const exchangeRateListQuerySchema = paginationQuerySchema.extend({ currency: currencyCodeSchema.optional() })
+export const exchangeRateListResponseSchema = paginated(exchangeRateSchema, z.null())
+export type ExchangeRate = z.infer<typeof exchangeRateSchema>
+export type ExchangeRateWriteInput = z.infer<typeof exchangeRateWriteSchema>
+export type ExchangeRateListQuery = z.infer<typeof exchangeRateListQuerySchema>
+export type ExchangeRateListResponse = z.infer<typeof exchangeRateListResponseSchema>
 
 // ── Notifications ───────────────────────────────────────────────────────────
 

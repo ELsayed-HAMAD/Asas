@@ -8,6 +8,7 @@ import {
 import TopBarActions from '../../../components/TopBarActions'
 import QueryState from '../../../components/common/QueryState'
 import { hrApi } from '../../../lib/api/hr'
+import { auditLogApi } from '../../../lib/api/auditLog'
 import { queryKeys } from '../../../lib/queryKeys'
 import { formatMoney, formatDate } from '../../../lib/format'
 import { exportsApi } from '../../../lib/api/exports'
@@ -29,27 +30,47 @@ const STATUS_LABELS = {
   ON_LEAVE: 'On Leave',
 }
 
+// Stable fallback so effects/memos keyed on `employees` don't re-run every render.
+const EMPTY_EMPLOYEES = []
+
+// The API's Zod schemas reject empty strings for optional fields (`z.email()`, `min(1)`).
+
 export default function EmployeeDirectory() {
   const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState(null)
   const [selectedIds, setSelectedIds] = useState([])
   const [sortAscending, setSortAscending] = useState(true)
+  const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [departmentId, setDepartmentId] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
-  const [createForm, setCreateForm] = useState({ name: '', title: '', email: '', departmentId: '' })
+  const [createForm, setCreateForm] = useState({ name: '', title: '', email: '', departmentId: '', salary: '', salaryBasis: '', hiredAt: '', status: 'ACTIVE', band: '', equityOptions: '' })
   const [editOpen, setEditOpen] = useState(false)
-  const [editForm, setEditForm] = useState({ name: '', title: '', email: '', location: '' })
+  const [editForm, setEditForm] = useState({ name: '', title: '', email: '', location: '', departmentId: '', salary: '', salaryBasis: '', hiredAt: '', status: 'ACTIVE', band: '', equityOptions: '' })
   const [deleteOpen, setDeleteOpen] = useState(false)
   const { data: activeMemberRole } = useActiveMemberRole()
-  const canDelete = activeMemberRole === 'OWNER' || activeMemberRole === 'ADMIN'
+  const roleName = typeof activeMemberRole === 'string' ? activeMemberRole : activeMemberRole?.role
+  const canDelete = roleName === 'OWNER' || roleName === 'ADMIN'
   const exportMutation = useMutation({ mutationFn: () => exportsApi.createJob({ kind: 'employees' }) })
   const { data: departmentsData } = useQuery({
     queryKey: queryKeys.hr.departments.list(),
     queryFn: hrApi.getDepartments,
   })
   const createMutation = useMutation({
-    mutationFn: () => hrApi.createEmployee({ ...createForm, departmentId: createForm.departmentId || null }),
+    mutationFn: () => hrApi.createEmployee((function(form){ return {
+        ...form,
+        name: form.name || undefined,
+        title: form.title || undefined,
+        email: form.email || null,
+        location: form.location || null,
+        departmentId: form.departmentId || null,
+        salary: form.salary || null,
+        salaryBasis: form.salaryBasis || null,
+        hiredAt: form.hiredAt ? new Date(form.hiredAt).toISOString() : null,
+        status: form.status || 'ACTIVE',
+        band: form.band || null,
+        equityOptions: form.equityOptions !== '' ? parseInt(form.equityOptions, 10) : null
+      } })(createForm)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.hr.employees.all() })
       setCreateOpen(false)
@@ -57,7 +78,20 @@ export default function EmployeeDirectory() {
     },
   })
   const editMutation = useMutation({
-    mutationFn: () => hrApi.updateEmployee(selectedId, editForm),
+    mutationFn: () => hrApi.updateEmployee(selectedId, (function(form){ return {
+        ...form,
+        name: form.name || undefined,
+        title: form.title || undefined,
+        email: form.email || null,
+        location: form.location || null,
+        departmentId: form.departmentId || null,
+        salary: form.salary || null,
+        salaryBasis: form.salaryBasis || null,
+        hiredAt: form.hiredAt ? new Date(form.hiredAt).toISOString() : null,
+        status: form.status || 'ACTIVE',
+        band: form.band || null,
+        equityOptions: form.equityOptions !== '' ? parseInt(form.equityOptions, 10) : null
+      } })(editForm)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.hr.employees.all() })
       setEditOpen(false)
@@ -73,29 +107,34 @@ export default function EmployeeDirectory() {
   })
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: queryKeys.hr.employees.list({ search: search || undefined, departmentId: departmentId || undefined }),
-    queryFn: () => hrApi.listEmployees({ search: search || undefined, departmentId: departmentId || undefined, limit: 100 }),
+    queryKey: queryKeys.hr.employees.list({ page, limit: 25, search: search || undefined, departmentId: departmentId || undefined, sort: sortAscending ? 'NAME_ASC' : 'NAME_DESC' }),
+    queryFn: () => hrApi.listEmployees({ page, limit: 25, search: search || undefined, departmentId: departmentId || undefined, sort: sortAscending ? 'NAME_ASC' : 'NAME_DESC' }),
+  })
+  const auditLogs = useQuery({
+    queryKey: ['audit-logs', { targetType: 'Employee', targetId: selectedId }],
+    queryFn: () => auditLogApi.listAuditLogs({ targetType: 'Employee', targetId: selectedId }),
+    enabled: Boolean(selectedId),
   })
 
-  const employees = data?.items ?? []
-  const sortedEmployees = useMemo(() => [...employees].sort((a, b) => {
-    const order = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-    return sortAscending ? order : -order
-  }), [employees, sortAscending])
+  const employees = data?.items ?? EMPTY_EMPLOYEES
   const allSelected = employees.length > 0 && employees.every(employee => selectedIds.includes(employee.id))
   const stats = data?.summary ?? { totalHeadcount: 0, onLeaveCount: 0, openRoles: 0 }
 
   useEffect(() => {
     if (!employees.length) {
       setSelectedId(null)
-      setSelectedIds([])
+      setSelectedIds(current => (current.length ? [] : current))
       return
     }
-    setSelectedIds(current => current.filter(id => employees.some(emp => emp.id === id)))
     if (!selectedId || !employees.some(emp => emp.id === selectedId)) {
       setSelectedId(employees[0].id)
     }
   }, [employees, selectedId])
+
+  useEffect(() => {
+    const pages = data?.pagination?.pages ?? 0
+    if (pages > 0 && page > pages) setPage(pages)
+  }, [data?.pagination?.pages, page])
 
   const selected = useMemo(
     () => employees.find(emp => emp.id === selectedId) || null,
@@ -111,12 +150,12 @@ export default function EmployeeDirectory() {
             <input
               type="text"
               value={search}
-              onChange={event => setSearch(event.target.value)}
+              onChange={event => { setSearch(event.target.value); setPage(1) }}
               placeholder="Search employees..."
               className="pl-9 pr-12 py-2 text-sm border border-border-default rounded-input bg-surface-muted/50 w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
           </div>
-          <select value={departmentId} onChange={event => setDepartmentId(event.target.value)} aria-label="Filter by department" className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm hover:bg-surface-muted transition-colors bg-surface-raised">
+          <select value={departmentId} onChange={event => { setDepartmentId(event.target.value); setPage(1) }} aria-label="Filter by department" className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm hover:bg-surface-muted transition-colors bg-surface-raised">
             <option value="">Department: All</option>
             {(departmentsData?.items ?? departmentsData ?? []).map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
           </select>
@@ -164,7 +203,7 @@ export default function EmployeeDirectory() {
               <input type="checkbox" checked={allSelected} onChange={event => setSelectedIds(event.target.checked ? employees.map(employee => employee.id) : [])} aria-label="Select all employees on this page" className="w-4 h-4 rounded border-border-strong text-accent focus:ring-accent" />
               <span className="text-sm font-medium text-body-light">{selectedIds.length ? `${selectedIds.length} selected` : 'Select All'}</span>
             </div>
-            <button type="button" onClick={() => setSortAscending(value => !value)} aria-label={`Sort employee names ${sortAscending ? 'descending' : 'ascending'}`} className="text-sm font-medium text-body-light hover:text-heading">Name {sortAscending ? 'A-Z' : 'Z-A'} ↕</button>
+            <button type="button" onClick={() => { setSortAscending(value => !value); setPage(1) }} aria-label={`Sort employee names ${sortAscending ? 'descending' : 'ascending'}`} className="text-sm font-medium text-body-light hover:text-heading">Name {sortAscending ? 'A-Z' : 'Z-A'} ↕</button>
           </div>
 
           <QueryState
@@ -186,7 +225,7 @@ export default function EmployeeDirectory() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
-                {sortedEmployees.map(emp => {
+                {employees.map(emp => {
                   const isSelected = selectedId === emp.id
                   return (
                     <tr
@@ -225,6 +264,14 @@ export default function EmployeeDirectory() {
               </tbody>
             </table>
           </QueryState>
+          {data?.pagination && <div className="flex items-center justify-between px-6 py-3 border-t border-border-default text-xs text-muted">
+            <span>Showing {data.pagination.total === 0 ? 0 : (page - 1) * data.pagination.limit + 1}–{Math.min(page * data.pagination.limit, data.pagination.total)} of {data.pagination.total}</span>
+            <div className="flex items-center gap-2">
+              <button type="button" disabled={page <= 1} onClick={() => setPage(current => current - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
+              <span>Page {data.pagination.pages === 0 ? 0 : page} of {data.pagination.pages}</span>
+              <button type="button" disabled={page >= data.pagination.pages} onClick={() => setPage(current => current + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+            </div>
+          </div>}
         </div>
 
         <div className="w-[420px] bg-surface-raised border-l border-border-default overflow-y-auto p-6 flex-shrink-0 space-y-6">
@@ -236,7 +283,7 @@ export default function EmployeeDirectory() {
             <>
               <div className="border border-border-default rounded-card-sm p-6 relative">
                 <div className="absolute top-4 right-4 flex gap-2">
-                  <button type="button" onClick={() => { setEditForm({ name: selected.name || '', title: selected.title || '', email: selected.email || '', location: selected.location || '' }); setEditOpen(true) }} className="p-1.5 border border-border-default rounded-input text-caption hover:text-body-light hover:bg-surface-muted transition-colors" aria-label="Edit profile">
+                  <button type="button" onClick={() => { setEditForm({ name: selected.name || '', title: selected.title || '', email: selected.email || '', location: selected.location || '', departmentId: selected.departmentId || '', salary: selected.salary || '', salaryBasis: selected.salaryBasis || '', hiredAt: selected.hiredAt ? selected.hiredAt.split('T')[0] : '', status: selected.status || 'ACTIVE', band: selected.band || '', equityOptions: selected.equityOptions ?? '' }); setEditOpen(true) }} className="p-1.5 border border-border-default rounded-input text-caption hover:text-body-light hover:bg-surface-muted transition-colors" aria-label="Edit profile">
                     <Pencil size={14} />
                   </button>
                   <button type="button" disabled={!canDelete} title={canDelete ? 'Delete employee' : 'Requires the ADMIN role'} onClick={() => setDeleteOpen(true)} className="p-1.5 border border-border-default rounded-input text-danger hover:bg-danger-light transition-colors disabled:opacity-40" aria-label="Delete employee">
@@ -351,7 +398,25 @@ export default function EmployeeDirectory() {
                   <History size={14} />
                   <span className="text-xs font-semibold">Recent Activity</span>
                 </div>
-                <p className="text-sm text-muted">Activity feed will appear here as HR events are recorded.</p>
+                {auditLogs.isLoading ? (
+                  <p className="text-sm text-muted">Loading activity...</p>
+                ) : auditLogs.isError ? (
+                  <p className="text-sm text-warning">Could not load activity.</p>
+                ) : auditLogs.data?.items?.length > 0 ? (
+                  <div className="space-y-4">
+                    {auditLogs.data.items.map((log) => (
+                      <div key={log.id} className="relative pl-4 border-l-2 border-border-faint">
+                        <div className="absolute w-2 h-2 rounded-full bg-accent -left-[5px] top-1.5" />
+                        <p className="text-sm text-heading">{log.action}</p>
+                        <p className="text-[11px] text-muted mt-1">
+                          {log.actorName} • {new Date(log.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted">No recent activity.</p>
+                )}
               </div>
             </>
           )}
@@ -367,6 +432,42 @@ export default function EmployeeDirectory() {
         <div className="space-y-4">
           {['name', 'title', 'email'].map(field => <label key={field} className="block text-sm font-medium text-body"><span className="mb-1 block capitalize">{field}</span><input type={field === 'email' ? 'email' : 'text'} required={field !== 'email'} value={createForm[field]} onChange={event => setCreateForm(current => ({ ...current, [field]: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" /></label>)}
           <label className="block text-sm font-medium text-body"><span className="mb-1 block">Department</span><select value={createForm.departmentId} onChange={event => setCreateForm(current => ({ ...current, departmentId: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2"><option value="">No department</option>{(departmentsData?.items ?? departmentsData ?? []).map(department => <option key={department.id} value={department.id}>{department.name}</option>)}</select></label>
+
+          <div className="grid grid-cols-2 gap-4">
+            <label className="block text-sm font-medium text-body">
+              <span className="mb-1 block">Salary</span>
+              <input type="number" step="0.01" value={createForm.salary} onChange={e => setCreateForm(c => ({ ...c, salary: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" />
+            </label>
+            <label className="block text-sm font-medium text-body">
+              <span className="mb-1 block">Basis</span>
+              <select value={createForm.salaryBasis} onChange={e => setCreateForm(c => ({ ...c, salaryBasis: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2">
+                <option value="">None</option>
+                <option value="ANNUAL">Annual</option>
+                <option value="MONTHLY">Monthly</option>
+              </select>
+            </label>
+            <label className="block text-sm font-medium text-body">
+              <span className="mb-1 block">Hire Date</span>
+              <input type="date" value={createForm.hiredAt} onChange={e => setCreateForm(c => ({ ...c, hiredAt: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" />
+            </label>
+            <label className="block text-sm font-medium text-body">
+              <span className="mb-1 block">Status</span>
+              <select value={createForm.status} onChange={e => setCreateForm(c => ({ ...c, status: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2">
+                <option value="ACTIVE">Active</option>
+                <option value="ON_LEAVE">On Leave</option>
+                <option value="ARCHIVED">Archived</option>
+              </select>
+            </label>
+            <label className="block text-sm font-medium text-body">
+              <span className="mb-1 block">Band</span>
+              <input type="text" value={createForm.band} onChange={e => setCreateForm(c => ({ ...c, band: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" />
+            </label>
+            <label className="block text-sm font-medium text-body">
+              <span className="mb-1 block">Equity</span>
+              <input type="number" value={createForm.equityOptions} onChange={e => setCreateForm(c => ({ ...c, equityOptions: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" />
+            </label>
+          </div>
+
         </div>
       </FormDialog>
       <ConfirmDialog open={deleteOpen} onClose={() => setDeleteOpen(false)} onConfirm={() => deleteMutation.mutate()} title="Delete employee?" description={`This permanently removes ${selected?.name || 'this employee'} and associated records.`} confirmLabel="Delete employee" busy={deleteMutation.isPending} danger />

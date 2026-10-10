@@ -31,6 +31,30 @@ function makeRequest(): FastifyRequest {
 }
 
 describe('errorHandler', () => {
+  it.each(['P2004', 'P2010'])('maps a trusted currency guard from %s to a safe conflict', code => {
+    const reply = makeReply()
+    const error = Object.assign(new Error('private SQL metadata'), {
+      name: 'PrismaClientKnownRequestError', code,
+      meta: { database_error: 'ASAS_CURRENCY_LOCKED: private details', message: 'ASAS_CURRENCY_CONFLICT: private details' },
+    })
+    errorHandler(error, makeRequest(), reply)
+    expect(reply.statusCode).toBe(409)
+    expect((reply.body as { error: { message: string } }).error.message).toContain('FX conversion')
+    expect((reply.body as { error: { message: string } }).error.message).not.toContain('private')
+  })
+  it('does not classify unrelated database constraint errors as currency conflicts', () => {
+    const reply = makeReply()
+    errorHandler(Object.assign(new Error('private metadata'), { name: 'PrismaClientKnownRequestError', code: 'P2004', meta: { database_error: 'Unrelated constraint' } }), makeRequest(), reply)
+    expect(reply.statusCode).toBe(500)
+    expect((reply.body as { error: { message: string } }).error.message).toBe('An internal server error occurred')
+  })
+  it.each([['P2002', 409], ['P2025', 404], ['P2034', 409]])('maps %s without leaking database details', (code, status) => {
+    const reply = makeReply()
+    const error = Object.assign(new Error('private database metadata'), { name: 'PrismaClientKnownRequestError', code })
+    errorHandler(error, makeRequest(), reply)
+    expect(reply.statusCode).toBe(status)
+    expect((reply.body as { error: { message: string } }).error.message).not.toContain('private')
+  })
   it('masks 5xx messages so internals never reach the client', () => {
     const reply = makeReply()
     const error = Object.assign(new Error('Postgres error: column "secret" of relation "users"'), {

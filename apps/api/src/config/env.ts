@@ -21,6 +21,11 @@ export interface AsasEnv {
    * it runs inline in-process. Default empty — local dev, tests, and CI never need a broker.
    */
   queueUrl: string
+  /**
+   * `ENABLE_API_DOCS=true` mounts the Swagger UI (`/docs`) even in production. Outside
+   * production the docs are always mounted.
+   */
+  enableApiDocs: boolean
 }
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
@@ -35,6 +40,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
     nodeEnv,
     isProduction: nodeEnv === 'production',
     queueUrl: source.QUEUE_URL ?? '',
+    enableApiDocs: source.ENABLE_API_DOCS === 'true',
   }
 }
 

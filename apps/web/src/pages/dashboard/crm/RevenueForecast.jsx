@@ -11,17 +11,23 @@ import {
   AlertTriangle,
   TrendingDown,
   Info,
-  Loader2
+  Loader2,
+  Target,
+  Trash2,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer
 } from 'recharts'
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { crmApi } from '../../../lib/api/crm';
 import { queryKeys } from '../../../lib/queryKeys';
 import TopBarActions from '../../../components/TopBarActions';
 import { moneyToMajor, formatCompactMoney } from '../../../lib/format';
+import { downloadCsv } from '../../../lib/csv';
+import { useActiveMemberRole } from '../../../lib/authClient';
+import FormDialog from '../../../components/common/FormDialog';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 const toMajor = (money) => (money == null ? 0 : moneyToMajor(money));
 
@@ -29,6 +35,13 @@ export default function RevenueForecast() {
   const [search, setSearch] = useState('')
   const [showAllReps, setShowAllReps] = useState(false)
   const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()))
+  const [quotaDialogOpen, setQuotaDialogOpen] = useState(false)
+  const [quotaEditingId, setQuotaEditingId] = useState('')
+  const [quotaForm, setQuotaForm] = useState({ repName: '', period: selectedYear, quota: '' })
+  const [quotaToDelete, setQuotaToDelete] = useState(null)
+  const queryClient = useQueryClient()
+  const { data: activeMemberRole } = useActiveMemberRole()
+  const canManageQuotas = activeMemberRole === 'OWNER' || activeMemberRole === 'ADMIN'
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.crm.forecast(selectedYear),
     queryFn: () => crmApi.getForecast(selectedYear),
@@ -40,6 +53,48 @@ export default function RevenueForecast() {
     queryKey: queryKeys.crm.salesPerformance(selectedYear),
     queryFn: () => crmApi.getSalesPerformance(selectedYear),
   });
+
+  const saveQuota = useMutation({
+    mutationFn: () => {
+      const input = { repName: quotaForm.repName.trim(), period: quotaForm.period.trim(), quota: quotaForm.quota.trim() }
+      return quotaEditingId ? crmApi.updateQuota(quotaEditingId, input) : crmApi.createQuota(input)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.crm.all() })
+      setQuotaDialogOpen(false)
+      setQuotaEditingId('')
+    },
+  })
+  const deleteQuota = useMutation({
+    mutationFn: () => crmApi.deleteQuota(quotaToDelete.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.crm.all() })
+      setQuotaToDelete(null)
+      setQuotaEditingId('')
+      setQuotaForm({ repName: '', period: selectedYear, quota: '' })
+    },
+    onError: () => setQuotaToDelete(null),
+  })
+
+  const openQuotaManager = () => {
+    setQuotaEditingId('')
+    setQuotaForm({ repName: '', period: selectedYear, quota: '' })
+    setQuotaDialogOpen(true)
+  }
+  const selectQuota = id => {
+    setQuotaEditingId(id)
+    const quota = data?.quotas?.find(item => item.id === id)
+    setQuotaForm(quota ? {
+      repName: quota.repName,
+      period: quota.period,
+      quota: quota.quota?.currency === data.baseCurrency ? String(moneyToMajor(quota.quota)) : '',
+    } : { repName: '', period: selectedYear, quota: '' })
+    saveQuota.reset()
+  }
+  const submitQuota = () => {
+    if (!quotaForm.repName.trim() || !quotaForm.period.trim() || !quotaForm.quota.trim()) return
+    saveQuota.mutate()
+  }
 
   if (isLoading) {
     return (
@@ -66,8 +121,9 @@ export default function RevenueForecast() {
   const wonMajor = toMajor(closedWon);
   const wonPctToQuota = quotaMajor > 0 && closedWon != null ? (wonMajor / quotaMajor) * 100 : null;
 
-  const committedTotal = toMajor(summary.totalCommit)
-  const bestCaseTotal = toMajor(summary.totalBestCase)
+  const committedTotal = toMajor(summary.dealCommit)
+  const bestCaseTotal = toMajor(summary.dealBestCase)
+  const weightedTotal = toMajor(summary.weightedPipeline)
 
   // Pipeline coverage — the server's `quotaAttainmentPct` is exactly totalPipeline ÷ totalQuota
   // (a percentage), so coverage in "×" is that value / 100.
@@ -93,24 +149,16 @@ export default function RevenueForecast() {
   const expectedShortfall = quotaMajor > 0 && closedWon != null ? Math.max(0, quotaMajor - wonMajor) : null;
 
   // Quota row per rep, joined by repName (the only rep identity forecastByRep carries).
-  const quotaByName = (name) => quotas.find((q) => q.repName === name);
   const availableYears = [...new Set([selectedYear, ...(data.availableYears || [])])].sort((a, b) => b.localeCompare(a))
   const formatCurrency = (num) => formatCompactMoney(num, currency)
   const visibleReps = forecastByRep.filter(rep => rep.repName.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
   const displayedReps = showAllReps || search.trim() ? visibleReps : visibleReps.slice(0, 5)
   const exportCsv = () => {
-    const quote = value => `"${String(value ?? '').replaceAll('"', '""')}"`
     const rows = [
       ['Rep', 'Period', `Closed (${currency})`, `Commit (${currency})`, `Best Case (${currency})`, 'Quota attainment (%)'],
       ...visibleReps.map(rep => [rep.repName, rep.period, toMajor(rep.closed), toMajor(rep.commit), toMajor(rep.bestCase), rep.quotaPct]),
     ]
-    const csv = rows.map(row => row.map(quote).join(',')).join('\r\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `revenue-forecast-${new Date().toISOString().slice(0, 10)}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
+    downloadCsv(rows, `revenue-forecast-${new Date().toISOString().slice(0, 10)}.csv`)
   }
   const shareForecast = async () => {
     const text = `Revenue forecast: ${formatCurrency(committedTotal)} committed, ${formatCurrency(bestCaseTotal)} best case.`
@@ -147,6 +195,9 @@ export default function RevenueForecast() {
           <button onClick={exportCsv} aria-label="Download forecast CSV" title="Download forecast CSV" className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors">
             <Download size={18} />
           </button>
+          {canManageQuotas && <button type="button" onClick={openQuotaManager} className="flex items-center gap-2 border border-gray-200 bg-white px-3 py-1.5 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+            <Target size={14} /> Manage Quotas
+          </button>}
 
           <button onClick={shareForecast} className="flex items-center gap-2 bg-black text-white px-4 py-1.5 rounded-md text-sm font-semibold hover:bg-gray-800 transition-colors shadow-sm">
             <Share2 size={14} />
@@ -156,6 +207,10 @@ export default function RevenueForecast() {
       </TopBarActions>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
+
+        {summary.excludedQuotaCount > 0 && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-900">
+          {summary.excludedQuotaCount} quota row(s) with a nonannual period or unknown/foreign currency are excluded from annual base-currency totals.
+        </div>}
 
         {/* ── KPIs Grid ── */}
         <div className="grid grid-cols-4 gap-4">
@@ -219,6 +274,10 @@ export default function RevenueForecast() {
               <span className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium">
                 <Info size={12} className="text-gray-400" />
                 {coverage == null ? 'Set a quota to measure coverage' : 'Open pipeline ÷ quota'}
+              </span>
+              <span className="block text-[10px] text-gray-500 font-medium">
+                Weighted pipeline: {formatCurrency(weightedTotal)}
+                {summary.unweightedDealCount > 0 && ` · ${summary.unweightedDealCount} deal(s), ${formatCurrency(toMajor(summary.unweightedPipeline))}, excluded (missing/invalid probability)`}
               </span>
             </div>
           </div>
@@ -297,7 +356,7 @@ export default function RevenueForecast() {
                   </tr>
                 ) : (
                   displayedReps.map((rep) => {
-                    const quotaRow = quotaByName(rep.repName);
+                    const quotaRow = quotas.find(q => q.repName === rep.repName && q.period === rep.period && q.quota?.currency === currency);
                     const quotaVal = quotaRow ? toMajor(quotaRow.quota) : null;
                     const repQuotaPct = rep.quotaPct != null ? rep.quotaPct : (quotaVal && toMajor(rep.closed) > 0 ? Math.min(100, (toMajor(rep.closed) / quotaVal) * 100) : null);
                     return (
@@ -362,6 +421,46 @@ export default function RevenueForecast() {
 
         </div>
       </div>
+      {canManageQuotas && <FormDialog
+        open={quotaDialogOpen}
+        onClose={() => { setQuotaDialogOpen(false); saveQuota.reset() }}
+        title={quotaEditingId ? 'Edit sales quota' : 'Add sales quota'}
+        subtitle={`Workspace base currency: ${data.baseCurrency}`}
+        confirmLabel={quotaEditingId ? 'Save quota' : 'Create quota'}
+        busy={saveQuota.isPending}
+        onConfirm={submitQuota}
+      >
+        <div className="space-y-4">
+          <div className="max-h-40 space-y-2 overflow-y-auto border-b border-gray-200 pb-3">
+            <p className="text-xs font-semibold uppercase text-gray-500">Existing quotas</p>
+            {quotas.length === 0 ? <p className="text-sm text-gray-500">No quotas recorded for this year.</p> : quotas.map(quota => <div key={quota.id} className="flex items-center justify-between gap-3 text-sm">
+              <button type="button" onClick={() => selectQuota(quota.id)} className="min-w-0 flex-1 truncate text-left text-blue-700 hover:underline">{quota.repName} · {quota.period} · {quota.quota ? formatCompactMoney(toMajor(quota.quota), quota.quota.currency) : 'Currency unknown'}</button>
+              <button type="button" onClick={() => setQuotaToDelete(quota)} aria-label={`Delete quota for ${quota.repName}`} className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-red-600"><Trash2 size={14} /></button>
+            </div>)}
+          </div>
+          <label className="block text-sm font-medium text-gray-700">Sales representative
+            <input value={quotaForm.repName} onChange={event => setQuotaForm(value => ({ ...value, repName: event.target.value }))} maxLength={160} required className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+          </label>
+          <label className="block text-sm font-medium text-gray-700">Period
+            <input value={quotaForm.period} onChange={event => setQuotaForm(value => ({ ...value, period: event.target.value }))} placeholder="2026, 2026-Q1, or 2026-01" required className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+          </label>
+          <label className="block text-sm font-medium text-gray-700">Quota amount ({data.baseCurrency})
+            <input type="number" min="0" step="0.01" value={quotaForm.quota} onChange={event => setQuotaForm(value => ({ ...value, quota: event.target.value }))} required className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+          </label>
+          <p className="text-xs text-gray-500">Annual periods contribute to the annual quota total. Quarter and month quotas remain available for their matching period. Legacy quotas with unknown or different currency are excluded until edited and saved in the workspace base currency.</p>
+          {saveQuota.isError && <p role="alert" className="text-sm text-red-600">{saveQuota.error?.message || 'Could not save quota.'}</p>}
+        </div>
+      </FormDialog>}
+      {canManageQuotas && <ConfirmDialog
+        open={Boolean(quotaToDelete)}
+        onClose={() => setQuotaToDelete(null)}
+        onConfirm={() => deleteQuota.mutate()}
+        title="Delete sales quota?"
+        description={quotaToDelete ? `This removes the ${quotaToDelete.period} quota for ${quotaToDelete.repName}.` : ''}
+        confirmLabel="Delete quota"
+        busy={deleteQuota.isPending}
+        danger
+      />}
     </div>
   );
 }

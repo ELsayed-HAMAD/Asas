@@ -1,7 +1,9 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   generateEnumsModule,
   locateSchema,
+  parsePrismaEnums,
   readGeneratedFile,
 } from '../scripts/prisma-enums.js'
 import {
@@ -43,6 +45,7 @@ describe('Generated Prisma Enums Contract', () => {
       'PENDING',
       'APPROVED',
       'PAID',
+      'VOID',
     ])
     expect(leaveTypeSchema.options).toEqual(['VACATION', 'SICK', 'PERSONAL'])
     expect(expenseCategorySchema.options).toContain('OFFICE_SUPPLIES')
@@ -50,7 +53,8 @@ describe('Generated Prisma Enums Contract', () => {
   })
 
   it('provides a complete registry object in prismaEnums', () => {
-    expect(Object.keys(prismaEnums).length).toBe(26)
+    const expected = Object.fromEntries(parsePrismaEnums(readFileSync(locateSchema(), 'utf8')).map(({ name, values }) => [name, values]))
+    expect(prismaEnums).toEqual(expected)
     expect(prismaEnums.UserRole).toEqual(['OWNER', 'ADMIN', 'MEMBER'])
   })
 })

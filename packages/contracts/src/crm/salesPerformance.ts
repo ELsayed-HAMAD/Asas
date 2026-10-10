@@ -2,7 +2,7 @@
  * CRM sales performance — `GET /crm/sales-performance`.
  *
  * `monthlyClosedWon` is the real per-calendar-month aggregate over `Deal` rows whose `stage` is
- * `CLOSED_WON` and whose `closeDate` is set — grouped in SQL, not resampled. `byRep` is the
+ * `CLOSED_WON` and whose actual `closedAt` is recorded — grouped in SQL, not resampled. `byRep` is the
  * same deals grouped by owner. Nothing here is a projection of future months.
  */
 import { z } from 'zod'
@@ -10,7 +10,7 @@ import { idSchema } from '../primitives/ids.js'
 import { moneySchema } from '../primitives/money.js'
 
 export const monthlyClosedWonSchema = z.object({
-  /** `YYYY-MM` of the deals' stored `closeDate`. */
+  /** `YYYY-MM` of the deals' recorded actual closure. */
   month: z.string().length(7),
   count: z.int().min(0),
   /** Total closed-won value that month, minor units. */
@@ -48,9 +48,13 @@ export const weeklyActivitySchema = z.object({
 })
 
 export const salesPerformanceResponseSchema = z.object({
-  /** Calendar year used for the year-to-date closed-won total. */
+  /** Calendar year for closed outcomes; open pipeline remains a current snapshot. */
   year: z.string().regex(/^\d{4}$/),
   yearWonTotal: moneySchema,
+  /** Prior calendar-year closed-won value, based only on recorded actual closure dates. */
+  previousYearWonTotal: moneySchema,
+  /** Legacy closed deals with unknown actual closure, excluded from dated outcomes. */
+  undatedClosedCount: z.int().nonnegative(),
   /** Closed-won by month, ascending. Months with no closed-won deals are simply absent. */
   monthlyClosedWon: z.array(monthlyClosedWonSchema),
   weeklyActivity: z.array(weeklyActivitySchema),

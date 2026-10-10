@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Money } from '../money/money.js'
-import { computeDeductions, computeGrossPay, computeNetPay, computePayrollLine, computeTaxLines } from './payroll.js'
+import { computeDeductions, computeGrossPay, computeNetPay, computePayrollLine, computeTaxLines, sumPayrollTaxRates } from './payroll.js'
 
 const STANDARD_RATES = [
   { label: 'Federal Tax', weight: 15 },
@@ -73,13 +73,34 @@ describe('computeTaxLines / computeDeductions / computeNetPay', () => {
     expect(computeDeductions(lines).toDecimalString()).toBe('0.00')
   })
 
-  it('treats a negative total weight as zero deductions instead of throwing', () => {
+  it('rejects negative rates even when they cancel out positive rates', () => {
     const gross = Money.fromDecimal('5000', 'USD')
-    const lines = computeTaxLines(gross, [
+    expect(() => computeTaxLines(gross, [
       { label: 'Federal Tax', weight: 15 },
       { label: 'Credit', weight: -15 },
-    ])
-    expect(computeDeductions(lines).toDecimalString()).toBe('0.00')
+    ])).toThrow(/non-negative/)
+  })
+
+  it('sums decimal percentages as an exact rational', () => {
+    expect(sumPayrollTaxRates([{ label: 'A', weight: '0.1' }, { label: 'B', weight: '0.2' }])).toEqual({ numerator: 3n, denominator: 10n })
+    expect(sumPayrollTaxRates([{ label: 'A', weight: '33.33' }, { label: 'B', weight: '33.33' }, { label: 'C', weight: '33.34' }])).toEqual({ numerator: 100n, denominator: 1n })
+  })
+
+  it('rejects any excess above 100%, without a float epsilon', () => {
+    expect(() => sumPayrollTaxRates([{ label: 'A', weight: '100' }, { label: 'B', weight: '0.000000000000000001' }])).toThrow(/100%/)
+  })
+
+  it.each(['NaN', 'Infinity', 'not-a-rate'])('rejects malformed rate %s', weight => {
+    expect(() => computeTaxLines(Money.fromDecimal('100', 'USD'), [{ label: 'Tax', weight }])).toThrow(RangeError)
+  })
+
+  it('rounds an exact half-cent boundary correctly despite decimal float summation', () => {
+    // Number('0.2') + Number('0.7') is 0.8999999999999999; exact 0.9% of 500 minor units is 4.5.
+    const rates = [{ label: 'A', weight: '0.2' }, { label: 'B', weight: '0.7' }]
+    const lines = computeTaxLines(Money.fromDecimal('0.500', 'KWD'), rates)
+    expect(computeDeductions(lines).toDecimalString()).toBe('0.005')
+    const usd = computeTaxLines(Money.fromDecimal('5.00', 'USD'), rates)
+    expect(computeDeductions(usd).toDecimalString()).toBe('0.05')
   })
 })
 

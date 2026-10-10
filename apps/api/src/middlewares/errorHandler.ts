@@ -8,6 +8,7 @@ const VALIDATION_ERROR_MESSAGE = 'Request validation failed'
 
 interface HandlerError extends FastifyError {
   details?: unknown
+  meta?: { database_error?: unknown; message?: unknown }
 }
 
 /**
@@ -27,7 +28,12 @@ interface HandlerError extends FastifyError {
  */
 export function errorHandler(error: FastifyError, request: FastifyRequest, reply: FastifyReply): void {
   const isValidationError = error instanceof ZodError
-  const statusCode = error.statusCode || (isValidationError ? 422 : 500)
+  const prismaCode = error.name === 'PrismaClientKnownRequestError' ? error.code : undefined
+  const meta = (error as HandlerError).meta
+  const currencyGuard = (prismaCode === 'P2004' || prismaCode === 'P2010') &&
+    [meta?.database_error, meta?.message].some(value => typeof value === 'string' && /ASAS_CURRENCY_(LOCKED|CONFLICT):/.test(value))
+  const prismaStatus = currencyGuard ? 409 : prismaCode === 'P2002' ? 409 : prismaCode === 'P2025' ? 404 : prismaCode === 'P2034' ? 409 : undefined
+  const statusCode = prismaStatus ?? (error.statusCode || (isValidationError ? 422 : 500))
   const isServerError = statusCode >= 500
   const withDetails = error as HandlerError
 
@@ -36,6 +42,10 @@ export function errorHandler(error: FastifyError, request: FastifyRequest, reply
   let message = error.message
   if (isServerError) message = INTERNAL_ERROR_MESSAGE
   else if (isValidationError) message = VALIDATION_ERROR_MESSAGE
+  else if (currencyGuard) message = 'Monetary currency is fixed. Refresh the workspace and retry; relabeling currency is not an FX conversion'
+  else if (prismaCode === 'P2002') message = 'A record with these unique fields already exists'
+  else if (prismaCode === 'P2025') message = 'Record not found'
+  else if (prismaCode === 'P2034') message = 'The record changed concurrently; retry the operation'
 
   const body: {
     error: { message: string; details?: unknown; requestId?: string; stack?: string }

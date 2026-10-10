@@ -16,7 +16,8 @@ import {
 import { requireAuthContext, requireRole } from '../../middlewares/rbac.js'
 import { requirePermission } from '../../middlewares/permissions.js'
 import { moduleKeyPrefix } from '../../plugins/sse.js'
-import { exportFileExtension, exportFilePath } from '../../services/queue.js'
+import { recordAuditLog } from '../../services/auditLog.js'
+import { exportFileExtension, exportFilePath, type ExportHandler } from '../../services/queue.js'
 import { renderEmployeeDirectoryXlsx, renderLedgerXlsx } from '../../services/export.js'
 import type { EmployeeDirectoryRow, LedgerRow } from '../../services/export.js'
 
@@ -39,6 +40,12 @@ import type { EmployeeDirectoryRow, LedgerRow } from '../../services/export.js'
  * The download is a binary stream addressed by job id (`storage/exports/<id>.<ext>`), so it
  * declares no JSON response schema — the same rule the CV preview route follows. Tenant
  * isolation: a job row is read with `{ id, tenantId }`, so a foreign id is a 404, not a leak.
+ * Downloading carries the same `employee.write` gate as creating, since an export may carry
+ * salaries; both are recorded in the audit log.
+ *
+ * The queue payload is plain data only (`{ canReadSalary }`) — it is JSON-serialised into
+ * pg-boss in boss mode. Handlers use the app's Prisma client (captured at registration) and
+ * read the owning `tenantId` from the `ExportJob` row, never from the payload.
  */
 
 /** Wire projection of an `ExportJob` row: the model's `dataScope` carries the kind. */
@@ -72,7 +79,7 @@ async function buildEmployeeDirectory(
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } })
   const currency = tenant?.currency ?? 'USD'
   const employees = await prisma.employee.findMany({
-    where: { tenantId },
+    where: { tenantId, status: { not: 'ARCHIVED' } },
     orderBy: { name: 'asc' },
     include: { department: { select: { name: true } } },
   })
@@ -112,15 +119,20 @@ async function buildLedger(prisma: PrismaClient, tenantId: string): Promise<Buff
  * Register the queue's two export handlers. Called from `buildApp` after the queue plugin is
  * up, so the handlers are present before the first job could dispatch (inline or boss).
  */
-export function registerExportHandlers(queue: { register: (kind: string, handler: (data: unknown) => Promise<Buffer>) => void }): void {
-  queue.register('employees', async data => {
-    const { prisma, tenantId, canReadSalary } = data as { prisma: PrismaClient; tenantId: string; canReadSalary: boolean }
-    return buildEmployeeDirectory(prisma, tenantId, canReadSalary)
+export function registerExportHandlers(
+  queue: { register: (kind: string, handler: ExportHandler) => void },
+  prisma: PrismaClient,
+): void {
+  async function jobTenantId(jobId: string): Promise<string> {
+    const job = await prisma.exportJob.findUnique({ where: { id: jobId }, select: { tenantId: true } })
+    if (!job) throw new Error(`Export job ${jobId} not found`)
+    return job.tenantId
+  }
+  queue.register('employees', async (data, { jobId }) => {
+    const { canReadSalary } = data as { canReadSalary?: unknown }
+    return buildEmployeeDirectory(prisma, await jobTenantId(jobId), canReadSalary === true)
   })
-  queue.register('ledger', async data => {
-    const { prisma, tenantId } = data as { prisma: PrismaClient; tenantId: string }
-    return buildLedger(prisma, tenantId)
-  })
+  queue.register('ledger', async (_data, { jobId }) => buildLedger(prisma, await jobTenantId(jobId)))
 }
 
 export async function exportRoutes(app: FastifyInstance): Promise<void> {
@@ -191,18 +203,23 @@ export async function exportRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request, reply) => {
-      const { tenantId, role } = requireAuthContext(request)
+      const { tenantId, role, userId } = requireAuthContext(request)
       const prisma = request.server.prisma
       const canReadSalary = role === 'ADMIN' || role === 'OWNER'
 
-      const jobId = await request.server.exportQueue.submit(
-        request.body.kind,
-        { prisma, tenantId, canReadSalary },
-        tenantId,
-      )
+      const jobId = await request.server.exportQueue.submit(request.body.kind, { canReadSalary }, tenantId)
 
       const job = await prisma.exportJob.findFirstOrThrow({ where: { id: jobId, tenantId } })
-      request.server.ssePublish(tenantId, [moduleKeyPrefix('hr'), moduleKeyPrefix('finance')])
+      await recordAuditLog(prisma, {
+        tenantId,
+        actorId: userId,
+        action: 'export.create',
+        targetType: 'ExportJob',
+        targetId: jobId,
+        metadata: { kind: request.body.kind },
+      })
+      // The web caches export jobs under `queryKeys.exports` (`asas,exports`), not hr/finance.
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('exports')])
       reply.code(202)
       return { data: mapExportJob(job) }
     },
@@ -217,11 +234,11 @@ export async function exportRoutes(app: FastifyInstance): Promise<void> {
   server.get(
     '/jobs/:id/download',
     {
-      preHandler: requireRole('MEMBER'),
+      preHandler: requirePermission('employee.write'),
       schema: { params: idParamSchema, ...({} as object) },
     },
     async (request, reply) => {
-      const { tenantId } = requireAuthContext(request)
+      const { tenantId, userId } = requireAuthContext(request)
       const job = await request.server.prisma.exportJob.findFirst({
         where: { id: request.params.id, tenantId },
       })
@@ -245,6 +262,14 @@ export async function exportRoutes(app: FastifyInstance): Promise<void> {
         reply.code(404)
         return { error: { message: 'Export file not found' } }
       }
+      await recordAuditLog(request.server.prisma, {
+        tenantId,
+        actorId: userId,
+        action: 'export.download',
+        targetType: 'ExportJob',
+        targetId: job.id,
+        metadata: { kind: job.dataScope },
+      })
 
       reply
         .code(200)

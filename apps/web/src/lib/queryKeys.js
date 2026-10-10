@@ -10,26 +10,46 @@
  * keys structurally, so `{ status: 'ACTIVE' }` and `{ status: 'ACTIVE', page: 1 }` are distinct
  * cache entries without any manual string-building.
  *
- * The stringified prefixes of `moduleKeys(name).all()` (e.g. `['asas','finance']` →
- * `"asas,finance"`) must match the API's `moduleKeyPrefix` used by the SSE invalidation
- * stream — see `sse.js`.
+ * Tenant scope: every key starts with `['asas', <activeOrgId | 'none'>]` (set via
+ * `setQueryScope`), so one workspace's cached data can never be served under another's key.
+ * Keys are built lazily at call time, so they always reflect the current scope.
+ *
+ * The API's SSE invalidation stream sends unscoped prefixes (`moduleKeyPrefix`, e.g.
+ * `"asas,finance"`); `scopeServerPrefix` maps those onto the current tenant scope — see `sse.js`.
  */
 
-const root = ['asas']
+const ROOT = 'asas'
+
+let activeOrgId = null
+
+/** Point every query key at the active organization (`null` when signed out / no workspace). */
+export function setQueryScope(orgId) {
+  activeOrgId = orgId ?? null
+}
+
+function root() {
+  return [ROOT, activeOrgId ?? 'none']
+}
+
+/** Map an unscoped server key prefix (`['asas', 'finance']`) onto the current tenant scope. */
+export function scopeServerPrefix(segments) {
+  if (segments[0] !== ROOT) return segments
+  return [...root(), ...segments.slice(1)]
+}
 
 function moduleKeys(name) {
   return {
-    all: () => [...root, name],
+    all: () => [...root(), name],
   }
 }
 
 function resourceKeys(base) {
   return {
-    all: () => [...base],
-    lists: () => [...base, 'list'],
-    list: (filters) => [...base, 'list', filters ?? {}],
-    details: () => [...base, 'detail'],
-    detail: (id) => [...base, 'detail', id],
+    all: () => [...base()],
+    lists: () => [...base(), 'list'],
+    list: (filters) => [...base(), 'list', filters ?? {}],
+    details: () => [...base(), 'detail'],
+    detail: (id) => [...base(), 'detail', id],
   }
 }
 
@@ -37,33 +57,35 @@ const authBase = moduleKeys('auth')
 const tenantBase = moduleKeys('tenant')
 
 const hrBase = moduleKeys('hr')
-const hrEmployeesBase = [...hrBase.all(), 'employees']
-const hrDepartmentsBase = [...hrBase.all(), 'departments']
-const hrPayrollRunsBase = [...hrBase.all(), 'payroll-runs']
-const hrCandidatesBase = [...hrBase.all(), 'candidates']
-const hrAttendanceBase = [...hrBase.all(), 'attendance']
-const hrLeaveRequestsBase = [...hrBase.all(), 'leave-requests']
+const hrEmployeesBase = () => [...hrBase.all(), 'employees']
+const hrDepartmentsBase = () => [...hrBase.all(), 'departments']
+const hrPayrollRunsBase = () => [...hrBase.all(), 'payroll-runs']
+const hrCandidatesBase = () => [...hrBase.all(), 'candidates']
+const hrAttendanceBase = () => [...hrBase.all(), 'attendance']
+const hrLeaveRequestsBase = () => [...hrBase.all(), 'leave-requests']
+const hrLeaveBalancesBase = () => [...hrBase.all(), 'leave-balances']
+const hrLeavePoliciesBase = () => [...hrBase.all(), 'leave-policies']
 
 const financeBase = moduleKeys('finance')
-const financePayablesBase = [...financeBase.all(), 'payables']
-const financeReceivablesBase = [...financeBase.all(), 'receivables']
-const financeExpensesBase = [...financeBase.all(), 'expenses']
+const financePayablesBase = () => [...financeBase.all(), 'payables']
+const financeReceivablesBase = () => [...financeBase.all(), 'receivables']
+const financeExpensesBase = () => [...financeBase.all(), 'expenses']
 
 const crmBase = moduleKeys('crm')
-const crmDealsBase = [...crmBase.all(), 'deals']
+const crmDealsBase = () => [...crmBase.all(), 'deals']
 
 const projectsBase = moduleKeys('projects')
-const projectsPortfolioBase = [...projectsBase.all(), 'portfolio']
-const projectsSprintsBase = [...projectsBase.all(), 'sprints']
-const projectsIssuesBase = [...projectsBase.all(), 'issues']
-const projectsRoadmapBase = [...projectsBase.all(), 'roadmap']
+const projectsPortfolioBase = () => [...projectsBase.all(), 'portfolio']
+const projectsSprintsBase = () => [...projectsBase.all(), 'sprints']
+const projectsIssuesBase = () => [...projectsBase.all(), 'issues']
+const projectsRoadmapBase = () => [...projectsBase.all(), 'roadmap']
 
 const inventoryBase = moduleKeys('inventory')
-const inventoryProductsBase = [...inventoryBase.all(), 'products']
-const inventoryMovementsBase = [...inventoryBase.all(), 'movements']
-const inventoryStockLevelsBase = [...inventoryBase.all(), 'stock-levels']
-const inventoryStockAlertsBase = [...inventoryBase.all(), 'stock-alerts']
-const inventoryWarehousesBase = [...inventoryBase.all(), 'warehouses']
+const inventoryProductsBase = () => [...inventoryBase.all(), 'products']
+const inventoryMovementsBase = () => [...inventoryBase.all(), 'movements']
+const inventoryStockLevelsBase = () => [...inventoryBase.all(), 'stock-levels']
+const inventoryStockAlertsBase = () => [...inventoryBase.all(), 'stock-alerts']
+const inventoryWarehousesBase = () => [...inventoryBase.all(), 'warehouses']
 
 const exportsBase = moduleKeys('exports')
 const settingsBase = moduleKeys('settings')
@@ -72,7 +94,7 @@ const supportBase = moduleKeys('support')
 const onboardingBase = moduleKeys('onboarding')
 
 export const queryKeys = {
-  all: () => root,
+  all: () => root(),
 
   auth: {
     ...authBase,
@@ -92,6 +114,8 @@ export const queryKeys = {
     candidates: resourceKeys(hrCandidatesBase),
     attendance: resourceKeys(hrAttendanceBase),
     leaveRequests: resourceKeys(hrLeaveRequestsBase),
+    leaveBalances: resourceKeys(hrLeaveBalancesBase),
+    leavePolicies: resourceKeys(hrLeavePoliciesBase),
   },
 
   finance: {
@@ -104,7 +128,10 @@ export const queryKeys = {
   crm: {
     ...crmBase,
     overview: () => [...crmBase.all(), 'overview'],
-    deals: resourceKeys(crmDealsBase),
+    deals: {
+      ...resourceKeys(crmDealsBase),
+      activities: (id, filters) => [...crmDealsBase(), 'activities', id, filters ?? {}],
+    },
     forecast: (year) => year ? [...crmBase.all(), 'forecast', year] : [...crmBase.all(), 'forecast'],
     salesPerformance: (year) => year ? [...crmBase.all(), 'sales-performance', year] : [...crmBase.all(), 'sales-performance'],
     agenda: () => [...crmBase.all(), 'agenda'],
@@ -112,35 +139,37 @@ export const queryKeys = {
 
   projects: {
     ...projectsBase,
-    projects: resourceKeys(projectsBase.all()),
+    projects: resourceKeys(projectsBase.all),
     portfolio: resourceKeys(projectsPortfolioBase),
     sprints: resourceKeys(projectsSprintsBase),
     issues: resourceKeys(projectsIssuesBase),
-    roadmap: () => [...projectsRoadmapBase],
+    roadmap: () => [...projectsRoadmapBase()],
     burndown: (sprintId, filters) =>
-      [...projectsSprintsBase, sprintId, 'burndown', filters ?? {}],
+      [...projectsSprintsBase(), sprintId, 'burndown', filters ?? {}],
   },
 
   inventory: {
     ...inventoryBase,
     products: resourceKeys(inventoryProductsBase),
     movements: resourceKeys(inventoryMovementsBase),
-    stockLevels: () => [...inventoryStockLevelsBase],
-    stockAlerts: () => [...inventoryStockAlertsBase],
-    warehouses: () => [...inventoryWarehousesBase],
+    stockLevels: () => [...inventoryStockLevelsBase()],
+    stockAlerts: () => [...inventoryStockAlertsBase()],
+    warehouses: () => [...inventoryWarehousesBase()],
   },
 
   exports: {
-    jobs: resourceKeys(exportsBase.all()),
+    ...exportsBase,
+    jobs: resourceKeys(exportsBase.all),
   },
 
   settings: {
     ...settingsBase,
     general: () => [...settingsBase.all(), 'general'],
+    exchangeRates: (filters) => [...settingsBase.all(), 'exchange-rates', filters ?? {}],
     billing: () => [...settingsBase.all(), 'billing'],
     backups: () => [...settingsBase.all(), 'backups'],
     notifications: () => [...settingsBase.all(), 'notifications'],
-    integrations: resourceKeys([...settingsBase.all(), 'integrations']),
+    integrations: resourceKeys(() => [...settingsBase.all(), 'integrations']),
   },
 
   dashboard: {

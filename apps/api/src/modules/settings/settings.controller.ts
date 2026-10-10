@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client'
+import type { Prisma, PrismaClient } from '@prisma/client'
 import type {
   GeneralSettings,
   GeneralSettingsUpdateInput,
@@ -13,6 +13,10 @@ import type {
   BackupScheduleUpdateInput,
   BackupScheduleWriteInput,
   BillingSettings,
+  ExchangeRate,
+  ExchangeRateListQuery,
+  ExchangeRateListResponse,
+  ExchangeRateWriteInput,
 } from '@asas/contracts'
 import * as settingsService from './settings.service.js'
 
@@ -30,11 +34,19 @@ export function getGeneral(prisma: PrismaClient, tenantId: string): Promise<Gene
 }
 
 export function updateGeneral(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Prisma.TransactionClient,
   tenantId: string,
   input: GeneralSettingsUpdateInput,
 ): Promise<GeneralSettings> {
   return settingsService.updateTenantSettings(prisma, tenantId, input)
+}
+
+export function listExchangeRates(prisma: PrismaClient, tenantId: string, query: ExchangeRateListQuery): Promise<ExchangeRateListResponse> {
+  return settingsService.listExchangeRates(prisma, tenantId, query)
+}
+
+export function createExchangeRate(prisma: PrismaClient | Prisma.TransactionClient, tenantId: string, actorId: string, input: ExchangeRateWriteInput): Promise<ExchangeRate> {
+  return settingsService.createExchangeRate(prisma, tenantId, actorId, input)
 }
 
 export function getNotifications(prisma: PrismaClient, tenantId: string): Promise<NotificationSettings> {

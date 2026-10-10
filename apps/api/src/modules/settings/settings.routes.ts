@@ -16,6 +16,10 @@ import {
   backupScheduleSchema,
   backupScheduleWriteSchema,
   backupScheduleUpdateSchema,
+  exchangeRateListQuerySchema,
+  exchangeRateListResponseSchema,
+  exchangeRateSchema,
+  exchangeRateWriteSchema,
 } from '@asas/contracts'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
@@ -36,6 +40,32 @@ import * as settingsController from './settings.controller.js'
  */
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   const server = app.withTypeProvider<ZodTypeProvider>()
+
+  server.get('/exchange-rates', {
+    preHandler: requireRole('MEMBER'),
+    schema: { querystring: exchangeRateListQuerySchema, response: { 200: envelope(exchangeRateListResponseSchema), ...errorResponses } },
+  }, async request => {
+    const { tenantId } = requireAuthContext(request)
+    return { data: await settingsController.listExchangeRates(request.server.prisma, tenantId, request.query) }
+  })
+
+  server.post('/exchange-rates', {
+    preHandler: requirePermission('settings.general.update'),
+    schema: { body: exchangeRateWriteSchema, response: { 201: envelope(exchangeRateSchema), ...errorResponses } },
+  }, async (request, reply) => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const rate = await request.server.prisma.$transaction(async tx => {
+      const created = await settingsController.createExchangeRate(tx, tenantId, userId, request.body)
+      await recordAuditLog(tx, {
+        tenantId, actorId: userId, action: 'settings.exchange_rate.create', targetType: 'ExchangeRate', targetId: created.id,
+        metadata: { currency: created.currency, baseCurrency: created.baseCurrency, rateToBase: created.rateToBase, effectiveAt: created.effectiveAt, reference: created.reference },
+      })
+      return created
+    })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('settings')])
+    reply.code(201)
+    return { data: rate }
+  })
 
   // ── General ───────────────────────────────────────────────────────────────
 
@@ -63,14 +93,14 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     },
     async request => {
       const { tenantId, userId } = requireAuthContext(request)
-      const settings = await settingsController.updateGeneral(request.server.prisma, tenantId, request.body)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'settings.general.update',
-        targetType: 'Tenant',
-        targetId: tenantId,
-        metadata: { fields: Object.keys(request.body) },
+      const settings = await request.server.prisma.$transaction(async tx => {
+        const settings = await settingsController.updateGeneral(tx, tenantId, request.body)
+        await recordAuditLog(tx, {
+          tenantId, actorId: userId, action: 'settings.general.update',
+          targetType: 'Tenant', targetId: tenantId,
+          metadata: { fields: Object.keys(request.body), currency: settings.currency, currencyLockedAt: settings.currencyLockedAt },
+        })
+        return settings
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('settings')])
       return { data: settings }

@@ -22,6 +22,9 @@ export const dashboardApi = {
   /** GET /finance/overview — `payableOutstanding` + the `cashFlow` series (the AreaChart). */
   getFinanceOverview: () => http.get('/finance/overview'),
 
+  /** GET /finance/payables — `{ items, pagination, summary }`; reads `summary.pastDueTotal/dueIn7DaysTotal`. */
+  listPayables: (params) => http.get('/finance/payables', { query: params }),
+
   /** GET /projects/sprints — `{ items }` of sprints (unpaginated collection). */
   getSprints: () => http.get('/projects/sprints'),
 

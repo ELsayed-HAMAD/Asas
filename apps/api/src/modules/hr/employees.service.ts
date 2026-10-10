@@ -8,6 +8,7 @@ import type {
 } from '@asas/contracts'
 import { buildPaginationMeta, toPrismaPage } from '@asas/contracts'
 import { AppError } from '../../utils/errors.js'
+import { tenantToday } from '../../utils/dates.js'
 
 const employeeInclude = {
   department: true,
@@ -41,6 +42,7 @@ function mapEmployee(employee: PrismaEmployeeWithIncludes, canReadSalary: boolea
     avatarUrl: employee.avatarUrl,
     hiredAt: employee.hiredAt?.toISOString() ?? null,
     salary: canReadSalary ? (employee.salary?.toString() ?? null) : null,
+    salaryBasis: canReadSalary ? (employee.salaryBasis ?? null) : null,
     equityOptions: employee.equityOptions,
     band: employee.band,
     location: employee.location,
@@ -99,11 +101,21 @@ export async function listEmployees(
   }
 
   const { skip, take } = toPrismaPage(query)
-  const [items, total, onLeaveCount, totalHeadcount] = await Promise.all([
-    prisma.employee.findMany({ where, skip, take, orderBy: { name: 'asc' }, include: employeeInclude }),
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { timezone: true } })
+  const timezone = tenant?.timezone ?? 'UTC'
+  const today = tenantToday(timezone)
+  const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1))
+
+  const [items, total, onLeaveCount, totalHeadcount, hiredThisMonth] = await Promise.all([
+    prisma.employee.findMany({
+      where, skip, take,
+      orderBy: query.sort === 'NAME_DESC' ? [{ name: 'desc' }, { id: 'asc' }] : [{ name: 'asc' }, { id: 'asc' }],
+      include: employeeInclude,
+    }),
     prisma.employee.count({ where }),
     prisma.employee.count({ where: { tenantId, status: 'ON_LEAVE' } }),
     prisma.employee.count({ where: { tenantId, status: { not: 'ARCHIVED' } } }),
+    prisma.employee.count({ where: { tenantId, status: { not: 'ARCHIVED' }, hiredAt: { gte: monthStart } } }),
   ])
 
   return {
@@ -112,6 +124,7 @@ export async function listEmployees(
     summary: {
       totalHeadcount,
       onLeaveCount,
+      hiredThisMonth,
       // See employeeSummarySchema.openRoles: no requisition model exists yet to compute this from.
       openRoles: 0,
     },
@@ -149,6 +162,7 @@ export async function createEmployee(
       avatarUrl: input.avatarUrl ?? null,
       hiredAt: input.hiredAt ? new Date(input.hiredAt) : null,
       salary: input.salary ?? null,
+      salaryBasis: input.salaryBasis ?? null,
       equityOptions: input.equityOptions ?? null,
       band: input.band ?? null,
       location: input.location ?? null,
@@ -184,6 +198,7 @@ export async function updateEmployee(
       ...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl }),
       ...(input.hiredAt !== undefined && { hiredAt: input.hiredAt ? new Date(input.hiredAt) : null }),
       ...(input.salary !== undefined && { salary: input.salary }),
+      ...(input.salaryBasis !== undefined && { salaryBasis: input.salaryBasis }),
       ...(input.equityOptions !== undefined && { equityOptions: input.equityOptions }),
       ...(input.band !== undefined && { band: input.band }),
       ...(input.location !== undefined && { location: input.location }),
@@ -206,5 +221,8 @@ export async function deleteEmployee(prisma: PrismaClient, tenantId: string, id:
     await prisma.employee.update({ where: { id_tenantId: { id, tenantId } }, data: { status: 'ARCHIVED' } })
     return
   }
-  await prisma.employee.delete({ where: { id_tenantId: { id, tenantId } } })
+  await prisma.$transaction(async tx => {
+    await tx.candidate.updateMany({ where: { tenantId, employeeId: id }, data: { employeeId: null } })
+    await tx.employee.delete({ where: { id_tenantId: { id, tenantId } } })
+  })
 }

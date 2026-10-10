@@ -18,6 +18,7 @@ import {
 } from '../primitives/ids.js'
 import { moneySchema, decimalStringSchema } from '../primitives/money.js'
 import { paginated, paginationQuerySchema } from '../primitives/pagination.js'
+import { booleanQueryParamSchema } from '../primitives/query.js'
 
 // ── Deal ─────────────────────────────────────────────────────────────────────
 
@@ -39,7 +40,9 @@ export const dealSchema = z.object({
   owner: dealOwnerSchema.nullable(),
   /** Stored `Float` column, percentage 0–100, or `null` when never set. */
   winProbability: percentageSchema.nullable(),
+  /** Expected close date; never used as proof of actual closure. */
   closeDate: isoDateTimeSchema.nullable(),
+  closedAt: isoDateTimeSchema.nullable(),
   productLine: z.string().nullable(),
   forecastBucket: z.string().nullable(),
   createdAt: isoDateTimeSchema,
@@ -53,8 +56,12 @@ export type Deal = z.infer<typeof dealSchema>
 export const dealListQuerySchema = paginationQuerySchema.extend({
   stage: dealStageSchema.optional(),
   /** Open pipeline only: excludes both closed stages. */
-  openOnly: z.coerce.boolean().optional(),
+  openOnly: booleanQueryParamSchema.optional(),
   ownerId: idSchema.optional(),
+  /** Recorded actual-close range; upper boundary is exclusive. */
+  closedFrom: isoDateSchema.optional(),
+  closedBefore: isoDateSchema.optional(),
+  sort: z.enum(['RECENT', 'VALUE_DESC']).optional(),
   search: boundedText(200, 0).optional(),
 })
 

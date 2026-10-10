@@ -60,6 +60,40 @@ export const decimalStringSchema = z
   .trim()
   .regex(/^-?\d+(\.\d+)?$/, "Expected a decimal string such as '1234.56'")
 
+/** A {@link decimalStringSchema} strictly greater than zero — a document amount (invoice, expense). */
+export const positiveDecimalStringSchema = decimalStringSchema.refine(
+  value => !value.startsWith('-') && /[1-9]/.test(value),
+  'Expected an amount greater than zero',
+)
+
+/** A {@link decimalStringSchema} greater than or equal to zero — e.g. a tax component. */
+export const nonNegativeDecimalStringSchema = decimalStringSchema.refine(
+  value => !value.startsWith('-') || !/[1-9]/.test(value),
+  'Expected an amount of zero or more',
+)
+
+/**
+ * Compare two decimal strings exactly (no float conversion): negative when `a < b`, zero when
+ * equal, positive when `a > b`. Both inputs must already match {@link decimalStringSchema}.
+ */
+export function compareDecimalStrings(a: string, b: string): number {
+  const parse = (value: string) => {
+    const trimmed = value.trim()
+    const negative = trimmed.startsWith('-')
+    const [whole = '0', fraction = ''] = trimmed.replace(/^-/, '').split('.')
+    return { negative, whole, fraction }
+  }
+  const left = parse(a)
+  const right = parse(b)
+  const scale = Math.max(left.fraction.length, right.fraction.length)
+  const toBigInt = (part: ReturnType<typeof parse>) => {
+    const digits = BigInt(part.whole + part.fraction.padEnd(scale, '0'))
+    return part.negative ? -digits : digits
+  }
+  const diff = toBigInt(left) - toBigInt(right)
+  return diff < 0n ? -1 : diff > 0n ? 1 : 0
+}
+
 /**
  * Build the parser for a decimal-string amount in a known currency.
  *

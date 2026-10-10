@@ -4,7 +4,6 @@ import {
   Calendar,
   Filter,
   MoreVertical,
-  Square,
   FileText,
   ZoomIn,
   ZoomOut,
@@ -13,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../../../lib/api/finance';
+import { projectsApi } from '../../../lib/api/projects';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney } from '../../../lib/format';
 import { http } from '../../../lib/api/http';
@@ -34,7 +34,7 @@ export default function AccountsPayable() {
   const [batchConfirmOpen, setBatchConfirmOpen] = useState(false)
   const [dateFilter, setDateFilter] = useState('ALL')
   useEffect(() => setSelectedIds(new Set()), [search, dateFilter])
-  const emptyBillForm = () => ({ vendorId: '', invoiceNumber: '', date: new Date().toISOString().slice(0, 10), dueDate: new Date().toISOString().slice(0, 10), amount: '' })
+  const emptyBillForm = () => ({ vendorId: '', projectId: '', invoiceNumber: '', date: new Date().toISOString().slice(0, 10), dueDate: new Date().toISOString().slice(0, 10), amount: '' })
   const [billForm, setBillForm] = useState(emptyBillForm)
 
   const { data, isLoading, isError } = useQuery({
@@ -66,6 +66,10 @@ export default function AccountsPayable() {
     queryKey: [...queryKeys.finance.all(), 'vendors'],
     queryFn: financeApi.listVendors,
   });
+  const { data: projectsData } = useQuery({
+    queryKey: queryKeys.projects.portfolio.list({ limit: 100 }),
+    queryFn: () => projectsApi.listProjects({ limit: 100 }),
+  });
   const vendorAvatar = {};
   (vendorsData?.items ?? []).forEach((v) => {
     if (v.avatarUrl) vendorAvatar[v.id] = v.avatarUrl;
@@ -77,7 +81,7 @@ export default function AccountsPayable() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.finance.payables.all() }),
   });
   const createBill = useMutation({
-    mutationFn: () => financeApi.createPayable({ ...billForm, invoiceNumber: billForm.invoiceNumber || null, status: 'PENDING' }),
+    mutationFn: () => financeApi.createPayable({ ...billForm, projectId: billForm.projectId || null, invoiceNumber: billForm.invoiceNumber || null, status: 'PENDING' }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.finance.payables.all() }); setBillOpen(false); setBillForm(emptyBillForm()) },
   })
   const requestChanges = useMutation({
@@ -141,6 +145,25 @@ export default function AccountsPayable() {
   const pastDueTotal = summary.pastDueTotal
   const dueIn7DaysTotal = summary.dueIn7DaysTotal
   const paidThisMonthTotal = summary.paidThisMonthTotal
+  const previousPaidTotal = summary.paidThisMonthComparison?.previousTotal
+  const paidThisMonthDelta = paidThisMonthTotal == null || previousPaidTotal == null
+    ? null
+    : paidThisMonthTotal.amount - previousPaidTotal.amount
+  const paidThisMonthCaption = paidThisMonthTotal == null
+    ? 'Unavailable until journal history covers this month'
+    : paidThisMonthDelta == null
+    ? 'Prior-period comparison unavailable'
+    : `${paidThisMonthDelta > 0 ? '+' : ''}${formatMoney({ amount: paidThisMonthDelta, currency: paidThisMonthTotal.currency })} vs same period last month`
+
+  const selectableItems = scheduled.filter(i => ['APPROVED', 'SCHEDULED'].includes(i.status));
+  const allSelected = selectableItems.length > 0 && selectableItems.every(i => selectedIds.has(i.id));
+  const handleToggleAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(selectableItems.map(i => i.id)));
+    }
+  };
 
   // Download the real invoice PDF (GET /finance/payables/:id/pdf, streamed binary).
   const handleDownloadPdf = async () => {
@@ -205,9 +228,10 @@ export default function AccountsPayable() {
             <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1.5">Due in 7 Days</p>
             <p className="text-3xl font-bold text-heading">{formatMoney(dueIn7DaysTotal)}</p>
           </div>
-          <div className="border border-border-default rounded-button p-4 bg-surface-raised shadow-card">
+          <div className="border border-border-default rounded-button p-4 bg-surface-raised shadow-card" title="Based on valued AP payment journals in base currency, net of linked reversals.">
             <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1.5">Paid This Month</p>
             <p className="text-3xl font-bold text-heading">{formatMoney(paidThisMonthTotal)}</p>
+            <p className="mt-1 text-xs text-muted">{paidThisMonthCaption}</p>
           </div>
         </div>
       </div>
@@ -221,7 +245,15 @@ export default function AccountsPayable() {
             <thead className="bg-surface-raised sticky top-0 z-10">
               <tr>
                 <th className="px-6 py-3 border-b border-border-default w-12">
-                  <input type="checkbox" disabled={!['APPROVED', 'SCHEDULED'].includes(item.status)} aria-label={`Select ${item.vendor} invoice`} checked={selectedIds.has(item.id)} onChange={() => toggleInvoiceSelection(item.id)} onClick={event => event.stopPropagation()} className="accent-blue-600 disabled:opacity-30" />
+                  <input
+                    type="checkbox"
+                    disabled={selectableItems.length === 0}
+                    aria-label="Select all approved invoices"
+                    checked={allSelected}
+                    onChange={handleToggleAll}
+                    onClick={event => event.stopPropagation()}
+                    className="accent-blue-600 disabled:opacity-30"
+                  />
                 </th>
                 <th className="px-2 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-default">Vendor</th>
                 <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-default text-left">Due Date</th>
@@ -297,8 +329,13 @@ export default function AccountsPayable() {
                       isSelected ? 'bg-surface-active/60' : 'bg-surface-raised hover:bg-surface-muted'
                     }`}
                   >
-                    <td className="px-6 py-3.5">
-                      <Square size={16} className="text-faint" />
+                    <td className="px-6 py-3.5" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(item.id)}
+                        onChange={() => toggleInvoiceSelection(item.id)}
+                        className="w-4 h-4 rounded-sm border-border-default text-primary focus:ring-primary cursor-pointer"
+                      />
                     </td>
                     <td className="px-2 py-3.5">
                       <div className="flex items-center gap-3">
@@ -372,7 +409,7 @@ export default function AccountsPayable() {
                 <button onClick={() => { setChangeRequestReason(''); requestChanges.reset(); setChangeRequestSaved(false); setChangeRequestOpen(true) }} disabled={!selectedRecord || requestChanges.isPending || !['APPROVED', 'SCHEDULED'].includes(selectedRecord.status)} className="border border-border-default text-body py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60">
                   Request Changes
                 </button>
-                <button disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status === 'PAID'} onClick={() => statusMutation.mutate('REJECTED')} className="border border-border-default text-danger py-2 rounded-input text-sm font-medium hover:bg-danger-light transition-colors disabled:opacity-60">
+                <button disabled={!selectedRecord || statusMutation.isPending || !['PENDING', 'APPROVED'].includes(selectedRecord.status)} onClick={() => statusMutation.mutate('REJECTED')} className="border border-border-default text-danger py-2 rounded-input text-sm font-medium hover:bg-danger-light transition-colors disabled:opacity-60">
                   Reject
                 </button>
               </div>
@@ -428,7 +465,7 @@ export default function AccountsPayable() {
         )}
       </div>
       <FormDialog open={billOpen} onClose={() => setBillOpen(false)} title="New bill" subtitle="Add a vendor invoice to accounts payable." busy={createBill.isPending} onConfirm={() => createBill.mutate()} confirmLabel="Create bill">
-        <div className="space-y-4"><label className="block text-sm font-medium text-body">Vendor<select required value={billForm.vendorId} onChange={event => setBillForm(current => ({ ...current, vendorId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="">Select a vendor</option>{(vendorsData?.items ?? []).map(vendor => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}</select></label><label className="block text-sm font-medium text-body">Invoice number<input value={billForm.invoiceNumber} onChange={event => setBillForm(current => ({ ...current, invoiceNumber: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Invoice date<input type="date" required value={billForm.date} onChange={event => setBillForm(current => ({ ...current, date: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Due date<input type="date" required value={billForm.dueDate} onChange={event => setBillForm(current => ({ ...current, dueDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Amount<input required type="number" min="0" step="0.01" value={billForm.amount} onChange={event => setBillForm(current => ({ ...current, amount: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div>
+        <div className="space-y-4"><label className="block text-sm font-medium text-body">Vendor<select required value={billForm.vendorId} onChange={event => setBillForm(current => ({ ...current, vendorId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="">Select a vendor</option>{(vendorsData?.items ?? []).map(vendor => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}</select></label><label className="block text-sm font-medium text-body">Project<select value={billForm.projectId} onChange={event => setBillForm(current => ({ ...current, projectId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="">Unassigned</option>{(projectsData?.items ?? []).map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><label className="block text-sm font-medium text-body">Invoice number<input value={billForm.invoiceNumber} onChange={event => setBillForm(current => ({ ...current, invoiceNumber: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Invoice date<input type="date" required value={billForm.date} onChange={event => setBillForm(current => ({ ...current, date: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Due date<input type="date" required value={billForm.dueDate} onChange={event => setBillForm(current => ({ ...current, dueDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Amount<input required type="number" min="0" step="0.01" value={billForm.amount} onChange={event => setBillForm(current => ({ ...current, amount: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div>
       </FormDialog>
       <FormDialog
         open={changeRequestOpen}

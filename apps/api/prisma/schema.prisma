@@ -38,6 +38,7 @@ enum PayrollRunStatus {
   PENDING
   APPROVED
   PAID
+  VOID
 }
 
 enum LeaveType {
@@ -68,12 +69,19 @@ enum CandidateStage {
   REJECTED
 }
 
+enum InterviewStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
 enum PayableStatus {
   PENDING
   SCHEDULED
   APPROVED
   PAID
   REJECTED
+  VOID
 }
 
 enum ReceivableStatus {
@@ -81,6 +89,7 @@ enum ReceivableStatus {
   OVERDUE
   IN_COLLECTIONS
   PAID
+  VOID
 }
 
 enum ExpenseCategory {
@@ -99,7 +108,9 @@ enum ExpenseStatus {
   FLAGGED
   PROCESSING
   APPROVED
+  REIMBURSED
   REJECTED
+  VOID
 }
 
 enum LedgerTxStatus {
@@ -113,6 +124,12 @@ enum DealStage {
   NEGOTIATION
   CLOSED_WON
   CLOSED_LOST
+}
+
+enum DealActivityType {
+  CALL
+  EMAIL
+  NOTE
 }
 
 enum ProductStockStatus {
@@ -188,57 +205,68 @@ enum SubscriptionStatus {
 // ─── Core ────────────────────────────────────────────────────────────────────
 
 model Tenant {
-  id               String           @id @default(cuid())
-  name             String
-  slug             String           @unique
-  supportEmail     String?
-  logoUrl          String?
-  metadata         String?
-  timezone         String           @default("UTC")
-  currency         String           @default("USD")
-  dateFormat       String           @default("MMM d, yyyy")
-  onboardingStatus OnboardingStatus @default(PENDING)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  id                 String           @id @default(cuid())
+  name               String
+  slug               String           @unique
+  supportEmail       String?
+  logoUrl            String?
+  metadata           String?
+  timezone           String           @default("UTC")
+  currency           String           @default("USD")
+  currencyLockedAt   DateTime?
+  dateFormat         String           @default("MMM d, yyyy")
+  overtimeThresholdHours Float        @default(8)
+  onboardingStatus   OnboardingStatus @default(PENDING)
+  sampleDataManifest Json?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
-  members               Member[]
-  invitations           Invitation[]
-  auditLogs             AuditLog[]
-  departments           Department[]
-  activityEvents        ActivityEvent[]
-  employees             Employee[]
-  payrollRuns           PayrollRun[]
-  timesheets            Timesheet[]
-  attendanceExceptions  AttendanceException[]
-  leaveRequests         LeaveRequest[]
-  candidates            Candidate[]
-  vendors               Vendor[]
-  payableInvoices       PayableInvoice[]
-  customers             Customer[]
-  receivableInvoices    ReceivableInvoice[]
-  expenses              Expense[]
-  ledgerTransactions    LedgerTransaction[]
-  cashFlowSnapshots     CashFlowSnapshot[]
-  companies             Company[]
-  deals                 Deal[]
-  agendaItems           AgendaItem[]
-  salesQuotas           SalesQuota[]
-  forecastSnapshots     ForecastSnapshot[]
-  products              Product[]
-  suppliers             Supplier[]
-  purchaseOrders        PurchaseOrder[]
-  projects              Project[]
-  sprints               Sprint[]
-  roadmapPhases         RoadmapPhase[]
-  subscriptions         Subscription[]
-  paymentMethods        PaymentMethod[]
-  billingInvoices       BillingInvoice[]
-  integrations          Integration[]
-  notificationPrefs     NotificationPreference[]
-  quietHours            QuietHours?
-  exportJobs            ExportJob[]
-  backupSchedules       BackupSchedule[]
-  supportTickets        SupportTicket[]
+  members              Member[]
+  invitations          Invitation[]
+  auditLogs            AuditLog[]
+  departments          Department[]
+  activityEvents       ActivityEvent[]
+  employees            Employee[]
+  payrollRuns          PayrollRun[]
+  timesheets           Timesheet[]
+  attendanceExceptions AttendanceException[]
+  leaveRequests        LeaveRequest[]
+  leavePolicies        LeavePolicy[]
+  candidates           Candidate[]
+  vendors              Vendor[]
+  payableInvoices      PayableInvoice[]
+  customers            Customer[]
+  receivableInvoices   ReceivableInvoice[]
+  expenses             Expense[]
+  ledgerTransactions   LedgerTransaction[]
+  ledgerAccounts       LedgerAccount[]
+  exchangeRates        ExchangeRate[]
+  journalEntries       JournalEntry[]
+  cashFlowSnapshots    CashFlowSnapshot[]
+  companies            Company[]
+  deals                Deal[]
+  dealStageHistory     DealStageHistory[]
+  crmHistoryCoverage   CrmHistoryCoverage?
+  settlementHistoryCoverage SettlementHistoryCoverage?
+  dealActivities       DealActivity[]
+  agendaItems          AgendaItem[]
+  salesQuotas          SalesQuota[]
+  forecastSnapshots    ForecastSnapshot[]
+  products             Product[]
+  suppliers            Supplier[]
+  purchaseOrders       PurchaseOrder[]
+  projects             Project[]
+  sprints              Sprint[]
+  roadmapPhases        RoadmapPhase[]
+  subscriptions        Subscription[]
+  paymentMethods       PaymentMethod[]
+  billingInvoices      BillingInvoice[]
+  integrations         Integration[]
+  notificationPrefs    NotificationPreference[]
+  quietHours           QuietHours?
+  exportJobs           ExportJob[]
+  backupSchedules      BackupSchedule[]
+  supportTickets       SupportTicket[]
 }
 
 // ─── Auth (Better Auth core + organization plugin, mapped onto Tenant) ───────
@@ -256,11 +284,12 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  sessions        Session[]
-  accounts        Account[]
-  members         Member[]
-  sentInvitations Invitation[] @relation("InvitationInviter")
-  auditLogs       AuditLog[]
+  sessions             Session[]
+  accounts             Account[]
+  members              Member[]
+  sentInvitations      Invitation[]   @relation("InvitationInviter")
+  auditLogs            AuditLog[]
+  exchangeRatesCreated ExchangeRate[]
 }
 
 model Session {
@@ -285,9 +314,11 @@ model Account {
   id                    String    @id @default(cuid())
   accountId             String
   providerId            String
-  /** better-auth 1.7.2's internal adapter always writes this (e.g. "local:credential") —
+  /**
+   * better-auth 1.7.2's internal adapter always writes this (e.g. "local:credential") —
    * confirmed by running an actual sign-up against a live database; not documented anywhere
-   * I found ahead of time. Nullable here in case an older/newer better-auth version omits it. */
+   * I found ahead of time. Nullable here in case an older/newer better-auth version omits it.
+   */
   issuer                String?
   userId                String
   password              String?
@@ -407,9 +438,22 @@ model ActivityEvent {
 
 // ─── HR ──────────────────────────────────────────────────────────────────────
 
+enum SalaryBasis {
+  ANNUAL
+  MONTHLY
+}
+
+enum PayFrequency {
+  MONTHLY
+  SEMIMONTHLY
+  BIWEEKLY
+  WEEKLY
+}
+
 model Employee {
   id             String         @id @default(cuid())
   tenantId       String
+  currency       String?
   departmentId   String?
   managerId      String?
   name           String
@@ -418,6 +462,7 @@ model Employee {
   avatarUrl      String?
   hiredAt        DateTime?
   salary         Decimal?       @db.Decimal(19, 4)
+  salaryBasis    SalaryBasis?
   equityOptions  Int?
   band           String?
   location       String?
@@ -426,62 +471,85 @@ model Employee {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  department   Department?          @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  manager      Employee?            @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
-  reports      Employee[]           @relation("EmployeeManager")
-  member       Member?
-  payrollLines PayrollLine[]
-  timesheets   Timesheet[]
-  exceptions   AttendanceException[]
-  leaveRequests LeaveRequest[]
-  ownedDeals   Deal[]
-  expenses     Expense[]
-  issueAssignees IssueAssignee[]
+  tenant           Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department       Department?           @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  manager          Employee?             @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
+  reports          Employee[]            @relation("EmployeeManager")
+  member           Member?
+  payrollLines     PayrollLine[]
+  timesheets       Timesheet[]
+  exceptions       AttendanceException[]
+  leaveRequests    LeaveRequest[]
+  ownedDeals       Deal[]
+  expenses         Expense[]
+  issueAssignees   IssueAssignee[]
   roadmapAssignees RoadmapTaskAssignee[]
+  hiredCandidate   Candidate?
 
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, departmentId])
   @@index([tenantId, status])
-  @@unique([id, tenantId])
 }
 
 model PayrollRun {
-  id        String           @id @default(cuid())
-  tenantId  String
-  label     String
-  payDate   DateTime?
-  status    PayrollRunStatus @default(PENDING)
+  id              String           @id @default(cuid())
+  tenantId        String
+  label           String
+  payDate         DateTime?
+  periodStart     DateTime?        @db.Date
+  periodEnd       DateTime?        @db.Date
+  payFrequency    PayFrequency?
+  periodsPerYear  Int?
+  salaryBasis     SalaryBasis?
+  prorationMethod String?
+  currency        String?
+  paidAt          DateTime?
+  paidById        String?
+  voidedAt        DateTime?
+  voidedById      String?
+  voidReason      String?
+  requestKey      String?
+  requestHash     String?
+  status          PayrollRunStatus @default(PENDING)
   /// JSON array of `{ label, rate }` rows — the tax/deduction rates this run was priced
   /// with, stored on the run so the tax split stays auditable and re-computable.
-  taxRates  Json?
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  taxRates        Json?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  lines  PayrollLine[]
+  tenant             Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lines              PayrollLine[]
+  settlementJournals JournalEntry[]
 
+  @@unique([tenantId, requestKey])
+  @@unique([id, tenantId])
   @@index([tenantId])
+  @@index([tenantId, periodStart, periodEnd])
 }
 
 model PayrollLine {
-  id            String   @id @default(cuid())
-  tenantId      String
-  payrollRunId  String
-  employeeId    String
-  gross         Decimal  @default(0) @db.Decimal(19, 4)
-  deductions    Decimal  @default(0) @db.Decimal(19, 4)
-  net           Decimal  @default(0) @db.Decimal(19, 4)
-  baseSalary    Decimal? @db.Decimal(19, 4)
-  missedDaysCount Int?
-  missedDaysAmount Decimal? @db.Decimal(19, 4)
-  bonusLabel    String?
-  bonusAmount   Decimal? @db.Decimal(19, 4)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id               String       @id @default(cuid())
+  tenantId         String
+  payrollRunId     String
+  employeeId       String
+  gross            Decimal      @default(0) @db.Decimal(19, 4)
+  deductions       Decimal      @default(0) @db.Decimal(19, 4)
+  net              Decimal      @default(0) @db.Decimal(19, 4)
+  baseSalary       Decimal?     @db.Decimal(19, 4)
+  sourceSalary     Decimal?     @db.Decimal(19, 4)
+  salaryBasis      SalaryBasis?
+  eligibleDays     Int?
+  periodDays       Int?
+  missedDaysCount  Int?
+  missedDaysAmount Decimal?     @db.Decimal(19, 4)
+  bonusLabel       String?
+  bonusAmount      Decimal?     @db.Decimal(19, 4)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
-  payrollRun PayrollRun      @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
-  employee   Employee        @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  payrollRun PayrollRun       @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employee   Employee         @relation(fields: [employeeId], references: [id], onDelete: Restrict)
   taxLines   PayrollTaxLine[]
 
   @@index([tenantId])
@@ -499,16 +567,17 @@ model PayrollTaxLine {
 }
 
 model Timesheet {
-  id           String   @id @default(cuid())
-  tenantId     String
-  employeeId   String
-  weekStart    DateTime
-  regularHours Float    @default(0)
-  overtimeHours Float   @default(0)
-  totalHours   Float    @default(0)
-  approvedAt   DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String    @id @default(cuid())
+  tenantId      String
+  employeeId    String
+  weekStart     DateTime
+  regularHours  Float     @default(0)
+  overtimeHours Float     @default(0)
+  totalHours    Float     @default(0)
+  overtimeThresholdHours Float @default(8)
+  approvedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   employee Employee       @relation(fields: [employeeId], references: [id], onDelete: Restrict)
@@ -519,13 +588,15 @@ model Timesheet {
 }
 
 model TimesheetDay {
-  id          String  @id @default(cuid())
+  id          String    @id @default(cuid())
   timesheetId String
   date        DateTime? @db.Date
   dayLabel    String
   clockIn     String?
   clockOut    String?
   totalHours  Float?
+  clockInAt   DateTime? @db.Timestamptz(3)
+  clockOutAt  DateTime? @db.Timestamptz(3)
 
   timesheet Timesheet @relation(fields: [timesheetId], references: [id], onDelete: Cascade)
 
@@ -533,14 +604,14 @@ model TimesheetDay {
 }
 
 model AttendanceException {
-  id         String                   @id @default(cuid())
+  id         String                  @id @default(cuid())
   tenantId   String
   employeeId String
   type       AttendanceExceptionType
   label      String
   date       DateTime
-  alert      Boolean                  @default(true)
-  createdAt  DateTime                 @default(now())
+  alert      Boolean                 @default(true)
+  createdAt  DateTime                @default(now())
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -565,41 +636,82 @@ model LeaveRequest {
   @@index([tenantId])
 }
 
+model LeavePolicy {
+  id                   String   @id @default(cuid())
+  tenantId             String
+  type                 LeaveType
+  annualAllowanceDays  Int
+  weekdaysOnly         Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, type])
+  @@index([tenantId])
+}
+
 model Candidate {
-  id            String         @id @default(cuid())
-  tenantId      String
-  name          String
-  role          String
-  stage         CandidateStage @default(APPLIED)
-  timeInStage   String?
-  appliedAt     DateTime       @default(now())
-  avatarUrl     String?
-  currentRole   String?
-  experience    String?
-  source        String?
-  location      String?
-  email         String?
-  education     String?
-  resumeUrl     String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id             String         @id @default(cuid())
+  tenantId       String
+  employeeId     String?
+  name           String
+  role           String
+  stage          CandidateStage @default(APPLIED)
+  stageEnteredAt DateTime       @default(now())
+  timeInStage    String?
+  appliedAt      DateTime       @default(now())
+  avatarUrl      String?
+  currentRole    String?
+  experience     String?
+  source         String?
+  location       String?
+  email          String?
+  education      String?
+  resumeUrl      String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee   Employee?           @relation(fields: [employeeId, tenantId], references: [id, tenantId], onDelete: NoAction)
   activities CandidateActivity[]
+  interviews CandidateInterview[]
 
+  @@unique([employeeId, tenantId])
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, stage])
-  @@unique([id, tenantId])
+  @@index([tenantId, employeeId])
 }
 
 model CandidateActivity {
-  id          String   @id @default(cuid())
+  id          String          @id @default(cuid())
   candidateId String
   action      String
   description String?
-  createdAt   DateTime @default(now())
+  fromStage   CandidateStage?
+  toStage     CandidateStage?
+  createdAt   DateTime        @default(now())
 
   candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+}
+
+model CandidateInterview {
+  id          String          @id @default(cuid())
+  candidateId String
+  startsAt    DateTime
+  durationMin Int             @default(60)
+  stage       CandidateStage
+  interviewer String?
+  meetingUrl  String?
+  notes       String?
+  status      InterviewStatus @default(SCHEDULED)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId, startsAt])
 }
 
 // ─── Finance ─────────────────────────────────────────────────────────────────
@@ -621,6 +733,8 @@ model Vendor {
 model PayableInvoice {
   id            String        @id @default(cuid())
   tenantId      String
+  projectId     String?
+  currency      String?
   vendorId      String
   invoiceNumber String?
   date          DateTime
@@ -628,25 +742,33 @@ model PayableInvoice {
   amount        Decimal       @db.Decimal(19, 4)
   status        PayableStatus @default(PENDING)
   pdfFilename   String?
+  createdById   String?
+  approvedById  String?
+  approvedAt    DateTime?
+  paidAt        DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
-  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  vendor    Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  lineItems PayableLineItem[]
+  tenant              Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project             Project?          @relation(fields: [projectId, tenantId], references: [id, tenantId], onDelete: NoAction)
+  vendor              Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  lineItems           PayableLineItem[]
+  settlementJournals  JournalEntry[]
+  recognitionJournals JournalEntry[]    @relation("PayableRecognition")
 
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([tenantId, dueDate])
-  @@unique([id, tenantId])
+  @@index([tenantId, projectId])
 }
 
 model PayableLineItem {
-  id          String  @id @default(cuid())
-  invoiceId   String
-  description String
+  id            String  @id @default(cuid())
+  invoiceId     String
+  description   String
   periodOrUsage String?
-  amount      Decimal @db.Decimal(19, 4)
+  amount        Decimal @db.Decimal(19, 4)
 
   invoice PayableInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 }
@@ -660,7 +782,7 @@ model Customer {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  tenant     Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant     Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   invoices   ReceivableInvoice[]
   activities CollectionActivity[]
 
@@ -670,19 +792,23 @@ model Customer {
 model ReceivableInvoice {
   id         String           @id @default(cuid())
   tenantId   String
+  currency   String?
   customerId String
   number     String?
   amount     Decimal          @db.Decimal(19, 4)
   dueDate    DateTime?
   status     ReceivableStatus @default(CURRENT)
+  paidAt     DateTime?
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
 
-  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tenant              Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer            Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  settlementJournals  JournalEntry[]
+  recognitionJournals JournalEntry[] @relation("ReceivableRecognition")
 
-  @@index([tenantId])
   @@unique([id, tenantId])
+  @@index([tenantId])
 }
 
 model CollectionActivity {
@@ -701,37 +827,153 @@ model CollectionActivity {
 }
 
 model Expense {
-  id          String          @id @default(cuid())
-  tenantId    String
-  employeeId  String?
-  name        String
-  category    ExpenseCategory @default(OTHER)
-  merchant    String?
-  date        DateTime
-  amount      Decimal         @db.Decimal(19, 4)
-  tax         Decimal?        @db.Decimal(19, 4)
-  policyMatch Boolean?
-  status      ExpenseStatus   @default(PENDING)
-  receiptMeta String?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id             String          @id @default(cuid())
+  tenantId       String
+  projectId      String?
+  currency       String?
+  employeeId     String?
+  name           String
+  category       ExpenseCategory @default(OTHER)
+  merchant       String?
+  date           DateTime
+  amount         Decimal         @db.Decimal(19, 4)
+  tax            Decimal?        @db.Decimal(19, 4)
+  policyMatch    Boolean?
+  status         ExpenseStatus   @default(PENDING)
+  receiptMeta    String?
+  createdById    String?
+  approvedById   String?
+  approvedAt     DateTime?
+  reimbursedAt   DateTime?
+  reimbursedById String?
+  voidedAt       DateTime?
+  voidedById     String?
+  voidReason     String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
-  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  tenant             Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project            Project?       @relation(fields: [projectId, tenantId], references: [id, tenantId], onDelete: NoAction)
+  employee           Employee?      @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  settlementJournals JournalEntry[]
 
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, status])
+  @@index([tenantId, projectId])
+}
+
+model LedgerAccount {
+  id        String   @id @default(cuid())
+  tenantId  String
+  code      String
+  name      String
+  kind      String
+  currency  String
+  createdAt DateTime @default(now())
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  lines  JournalLine[]
+
+  @@unique([tenantId, code, currency])
+  @@unique([id, tenantId])
+}
+
+/// Manually maintained historical FX quotes expressed as base-currency units per one unit of `currency`.
+model ExchangeRate {
+  id          String   @id @default(cuid())
+  tenantId    String
+  currency    String
+  rateToBase  Decimal  @db.Decimal(24, 12)
+  effectiveAt DateTime
+  source      String   @default("MANUAL")
+  reference   String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  createdBy      User?          @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  journalEntries JournalEntry[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, currency, effectiveAt])
+  @@index([tenantId, currency, effectiveAt])
+}
+
+model JournalEntry {
+  id                            String   @id @default(cuid())
+  tenantId                      String
+  currency                      String
+  amount                        Decimal  @db.Decimal(19, 4)
+  baseCurrency                  String?
+  baseAmount                    Decimal? @db.Decimal(19, 4)
+  baseMinorUnitDigits           Int?
+  fxRate                        Decimal? @db.Decimal(24, 12)
+  exchangeRateId                String?
+  sourceType                    String
+  payableInvoiceId              String?
+  receivableInvoiceId           String?
+  payrollRunId                  String?
+  expenseId                     String?
+  recognizesPayableInvoiceId    String?
+  recognizesReceivableInvoiceId String?
+  reversesJournalEntryId        String?  @unique
+  reversalReason                String?
+  currencyProvenance            String
+  description                   String
+  actorId                       String?
+  postedAt                      DateTime
+  createdAt                     DateTime @default(now())
+
+  tenant               Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  exchangeRate         ExchangeRate?      @relation(fields: [exchangeRateId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  payable              PayableInvoice?    @relation(fields: [payableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  receivable           ReceivableInvoice? @relation(fields: [receivableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  payrollRun           PayrollRun?        @relation(fields: [payrollRunId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  expense              Expense?           @relation(fields: [expenseId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  recognizedPayable    PayableInvoice?    @relation("PayableRecognition", fields: [recognizesPayableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  recognizedReceivable ReceivableInvoice? @relation("ReceivableRecognition", fields: [recognizesReceivableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  reverses             JournalEntry?      @relation("JournalReversal", fields: [reversesJournalEntryId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  reversedBy           JournalEntry?      @relation("JournalReversal")
+  lines                JournalLine[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, payableInvoiceId])
+  @@unique([tenantId, receivableInvoiceId])
+  @@unique([tenantId, payrollRunId])
+  @@unique([tenantId, expenseId])
+  @@unique([reversesJournalEntryId, tenantId])
+  @@index([tenantId, recognizesPayableInvoiceId])
+  @@index([tenantId, recognizesReceivableInvoiceId])
+  @@index([tenantId, postedAt])
+}
+
+model JournalLine {
+  id         String   @id @default(cuid())
+  tenantId   String
+  entryId    String
+  accountId  String
+  side       String
+  amount     Decimal  @db.Decimal(19, 4)
+  baseAmount Decimal? @db.Decimal(19, 4)
+
+  entry   JournalEntry  @relation(fields: [entryId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  account LedgerAccount @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@index([tenantId, accountId])
+  @@index([entryId])
 }
 
 model LedgerTransaction {
-  id          String        @id @default(cuid())
+  id          String         @id @default(cuid())
   tenantId    String
+  currency    String?
   date        DateTime
   description String
-  amount      Decimal       @db.Decimal(19, 4)
+  amount      Decimal        @db.Decimal(19, 4)
   status      LedgerTxStatus @default(CLEARED)
-  isCredit    Boolean       @default(true)
-  createdAt   DateTime      @default(now())
+  isCredit    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -741,6 +983,7 @@ model LedgerTransaction {
 model CashFlowSnapshot {
   id        String   @id @default(cuid())
   tenantId  String
+  currency  String?
   month     String
   inflow    Decimal  @default(0) @db.Decimal(19, 4)
   outflow   Decimal  @default(0) @db.Decimal(19, 4)
@@ -772,6 +1015,7 @@ model Company {
 model Deal {
   id              String    @id @default(cuid())
   tenantId        String
+  currency        String?
   companyId       String?
   ownerEmployeeId String?
   name            String
@@ -779,28 +1023,73 @@ model Deal {
   value           Decimal   @default(0) @db.Decimal(19, 4)
   winProbability  Float?
   closeDate       DateTime?
+  closedAt        DateTime?
   productLine     String?
   forecastBucket  String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  company    Company?       @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  owner      Employee?      @relation(fields: [ownerEmployeeId], references: [id], onDelete: SetNull)
-  activities DealActivity[]
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company      Company?           @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  owner        Employee?          @relation(fields: [ownerEmployeeId], references: [id], onDelete: SetNull)
+  activities   DealActivity[]
+  stageHistory DealStageHistory[]
 
-  @@index([tenantId])
-  @@index([tenantId, stage])
   @@unique([id, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, closedAt])
+  @@index([tenantId, stage])
+}
+
+model DealStageHistory {
+  id              String     @id @default(cuid())
+  tenantId        String
+  dealId          String
+  fromStage       DealStage?
+  toStage         DealStage
+  occurredAt      DateTime   @default(now())
+  actorId         String?
+  ownerEmployeeId String?
+  value           Decimal    @db.Decimal(19, 4)
+  isBaseline      Boolean    @default(false)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deal   Deal   @relation(fields: [dealId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@index([tenantId, occurredAt])
+  @@index([dealId, occurredAt])
+  @@index([tenantId, dealId, occurredAt(sort: Desc), id(sort: Desc)])
+}
+
+/** Earliest instant from which CRM stage history is complete for historical comparisons. */
+model CrmHistoryCoverage {
+  tenantId String   @id
+  startsAt DateTime
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+/** Earliest instant from which tenant settlement journals are complete for period comparisons. */
+model SettlementHistoryCoverage {
+  tenantId String   @id
+  startsAt DateTime
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 model DealActivity {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
+  tenantId  String
   dealId    String
+  type      DealActivityType @default(NOTE)
   title     String
-  createdAt DateTime @default(now())
+  body      String?          @db.Text
+  actorId   String?
+  actorName String?
+  createdAt DateTime         @default(now())
 
-  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deal   Deal   @relation(fields: [dealId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@index([tenantId, dealId, createdAt])
 }
 
 model AgendaItem {
@@ -820,6 +1109,7 @@ model AgendaItem {
 model SalesQuota {
   id         String   @id @default(cuid())
   tenantId   String
+  currency   String?
   employeeId String?
   repName    String
   period     String
@@ -834,6 +1124,7 @@ model SalesQuota {
 model ForecastSnapshot {
   id        String   @id @default(cuid())
   tenantId  String
+  currency  String?
   repName   String
   period    String
   closed    Decimal  @default(0) @db.Decimal(19, 4)
@@ -852,6 +1143,7 @@ model ForecastSnapshot {
 model Product {
   id              String             @id @default(cuid())
   tenantId        String
+  currency        String?
   name            String
   sku             String
   price           Decimal            @default(0) @db.Decimal(19, 4)
@@ -867,10 +1159,10 @@ model Product {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
-  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  movements    StockMovement[]
-  suppliers    ProductSupplier[]
-  poLines      PurchaseOrderLine[]
+  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  movements StockMovement[]
+  suppliers ProductSupplier[]
+  poLines   PurchaseOrderLine[]
 
   @@unique([tenantId, sku])
   @@unique([id, tenantId])
@@ -940,25 +1232,29 @@ model PurchaseOrderLine {
 // ─── Projects ────────────────────────────────────────────────────────────────
 
 model Project {
-  id         String        @id @default(cuid())
-  tenantId   String
+  id           String        @id @default(cuid())
+  tenantId     String
+  currency     String?
   departmentId String?
-  name       String
-  budget     Decimal?      @db.Decimal(19, 4)
-  spent      Decimal       @default(0) @db.Decimal(19, 4)
-  timeline   DateTime?
-  status     ProjectStatus @default(PLANNING)
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  name         String
+  budget       Decimal?      @db.Decimal(19, 4)
+  spent        Decimal       @default(0) @db.Decimal(19, 4)
+  timeline     DateTime?
+  status       ProjectStatus @default(PLANNING)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   department Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   milestones ProjectMilestone[]
   risks      ProjectRisk[]
   sprints    Sprint[]
+  issues     Issue[]
+  payables   PayableInvoice[]
+  expenses   Expense[]
 
-  @@index([tenantId])
   @@unique([id, tenantId])
+  @@index([tenantId])
 }
 
 model ProjectMilestone {
@@ -972,53 +1268,60 @@ model ProjectMilestone {
 }
 
 model ProjectRisk {
-  id       String       @id @default(cuid())
+  id        String       @id @default(cuid())
   projectId String
-  title    String
-  impact   String?
-  severity RiskSeverity @default(MEDIUM)
+  title     String
+  impact    String?
+  severity  RiskSeverity @default(MEDIUM)
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model Sprint {
-  id            String    @id @default(cuid())
+  id            String       @id @default(cuid())
   tenantId      String
   projectId     String?
   name          String
   status        SprintStatus @default(ACTIVE)
+  startsAt      DateTime?
   endsAt        DateTime?
-  completionPct Float     @default(0)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  completionPct Float        @default(0)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
-  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   issues  Issue[]
 
-  @@index([tenantId])
   @@unique([id, tenantId])
+  @@index([tenantId])
 }
 
 model Issue {
   id          String        @id @default(cuid())
   tenantId    String
   sprintId    String?
+  projectId   String?
   key         String?
   title       String
   tag         String?
   priority    IssuePriority @default(MEDIUM)
   status      IssueStatus   @default(TODO)
+  storyPoints Int?
+  completedAt DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  sprint     Sprint?              @relation(fields: [sprintId], references: [id], onDelete: SetNull)
-  checklist  IssueChecklistItem[]
-  comments   IssueComment[]
-  assignees  IssueAssignee[]
+  sprint    Sprint?              @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+  project   Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  checklist IssueChecklistItem[]
+  comments  IssueComment[]
+  assignees IssueAssignee[]
 
-  @@index([tenantId])
   @@unique([id, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, projectId])
+  @@index([tenantId, sprintId, completedAt])
 }
 
 model IssueChecklistItem {
@@ -1065,30 +1368,30 @@ model RoadmapPhase {
 }
 
 model RoadmapTask {
-  id           String    @id @default(cuid())
-  phaseId      String
-  tenantId     String
-  title        String
-  taskCode     String?
-  statusLabel  String?
-  description  String?
-  startDate    DateTime?
-  endDate      DateTime?
-  progressPct  Float     @default(0)
-  barColor     String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  phaseId     String
+  tenantId    String
+  title       String
+  taskCode    String?
+  statusLabel String?
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  progressPct Float     @default(0)
+  barColor    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  phase       RoadmapPhase         @relation(fields: [phaseId], references: [id], onDelete: Cascade)
-  assignees   RoadmapTaskAssignee[]
-  blocking    RoadmapDependency[]  @relation("BlockingTask")
-  blockedBy   RoadmapDependency[]  @relation("BlockedTask")
+  phase     RoadmapPhase          @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  assignees RoadmapTaskAssignee[]
+  blocking  RoadmapDependency[]   @relation("BlockingTask")
+  blockedBy RoadmapDependency[]   @relation("BlockedTask")
 }
 
 model RoadmapTaskAssignee {
-  id           String @id @default(cuid())
+  id            String @id @default(cuid())
   roadmapTaskId String
-  employeeId   String
+  employeeId    String
 
   task     RoadmapTask @relation(fields: [roadmapTaskId], references: [id], onDelete: Cascade)
   employee Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -1110,18 +1413,18 @@ model RoadmapDependency {
 // ─── Settings / Support ──────────────────────────────────────────────────────
 
 model Subscription {
-  id            String             @id @default(cuid())
-  tenantId      String
-  planName      String
-  priceMonthly  Decimal            @default(0) @db.Decimal(19, 4)
-  status        SubscriptionStatus @default(ACTIVE)
-  renewsOn      DateTime?
-  seatsUsed     Int                @default(1)
-  seatLimit     Int                @default(10)
-  storageUsedGb Float              @default(0)
-  storageLimitGb Float             @default(100)
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  id             String             @id @default(cuid())
+  tenantId       String
+  planName       String
+  priceMonthly   Decimal            @default(0) @db.Decimal(19, 4)
+  status         SubscriptionStatus @default(ACTIVE)
+  renewsOn       DateTime?
+  seatsUsed      Int                @default(1)
+  seatLimit      Int                @default(10)
+  storageUsedGb  Float              @default(0)
+  storageLimitGb Float              @default(100)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -1211,16 +1514,16 @@ model QuietHours {
 }
 
 model ExportJob {
-  id         String          @id @default(cuid())
-  tenantId   String
-  filename   String
-  dataScope  String?
-  format     String?
-  dateRange  String?
-  progressPct Float          @default(0)
-  status     ExportJobStatus @default(QUEUED)
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  id          String          @id @default(cuid())
+  tenantId    String
+  filename    String
+  dataScope   String?
+  format      String?
+  dateRange   String?
+  progressPct Float           @default(0)
+  status      ExportJobStatus @default(QUEUED)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -1228,11 +1531,11 @@ model ExportJob {
 }
 
 model BackupSchedule {
-  id        String  @id @default(cuid())
+  id        String   @id @default(cuid())
   tenantId  String
   name      String
   schedule  String
-  enabled   Boolean @default(true)
+  enabled   Boolean  @default(true)
   createdAt DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)

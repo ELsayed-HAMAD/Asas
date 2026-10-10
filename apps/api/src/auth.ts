@@ -68,16 +68,16 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
             additionalFields: {
               supportEmail: { type: 'string', required: false },
               timezone: { type: 'string', required: false },
-              currency: { type: 'string', required: false },
+              currency: { type: 'string', required: false, input: false },
               dateFormat: { type: 'string', required: false },
-              onboardingStatus: { type: 'string', required: false },
+              onboardingStatus: { type: 'string', required: false, input: false },
             },
           },
           member: {
             modelName: 'Member',
             fields: { organizationId: 'tenantId' },
             additionalFields: {
-              employeeId: { type: 'string', required: false },
+              employeeId: { type: 'string', required: false, input: false },
             },
           },
           invitation: {

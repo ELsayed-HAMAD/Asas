@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Search, Filter, Download, X, FileText,
@@ -37,6 +37,16 @@ const STAGE_COLORS = {
   'Rejected': 'bg-danger-light text-danger',
 }
 
+const NEXT_STAGES = {
+  APPLIED: ['SCREENING', 'REJECTED'],
+  SCREENING: ['TECH_INTERVIEW', 'REJECTED'],
+  TECH_INTERVIEW: ['FINAL_INTERVIEW', 'REJECTED'],
+  FINAL_INTERVIEW: ['OFFER_SENT', 'REJECTED'],
+  OFFER_SENT: ['HIRED', 'REJECTED'],
+  HIRED: [],
+  REJECTED: [],
+}
+
 // ── 2. Candidate Inspector Component ────────────────────────
 
 const CV_MAX_BYTES = 5 * 1024 * 1024 // Client-side guard mirroring the upload grant's maxBytes (server re-validates)
@@ -47,7 +57,7 @@ function formatBytes(bytes) {
   return `PDF • ${Math.max(1, Math.round(bytes / 1024))} KB`
 }
 
-function CandidateInspector({ candidate, onClose, canWrite, onMoveStage }) {
+function CandidateInspector({ candidate, interviews = [], onClose, canWrite, canMoveStage, onMoveStage, onSchedule, onCancelInterview }) {
   if (!candidate) return null
   const profile = candidate.profile || {}
   const activity = candidate.activity || []
@@ -80,10 +90,10 @@ function CandidateInspector({ candidate, onClose, canWrite, onMoveStage }) {
           </div>
 
           <div className="grid grid-cols-2 gap-2 mt-5">
-            <button disabled className="flex items-center justify-center gap-1.5 bg-primary text-white text-xs font-medium py-2 rounded-button hover:bg-primary-hover disabled:opacity-60">
+            <button type="button" disabled={!canWrite || !canMoveStage} onClick={onSchedule} title={!canWrite ? 'Requires the ADMIN role' : !canMoveStage ? 'Candidate is closed' : undefined} className="flex items-center justify-center gap-1.5 bg-primary text-white text-xs font-medium py-2 rounded-button hover:bg-primary-hover disabled:opacity-60">
               <Calendar size={14} /> Schedule
             </button>
-            <button type="button" disabled={!canWrite} onClick={onMoveStage} className="flex items-center justify-center gap-1.5 bg-surface-raised border border-border-default text-body text-xs font-medium py-2 rounded-button hover:bg-surface-muted disabled:opacity-60">
+            <button type="button" disabled={!canWrite || !canMoveStage} onClick={onMoveStage} className="flex items-center justify-center gap-1.5 bg-surface-raised border border-border-default text-body text-xs font-medium py-2 rounded-button hover:bg-surface-muted disabled:opacity-60">
               <ArrowRight size={14} /> Move Stage
             </button>
           </div>
@@ -91,6 +101,24 @@ function CandidateInspector({ candidate, onClose, canWrite, onMoveStage }) {
 
         {/* Profile Details */}
         <div className="p-4 space-y-6">
+          <div>
+            <h4 className="text-[10px] font-semibold text-caption uppercase tracking-wider mb-3">Interviews</h4>
+            <div className="space-y-2">
+              {interviews.length === 0 ? <p className="text-xs text-muted">No interviews scheduled.</p> : interviews.map(interview => (
+                <div key={interview.id} className="rounded-card-sm border border-border-default p-3 text-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-heading">{STAGE_LABELS[interview.stage]} · {new Date(interview.startsAt).toLocaleString()}</p>
+                      <p className="text-muted mt-1">{interview.durationMin} min{interview.interviewer ? ` · ${interview.interviewer}` : ''} · {interview.status.toLowerCase()}</p>
+                      {interview.meetingUrl && <a href={interview.meetingUrl} target="_blank" rel="noreferrer" className="text-accent underline mt-1 inline-block">Meeting link</a>}
+                      {interview.notes && <p className="text-body-light mt-1 whitespace-pre-wrap">{interview.notes}</p>}
+                    </div>
+                    {interview.status === 'SCHEDULED' && canWrite && <button type="button" onClick={() => onCancelInterview(interview.id)} className="text-danger hover:underline">Cancel</button>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
           <div>
             <h4 className="text-[10px] font-semibold text-caption uppercase tracking-wider mb-3">Overview</h4>
             <div className="space-y-3 text-sm">
@@ -131,10 +159,10 @@ function CandidateInspector({ candidate, onClose, canWrite, onMoveStage }) {
                       )}
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-heading">{log.action}</p>
-                      <p className="text-[11px] text-body-light leading-relaxed mt-0.5">{log.desc}</p>
+                      <p className="text-xs font-semibold text-heading">{log.action === 'stage.changed' ? 'Stage changed' : log.action === 'cv.uploaded' ? 'CV uploaded' : log.action === 'interview.scheduled' ? 'Interview scheduled' : log.action === 'interview.cancelled' ? 'Interview cancelled' : 'Candidate created'}</p>
+                      <p className="text-[11px] text-body-light leading-relaxed mt-0.5">{log.description || '—'}</p>
                       <p className="text-[9px] text-caption mt-1">
-                        {new Date(log.time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                        {new Date(log.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
                       </p>
                     </div>
                   </div>
@@ -269,6 +297,11 @@ export default function RecruitmentPipeline() {
   const [search, setSearch] = useState('')
   const [stageOpen, setStageOpen] = useState(false)
   const [nextStage, setNextStage] = useState('SCREENING')
+  const [scheduleOpen, setScheduleOpen] = useState(false)
+  const [interviewForm, setInterviewForm] = useState({ startsAt: '', durationMin: '60', stage: 'TECH_INTERVIEW', interviewer: '', meetingUrl: '', notes: '' })
+  const [interviewError, setInterviewError] = useState(null)
+  const [exportError, setExportError] = useState(null)
+  const [exporting, setExporting] = useState(false)
 
   const { data: activeMemberRole } = useActiveMemberRole()
   const canWrite = activeMemberRole === 'OWNER' || activeMemberRole === 'ADMIN'
@@ -280,6 +313,11 @@ export default function RecruitmentPipeline() {
 
   const candidates = data?.items || []
   const selectedCandidate = candidates.find(c => c.id === selectedId)
+  const { data: interviews = [] } = useQuery({
+    queryKey: queryKeys.hr.candidates.detail(selectedId ? `${selectedId}:interviews` : 'none'),
+    queryFn: () => hrApi.listCandidateInterviews(selectedId),
+    enabled: !!selectedId,
+  })
   const moveStageMutation = useMutation({
     mutationFn: () => hrApi.updateCandidateStage(selectedId, nextStage),
     onSuccess: () => {
@@ -287,6 +325,60 @@ export default function RecruitmentPipeline() {
       setStageOpen(false)
     },
   })
+  const scheduleInterviewMutation = useMutation({
+    mutationFn: body => hrApi.scheduleCandidateInterview(selectedId, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.hr.candidates.detail(`${selectedId}:interviews`) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.hr.candidates.all() })
+      setScheduleOpen(false)
+      setInterviewError(null)
+      setInterviewForm({ startsAt: '', durationMin: '60', stage: selectedCandidate?.stage === 'FINAL_INTERVIEW' ? 'FINAL_INTERVIEW' : 'TECH_INTERVIEW', interviewer: '', meetingUrl: '', notes: '' })
+    },
+    onError: err => setInterviewError(err?.message || 'Could not schedule interview'),
+  })
+  const cancelInterviewMutation = useMutation({
+    mutationFn: interviewId => hrApi.cancelCandidateInterview(selectedId, interviewId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.hr.candidates.detail(`${selectedId}:interviews`) }),
+    onError: err => setInterviewError(err?.message || 'Could not cancel interview'),
+  })
+
+  async function exportCandidates() {
+    setExporting(true)
+    setExportError(null)
+    try {
+      const blob = await hrApi.exportCandidates({ search: search || undefined })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'recruitment-candidates.csv'
+      link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (err) {
+      setExportError(err?.message || 'Could not export candidates')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  function submitInterview() {
+    if (!interviewForm.startsAt) {
+      setInterviewError('Choose an interview date and time.')
+      return
+    }
+    const startsAt = new Date(interviewForm.startsAt)
+    if (!Number.isFinite(startsAt.getTime())) {
+      setInterviewError('The date and time are invalid.')
+      return
+    }
+    scheduleInterviewMutation.mutate({
+      startsAt: startsAt.toISOString(),
+      durationMin: Number(interviewForm.durationMin),
+      stage: interviewForm.stage,
+      ...(interviewForm.interviewer.trim() && { interviewer: interviewForm.interviewer.trim() }),
+      ...(interviewForm.meetingUrl.trim() && { meetingUrl: interviewForm.meetingUrl.trim() }),
+      ...(interviewForm.notes.trim() && { notes: interviewForm.notes.trim() }),
+    })
+  }
 
   // Add-candidate dialog
   const [addOpen, setAddOpen] = useState(false)
@@ -324,14 +416,6 @@ export default function RecruitmentPipeline() {
   // The endpoint's `summary` is `null` (nothing to aggregate), so the KPI cards derive their
   // stage counts from the loaded page — `limit: 100` covers the full dataset, mirroring the
   // old client-side `stats` tally.
-  const stageCounts = useMemo(() => {
-    const counts = {}
-    candidates.forEach(c => {
-      counts[c.stage] = (counts[c.stage] || 0) + 1
-    })
-    return counts
-  }, [candidates])
-
   // Auto-select first candidate if none selected
   useEffect(() => {
     if (!selectedId && candidates.length > 0) {
@@ -339,17 +423,17 @@ export default function RecruitmentPipeline() {
     }
   }, [candidates, selectedId])
 
-  // High-level stats from the loaded candidate records. The API does not expose time-to-hire or
-  // offer-acceptance aggregates, so those KPIs stay explicitly unavailable.
-  const totalActive = Object.entries(stageCounts)
-    .filter(([code]) => code !== 'HIRED' && code !== 'REJECTED')
-    .reduce((acc, [, count]) => acc + count, 0)
-  const totalHired = stageCounts['HIRED'] || 0
+  // Period deltas use recorded stage-entry timestamps, compared with the same elapsed days
+  // in the previous tenant-local month.
+  const summary = data?.summary
+  const periodDelta = (current, previous, unit, digits = 0) => current == null || previous == null
+    ? 'No comparable period data'
+    : `${current - previous > 0 ? '+' : ''}${(current - previous).toFixed(digits)} ${unit} vs prior month-to-date`
   const displayStats = [
-    { label: 'Active Candidates', value: totalActive, trend: 'neutral', sub: 'Current pipeline' },
-    { label: 'Total Hired', value: totalHired, trend: 'neutral', sub: 'All time' },
-    { label: 'Avg Time to Hire', value: '—', trend: 'neutral', sub: 'Not available' },
-    { label: 'Offer Acceptance', value: '—', trend: 'neutral', sub: 'Not available' },
+    { label: 'Active Candidates', value: summary?.activeCandidates ?? '—', trend: 'neutral', sub: 'Current pipeline' },
+    { label: 'Hired (month to date)', value: summary?.hiredThisPeriod ?? '—', trend: 'neutral', sub: periodDelta(summary?.hiredThisPeriod, summary?.hiredPreviousPeriod, 'hires') },
+    { label: 'Avg Time to Hire (MTD)', value: summary?.averageTimeToHireThisPeriod == null ? '—' : summary.averageTimeToHireThisPeriod + ' days', trend: 'neutral', sub: periodDelta(summary?.averageTimeToHireThisPeriod, summary?.averageTimeToHirePreviousPeriod, 'days', 1) },
+    { label: 'Offer Acceptance (MTD)', value: summary?.offerAcceptanceRateThisPeriod == null ? '—' : summary.offerAcceptanceRateThisPeriod + '%', trend: 'neutral', sub: `${summary?.offersDecidedThisPeriod ?? 0} decisions · ${periodDelta(summary?.offerAcceptanceRateThisPeriod, summary?.offerAcceptanceRatePreviousPeriod, 'points', 1)}` },
   ]
 
   return (
@@ -411,10 +495,11 @@ export default function RecruitmentPipeline() {
               Role: All
             </button>
           </div>
-          <button disabled className="flex items-center gap-2 text-muted text-sm hover:text-heading font-medium px-3 py-1.5 disabled:opacity-60">
-            <Download size={14} /> Export
+          <button type="button" disabled={!canWrite || exporting} title={canWrite ? 'Export all candidates matching the current search' : 'Requires the ADMIN role'} onClick={exportCandidates} className="flex items-center gap-2 text-muted text-sm hover:text-heading font-medium px-3 py-1.5 disabled:opacity-60">
+            {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Export
           </button>
         </div>
+        {exportError && <p role="alert" className="px-8 py-2 text-xs text-danger">{exportError}</p>}
 
         {/* Data Table */}
         <div className="flex-1 overflow-auto">
@@ -492,10 +577,14 @@ export default function RecruitmentPipeline() {
               experience: selectedCandidate.experience,
               source: selectedCandidate.source,
             },
-            activity: [],
+            activity: selectedCandidate.activity,
           } : null}
+          interviews={interviews}
           canWrite={canWrite}
-          onMoveStage={() => { setNextStage(selectedCandidate?.stage === 'APPLIED' ? 'SCREENING' : 'TECH_INTERVIEW'); setStageOpen(true) }}
+          canMoveStage={!!NEXT_STAGES[selectedCandidate?.stage]?.length}
+          onMoveStage={() => { setNextStage(NEXT_STAGES[selectedCandidate.stage][0]); setStageOpen(true) }}
+          onSchedule={() => { setInterviewError(null); setInterviewForm({ startsAt: '', durationMin: '60', stage: selectedCandidate?.stage === 'FINAL_INTERVIEW' ? 'FINAL_INTERVIEW' : 'TECH_INTERVIEW', interviewer: '', meetingUrl: '', notes: '' }); setScheduleOpen(true) }}
+          onCancelInterview={interviewId => cancelInterviewMutation.mutate(interviewId)}
           onClose={() => setSelectedId(null)}
         />
       )}
@@ -568,7 +657,21 @@ export default function RecruitmentPipeline() {
       </FormDialog>
 
       <FormDialog open={stageOpen} onClose={() => setStageOpen(false)} title="Move candidate stage" subtitle={selectedCandidate?.name} confirmLabel="Save stage" busy={moveStageMutation.isPending} onConfirm={() => moveStageMutation.mutate()}>
-        <label className="block text-sm font-medium text-body">Stage<select value={nextStage} onChange={event => setNextStage(event.target.value)} className="mt-1 w-full rounded-input border border-border-default px-3 py-2">{Object.entries(STAGE_LABELS).filter(([stage]) => stage !== selectedCandidate?.stage).map(([stage, label]) => <option key={stage} value={stage}>{label}</option>)}</select></label>
+        <label className="block text-sm font-medium text-body">Stage<select value={nextStage} onChange={event => setNextStage(event.target.value)} className="mt-1 w-full rounded-input border border-border-default px-3 py-2">{(NEXT_STAGES[selectedCandidate?.stage] || []).map(stage => <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>)}</select></label>
+      </FormDialog>
+
+      <FormDialog open={scheduleOpen} onClose={() => setScheduleOpen(false)} title="Schedule interview" subtitle={selectedCandidate?.name} confirmLabel="Schedule interview" busy={scheduleInterviewMutation.isPending} onConfirm={submitInterview}>
+        <div className="space-y-3">
+          <label className="block text-sm font-medium text-body">Date and time (your device time)<input type="datetime-local" value={interviewForm.startsAt} onChange={event => setInterviewForm(f => ({ ...f, startsAt: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm font-medium text-body">Interview stage<select value={interviewForm.stage} onChange={event => setInterviewForm(f => ({ ...f, stage: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2">{['SCREENING', 'TECH_INTERVIEW', 'FINAL_INTERVIEW'].map(stage => <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>)}</select></label>
+            <label className="block text-sm font-medium text-body">Duration (minutes)<input type="number" min="15" max="480" step="15" value={interviewForm.durationMin} onChange={event => setInterviewForm(f => ({ ...f, durationMin: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
+          </div>
+          <label className="block text-sm font-medium text-body">Interviewer<input value={interviewForm.interviewer} onChange={event => setInterviewForm(f => ({ ...f, interviewer: event.target.value }))} maxLength={160} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
+          <label className="block text-sm font-medium text-body">Meeting URL<input type="url" value={interviewForm.meetingUrl} onChange={event => setInterviewForm(f => ({ ...f, meetingUrl: event.target.value }))} placeholder="https://..." className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
+          <label className="block text-sm font-medium text-body">Notes<textarea value={interviewForm.notes} onChange={event => setInterviewForm(f => ({ ...f, notes: event.target.value }))} maxLength={2000} rows={3} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
+          {interviewError && <p role="alert" className="text-xs text-danger">{interviewError}</p>}
+        </div>
       </FormDialog>
 
     </div>

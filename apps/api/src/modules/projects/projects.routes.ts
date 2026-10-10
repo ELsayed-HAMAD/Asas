@@ -20,6 +20,7 @@ import {
   roadmapTaskUpdateSchema,
   roadmapTaskWriteSchema,
   sprintListResponseSchema,
+  sprintVelocityComparisonSchema,
   sprintSchema,
   sprintUpdateSchema,
   sprintWriteSchema,
@@ -156,6 +157,19 @@ export async function projectsRoutes(app: FastifyInstance): Promise<void> {
     async request => {
       const { tenantId } = requireAuthContext(request)
       const result = await projectsController.getPortfolioUtilization(request.server.prisma, tenantId)
+      return { data: result }
+    },
+  )
+
+  server.get(
+    '/projects/:id/sprint-velocity-comparison',
+    {
+      preHandler: requireRole('MEMBER'),
+      schema: { params: idParamSchema, response: { 200: envelope(sprintVelocityComparisonSchema), ...errorResponses } },
+    },
+    async request => {
+      const { tenantId } = requireAuthContext(request)
+      const result = await projectsController.getSprintVelocityComparison(request.server.prisma, tenantId, request.params.id)
       return { data: result }
     },
   )

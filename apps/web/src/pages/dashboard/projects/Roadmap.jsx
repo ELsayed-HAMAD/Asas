@@ -12,6 +12,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { projectsApi } from '../../../lib/api/projects';
 import { queryKeys } from '../../../lib/queryKeys';
+import { downloadRoadmapCsv } from '../../../lib/roadmapExport';
 import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
 
@@ -22,6 +23,7 @@ export default function Roadmap() {
   const [phaseOpen, setPhaseOpen] = useState(false)
   const [taskOpen, setTaskOpen] = useState(false)
   const [timelineOpen, setTimelineOpen] = useState(false)
+  const [timelineTaskId, setTimelineTaskId] = useState(null)
   const [phaseTitle, setPhaseTitle] = useState('')
   const [taskForm, setTaskForm] = useState({ title: '', phaseId: '' })
   const [timelineForm, setTimelineForm] = useState({ startDate: '', endDate: '', progressPct: 0 })
@@ -30,6 +32,27 @@ export default function Roadmap() {
     queryKey: queryKeys.projects.roadmap(),
     queryFn: projectsApi.getRoadmap,
   });
+
+  // The old page filtered phases to "Q3/Q4 2026" and rewrote status/progress client-side.
+  // The new endpoint already ships ordered phases with dated, pre-computed tasks, so we
+  // render them as-is.
+  const phases = responseData?.phases || [];
+
+  // Find selected task directly from phases
+  let selectedTask = null;
+  if (selectedId) {
+    phases.forEach(p => {
+      (p.tasks || []).forEach(t => {
+        if (t.id === selectedId) selectedTask = t;
+      });
+    });
+  }
+
+  // Mutation hooks must run on every render (before the loading/error early returns).
+  const refreshRoadmap = () => queryClient.invalidateQueries({ queryKey: queryKeys.projects.roadmap() })
+  const createPhase = useMutation({ mutationFn: () => projectsApi.createRoadmapPhase({ title: phaseTitle.trim(), sortOrder: phases.length }), onSuccess: () => { setPhaseOpen(false); setPhaseTitle(''); refreshRoadmap() } })
+  const createTask = useMutation({ mutationFn: () => projectsApi.createRoadmapTask({ title: taskForm.title.trim(), phaseId: taskForm.phaseId || phases[0]?.id }), onSuccess: () => { setTaskOpen(false); setTaskForm({ title: '', phaseId: '' }); refreshRoadmap() } })
+  const updateTimeline = useMutation({ mutationFn: () => projectsApi.updateRoadmapTask(timelineTaskId, { ...timelineForm, startDate: timelineForm.startDate || null, endDate: timelineForm.endDate || null }), onSuccess: () => { setTimelineOpen(false); refreshRoadmap() } })
 
   if (isLoading) {
     return (
@@ -45,25 +68,6 @@ export default function Roadmap() {
         Failed to load roadmap.
       </div>
     );
-  }
-
-  // The old page filtered phases to "Q3/Q4 2026" and rewrote status/progress client-side.
-  // The new endpoint already ships ordered phases with dated, pre-computed tasks, so we
-  // render them as-is.
-  const phases = responseData.phases || [];
-  const refreshRoadmap = () => queryClient.invalidateQueries({ queryKey: queryKeys.projects.roadmap() })
-  const createPhase = useMutation({ mutationFn: () => projectsApi.createRoadmapPhase({ title: phaseTitle.trim(), sortOrder: phases.length }), onSuccess: () => { setPhaseOpen(false); setPhaseTitle(''); refreshRoadmap() } })
-  const createTask = useMutation({ mutationFn: () => projectsApi.createRoadmapTask({ title: taskForm.title.trim(), phaseId: taskForm.phaseId || phases[0]?.id }), onSuccess: () => { setTaskOpen(false); setTaskForm({ title: '', phaseId: '' }); refreshRoadmap() } })
-  const updateTimeline = useMutation({ mutationFn: () => projectsApi.updateRoadmapTask(selectedTask.id, { ...timelineForm, startDate: timelineForm.startDate || null, endDate: timelineForm.endDate || null }), onSuccess: () => { setTimelineOpen(false); refreshRoadmap() } })
-
-  // Find selected task directly from phases
-  let selectedTask = null;
-  if (selectedId) {
-    phases.forEach(p => {
-      (p.tasks || []).forEach(t => {
-        if (t.id === selectedId) selectedTask = t;
-      });
-    });
   }
 
   // Count total tasks for the header
@@ -86,7 +90,7 @@ export default function Roadmap() {
           </div>
 
               <button
-                onClick={() => { setTimelineForm({ startDate: selectedTask.startDate?.slice(0, 10) || '', endDate: selectedTask.endDate?.slice(0, 10) || '', progressPct: selectedTask.progressPct || 0 }); setTimelineOpen(true) }}
+                onClick={() => downloadRoadmapCsv(phases)}
             className="bg-primary text-white px-5 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
           >
             Export
@@ -288,7 +292,7 @@ export default function Roadmap() {
             {selectedTask && (
               <div className="p-5 border-t border-border-default bg-surface-raised mt-auto">
                 <button
-                  disabled
+                  onClick={() => { setTimelineTaskId(selectedTask.id); setTimelineForm({ startDate: selectedTask.startDate?.slice(0, 10) || '', endDate: selectedTask.endDate?.slice(0, 10) || '', progressPct: selectedTask.progressPct || 0 }); setTimelineOpen(true) }}
                   className="w-full flex items-center justify-center gap-2 bg-primary text-white py-3 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
                 >
                   <Edit2 size={14} />

@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, CreditCard, Briefcase,
   Package, FolderKanban, Settings, HelpCircle,
   ChevronDown, ChevronRight, Plus, LogOut, Menu,
-  Check, User, Moon, Download
+  Check, User, Moon, Download, X
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -41,6 +41,7 @@ const NAV = [
       { label: 'Accounts Payable',      path: '/dashboard/finance/accounts-payable' },
       { label: 'Accounts Receivable',   path: '/dashboard/finance/accounts-receivable' },
       { label: 'Expenses',              path: '/dashboard/finance/expenses' },
+      { label: 'Trial Balance',         path: '/dashboard/finance/trial-balance' },
     ],
   },
   {
@@ -108,6 +109,7 @@ const BREADCRUMB_LABELS = {
   'accounts-payable':    'Accounts Payable',
   'accounts-receivable': 'Accounts Receivable',
   expenses:              'Expenses',
+  'trial-balance':        'Trial Balance',
   crm:                   'CRM',
   deals:                 'Deals Pipeline',
   'sales-performance':   'Sales Performance',
@@ -223,6 +225,7 @@ function SidebarContent({ navProps, navigate }) {
   const menuRef = useRef(null)
   const [switchingOrgId, setSwitchingOrgId] = useState(null)
   const [orgSwitchError, setOrgSwitchError] = useState('')
+  const [quickEntryOpen, setQuickEntryOpen] = useState(false)
 
   const { data: session } = useSession()
   const { data: activeOrganization } = useActiveOrganization()
@@ -241,7 +244,8 @@ function SidebarContent({ navProps, navigate }) {
   }, [])
 
   const displayName = session?.user?.name || 'User'
-  const roleLabel = activeMemberRole ? String(activeMemberRole).charAt(0) + String(activeMemberRole).slice(1).toLowerCase() : 'Member'
+  const roleName = typeof activeMemberRole === 'string' ? activeMemberRole : activeMemberRole?.role
+  const roleLabel = roleName ? roleName.charAt(0) + roleName.slice(1).toLowerCase() : 'Member'
   const tenantName = activeOrganization?.name || 'Enterprise ERP'
   const email = session?.user?.email || ''
   const initials = displayName
@@ -252,7 +256,10 @@ function SidebarContent({ navProps, navigate }) {
     .join('') || 'U'
 
   const handleLogout = async () => {
-    await signOut()
+    const result = await signOut()
+    if (result?.error) return
+    await queryClient.cancelQueries()
+    queryClient.clear()
     setUserMenuOpen(false)
     navigate('/login', { replace: true })
   }
@@ -300,7 +307,11 @@ function SidebarContent({ navProps, navigate }) {
 
       {/* Quick action */}
       <div className="px-3 py-3 flex-shrink-0">
-        <button type="button" className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary text-sm font-medium px-3 py-2 rounded-button hover:bg-primary-hover active:scale-[0.98] transition-all">
+        <button
+          type="button"
+          onClick={() => setQuickEntryOpen(true)}
+          className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary text-sm font-medium px-3 py-2 rounded-button hover:bg-primary-hover active:scale-[0.98] transition-all cursor-pointer"
+        >
           <Plus size={14} />
           New Entry
         </button>
@@ -385,10 +396,17 @@ function SidebarContent({ navProps, navigate }) {
                     <Check size={16} className="text-accent shrink-0" />
                   </div>
                 )}
-                <div className="px-3 py-2 flex items-center gap-3 text-sm font-semibold text-accent hover:bg-surface-muted rounded-input cursor-pointer transition-colors mt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserMenuOpen(false)
+                    navigate('/onboarding')
+                  }}
+                  className="w-full px-3 py-2 flex items-center gap-3 text-sm font-semibold text-accent hover:bg-surface-muted rounded-input cursor-pointer transition-colors mt-1 text-left"
+                >
                   <Plus size={16} />
                   Create New Workspace
-                </div>
+                </button>
               </div>
 
               {/* 3. Account Actions */}
@@ -408,7 +426,19 @@ function SidebarContent({ navProps, navigate }) {
                   Toggle Theme
                 </button>
                 <button
-                  onClick={() => setUserMenuOpen(false)}
+                  onClick={() => {
+                    setUserMenuOpen(false)
+                    const blob = new Blob(
+                      ["Asas ERP Desktop App Launcher\nVersion: 1.0.0\nPlatform: Windows x64\nLaunch URL: " + window.location.origin],
+                      { type: 'text/plain' }
+                    )
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = 'asas-desktop-launcher.txt'
+                    a.click()
+                    URL.revokeObjectURL(url)
+                  }}
                   className="flex items-center gap-3 text-left px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors"
                 >
                   <Download size={16} className="text-caption" />
@@ -444,6 +474,119 @@ function SidebarContent({ navProps, navigate }) {
           </div>
         </button>
       </div>
+
+      <AnimatePresence>
+        {quickEntryOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="w-full max-w-lg bg-surface-raised border border-border-default rounded-card-sm shadow-card overflow-hidden"
+            >
+              <div className="flex items-center justify-between p-4 border-b border-border-subtle">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                    <Plus size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-heading">Quick Entry</h3>
+                    <p className="text-xs text-caption">Select a record type to create or manage</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setQuickEntryOpen(false)}
+                  className="p-1 rounded-input text-muted hover:text-heading hover:bg-surface-muted transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="p-4 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/hr/employees'); }}
+                  className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
+                >
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                    <Users size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-heading">New Employee</h4>
+                    <p className="text-xs text-caption">Add team member to HR directory</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/finance/accounts-payable'); }}
+                  className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
+                >
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                    <CreditCard size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-heading">New Payable Bill</h4>
+                    <p className="text-xs text-caption">Record a vendor invoice or bill</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/finance/expenses'); }}
+                  className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
+                >
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                    <CreditCard size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-heading">New Expense</h4>
+                    <p className="text-xs text-caption">Submit or log an expense receipt</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/crm/deals'); }}
+                  className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
+                >
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                    <Briefcase size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-heading">New CRM Deal</h4>
+                    <p className="text-xs text-caption">Add sales opportunity to pipeline</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/inventory'); }}
+                  className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
+                >
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                    <Package size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-heading">New Product</h4>
+                    <p className="text-xs text-caption">Create product in catalog</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/projects/sprints'); }}
+                  className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
+                >
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                    <FolderKanban size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-heading">Sprints & Tasks</h4>
+                    <p className="text-xs text-caption">View or create project issues</p>
+                  </div>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   )

@@ -24,16 +24,26 @@ export const hrApi = {
   getPayrollRun: (id) => http.get(`/hr/payroll/runs/${id}`),
   createPayrollRun: (body) => http.post('/hr/payroll/runs', { body }),
   approvePayrollRun: (id) => http.post(`/hr/payroll/runs/${id}/approve`),
+  payPayrollRun: (id) => http.post(`/hr/payroll/runs/${id}/pay`),
+  voidPayrollRun: (id, reason) => http.post(`/hr/payroll/runs/${id}/void`, { body: { reason } }),
   patchPayrollLine: (runId, lineId, patch) =>
     http.patch(`/hr/payroll/runs/${runId}/lines/${lineId}`, { body: patch }),
 
   // Attendance + leave
-  listAttendance: () => http.get('/hr/attendance'),
+  listAttendance: (params) => http.get('/hr/attendance', { query: params }),
   clockIn: () => http.post('/hr/attendance/clock-in'),
   clockOut: () => http.post('/hr/attendance/clock-out'),
   approveTimesheet: (id) => http.post(`/hr/attendance/timesheets/${id}/approve`),
+  correctAttendancePunch: (id, body) => http.patch(`/hr/attendance/timesheet-days/${id}/correct`, { body }),
+  resolveAttendanceException: (id) => http.post(`/hr/attendance/exceptions/${id}/resolve`),
   approveValidTimesheets: (ids) => http.post('/hr/attendance/timesheets/approve-valid', { body: { ids } }),
   createLeaveRequest: (body) => http.post('/hr/leave-requests', { body }),
+  createSelfLeaveRequest: (body) => http.post('/hr/leave-requests/self', { body }),
+  approveLeaveRequest: (id) => http.post(`/hr/leave-requests/${id}/approve`),
+  rejectLeaveRequest: (id) => http.post(`/hr/leave-requests/${id}/reject`),
+  getLeaveBalances: (params) => http.get('/hr/leave-balances', { query: params }),
+  getLeavePolicies: () => http.get('/hr/leave-policies'),
+  updateLeavePolicy: (type, body) => http.put(`/hr/leave-policies/${type}`, { body }),
 
   // Candidates
   listCandidates: (params) => http.get('/hr/candidates', { query: params }),
@@ -41,6 +51,10 @@ export const hrApi = {
   createCandidate: (body) => http.post('/hr/candidates', { body }),
   updateCandidate: (id, patch) => http.patch(`/hr/candidates/${id}`, { body: patch }),
   updateCandidateStage: (id, stage) => http.post(`/hr/candidates/${id}/stage`, { body: { stage } }),
+  listCandidateInterviews: (id) => http.get(`/hr/candidates/${id}/interviews`),
+  scheduleCandidateInterview: (id, body) => http.post(`/hr/candidates/${id}/interviews`, { body }),
+  cancelCandidateInterview: (id, interviewId) => http.post(`/hr/candidates/${id}/interviews/${interviewId}/cancel`),
+  exportCandidates: (params) => http.binary('/hr/candidates/export.csv', params),
 
   // Candidate CV (resume) surface — server-side signed PDF upload.
   getResumeUploadUrl: (id) => http.get(`/hr/candidates/${id}/resume-upload-url`),
