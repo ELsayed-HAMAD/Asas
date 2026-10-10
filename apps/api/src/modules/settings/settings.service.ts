@@ -1,7 +1,7 @@
+import { Prisma } from '@prisma/client'
 import type {
   Integration as PrismaIntegration,
   NotificationPreference,
-  Prisma,
   PrismaClient,
   Tenant as PrismaTenant,
 } from '@prisma/client'
@@ -21,7 +21,12 @@ import type {
   BackupScheduleUpdateInput,
   BackupScheduleWriteInput,
   BillingSettings,
+  ExchangeRate,
+  ExchangeRateListQuery,
+  ExchangeRateListResponse,
+  ExchangeRateWriteInput,
 } from '@asas/contracts'
+import { buildPaginationMeta, toPrismaPage } from '@asas/contracts'
 import { AppError } from '../../utils/errors.js'
 
 /**
@@ -42,7 +47,9 @@ const generalSelect = {
   logoUrl: true,
   timezone: true,
   currency: true,
+  currencyLockedAt: true,
   dateFormat: true,
+  overtimeThresholdHours: true,
   createdAt: true,
   updatedAt: true,
 } as const
@@ -55,7 +62,9 @@ function mapGeneral(tenant: Prisma.TenantGetPayload<{ select: typeof generalSele
     logoUrl: tenant.logoUrl,
     timezone: tenant.timezone,
     currency: tenant.currency,
+    currencyLockedAt: tenant.currencyLockedAt?.toISOString() ?? null,
     dateFormat: tenant.dateFormat,
+    overtimeThresholdHours: tenant.overtimeThresholdHours,
     createdAt: tenant.createdAt.toISOString(),
     updatedAt: tenant.updatedAt.toISOString(),
   }
@@ -68,11 +77,20 @@ export async function getTenantSettings(prisma: PrismaClient, tenantId: string):
 }
 
 export async function updateTenantSettings(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Prisma.TransactionClient,
   tenantId: string,
   input: GeneralSettingsUpdateInput,
 ): Promise<GeneralSettings> {
-  await assertTenantExists(prisma, tenantId)
+  if ('$transaction' in prisma) return prisma.$transaction(tx => updateTenantSettings(tx, tenantId, input))
+  const locked = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT "id" FROM "Tenant" WHERE "id" = ${tenantId} FOR UPDATE
+  `
+  if (locked.length === 0) throw new AppError(404, 'Workspace not found')
+  const existing = await prisma.tenant.findUnique({ where: { id: tenantId }, select: generalSelect })
+  if (!existing) throw new AppError(404, 'Workspace not found')
+  if (input.currency !== undefined && input.currency !== existing.currency && existing.currencyLockedAt) {
+    throw new AppError(409, 'Base currency is fixed once monetary data exists. Changing a currency label is not an FX conversion')
+  }
 
   const tenant = await prisma.tenant.update({
     where: { id: tenantId },
@@ -83,10 +101,48 @@ export async function updateTenantSettings(
       ...(input.timezone !== undefined && { timezone: input.timezone }),
       ...(input.currency !== undefined && { currency: input.currency }),
       ...(input.dateFormat !== undefined && { dateFormat: input.dateFormat }),
+      ...(input.overtimeThresholdHours !== undefined && { overtimeThresholdHours: input.overtimeThresholdHours }),
     },
     select: generalSelect,
   })
   return mapGeneral(tenant)
+}
+
+function mapExchangeRate(row: { id: string; currency: string; rateToBase: Prisma.Decimal; effectiveAt: Date; source: string; reference: string | null; createdById: string | null; createdAt: Date }, baseCurrency: string): ExchangeRate {
+  return {
+    id: row.id, currency: row.currency, baseCurrency, rateToBase: row.rateToBase.toString(),
+    effectiveAt: row.effectiveAt.toISOString(), source: 'MANUAL', reference: row.reference,
+    createdById: row.createdById, createdAt: row.createdAt.toISOString(),
+  }
+}
+
+export async function listExchangeRates(prisma: PrismaClient, tenantId: string, query: ExchangeRateListQuery): Promise<ExchangeRateListResponse> {
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } })
+  if (!tenant) throw new AppError(404, 'Workspace not found')
+  const where = { tenantId, ...(query.currency && { currency: query.currency }) }
+  const [rows, total] = await Promise.all([
+    prisma.exchangeRate.findMany({ where, ...toPrismaPage(query), orderBy: [{ effectiveAt: 'desc' }, { id: 'desc' }] }),
+    prisma.exchangeRate.count({ where }),
+  ])
+  return { items: rows.map(row => mapExchangeRate(row, tenant.currency)), pagination: buildPaginationMeta(query, total), summary: null }
+}
+
+export async function createExchangeRate(prisma: PrismaClient | Prisma.TransactionClient, tenantId: string, actorId: string, input: ExchangeRateWriteInput): Promise<ExchangeRate> {
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } })
+  if (!tenant) throw new AppError(404, 'Workspace not found')
+  if (tenant.currency === input.currency) throw new AppError(400, 'The workspace base currency does not need an FX rate')
+  const [whole, fraction = ''] = input.rateToBase.split('.')
+  if (whole!.length > 12 || fraction.length > 12) throw new AppError(400, 'An FX rate must fit within 24 digits and 12 decimal places')
+  try {
+    const row = await prisma.exchangeRate.create({ data: {
+      tenantId, currency: input.currency, rateToBase: new Prisma.Decimal(input.rateToBase),
+      effectiveAt: new Date(input.effectiveAt), source: 'MANUAL', reference: input.reference ?? null, createdById: actorId,
+    } })
+    return mapExchangeRate(row, tenant.currency)
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new AppError(409, 'An FX rate already exists for this currency and effective time')
+    throw error
+  }
 }
 
 // ── Notifications ───────────────────────────────────────────────────────────

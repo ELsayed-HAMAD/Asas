@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto'
+import { createHmac, timingSafeEqual } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { z } from 'zod'
@@ -7,6 +7,9 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import {
   candidateListQuerySchema,
   candidateListResponseSchema,
+  candidateInterviewListSchema,
+  candidateInterviewSchema,
+  candidateInterviewWriteSchema,
   candidateSchema,
   candidateStageUpdateSchema,
   candidateWriteSchema,
@@ -20,6 +23,8 @@ import { requireAuthContext, requireRole } from '../../middlewares/rbac.js'
 import { requirePermission } from '../../middlewares/permissions.js'
 import { moduleKeyPrefix } from '../../plugins/sse.js'
 import * as candidatesService from './candidates.service.js'
+import { renderCandidateCsv } from './candidateExport.js'
+import { recordAuditLog } from '../../services/auditLog.js'
 
 /**
  * HR candidates — recruitment pipeline reads/writes plus the CV (resume) surface.
@@ -27,16 +32,20 @@ import * as candidatesService from './candidates.service.js'
  * The CV flow is **server-side storage with a signed upload**, not a third-party presigned
  * URL: the API mints a short-lived HMAC-signed PUT (the `h` and `exp` params, 10-minute
  * window, verified against `authSecret`) scoped to exactly one tenant + candidate, and the
- * browser PUTs the PDF straight to the API. The file lands under `storage/resumes/<tenantId>/`
- * (gitignored, outside `dist/`), `Candidate.resumeUrl` records the preview path, and the
+ * browser PUTs the PDF straight to the API. The file lands at
+ * `storage/resumes/<tenantId>/<candidateId>.pdf` (gitignored, outside `dist/`),
+ * `Candidate.resumeUrl` records the preview path, and the
  * preview route streams it back as `application/pdf` — which the web app feeds to an in-app
  * `<iframe>` over a same-origin blob URL (native PDF viewer; the 500 kB CI chunk budget rules
  * out bundling pdf.js).
  *
- * The stored filename is fixed (`resume.pdf`) rather than client-supplied: a candidate has
- * exactly one CV at a time, so a re-upload replaces in place and there is no path to
- * influence. Tenant isolation follows the module's rule — `tenantId` only ever comes from
- * the resolved session.
+ * The stored filename is the candidate's own id (never client-supplied, and checked against
+ * `^[a-z0-9]+$` so it cannot traverse): a candidate has exactly one CV at a time, so a
+ * re-upload replaces in place, and two candidates can never share or overwrite a file. Legacy
+ * files from the old shared `resume.pdf` layout are deliberately *not* read back — that file
+ * may belong to a different candidate — so such a candidate reads as 404 until re-uploaded.
+ * Tenant isolation follows the module's rule — `tenantId` only ever comes from the resolved
+ * session.
  */
 
 /** Upload window: 10 minutes is enough for a human, short enough that a leaked link is stale. */
@@ -46,6 +55,22 @@ const MAX_RESUME_BYTES = 5 * 1024 * 1024
 
 function storageDir(tenantId: string): string {
   return path.join(process.cwd(), 'storage', 'resumes', tenantId)
+}
+
+/**
+ * The one CV file for a candidate. `z.cuid()` alone admits `/` and `.`, so the id is re-checked
+ * here before it becomes a path segment.
+ */
+function resumeFilePath(tenantId: string, candidateId: string): string {
+  if (!/^[a-z0-9]+$/.test(candidateId)) throw new Error('Refusing to build a resume path from a non-alphanumeric id')
+  return path.join(storageDir(tenantId), `${candidateId}.pdf`)
+}
+
+/** Constant-time comparison of two hex signatures; a length mismatch is simply unequal. */
+function signaturesMatch(provided: string, expected: string): boolean {
+  const a = Buffer.from(provided, 'utf8')
+  const b = Buffer.from(expected, 'utf8')
+  return a.length === b.length && timingSafeEqual(a, b)
 }
 
 /**
@@ -61,6 +86,54 @@ function signUpload(secret: string, tenantId: string, candidateId: string, expir
 export async function candidateRoutes(app: FastifyInstance): Promise<void> {
   const server = app.withTypeProvider<ZodTypeProvider>()
   const authSecret = app.authSecret
+
+  server.get('/candidates/export.csv', {
+    preHandler: requirePermission('candidate.export'),
+    schema: { querystring: candidateListQuerySchema, ...({} as object) },
+  }, async (request, reply) => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const rows = await candidatesService.getCandidatesForExport(request.server.prisma, tenantId, request.query)
+    await recordAuditLog(request.server.prisma, { tenantId, actorId: userId, action: 'hr.candidate.export', targetType: 'Candidate', metadata: { count: rows.length, stage: request.query.stage ?? null, search: request.query.search ?? null } })
+    reply.code(200).header('content-type', 'text/csv; charset=utf-8').header('content-disposition', 'attachment; filename="recruitment-candidates.csv"')
+    return reply.send(renderCandidateCsv(rows))
+  })
+
+  server.get('/candidates/:id/interviews', {
+    preHandler: requireRole('MEMBER'),
+    schema: { params: idParamSchema, response: { 200: envelope(candidateInterviewListSchema), ...errorResponses } },
+  }, async request => {
+    const { tenantId } = requireAuthContext(request)
+    return { data: await candidatesService.listCandidateInterviews(request.server.prisma, tenantId, request.params.id) }
+  })
+
+  server.post('/candidates/:id/interviews', {
+    preHandler: requirePermission('candidate.write'),
+    schema: { params: idParamSchema, body: candidateInterviewWriteSchema, response: { 201: envelope(candidateInterviewSchema), ...errorResponses } },
+  }, async (request, reply) => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const interview = await request.server.prisma.$transaction(async tx => {
+      const created = await candidatesService.scheduleCandidateInterview(tx, tenantId, request.params.id, request.body)
+      await recordAuditLog(tx, { tenantId, actorId: userId, action: 'hr.candidate.interview.schedule', targetType: 'Candidate', targetId: request.params.id, metadata: { interviewId: created.id, startsAt: created.startsAt, stage: created.stage } })
+      return created
+    })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('hr')])
+    reply.code(201)
+    return { data: interview }
+  })
+
+  server.post('/candidates/:id/interviews/:interviewId/cancel', {
+    preHandler: requirePermission('candidate.write'),
+    schema: { params: z.object({ id: idParamSchema.shape.id, interviewId: idParamSchema.shape.id }), response: { 200: envelope(candidateInterviewSchema), ...errorResponses } },
+  }, async request => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const interview = await request.server.prisma.$transaction(async tx => {
+      const cancelled = await candidatesService.cancelCandidateInterview(tx, tenantId, request.params.id, request.params.interviewId)
+      await recordAuditLog(tx, { tenantId, actorId: userId, action: 'hr.candidate.interview.cancel', targetType: 'Candidate', targetId: request.params.id, metadata: { interviewId: cancelled.id } })
+      return cancelled
+    })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('hr')])
+    return { data: interview }
+  })
 
   server.get(
     '/candidates',
@@ -104,8 +177,12 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request, reply) => {
-      const { tenantId } = requireAuthContext(request)
-      const candidate = await candidatesService.createCandidate(request.server.prisma, tenantId, request.body)
+      const { tenantId, userId } = requireAuthContext(request)
+      const candidate = await request.server.prisma.$transaction(async tx => {
+        const created = await candidatesService.createCandidateInTransaction(tx, tenantId, request.body)
+        await recordAuditLog(tx, { tenantId, actorId: userId, action: 'hr.candidate.create', targetType: 'Candidate', targetId: created.id })
+        return created
+      })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('hr')])
       reply.code(201)
       return { data: candidate }
@@ -123,13 +200,21 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async request => {
-      const { tenantId } = requireAuthContext(request)
-      const candidate = await candidatesService.updateCandidateStage(
-        request.server.prisma,
-        tenantId,
-        request.params.id,
-        request.body,
-      )
+      const { tenantId, userId } = requireAuthContext(request)
+      const candidate = await request.server.prisma.$transaction(async tx => {
+        const updated = await candidatesService.updateCandidateStageInTransaction(tx, tenantId, request.params.id, request.body)
+        await recordAuditLog(tx, {
+          tenantId, actorId: userId, action: 'hr.candidate.stage.change', targetType: 'Candidate', targetId: request.params.id,
+          metadata: { toStage: request.body.stage },
+        })
+        if (request.body.stage === 'HIRED' && updated.employeeId) {
+          await recordAuditLog(tx, {
+            tenantId, actorId: userId, action: 'hr.employee.create_from_candidate', targetType: 'Employee', targetId: updated.employeeId,
+            metadata: { candidateId: request.params.id },
+          })
+        }
+        return updated
+      }, { isolationLevel: 'Serializable' })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('hr')])
       return { data: candidate }
     },
@@ -200,7 +285,7 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
         return { error: { message: 'Invalid or expired upload signature' } }
       }
       const expected = signUpload(authSecret, tenantId, candidateId, exp)
-      if (request.query.h.length !== 64 || request.query.h !== expected) {
+      if (!signaturesMatch(request.query.h, expected)) {
         reply.code(403)
         return { error: { message: 'Invalid or expired upload signature' } }
       }
@@ -221,9 +306,8 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
 
       const prisma = request.server.prisma
       const candidate = await candidatesService.getCandidate(prisma, tenantId, candidateId)
-      const dir = storageDir(tenantId)
-      await mkdir(dir, { recursive: true })
-      await writeFile(path.join(dir, 'resume.pdf'), body)
+      await mkdir(storageDir(tenantId), { recursive: true })
+      await writeFile(resumeFilePath(tenantId, candidate.id), body)
 
       const updated = await prisma.candidate.update({
         where: { id: candidate.id },
@@ -257,7 +341,7 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
         return { error: { message: 'No resume has been uploaded for this candidate' } }
       }
 
-      const file = path.join(storageDir(tenantId), 'resume.pdf')
+      const file = resumeFilePath(tenantId, candidate.id)
       let bytes: Buffer
       try {
         bytes = await readFile(file)

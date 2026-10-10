@@ -1,10 +1,13 @@
 import { Money } from '@asas/domain'
 import { describe, expect, it } from 'vitest'
 import {
+  compareDecimalStrings,
   currencyCodeSchema,
   decimalStringSchema,
   moneyAsDomainSchema,
   moneySchema,
+  nonNegativeDecimalStringSchema,
+  positiveDecimalStringSchema,
 } from './money.js'
 
 describe('currencyCodeSchema', () => {
@@ -60,5 +63,43 @@ describe('decimalStringSchema', () => {
     expect(() => decimalStringSchema.parse('abc')).toThrow()
     expect(() => decimalStringSchema.parse('12.34.56')).toThrow()
     expect(() => decimalStringSchema.parse('')).toThrow()
+  })
+})
+
+describe('positiveDecimalStringSchema', () => {
+  it('accepts amounts greater than zero', () => {
+    expect(positiveDecimalStringSchema.parse('0.01')).toBe('0.01')
+    expect(positiveDecimalStringSchema.parse(' 1250.00 ')).toBe('1250.00')
+  })
+
+  it('rejects zero, negative, and malformed amounts', () => {
+    expect(positiveDecimalStringSchema.safeParse('0').success).toBe(false)
+    expect(positiveDecimalStringSchema.safeParse('0.00').success).toBe(false)
+    expect(positiveDecimalStringSchema.safeParse('-5').success).toBe(false)
+    expect(positiveDecimalStringSchema.safeParse('-0.01').success).toBe(false)
+    expect(positiveDecimalStringSchema.safeParse('abc').success).toBe(false)
+  })
+})
+
+describe('nonNegativeDecimalStringSchema', () => {
+  it('accepts zero and positive amounts', () => {
+    expect(nonNegativeDecimalStringSchema.parse('0')).toBe('0')
+    expect(nonNegativeDecimalStringSchema.parse('0.00')).toBe('0.00')
+    expect(nonNegativeDecimalStringSchema.parse('12.5')).toBe('12.5')
+  })
+
+  it('rejects negative amounts', () => {
+    expect(nonNegativeDecimalStringSchema.safeParse('-0.01').success).toBe(false)
+    expect(nonNegativeDecimalStringSchema.safeParse('-3').success).toBe(false)
+  })
+})
+
+describe('compareDecimalStrings', () => {
+  it('compares exactly across differing scales and signs', () => {
+    expect(compareDecimalStrings('10.5', '10.50')).toBe(0)
+    expect(compareDecimalStrings('10.05', '10.5')).toBe(-1)
+    expect(compareDecimalStrings('100', '99.9999')).toBe(1)
+    expect(compareDecimalStrings('-1', '0')).toBe(-1)
+    expect(compareDecimalStrings('0.1', '0.10000000000000001')).toBe(-1)
   })
 })

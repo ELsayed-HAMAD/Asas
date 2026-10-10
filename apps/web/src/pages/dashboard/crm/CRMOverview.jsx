@@ -29,16 +29,16 @@ export default function CRMOverview() {
   const [dealForm, setDealForm] = useState({ name: '', value: '', stage: 'LEADS', closeDate: '' })
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.crm.overview(),
-    queryFn: crmApi.getOverview,
+    queryFn: () => crmApi.getOverview(),
   });
 
   // Revenue forecast uses open pipeline grouped by close month; outcome trend uses closed deals
   // grouped by their recorded close month from the overview endpoint.
   const { data: forecast } = useQuery({
     queryKey: queryKeys.crm.forecast(),
-    queryFn: crmApi.getForecast,
+    queryFn: () => crmApi.getForecast(),
   });
-  const { data: agenda } = useQuery({ queryKey: queryKeys.crm.agenda(), queryFn: crmApi.listAgenda })
+  const { data: agenda } = useQuery({ queryKey: queryKeys.crm.agenda(), queryFn: () => crmApi.listAgenda() })
   const createAgenda = useMutation({
     mutationFn: () => crmApi.createAgenda({ title: agendaTitle.trim() }),
     onSuccess: () => { setAgendaTitle(''); queryClient.invalidateQueries({ queryKey: queryKeys.crm.agenda() }) },
@@ -79,15 +79,21 @@ export default function CRMOverview() {
     closedLost: byStage('CLOSED_LOST'),
   };
 
-  // Stage-to-stage conversion (count-based), same ratio positions as the old page.
-  const conv = (from, to) => (from.count ? Math.round((to.count / from.count) * 100) : 0);
-  const proposalConv = conv(s.leads, s.proposal);
-  const negotiationConv = conv(s.proposal, s.negotiation);
-  const closedConv = conv(s.negotiation, s.closedWon);
+  // Historical cohort conversion is computed from recorded stage-entry events, not current inventory.
+  const conversion = (fromStage, toStage) => data.stageConversions?.find(row => row.fromStage === fromStage && row.toStage === toStage)?.rate ?? null;
+  const proposalConv = conversion('LEADS', 'PROPOSAL');
+  const negotiationConv = conversion('PROPOSAL', 'NEGOTIATION');
+  const closedConv = conversion('NEGOTIATION', 'CLOSED_WON');
+  const formatConversion = rate => rate == null ? '—' : `${Math.round(rate)}%`;
 
   const monthly = (forecast?.monthlyPipeline || []).map((row) => ({ month: row.month, value: toMajor(row.value) }));
   const pipelineSpark = monthly.map((row) => ({ v: row.value }));
   const winRateSpark = (data.monthlyWinRate || []).filter((row) => row.rate != null).map((row) => ({ v: row.rate }));
+  const currentPeriodWinRate = data.winRateComparison?.current?.rate ?? null;
+  const previousPeriodWinRate = data.winRateComparison?.previous?.rate ?? null;
+  const monthlyWinRateDelta = currentPeriodWinRate != null && previousPeriodWinRate != null
+    ? Math.round((currentPeriodWinRate - previousPeriodWinRate) * 10) / 10
+    : null;
   const currency = pipeline.openTotal?.currency || forecast?.summary?.totalPipeline?.currency || 'USD';
 
   // Closed-Won progress bar: closed-won value against the stored quota goal (when any).
@@ -147,7 +153,14 @@ export default function CRMOverview() {
             {/* Text Foreground */}
             <div className="relative z-10 h-full flex flex-col justify-between pointer-events-none">
               <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Total Pipeline</p>
-              <p className="text-3xl font-bold text-heading tracking-tight leading-none pointer-events-auto">{formatMoney(pipeline.openTotal)}</p>
+              <div className="pointer-events-auto">
+                <p className="text-3xl font-bold text-heading tracking-tight leading-none">{formatMoney(pipeline.openTotal)}</p>
+                <p className="text-[9px] text-muted mt-1">
+                  Prior-month value (as of {pipeline.openTotalComparison?.previousAsOfDate ?? pipeline.openCountComparison?.previousAsOfDate}) {pipeline.openTotalComparison?.previousTotal == null
+                    ? 'unavailable'
+                    : formatMoney(pipeline.openTotalComparison.previousTotal)}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -172,7 +185,12 @@ export default function CRMOverview() {
             {/* Text Foreground */}
             <div className="relative z-10 h-full flex flex-col justify-between pointer-events-none">
               <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Win Rate</p>
-              <p className="text-3xl font-bold text-heading tracking-tight leading-none pointer-events-auto">{formatPercent(data.winRate)}</p>
+              <div className="pointer-events-auto">
+                <p className="text-3xl font-bold text-heading tracking-tight leading-none">{formatPercent(data.winRate)}</p>
+                <p className="text-[9px] text-muted mt-1">
+                  MTD {formatPercent(currentPeriodWinRate)} · Prior period {monthlyWinRateDelta == null ? formatPercent(previousPeriodWinRate) : `${monthlyWinRateDelta > 0 ? '+' : ''}${monthlyWinRateDelta.toFixed(1)} pts`}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -245,7 +263,8 @@ export default function CRMOverview() {
 
           {/* Pipeline Conversion Funnel — real 5-stage funnel from the server */}
           <div className="col-span-2 bg-surface-raised border border-border-default rounded-card-sm shadow-card p-6 flex flex-col min-h-[340px]">
-            <h2 className="text-lg font-bold text-heading mb-8">Pipeline Conversion</h2>
+            <h2 className="text-lg font-bold text-heading mb-2">Pipeline Conversion</h2>
+            <p className="mb-5 text-xs text-muted">All-time cohorts from recorded stage history. Deals without recorded history are excluded.</p>
 
             <div className="flex flex-col items-center flex-1 w-full px-4">
 
@@ -255,7 +274,7 @@ export default function CRMOverview() {
                 <span className="text-sm font-bold">{formatMoney(s.leads.value)}</span>
               </div>
               <div className="relative -my-2.5 z-10 bg-surface-raised border border-border-strong rounded-input px-2 py-0.5 text-[10px] font-bold text-heading shadow-md">
-                {proposalConv}%
+                {formatConversion(proposalConv)}
               </div>
 
               {/* Proposal */}
@@ -264,7 +283,7 @@ export default function CRMOverview() {
                 <span className="text-sm font-bold">{formatMoney(s.proposal.value)}</span>
               </div>
               <div className="relative -my-2.5 z-10 bg-surface-raised border border-border-strong rounded-input px-2 py-0.5 text-[10px] font-bold text-heading shadow-md">
-                {negotiationConv}%
+                {formatConversion(negotiationConv)}
               </div>
 
               {/* Negotiation */}
@@ -273,7 +292,7 @@ export default function CRMOverview() {
                 <span className="text-sm font-bold">{formatMoney(s.negotiation.value)}</span>
               </div>
               <div className="relative -my-2.5 z-10 bg-surface-raised border border-border-strong rounded-input px-2 py-0.5 text-[10px] font-bold text-heading shadow-md">
-                {closedConv}%
+                {formatConversion(closedConv)}
               </div>
 
               {/* Closed Won */}

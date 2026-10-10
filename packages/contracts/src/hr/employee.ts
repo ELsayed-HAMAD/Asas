@@ -3,7 +3,7 @@
  * (starting with `apps/web`) import, so the wire shape is defined exactly once.
  */
 import { z } from 'zod'
-import { employeeStatusSchema } from '../enums.generated.js'
+import { employeeStatusSchema, salaryBasisSchema } from '../enums.generated.js'
 import { idSchema, isoDateSchema, isoDateTimeSchema, boundedText, shortTextSchema } from '../primitives/ids.js'
 import { decimalStringSchema } from '../primitives/money.js'
 import { paginated, paginationQuerySchema } from '../primitives/pagination.js'
@@ -33,6 +33,7 @@ export const employeeSchema = z.object({
    * difference either.
    */
   salary: decimalStringSchema.nullable(),
+  salaryBasis: salaryBasisSchema.nullable(),
   equityOptions: z.int().nonnegative().nullable(),
   band: z.string().nullable(),
   location: z.string().nullable(),
@@ -48,6 +49,7 @@ export const employeeListQuerySchema = paginationQuerySchema.extend({
   departmentId: idSchema.optional(),
   status: z.enum(['Active', 'On Leave']).optional(),
   search: boundedText(200, 0).optional(),
+  sort: z.enum(['NAME_ASC', 'NAME_DESC']).optional(),
 })
 
 export type EmployeeListQuery = z.infer<typeof employeeListQuerySchema>
@@ -55,6 +57,11 @@ export type EmployeeListQuery = z.infer<typeof employeeListQuerySchema>
 export const employeeSummarySchema = z.object({
   totalHeadcount: z.int().min(0),
   onLeaveCount: z.int().min(0),
+  /**
+   * Employees with a recorded `hiredAt` in the current tenant-local calendar month who are
+   * not archived. Zero when no hires occurred this month or `hiredAt` is null.
+   */
+  hiredThisMonth: z.int().min(0),
   /**
    * TODO(phase-2-hr): always `0` until a real requisition/job-opening model exists to compute
    * it from. Previously this was read straight off a client-supplied query parameter (any
@@ -77,6 +84,7 @@ export const employeeWriteSchema = z.object({
   avatarUrl: z.url().optional().nullable(),
   hiredAt: isoDateSchema.optional().nullable(),
   salary: decimalStringSchema.optional().nullable(),
+  salaryBasis: salaryBasisSchema.optional().nullable(),
   equityOptions: z.int().nonnegative().optional().nullable(),
   band: boundedText(64).optional().nullable(),
   location: boundedText(200).optional().nullable(),

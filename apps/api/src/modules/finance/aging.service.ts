@@ -17,22 +17,25 @@ const UNPAID_RECEIVABLE_STATUSES = ['CURRENT', 'OVERDUE', 'IN_COLLECTIONS'] as c
 const BUCKET_ORDER = ['current', '1-30', '31-60', '60+'] as const
 
 export async function computeAgingBuckets(
-  prisma: PrismaClient,
+  prisma: Pick<PrismaClient, '$queryRaw'>,
   tenantId: string,
   currency: CurrencyCode,
+  asOfDate: Date,
 ): Promise<AgingBucket[]> {
   const rows = await prisma.$queryRaw<
     Array<{ bucket: string; count: bigint; total: Prisma.Decimal | null }>
   >`
+    WITH report_date AS (SELECT ${asOfDate}::date AS today)
     SELECT CASE
-        WHEN "dueDate" IS NULL OR "dueDate" >= CURRENT_DATE THEN 'current'
-        WHEN "dueDate" >= CURRENT_DATE - INTERVAL '30 days' THEN '1-30'
-        WHEN "dueDate" >= CURRENT_DATE - INTERVAL '60 days' THEN '31-60'
+        WHEN "dueDate" IS NULL OR "dueDate" >= report_date.today THEN 'current'
+        WHEN "dueDate" >= report_date.today - INTERVAL '30 days' THEN '1-30'
+        WHEN "dueDate" >= report_date.today - INTERVAL '60 days' THEN '31-60'
         ELSE '60+'
       END AS bucket,
       count(*)::bigint AS count,
       sum("amount") AS total
     FROM "ReceivableInvoice"
+    CROSS JOIN report_date
     WHERE "tenantId" = ${tenantId}
       AND "status"::text IN (${Prisma.join([...UNPAID_RECEIVABLE_STATUSES])})
     GROUP BY 1

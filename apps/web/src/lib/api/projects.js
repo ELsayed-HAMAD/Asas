@@ -25,6 +25,8 @@ export const projectsApi = {
   updateRoadmapTask: (id, body) => http.patch(`/projects/roadmap/tasks/${id}`, { body }),
   /** GET /projects/portfolio — portfolio utilization rows + tenant-wide summary. */
   getPortfolio: () => http.get('/projects/portfolio'),
+  /** GET /projects/:id/sprint-velocity-comparison â€” latest two completed sprint estimates. */
+  getSprintVelocityComparison: (projectId) => http.get(`/projects/${projectId}/sprint-velocity-comparison`),
 
   /** GET /projects/sprints — every sprint with issue counts + completion PCT. */
   getSprints: () => http.get('/projects/sprints'),

@@ -66,6 +66,7 @@ export default function Inventory() {
     enabled: activeTab === 'history' && !!selectedProduct,
   });
   const movements = movementData?.items ?? [];
+  const movementSummary = movementData?.summary;
   const { data: suppliersData, isLoading: isSuppliersLoading, isError: isSuppliersError } = useQuery({
     queryKey: [...queryKeys.inventory.all(), 'productSuppliers', selectedId],
     queryFn: () => inventoryApi.listProductSuppliers(selectedId),
@@ -407,7 +408,7 @@ export default function Inventory() {
                               ? 'bg-danger-light text-danger border border-danger-border'
                               : 'bg-success-light text-success-text border border-[#bbf7d0]'
                           }`}>
-                            {product.stock} {product.status.replace('_', ' ')}
+                            {product.stock} {product.status.replaceAll('_', ' ')}
                           </span>
                         </td>
                       </tr>
@@ -538,6 +539,10 @@ export default function Inventory() {
                     </div>
                   ) : (
                     <div className="bg-surface-raised border border-border-default rounded-button shadow-card overflow-hidden">
+                      <p className="px-4 py-3 text-xs text-muted border-b border-border-default" title="Recorded stock movement quantities for this product; compares equal elapsed calendar dates in the workspace timezone">
+                        This month: {movementSummary?.recordedThisMonth?.totalIn ?? 0} in / {movementSummary?.recordedThisMonth?.totalOut ?? 0} out
+                        {' · Prior period: '}{movementSummary?.recordedThisMonthComparison?.totalIn ?? 0} in / {movementSummary?.recordedThisMonthComparison?.totalOut ?? 0} out
+                      </p>
                       <table className="w-full text-left border-collapse">
                         <thead className="bg-surface-muted/80 border-b border-border-default">
                           <tr>

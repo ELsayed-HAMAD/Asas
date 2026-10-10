@@ -1,6 +1,10 @@
 import {
   dealListQuerySchema,
   dealListResponseSchema,
+  dealActivityListQuerySchema,
+  dealActivityListResponseSchema,
+  dealActivitySchema,
+  dealActivityWriteSchema,
   dealSchema,
   dealUpdateSchema,
   dealWriteSchema,
@@ -15,6 +19,10 @@ import {
   agendaItemSchema,
   agendaItemWriteSchema,
   agendaItemUpdateSchema,
+  salesQuotaSchema,
+  salesQuotaUpdateSchema,
+  salesQuotaWriteSchema,
+  noContentSchema,
 } from '@asas/contracts'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
@@ -127,6 +135,57 @@ export async function crmRoutes(app: FastifyInstance): Promise<void> {
     return { data: await crmController.updateAgenda(request.server.prisma, tenantId, request.params.id, request.body) }
   })
 
+  server.post('/quotas', {
+    preHandler: requirePermission('deal.write'),
+    schema: { body: salesQuotaWriteSchema, response: { 201: envelope(salesQuotaSchema), ...errorResponses } },
+  }, async (request, reply) => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const quota = await request.server.prisma.$transaction(async tx => {
+      const created = await crmController.createSalesQuota(tx, tenantId, request.body)
+      await recordAuditLog(tx, {
+        tenantId, actorId: userId, action: 'crm.quota.create', targetType: 'SalesQuota', targetId: created.id,
+        metadata: { repName: created.repName, period: created.period, quota: created.quota },
+      })
+      return created
+    })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('crm')])
+    reply.code(201)
+    return { data: quota }
+  })
+
+  server.patch('/quotas/:id', {
+    preHandler: requirePermission('deal.write'),
+    schema: { params: idParamSchema, body: salesQuotaUpdateSchema, response: { 200: envelope(salesQuotaSchema), ...errorResponses } },
+  }, async request => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const quota = await request.server.prisma.$transaction(async tx => {
+      const updated = await crmController.updateSalesQuota(tx, tenantId, request.params.id, request.body)
+      await recordAuditLog(tx, {
+        tenantId, actorId: userId, action: 'crm.quota.update', targetType: 'SalesQuota', targetId: updated.id,
+        metadata: { fields: Object.keys(request.body), repName: updated.repName, period: updated.period, quota: updated.quota },
+      })
+      return updated
+    })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('crm')])
+    return { data: quota }
+  })
+
+  server.delete('/quotas/:id', {
+    preHandler: requirePermission('deal.write'),
+    schema: { params: idParamSchema, response: { 204: noContentSchema, ...errorResponses } },
+  }, async (request, reply) => {
+    const { tenantId, userId } = requireAuthContext(request)
+    await request.server.prisma.$transaction(async tx => {
+      const quota = await crmController.deleteSalesQuota(tx, tenantId, request.params.id)
+      await recordAuditLog(tx, {
+        tenantId, actorId: userId, action: 'crm.quota.delete', targetType: 'SalesQuota', targetId: quota.id,
+        metadata: { repName: quota.repName, period: quota.period, quota: quota.quota },
+      })
+    })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('crm')])
+    return reply.code(204).send()
+  })
+
   server.get(
     '/deals/:id',
     {
@@ -143,6 +202,45 @@ export async function crmRoutes(app: FastifyInstance): Promise<void> {
     },
   )
 
+  server.get('/deals/:id/activities', {
+    preHandler: requireRole('MEMBER'),
+    schema: {
+      params: idParamSchema,
+      querystring: dealActivityListQuerySchema,
+      response: { 200: envelope(dealActivityListResponseSchema), ...errorResponses },
+    },
+  }, async request => {
+    const { tenantId } = requireAuthContext(request)
+    const result = await crmController.listDealActivities(request.server.prisma, tenantId, request.params.id, request.query)
+    return { data: result }
+  })
+
+  server.post('/deals/:id/activities', {
+    preHandler: requirePermission('deal.write'),
+    schema: {
+      params: idParamSchema,
+      body: dealActivityWriteSchema,
+      response: { 201: envelope(dealActivitySchema), ...errorResponses },
+    },
+  }, async (request, reply) => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const activity = await request.server.prisma.$transaction(async tx => {
+      const created = await crmController.createDealActivity(tx, tenantId, request.params.id, userId, request.body)
+      await recordAuditLog(tx, {
+        tenantId,
+        actorId: userId,
+        action: 'crm.deal.activity.create',
+        targetType: 'DealActivity',
+        targetId: created.id,
+        metadata: { dealId: created.dealId, type: created.type, title: created.title },
+      })
+      return created
+    })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('crm')])
+    reply.code(201)
+    return { data: activity }
+  })
+
   server.post(
     '/deals',
     {
@@ -154,14 +252,14 @@ export async function crmRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      const deal = await crmController.createDeal(request.server.prisma, tenantId, request.body)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'crm.deal.create',
-        targetType: 'Deal',
-        targetId: deal.id,
-        metadata: { amount: deal.value },
+      const deal = await request.server.prisma.$transaction(async tx => {
+        const deal = await crmController.createDeal(tx, tenantId, request.body, userId)
+        await recordAuditLog(tx, {
+          tenantId, actorId: userId, action: 'crm.deal.create',
+          targetType: 'Deal', targetId: deal.id,
+          metadata: { amount: deal.value, stage: deal.stage, closedAt: deal.closedAt },
+        })
+        return deal
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('crm')])
       reply.code(201)
@@ -181,19 +279,14 @@ export async function crmRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      const deal = await crmController.updateDeal(
-        request.server.prisma,
-        tenantId,
-        request.params.id,
-        request.body,
-      )
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'crm.deal.update',
-        targetType: 'Deal',
-        targetId: deal.id,
-        metadata: { fields: Object.keys(request.body) },
+      const deal = await request.server.prisma.$transaction(async tx => {
+        const deal = await crmController.updateDeal(tx, tenantId, request.params.id, request.body, userId)
+        await recordAuditLog(tx, {
+          tenantId, actorId: userId, action: 'crm.deal.update',
+          targetType: 'Deal', targetId: deal.id,
+          metadata: { fields: Object.keys(request.body), stage: deal.stage, closedAt: deal.closedAt },
+        })
+        return deal
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('crm')])
       return { data: deal }

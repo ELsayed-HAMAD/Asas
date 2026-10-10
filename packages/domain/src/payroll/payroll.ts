@@ -1,4 +1,5 @@
 import { Money } from '../money/money.js'
+import { makeRational, rationalFromDecimal, type Rational } from '../money/rational.js'
 
 export interface PayrollLineInputs {
   /** The employee's base pay for the period, before any adjustment. */
@@ -11,7 +12,7 @@ export interface PayrollLineInputs {
 
 export interface TaxRate {
   label: string
-  /** Relative weight within the split \u2014 e.g. `15` and `5` split a 20% total 3:1. */
+  /** Percentage of gross, e.g. `15` and `5` mean a 20% deduction split 3:1. */
   weight: number | string
 }
 
@@ -40,28 +41,31 @@ export function computeGrossPay(inputs: PayrollLineInputs): Money {
   return gross
 }
 
+/** Exact combined percentage; invalid rates must never silently become zero deductions. */
+export function sumPayrollTaxRates(rates: readonly TaxRate[]): Rational {
+  let total = makeRational(0n, 1n)
+  for (const rate of rates) {
+    const value = rationalFromDecimal(rate.weight)
+    if (value.numerator < 0n) throw new RangeError(`Tax rate '${rate.label}' must be non-negative`)
+    total = makeRational(total.numerator * value.denominator + value.numerator * total.denominator, total.denominator * value.denominator)
+  }
+  if (total.numerator > 100n * total.denominator) throw new RangeError('Tax rates cannot add up to more than 100%')
+  return total
+}
+
 /**
- * Splits gross pay into named tax lines that always sum to exactly the combined rate's share
- * of gross \u2014 the total is rounded once, then apportioned by weight with
- * {@link Money.allocate}, rather than rounding each line independently.
- *
- * Rounding each line independently is the bug this replaces: two lines rounded on their own
- * (e.g. 15% and 5% of $11,894.50, HALF_UP) land on $1,784.18 and $594.73 \u2014 summing to
- * $2,378.91, one cent more than the correct $2,378.90 (20% of gross). `allocate` guarantees the
- * parts always sum back to the rounded whole instead.
+ * Combine percentages exactly, round the total deduction once, then allocate by weight.
+ * Independent rounding can leak a minor unit; floating-point summation can move an exact
+ * HALF_UP boundary down. The named tax lines must sum back to the rounded total in all cases.
  */
 export function computeTaxLines(gross: Money, rates: readonly TaxRate[]): TaxLine[] {
   if (rates.length === 0) return []
 
-  const totalWeight = rates.reduce((sum, rate) => sum + Number(rate.weight), 0)
-  if (totalWeight <= 0) {
-    // Zero or negative weights are legal contract input (an all-zero rate set means "no
-    // deduction", a negative weight is a caller mistake the API rejects with a 400). Returning
-    // zero lines here keeps the domain total well-defined instead of throwing an unhandled
-    // RangeError from `Money.allocate` deep in a payroll request.
+  const totalRate = sumPayrollTaxRates(rates)
+  if (totalRate.numerator === 0n) {
     return rates.map(rate => ({ label: rate.label, amount: Money.zero(gross.currency) }))
   }
-  const totalDeduction = gross.percentage(totalWeight, 'HALF_UP')
+  const totalDeduction = gross.multiply(makeRational(totalRate.numerator, totalRate.denominator * 100n), 'HALF_UP')
   const amounts = totalDeduction.allocate(rates.map(rate => rate.weight))
 
   return rates.map((rate, index) => ({

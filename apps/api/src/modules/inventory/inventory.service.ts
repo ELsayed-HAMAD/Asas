@@ -39,6 +39,7 @@ import type {
 } from '@asas/contracts'
 import { buildPaginationMeta, stockLevelToStatus, toPrismaPage } from '@asas/contracts'
 import { AppError } from '../../utils/errors.js'
+import { monthToDateComparisonPeriods, tenantToday } from '../../utils/dates.js'
 
 // ── Stock derivation (SQL, single round trip) ──────────────────────────────────
 
@@ -401,6 +402,9 @@ export async function listStockMovements(
   tenantId: string,
   query: StockMovementListQuery,
 ): Promise<StockMovementListResult> {
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { timezone: true } })
+  if (!tenant) throw new AppError(404, 'Workspace not found')
+  const periods = monthToDateComparisonPeriods(tenantToday(tenant.timezone))
   const where: Prisma.StockMovementWhereInput = { tenantId }
   if (query.productId) where.productId = query.productId
   if (query.warehouse) where.product = { warehouse: query.warehouse }
@@ -408,7 +412,20 @@ export async function listStockMovements(
   if (query.type === 'OUT') where.delta = { lt: 0 }
 
   const { skip, take } = toPrismaPage(query)
-  const [items, total, inAgg, outAgg] = await Promise.all([
+  const movementFilters: Prisma.Sql[] = [Prisma.sql`movement."tenantId" = ${tenantId}`]
+  if (query.productId) movementFilters.push(Prisma.sql`movement."productId" = ${query.productId}`)
+  if (query.warehouse) movementFilters.push(Prisma.sql`
+    EXISTS (
+      SELECT 1 FROM "Product" AS product
+      WHERE product."id" = movement."productId"
+        AND product."tenantId" = movement."tenantId"
+        AND product."warehouse" = ${query.warehouse}
+    )
+  `)
+  if (query.type === 'IN') movementFilters.push(Prisma.sql`movement."delta" > 0`)
+  if (query.type === 'OUT') movementFilters.push(Prisma.sql`movement."delta" < 0`)
+
+  const [items, total, inAgg, outAgg, periodRows] = await Promise.all([
     prisma.stockMovement.findMany({
       where,
       skip,
@@ -416,17 +433,61 @@ export async function listStockMovements(
       orderBy: { createdAt: 'desc' },
       include: { product: { select: { name: true, warehouse: true } } },
     }),
-    prisma.stockMovement.count({ where: { tenantId } }),
-    prisma.stockMovement.aggregate({ where: { tenantId, delta: { gt: 0 } }, _sum: { delta: true } }),
-    prisma.stockMovement.aggregate({ where: { tenantId, delta: { lt: 0 } }, _sum: { delta: true } }),
+    prisma.stockMovement.count({ where }),
+    prisma.stockMovement.aggregate({ where: { AND: [where, { delta: { gt: 0 } }] }, _sum: { delta: true } }),
+    prisma.stockMovement.aggregate({ where: { AND: [where, { delta: { lt: 0 } }] }, _sum: { delta: true } }),
+    prisma.$queryRaw<Array<{ currentIn: bigint; currentOut: bigint; previousIn: bigint; previousOut: bigint }>>`
+      WITH bounds AS (
+        SELECT
+          (${periods.current.startDate}::date::timestamp AT TIME ZONE ${tenant.timezone}) AS current_start,
+          (${periods.current.endDateExclusive}::date::timestamp AT TIME ZONE ${tenant.timezone}) AS current_end,
+          (${periods.previous.startDate}::date::timestamp AT TIME ZONE ${tenant.timezone}) AS previous_start,
+          (${periods.previous.endDateExclusive}::date::timestamp AT TIME ZONE ${tenant.timezone}) AS previous_end
+      )
+      SELECT
+        COALESCE(sum(movement."delta") FILTER (
+          WHERE movement."delta" > 0
+            AND movement."createdAt" >= (bounds.current_start AT TIME ZONE 'UTC')
+            AND movement."createdAt" < (bounds.current_end AT TIME ZONE 'UTC')
+        ), 0)::bigint AS "currentIn",
+        COALESCE(-sum(movement."delta") FILTER (
+          WHERE movement."delta" < 0
+            AND movement."createdAt" >= (bounds.current_start AT TIME ZONE 'UTC')
+            AND movement."createdAt" < (bounds.current_end AT TIME ZONE 'UTC')
+        ), 0)::bigint AS "currentOut",
+        COALESCE(sum(movement."delta") FILTER (
+          WHERE movement."delta" > 0
+            AND movement."createdAt" >= (bounds.previous_start AT TIME ZONE 'UTC')
+            AND movement."createdAt" < (bounds.previous_end AT TIME ZONE 'UTC')
+        ), 0)::bigint AS "previousIn",
+        COALESCE(-sum(movement."delta") FILTER (
+          WHERE movement."delta" < 0
+            AND movement."createdAt" >= (bounds.previous_start AT TIME ZONE 'UTC')
+            AND movement."createdAt" < (bounds.previous_end AT TIME ZONE 'UTC')
+        ), 0)::bigint AS "previousOut"
+      FROM "StockMovement" AS movement
+      CROSS JOIN bounds
+      WHERE ${Prisma.join(movementFilters, ' AND ')}
+    `,
   ])
+  const periodTotals = periodRows[0]
 
   return {
     items: items.map(mapMovement),
     pagination: buildPaginationMeta(query, total),
     summary: {
       totalIn: inAgg._sum.delta ?? 0,
-      totalOut: outAgg._sum.delta ?? 0,
+      totalOut: Math.abs(outAgg._sum.delta ?? 0),
+      recordedThisMonth: {
+        totalIn: Number(periodTotals?.currentIn ?? 0n),
+        totalOut: Number(periodTotals?.currentOut ?? 0n),
+      },
+      recordedThisMonthComparison: {
+        previousStartDate: periods.previous.startDate,
+        previousEndDateExclusive: periods.previous.endDateExclusive,
+        totalIn: Number(periodTotals?.previousIn ?? 0n),
+        totalOut: Number(periodTotals?.previousOut ?? 0n),
+      },
     },
   }
 }
@@ -459,6 +520,15 @@ export async function recordStockMovement(
   if (!product) throw new AppError(404, 'Product not found')
 
   const result = await prisma.$transaction(async tx => {
+    const changed = await tx.product.updateMany({
+      where: {
+        id: product.id, tenantId, archivedAt: null,
+        ...(input.delta < 0 && { stock: { gte: -input.delta } }),
+      },
+      data: { stock: { increment: input.delta } },
+    })
+    if (changed.count !== 1) throw new AppError(409, 'Insufficient stock or product no longer available')
+    const updated = await tx.product.findUniqueOrThrow({ where: { id: product.id } })
     const movement = await tx.stockMovement.create({
       data: {
         tenantId,
@@ -468,15 +538,11 @@ export async function recordStockMovement(
       },
       include: { product: { select: { name: true, warehouse: true } } },
     })
-    await tx.product.update({
-      where: { id: product.id },
-      data: { stock: { increment: input.delta } },
-    })
-    return movement
+    return { movement, newStock: updated.stock }
   })
 
   return {
-    ...mapMovement(result),
-    newStock: product.stock + input.delta,
+    ...mapMovement(result.movement),
+    newStock: result.newStock,
   }
 }

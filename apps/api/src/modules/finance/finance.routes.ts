@@ -14,6 +14,14 @@ import {
   expenseUpdateSchema,
   expenseWriteSchema,
   financeOverviewResponseSchema,
+  financeOverviewQuerySchema,
+  journalEntrySchema,
+  journalListQuerySchema,
+  journalListResponseSchema,
+  openingBalanceWriteSchema,
+  trialBalanceQuerySchema,
+  trialBalanceResponseSchema,
+  financeVoidSchema,
   idParamSchema,
   noContentSchema,
   payableInvoiceSchema,
@@ -66,14 +74,71 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     '/overview',
     {
       preHandler: requireRole('MEMBER'),
-      schema: { response: { 200: envelope(financeOverviewResponseSchema), ...errorResponses } },
+      schema: { querystring: financeOverviewQuerySchema, response: { 200: envelope(financeOverviewResponseSchema), ...errorResponses } },
     },
     async request => {
       const { tenantId } = requireAuthContext(request)
-      const result = await financeController.getOverview(request.server.prisma, tenantId)
+      const result = await financeController.getOverview(request.server.prisma, tenantId, request.query)
       return { data: result }
     },
   )
+
+  server.get('/journals', {
+    preHandler: requireRole('MEMBER'),
+    schema: {
+      querystring: journalListQuerySchema,
+      response: { 200: envelope(journalListResponseSchema), ...errorResponses },
+    },
+  }, async request => {
+    const { tenantId } = requireAuthContext(request)
+    const result = await financeController.listJournals(request.server.prisma, tenantId, request.query)
+    return { data: { ...result, summary: null } }
+  })
+
+  server.get('/trial-balance', {
+    preHandler: requireRole('MEMBER'),
+    schema: {
+      querystring: trialBalanceQuerySchema,
+      response: { 200: envelope(trialBalanceResponseSchema), ...errorResponses },
+    },
+  }, async request => {
+    const { tenantId } = requireAuthContext(request)
+    return { data: await financeController.getTrialBalance(request.server.prisma, tenantId, request.query.asOf) }
+  })
+
+  server.post('/opening-balances', {
+    preHandler: requirePermission('finance.invoice.write'),
+    schema: {
+      body: openingBalanceWriteSchema,
+      response: { 201: envelope(journalEntrySchema), ...errorResponses },
+    },
+  }, async (request, reply) => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const entry = await request.server.prisma.$transaction(async tx => {
+      const journal = await financeController.postOpeningBalance(tx, tenantId, userId, request.body)
+      await recordAuditLog(tx, {
+        tenantId, actorId: userId, action: 'finance.opening_balance.post',
+        targetType: 'JournalEntry', targetId: journal.id,
+        metadata: { asOf: request.body.asOf, lineCount: request.body.lines.length, currency: journal.amount.currency },
+      })
+      return journal
+    }, { isolationLevel: 'Serializable' })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
+    reply.code(201)
+    return { data: entry }
+  })
+
+  server.get('/journals/:id', {
+    preHandler: requireRole('MEMBER'),
+    schema: {
+      params: idParamSchema,
+      response: { 200: envelope(journalEntrySchema), ...errorResponses },
+    },
+  }, async request => {
+    const { tenantId } = requireAuthContext(request)
+    const entry = await financeController.getJournal(request.server.prisma, tenantId, request.params.id)
+    return { data: entry }
+  })
 
   // ── Vendors ─────────────────────────────────────────────────────────────────
 
@@ -117,13 +182,16 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      const vendor = await financeController.createVendor(request.server.prisma, tenantId, request.body)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'finance.vendor.create',
-        targetType: 'Vendor',
-        targetId: vendor.id,
+      const vendor = await request.server.prisma.$transaction(async tx => {
+        const vendor = await financeController.createVendor(tx, tenantId, request.body)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.vendor.create',
+          targetType: 'Vendor',
+          targetId: vendor.id,
+        })
+        return vendor
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       reply.code(201)
@@ -176,14 +244,17 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      const invoice = await financeController.createPayable(request.server.prisma, tenantId, request.body)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'finance.payable.create',
-        targetType: 'PayableInvoice',
-        targetId: invoice.id,
-        metadata: { amount: invoice.amount },
+      const invoice = await request.server.prisma.$transaction(async tx => {
+        const invoice = await financeController.createPayable(tx, tenantId, request.body, userId)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.payable.create',
+          targetType: 'PayableInvoice',
+          targetId: invoice.id,
+          metadata: { amount: invoice.amount },
+        })
+        return invoice
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       reply.code(201)
@@ -203,19 +274,22 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      const invoice = await financeController.updatePayable(
-        request.server.prisma,
-        tenantId,
-        request.params.id,
-        request.body,
-      )
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'finance.payable.update',
-        targetType: 'PayableInvoice',
-        targetId: invoice.id,
-        metadata: { fields: Object.keys(request.body) },
+      const invoice = await request.server.prisma.$transaction(async tx => {
+        const invoice = await financeController.updatePayable(
+          tx,
+          tenantId,
+          request.params.id,
+          request.body,
+        )
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.payable.update',
+          targetType: 'PayableInvoice',
+          targetId: invoice.id,
+          metadata: { fields: Object.keys(request.body) },
+        })
+        return invoice
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       return { data: invoice }
@@ -234,19 +308,23 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      const invoice = await financeController.updatePayableStatus(
-        request.server.prisma,
-        tenantId,
-        request.params.id,
-        request.body.status,
-      )
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'finance.payable.status',
-        targetType: 'PayableInvoice',
-        targetId: invoice.id,
-        metadata: { status: invoice.status },
+      const invoice = await request.server.prisma.$transaction(async tx => {
+        const invoice = await financeController.updatePayableStatus(
+          tx,
+          tenantId,
+          request.params.id,
+          request.body.status,
+          userId,
+        )
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.payable.status',
+          targetType: 'PayableInvoice',
+          targetId: invoice.id,
+          metadata: { status: invoice.status },
+        })
+        return invoice
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       return { data: invoice }
@@ -262,14 +340,17 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async request => {
     const { tenantId, userId } = requireAuthContext(request)
-    const invoice = await financeController.requestPayableChanges(request.server.prisma, tenantId, request.params.id)
-    await recordAuditLog(request.server.prisma, {
-      tenantId,
-      actorId: userId,
-      action: 'finance.payable.request_changes',
-      targetType: 'PayableInvoice',
-      targetId: invoice.id,
-      metadata: { status: invoice.status, reason: request.body.reason },
+    const invoice = await request.server.prisma.$transaction(async tx => {
+      const invoice = await financeController.requestPayableChanges(tx, tenantId, request.params.id, userId)
+      await recordAuditLog(tx, {
+        tenantId,
+        actorId: userId,
+        action: 'finance.payable.request_changes',
+        targetType: 'PayableInvoice',
+        targetId: invoice.id,
+        metadata: { status: invoice.status, reason: request.body.reason },
+      })
+      return invoice
     })
     request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
     return { data: invoice }
@@ -283,17 +364,20 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async request => {
     const { tenantId, userId } = requireAuthContext(request)
-    const invoices = await financeController.payApprovedPayables(request.server.prisma, tenantId, request.body)
-    for (const invoice of invoices) {
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'finance.payable.batch_paid',
-        targetType: 'PayableInvoice',
-        targetId: invoice.id,
-        metadata: { status: invoice.status },
-      })
-    }
+    const invoices = await request.server.prisma.$transaction(async tx => {
+      const invoices = await financeController.payApprovedPayables(tx, tenantId, request.body, userId)
+      for (const invoice of invoices) {
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.payable.batch_paid',
+          targetType: 'PayableInvoice',
+          targetId: invoice.id,
+          metadata: { status: invoice.status },
+        })
+      }
+      return invoices
+    }, { isolationLevel: 'Serializable' })
     request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
     return { data: invoices }
   })
@@ -309,18 +393,42 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      await financeController.deletePayable(request.server.prisma, tenantId, request.params.id)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'finance.payable.delete',
-        targetType: 'PayableInvoice',
-        targetId: request.params.id,
+      await request.server.prisma.$transaction(async tx => {
+        await financeController.deletePayable(tx, tenantId, request.params.id, userId)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.payable.delete',
+          targetType: 'PayableInvoice',
+          targetId: request.params.id,
+        })
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       reply.code(204)
     },
   )
+
+  server.post('/payables/:id/void', {
+    preHandler: requirePermission('finance.invoice.write'),
+    schema: {
+      params: idParamSchema,
+      body: financeVoidSchema,
+      response: { 200: envelope(payableInvoiceSchema), ...errorResponses },
+    },
+  }, async request => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const invoice = await request.server.prisma.$transaction(async tx => {
+      const invoice = await financeService.voidPayable(tx, tenantId, request.params.id, request.body.reason, userId)
+      await recordAuditLog(tx, {
+        tenantId, actorId: userId, action: 'finance.payable.void',
+        targetType: 'PayableInvoice', targetId: invoice.id,
+        metadata: { status: invoice.status, reason: request.body.reason },
+      })
+      return invoice
+    })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
+    return { data: invoice }
+  })
 
   // ── Customers ───────────────────────────────────────────────────────────────
 
@@ -348,13 +456,16 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      const customer = await financeController.createCustomer(request.server.prisma, tenantId, request.body)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'finance.customer.create',
-        targetType: 'Customer',
-        targetId: customer.id,
+      const customer = await request.server.prisma.$transaction(async tx => {
+        const customer = await financeController.createCustomer(tx, tenantId, request.body)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.customer.create',
+          targetType: 'Customer',
+          targetId: customer.id,
+        })
+        return customer
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       reply.code(201)
@@ -384,8 +495,11 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
       const user = await request.server.prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
-      const activity = await financeController.createCollectionActivity(request.server.prisma, tenantId, request.params.id, user?.name ?? 'Workspace member', request.body)
-      await recordAuditLog(request.server.prisma, { tenantId, actorId: userId, action: 'finance.collection_activity.create', targetType: 'Customer', targetId: request.params.id })
+      const activity = await request.server.prisma.$transaction(async tx => {
+        const activity = await financeController.createCollectionActivity(tx, tenantId, request.params.id, user?.name ?? 'Workspace member', request.body)
+        await recordAuditLog(tx, { tenantId, actorId: userId, action: 'finance.collection_activity.create', targetType: 'Customer', targetId: request.params.id })
+        return activity
+      })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       reply.code(201)
       return { data: activity }
@@ -437,14 +551,17 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      const invoice = await financeController.createReceivable(request.server.prisma, tenantId, request.body)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'finance.receivable.create',
-        targetType: 'ReceivableInvoice',
-        targetId: invoice.id,
-        metadata: { amount: invoice.amount },
+      const invoice = await request.server.prisma.$transaction(async tx => {
+        const invoice = await financeController.createReceivable(tx, tenantId, request.body, userId)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.receivable.create',
+          targetType: 'ReceivableInvoice',
+          targetId: invoice.id,
+          metadata: { amount: invoice.amount },
+        })
+        return invoice
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       reply.code(201)
@@ -464,19 +581,23 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      const invoice = await financeController.updateReceivable(
-        request.server.prisma,
-        tenantId,
-        request.params.id,
-        request.body,
-      )
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'finance.receivable.update',
-        targetType: 'ReceivableInvoice',
-        targetId: invoice.id,
-        metadata: { fields: Object.keys(request.body) },
+      const invoice = await request.server.prisma.$transaction(async tx => {
+        const invoice = await financeController.updateReceivable(
+          tx,
+          tenantId,
+          request.params.id,
+          request.body,
+          userId,
+        )
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.receivable.update',
+          targetType: 'ReceivableInvoice',
+          targetId: invoice.id,
+          metadata: { fields: Object.keys(request.body) },
+        })
+        return invoice
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       return { data: invoice }
@@ -495,19 +616,23 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      const invoice = await financeController.updateReceivableStatus(
-        request.server.prisma,
-        tenantId,
-        request.params.id,
-        request.body.status,
-      )
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'finance.receivable.status',
-        targetType: 'ReceivableInvoice',
-        targetId: invoice.id,
-        metadata: { status: invoice.status },
+      const invoice = await request.server.prisma.$transaction(async tx => {
+        const invoice = await financeController.updateReceivableStatus(
+          tx,
+          tenantId,
+          request.params.id,
+          request.body.status,
+          userId,
+        )
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.receivable.status',
+          targetType: 'ReceivableInvoice',
+          targetId: invoice.id,
+          metadata: { status: invoice.status },
+        })
+        return invoice
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       return { data: invoice }
@@ -525,18 +650,42 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      await financeController.deleteReceivable(request.server.prisma, tenantId, request.params.id)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'finance.receivable.delete',
-        targetType: 'ReceivableInvoice',
-        targetId: request.params.id,
+      await request.server.prisma.$transaction(async tx => {
+        await financeController.deleteReceivable(tx, tenantId, request.params.id, userId)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.receivable.delete',
+          targetType: 'ReceivableInvoice',
+          targetId: request.params.id,
+        })
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       reply.code(204)
     },
   )
+
+  server.post('/receivables/:id/void', {
+    preHandler: requirePermission('finance.invoice.write'),
+    schema: {
+      params: idParamSchema,
+      body: financeVoidSchema,
+      response: { 200: envelope(receivableInvoiceSchema), ...errorResponses },
+    },
+  }, async request => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const invoice = await request.server.prisma.$transaction(async tx => {
+      const invoice = await financeService.voidReceivable(tx, tenantId, request.params.id, request.body.reason, userId)
+      await recordAuditLog(tx, {
+        tenantId, actorId: userId, action: 'finance.receivable.void',
+        targetType: 'ReceivableInvoice', targetId: invoice.id,
+        metadata: { status: invoice.status, reason: request.body.reason },
+      })
+      return invoice
+    })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
+    return { data: invoice }
+  })
 
   // ── Expenses ────────────────────────────────────────────────────────────────
 
@@ -583,14 +732,17 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      const expense = await financeController.createExpense(request.server.prisma, tenantId, request.body)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'finance.expense.create',
-        targetType: 'Expense',
-        targetId: expense.id,
-        metadata: { amount: expense.amount },
+      const expense = await request.server.prisma.$transaction(async tx => {
+        const expense = await financeController.createExpense(tx, tenantId, request.body, userId)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.expense.create',
+          targetType: 'Expense',
+          targetId: expense.id,
+          metadata: { amount: expense.amount },
+        })
+        return expense
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       reply.code(201)
@@ -610,19 +762,22 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      const expense = await financeController.updateExpense(
-        request.server.prisma,
-        tenantId,
-        request.params.id,
-        request.body,
-      )
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'finance.expense.update',
-        targetType: 'Expense',
-        targetId: expense.id,
-        metadata: { fields: Object.keys(request.body) },
+      const expense = await request.server.prisma.$transaction(async tx => {
+        const expense = await financeController.updateExpense(
+          tx,
+          tenantId,
+          request.params.id,
+          request.body,
+        )
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.expense.update',
+          targetType: 'Expense',
+          targetId: expense.id,
+          metadata: { fields: Object.keys(request.body) },
+        })
+        return expense
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       return { data: expense }
@@ -641,20 +796,49 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      const expense = await financeController.updateExpenseStatus(
-        request.server.prisma,
-        tenantId,
-        request.params.id,
-        request.body.status,
-      )
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'finance.expense.status',
-        targetType: 'Expense',
-        targetId: expense.id,
-        metadata: { status: expense.status },
+      const expense = await request.server.prisma.$transaction(async tx => {
+        const expense = await financeController.updateExpenseStatus(
+          tx,
+          tenantId,
+          request.params.id,
+          request.body.status,
+          userId,
+        )
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.expense.status',
+          targetType: 'Expense',
+          targetId: expense.id,
+          metadata: { status: expense.status },
+        })
+        return expense
       })
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
+      return { data: expense }
+    },
+  )
+
+  server.post(
+    '/expenses/:id/void',
+    {
+      preHandler: requirePermission('finance.expense.write'),
+      schema: {
+        params: idParamSchema,
+        body: financeVoidSchema,
+        response: { 200: envelope(expenseSchema), ...errorResponses },
+      },
+    },
+    async request => {
+      const { tenantId, userId } = requireAuthContext(request)
+      const expense = await request.server.prisma.$transaction(async tx => {
+        const expense = await financeController.voidExpense(tx, tenantId, request.params.id, request.body.reason, userId)
+        await recordAuditLog(tx, {
+          tenantId, actorId: userId, action: 'finance.expense.void', targetType: 'Expense', targetId: expense.id,
+          metadata: { status: expense.status, voidedAt: expense.voidedAt, reason: expense.voidReason },
+        })
+        return expense
+      }, { maxWait: 5000 })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       return { data: expense }
     },
@@ -671,13 +855,15 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      await financeController.deleteExpense(request.server.prisma, tenantId, request.params.id)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'finance.expense.delete',
-        targetType: 'Expense',
-        targetId: request.params.id,
+      await request.server.prisma.$transaction(async tx => {
+        await financeController.deleteExpense(tx, tenantId, request.params.id)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.expense.delete',
+          targetType: 'Expense',
+          targetId: request.params.id,
+        })
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       reply.code(204)

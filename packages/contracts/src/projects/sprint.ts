@@ -1,6 +1,6 @@
 /**
  * Projects / Sprint contract. A sprint is a dated container of issues (work items); the
- * burndown and completion KPIs are computed from its issues' `updatedAt`/`status` in SQL on
+ * burndown and completion KPIs are computed from its issues' completion timestamps in SQL on
  * the API side and shipped back here.
  */
 import { z } from 'zod'
@@ -13,6 +13,8 @@ export const sprintSchema = z.object({
   name: z.string(),
   status: sprintStatusSchema,
   projectId: idSchema.nullable(),
+  /** Null for legacy sprints whose actual start date is unknown. */
+  startsAt: isoDateTimeSchema.nullable(),
   /** `null` when the sprint has no end date set yet. */
   endsAt: isoDateTimeSchema.nullable(),
   /**
@@ -25,6 +27,12 @@ export const sprintSchema = z.object({
     total: z.int().min(0),
     done: z.int().min(0),
   }),
+  velocity: z.object({
+    /** Null means none of the completed issues has an estimate; it is not a zero-point sprint. */
+    completedStoryPoints: z.int().min(0).nullable(),
+    estimatedCompletedIssues: z.int().min(0),
+    unestimatedCompletedIssues: z.int().min(0),
+  }),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 })
@@ -36,6 +44,7 @@ export const sprintListResponseSchema = collection(sprintSchema)
 export const sprintWriteSchema = z.object({
   name: boundedText(200),
   projectId: idSchema.optional().nullable(),
+  startsAt: isoDateTimeSchema.optional().nullable(),
   endsAt: isoDateTimeSchema.optional().nullable(),
   status: sprintStatusSchema.optional(),
 })

@@ -6,12 +6,14 @@ import {
   approvePayrollRun,
   createPayrollRun,
   getPayrollRun,
+  getPayslipDoc,
   listPayrollRuns,
 } from '../src/modules/hr/payroll.service.js'
 
 const now = new Date('2026-08-01T00:00:00.000Z')
 const TENANT = 'tenant_1'
 const RUN_ID = 'run_1'
+const PERIOD = { periodStart: '2026-08-01', periodEnd: '2026-08-31', payFrequency: 'MONTHLY' as const, salaryBasis: 'ANNUAL' as const, requestKey: 'cc35b4e1-07ec-4656-a3d3-8b4e71c67251' }
 
 type Row = Record<string, unknown>
 
@@ -59,12 +61,13 @@ interface StubOptions {
   deductionsSum?: Prisma.Decimal
   netSum?: Prisma.Decimal
   lineCount?: number
+  currency?: string
 }
 
 /**
  * A stub Prisma client. `createPayrollRun`/`adjustPayrollLine`/`approvePayrollRun` all end with a
- * `getPayrollRun` re-read, so the rows a test asserts on come from `options.lines` (the read side);
- * the `$transaction` only needs to echo back an id for the run and not throw for the lines.
+ * `getPayrollRun` re-read, so the rows a test asserts on come from `options.lines` (the read side).
+ * The transaction client omits `$transaction` and supports reads as well as writes.
  */
 function stubPrisma(options: StubOptions = {}) {
   const employees: Row[] =
@@ -79,33 +82,31 @@ function stubPrisma(options: StubOptions = {}) {
     ? null
     : { ...(options.payrollRunFindFirst ?? runRow('PENDING')) }
 
-  const tx = {
-    payrollRun: { create: async (args: { data: Row }) => ({ id: RUN_ID, ...args.data }) },
-    payrollLine: {
-      create: async (args: { data: Row }) => ({ id: 'line_1', ...args.data }),
-      update: async (args: { data: Row }) => ({ id: 'line_1', ...args.data }),
-    },
-    payrollTaxLine: { deleteMany: async () => {}, createMany: async () => {} },
-  }
-
-  return {
-    tenant: { findUnique: async () => ({ currency: 'USD' }) },
+  const prisma = {
+    tenant: { findUnique: async () => ({ name: 'Asas', currency: options.currency ?? 'USD', timezone: 'UTC' }) },
     employee: {
       findMany: async (args: { where: { id: { in: string[] } } }) =>
         employees.filter(e => (args.where.id.in as string[]).includes(e.id as string)),
     },
     payrollRun: {
-      findFirst: async () => currentRun,
-      update: async () => {
-        if (currentRun) currentRun.status = 'APPROVED'
+      findFirst: async ({ where }: { where: Row }) => where.requestKey ? (currentRun?.requestKey === where.requestKey ? currentRun : null) : currentRun,
+      updateMany: async ({ data }: { data: Row }) => {
+        if (!currentRun || !['DRAFT', 'PENDING'].includes(String(currentRun.status))) return { count: 0 }
+        currentRun = { ...currentRun, ...data }
+        return { count: 1 }
       },
-      create: async () => ({ id: RUN_ID }),
+      create: async ({ data }: { data: Row }) => {
+        currentRun = { ...runRow('PENDING'), ...data }
+        return { id: RUN_ID, ...data }
+      },
       count: async () => 1,
       findMany: async () => [
         { id: RUN_ID, label: 'August pay', payDate: null, status: 'PENDING', createdAt: now, _count: { lines: 2 } },
       ],
     },
     payrollLine: {
+      count: async () => 0,
+      create: async (args: { data: Row }) => ({ id: 'line_1', ...args.data }),
       findMany: async () => lines,
       findFirst: async () => lineRow(),
       update: async () => {},
@@ -115,32 +116,51 @@ function stubPrisma(options: StubOptions = {}) {
       }),
     },
     payrollTaxLine: { deleteMany: async () => {}, createMany: async () => {} },
-    $transaction: async (cb: (tx: unknown) => Promise<unknown>) => cb(tx),
-  } as never
+    $queryRaw: async (strings: TemplateStringsArray) => {
+      if (strings.join('').includes('SettlementHistoryCoverage')) return [{ currentTotal: null, previousTotal: null }]
+      return currentRun ? [{ id: RUN_ID }] : []
+    },
+    $transaction: async (cb: (tx: unknown) => Promise<unknown>): Promise<unknown> => {
+      const { $transaction: _transaction, ...tx } = prisma
+      return cb(tx)
+    },
+  }
+  return prisma as never
 }
 
 describe('payroll.service', () => {
+  it('preserves legacy amounts without inventing their earning policy', async () => {
+    const run = await getPayrollRun(stubPrisma(), TENANT, RUN_ID)
+    expect(run).toMatchObject({ periodStart: null, periodEnd: null, payFrequency: null, periodsPerYear: null, salaryBasis: null, currency: null })
+    expect(run.lines[0]).toMatchObject({ baseSalary: '100000.00', sourceSalary: null, salaryBasis: null, eligibleDays: null, periodDays: null })
+  })
+  it('uses recorded currency and earning dates on payslips after workspace settings change', async () => {
+    const doc = await getPayslipDoc(stubPrisma({ currency: 'JPY', payrollRunFindFirst: {
+      ...runRow('PENDING'), currency: 'KWD', periodStart: new Date('2026-08-01'), periodEnd: new Date('2026-08-31'),
+    } }), TENANT, RUN_ID, 'line_1')
+    expect(doc).toMatchObject({ currency: 'KWD', periodStart: '2026-08-01', periodEnd: '2026-08-31', gross: '100000.00' })
+  })
   it('prices every line from the employee salary through the domain math', async () => {
     // Two employees, one 10% pension rate. The returned lines are the stored rows; the money is
     // what the domain layer computed and the service wrote — decimal strings, no float.
     const created = await createPayrollRun(
       stubPrisma({
         lines: [
-          lineRow(),
+          lineRow({ baseSalary: dec('8333.33'), gross: dec('8333.33'), deductions: dec('833.33'), net: dec('7500.00'), taxLines: [{ id: 'tax_1', label: 'Pension', amount: dec('833.33'), override: false }] }),
           lineRow({
             id: 'line_2',
             employeeId: 'emp_2',
             employee: { id: 'emp_2', name: 'Grace Hopper', title: 'Engineer' },
-            baseSalary: dec('120000.00'),
-            gross: dec('120000.00'),
-            deductions: dec('12000.00'),
-            net: dec('108000.00'),
-            taxLines: [{ id: 'tax_2', label: 'Pension', amount: dec('12000.00'), override: false }],
+            baseSalary: dec('10000.00'),
+            gross: dec('10000.00'),
+            deductions: dec('1000.00'),
+            net: dec('9000.00'),
+            taxLines: [{ id: 'tax_2', label: 'Pension', amount: dec('1000.00'), override: false }],
           }),
         ],
       }),
       TENANT,
-      { label: 'August pay', taxRates: [{ label: 'Pension', rate: '10' }], employeeIds: ['emp_1', 'emp_2'] },
+      { ...PERIOD, label: 'August pay', taxRates: [{ label: 'Pension', rate: '10' }], employeeIds: ['emp_1', 'emp_2'] },
     )
 
     expect(created.status).toBe('PENDING')
@@ -148,19 +168,19 @@ describe('payroll.service', () => {
     expect(created.lines).toHaveLength(2)
 
     const ada = created.lines.find(line => line.employee.id === 'emp_1')!
-    expect(ada.baseSalary).toBe('100000.00')
-    expect(ada.gross).toBe('100000.00')
-    expect(ada.deductions).toBe('10000.00')
-    expect(ada.net).toBe('90000.00')
+    expect(ada.baseSalary).toBe('8333.33')
+    expect(ada.gross).toBe('8333.33')
+    expect(ada.deductions).toBe('833.33')
+    expect(ada.net).toBe('7500.00')
     expect(ada.taxLines).toEqual([
-      { id: 'tax_1', label: 'Pension', amount: '10000.00', override: false },
+      { id: 'tax_1', label: 'Pension', amount: '833.33', override: false },
     ])
   })
 
   it('rejects an employee the tenant does not own (tenant isolation on the run inputs)', async () => {
     await expect(
       createPayrollRun(stubPrisma(), TENANT, {
-        label: 'x',
+        ...PERIOD, label: 'x',
         taxRates: [{ label: 'Pension', rate: '10' }],
         employeeIds: ['emp_1', 'other_tenant_emp'],
       }),
@@ -171,7 +191,7 @@ describe('payroll.service', () => {
     const prisma = stubPrisma({ employees: [{ id: 'emp_1', name: 'Ada Lovelace', salary: null }] })
     await expect(
       createPayrollRun(prisma, TENANT, {
-        label: 'x',
+        ...PERIOD, label: 'x',
         taxRates: [{ label: 'Pension', rate: '10' }],
         employeeIds: ['emp_1'],
       }),
@@ -222,6 +242,8 @@ describe('payroll.service', () => {
     expect(result.summary.totalGross).toBe('220000')
     expect(result.summary.totalNet).toBe('198000')
     expect(result.summary.lineCount).toBe(2)
+    expect(result.summary.paidThisMonthTotal).toBeNull()
+    expect(result.summary.paidThisMonthComparison.previousTotal).toBeNull()
   })
 
   it('404s a run the tenant does not own', async () => {

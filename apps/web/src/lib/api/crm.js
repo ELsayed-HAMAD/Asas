@@ -19,7 +19,14 @@ export const crmApi = {
   /** `{ items: Deal[], pagination, summary }` — summary is computed over the whole filtered set. */
   listDeals: (filters = {}) => http.get('/crm/deals', { query: filters }),
 
+  /** Quotas returned with the forecast; writes are ADMIN-only and use workspace base currency. */
+  createQuota: (body) => http.post('/crm/quotas', { body }),
+  updateQuota: (id, body) => http.patch(`/crm/quotas/${id}`, { body }),
+  deleteQuota: (id) => http.delete(`/crm/quotas/${id}`),
+
   getDeal: (id) => http.get(`/crm/deals/${id}`),
+  listDealActivities: (id, filters = {}) => http.get(`/crm/deals/${id}/activities`, { query: filters }),
+  createDealActivity: (id, body) => http.post(`/crm/deals/${id}/activities`, { body }),
 
   /** `forecastByRep` (ForecastSnapshot rows) + `quotas` + real open-deal `monthlyPipeline`. */
   getForecast: (year) => http.get('/crm/forecast', { query: year ? { year } : undefined }),

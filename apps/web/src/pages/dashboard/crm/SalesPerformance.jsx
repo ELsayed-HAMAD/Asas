@@ -17,6 +17,7 @@ import { useQuery } from '@tanstack/react-query';
 import { crmApi } from '../../../lib/api/crm';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney, formatPercent, moneyToMajor } from '../../../lib/format';
+import { downloadCsv } from '../../../lib/csv';
 import TopBarActions from '../../../components/TopBarActions';
 
 const REP_SPARK_COLORS = ['#10b981', '#3b82f6', '#ef4444']
@@ -35,27 +36,40 @@ const toMajor = (money) => (money == null ? 0 : moneyToMajor(money));
 
 export default function SalesPerformance() {
   const [search, setSearch] = useState('')
+  const [year, setYear] = useState(String(new Date().getUTCFullYear()))
   const [dealsPeriod, setDealsPeriod] = useState('MONTH')
   const [showAllDeals, setShowAllDeals] = useState(false)
+  const [topDealsPage, setTopDealsPage] = useState(1)
   const [repSort, setRepSort] = useState('PIPELINE')
   const [repMenuOpen, setRepMenuOpen] = useState(false)
   const { data, isLoading, isError } = useQuery({
-    queryKey: queryKeys.crm.salesPerformance(),
-    queryFn: crmApi.getSalesPerformance,
+    queryKey: queryKeys.crm.salesPerformance(year),
+    queryFn: () => crmApi.getSalesPerformance(year),
   });
 
   // Team quota attainment has no source in /crm/sales-performance; the real
   // aggregate lives in /crm/forecast's summary.
   const { data: forecast } = useQuery({
-    queryKey: queryKeys.crm.forecast(),
-    queryFn: crmApi.getForecast,
+    queryKey: queryKeys.crm.forecast(year),
+    queryFn: () => crmApi.getForecast(year),
   });
 
-  // Top deals this month: the API has no top-deals endpoint, so the rows come from
-  // the deal list (highest stored value first, display-only selection).
-  const { data: dealsData } = useQuery({
-    queryKey: queryKeys.crm.deals.list({ limit: 100 }),
-    queryFn: () => crmApi.listDeals({ limit: 100 }),
+  const month = new Date().getUTCMonth()
+  const monthStart = new Date(Date.UTC(Number(year), month, 1)).toISOString().slice(0, 10)
+  const monthEnd = new Date(Date.UTC(Number(year), month + 1, 1)).toISOString().slice(0, 10)
+  const monthLabel = new Date(`${monthStart}T00:00:00Z`).toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' })
+  // Search and value ranking happen on the full server-side set before each page is returned.
+  const dealFilters = {
+    page: topDealsPage,
+    limit: showAllDeals ? 10 : 3,
+    stage: 'CLOSED_WON',
+    sort: 'VALUE_DESC',
+    ...(search.trim() && { search: search.trim() }),
+    ...(dealsPeriod === 'MONTH' && { closedFrom: monthStart, closedBefore: monthEnd }),
+  }
+  const { data: dealsData, isLoading: dealsLoading, isError: dealsError } = useQuery({
+    queryKey: queryKeys.crm.deals.list(dealFilters),
+    queryFn: () => crmApi.listDeals(dealFilters),
   });
 
   if (isLoading) {
@@ -83,6 +97,9 @@ export default function SalesPerformance() {
   const quotaMajor = toMajor(forecast?.summary?.totalQuota);
   const attainmentPct = quotaMajor > 0 ? (toMajor(data.yearWonTotal) / quotaMajor) * 100 : null;
   const attainmentWidth = attainmentPct == null ? 0 : Math.min(100, attainmentPct);
+  const previousYearWonMajor = toMajor(data.previousYearWonTotal);
+  const yearWonMajor = toMajor(data.yearWonTotal);
+  const yearWonDeltaPct = previousYearWonMajor > 0 ? ((yearWonMajor - previousYearWonMajor) / previousYearWonMajor) * 100 : null;
 
   const closedTotal = summary.totalWonCount + summary.totalLostCount;
   const winLossData = summary.overallWinRate == null ? [] : [
@@ -101,18 +118,7 @@ export default function SalesPerformance() {
       if (repSort === 'WIN_RATE') return (b.winRate ?? -1) - (a.winRate ?? -1)
       return b.openValue.amount - a.openValue.amount
     })
-  const sortedTopDeals = (dealsData?.items || [])
-    .filter(deal => matchesSearch(`${deal.name} ${deal.company || ''} ${deal.owner?.name || ''}`))
-    .filter(deal => {
-      if (dealsPeriod === 'ALL') return true
-      if (!deal.closeDate) return false
-      const closeDate = new Date(deal.closeDate)
-      const now = new Date()
-      return closeDate.getFullYear() === now.getFullYear() && closeDate.getMonth() === now.getMonth()
-    })
-    .slice()
-    .sort((a, b) => (b.value?.amount ?? 0) - (a.value?.amount ?? 0))
-  const topDeals = showAllDeals ? sortedTopDeals : sortedTopDeals.slice(0, 3)
+  const topDeals = dealsData?.items || []
 
   function downloadReport() {
     const rows = [
@@ -123,13 +129,7 @@ export default function SalesPerformance() {
       ...byRep.map(rep => ['Representative', rep.ownerName || 'Unassigned', 'Won value', formatMoney(rep.wonValue)]),
       ...byRep.map(rep => ['Representative', rep.ownerName || 'Unassigned', 'Win rate', formatPercent(rep.winRate)]),
     ]
-    const csv = rows.map(row => row.map(value => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\r\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'sales-performance.csv'
-    link.click()
-    URL.revokeObjectURL(url)
+    downloadCsv(rows, 'sales-performance.csv')
   }
 
   return (
@@ -143,14 +143,21 @@ export default function SalesPerformance() {
               type="text"
               placeholder="Search..."
               value={search}
-              onChange={event => setSearch(event.target.value)}
+              onChange={event => { setSearch(event.target.value); setTopDealsPage(1) }}
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-56 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
           </div>
 
-          <button onClick={() => { setDealsPeriod(value => value === 'MONTH' ? 'ALL' : 'MONTH'); setShowAllDeals(false) }} className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors">
+          <label className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium">
             <Calendar size={14} className="text-muted" />
-            {dealsPeriod === 'MONTH' ? 'This Month' : 'All Dates'}
+            <select aria-label="Sales performance year" value={year} onChange={event => setYear(event.target.value)} className="bg-transparent outline-none">
+              {[...new Set([year, String(new Date().getUTCFullYear()), ...(forecast?.availableYears || []), ...Array.from({ length: 5 }, (_, index) => String(new Date().getUTCFullYear() - index))])].sort().reverse().map(value => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </label>
+
+          <button onClick={() => { setDealsPeriod(value => value === 'MONTH' ? 'ALL' : 'MONTH'); setShowAllDeals(false); setTopDealsPage(1) }} className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors">
+            <Calendar size={14} className="text-muted" />
+            {dealsPeriod === 'MONTH' ? monthLabel : 'All Dates'}
             <ChevronDown size={14} className="text-caption" />
           </button>
 
@@ -165,6 +172,8 @@ export default function SalesPerformance() {
       </TopBarActions>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
+
+        <p className="text-xs text-muted">Closed outcomes: {year} (UTC). Open pipeline: current snapshot. Weekly activity counts recorded stage moves, not calls or emails.{data.undatedClosedCount > 0 ? ` ${data.undatedClosedCount} legacy closed deals have no recorded actual close date and are excluded from dated metrics.` : ''}</p>
 
         {/* ── KPIs Grid ── */}
         <div className="grid grid-cols-3 gap-4">
@@ -189,7 +198,14 @@ export default function SalesPerformance() {
               <p className="text-[11px] font-bold text-muted uppercase tracking-wider">Total Closed Won</p>
               <TrendingUp size={16} className="text-success-dot" />
             </div>
-              <p className="text-3xl font-extrabold text-heading tracking-tight relative z-10">{formatMoney(summary.totalWon)}</p>
+              <div className="relative z-10">
+                <p className="text-3xl font-extrabold text-heading tracking-tight">{formatMoney(data.yearWonTotal)}</p>
+                <p className="text-[10px] font-semibold text-muted mt-1">
+                  {yearWonDeltaPct == null
+                    ? `No ${Number(year) - 1} baseline`
+                    : `${yearWonDeltaPct > 0 ? '+' : ''}${yearWonDeltaPct.toFixed(1)}% vs ${Number(year) - 1}`}
+                </p>
+              </div>
             {/* Sparkline Area Chart — real closed-won value by month */}
             <div className="absolute bottom-0 left-0 w-full h-14">
               <ResponsiveContainer width="100%" height="100%">
@@ -385,15 +401,19 @@ export default function SalesPerformance() {
           {/* Top Deals This Month — real deals, highest stored value first */}
           <div className="col-span-5 bg-surface-raised border border-border-default rounded-card-sm shadow-card flex flex-col">
             <div className="flex items-center justify-between px-6 py-5 border-b border-border-subtle">
-              <h2 className="text-lg font-bold text-heading">{dealsPeriod === 'MONTH' ? 'Top Deals This Month' : 'Top Deals · All Dates'}</h2>
-              <button onClick={() => setShowAllDeals(current => !current)} className="text-xs font-semibold text-accent hover:text-accent-hover transition-colors">
+              <h2 className="text-lg font-bold text-heading">{dealsPeriod === 'MONTH' ? `Top Deals · ${monthLabel}` : 'Top Deals · All Dates'}</h2>
+              <button onClick={() => { setShowAllDeals(current => !current); setTopDealsPage(1) }} className="text-xs font-semibold text-accent hover:text-accent-hover transition-colors">
                 {showAllDeals ? 'Show Top 3' : 'View All'}
               </button>
             </div>
 
             <div className="p-6 space-y-4">
-              {topDeals.length === 0 ? (
-                <div className="text-sm text-muted">No deals yet.</div>
+              {dealsLoading ? (
+                <div className="text-sm text-muted">Loading closed-won deals…</div>
+              ) : dealsError ? (
+                <div role="alert" className="text-sm text-danger">Could not load top deals.</div>
+              ) : topDeals.length === 0 ? (
+                <div className="text-sm text-muted">No closed-won deals match this search and period.</div>
               ) : (
                 topDeals.map((deal, idx) => (
                   <div key={deal.id} className="flex items-center justify-between p-4 border border-border-default rounded-button shadow-card hover:shadow-card-hover transition-shadow cursor-pointer bg-surface-raised">
@@ -415,6 +435,14 @@ export default function SalesPerformance() {
                   </div>
                 ))
               )}
+              {showAllDeals && dealsData?.pagination && <div className="flex items-center justify-between border-t border-border-subtle pt-3 text-xs text-muted">
+                <span>Showing {dealsData.pagination.total === 0 ? 0 : (topDealsPage - 1) * dealsData.pagination.limit + 1}–{Math.min(topDealsPage * dealsData.pagination.limit, dealsData.pagination.total)} of {dealsData.pagination.total}</span>
+                {dealsData.pagination.pages > 1 && <div className="flex items-center gap-2">
+                  <button type="button" disabled={topDealsPage <= 1} onClick={() => setTopDealsPage(page => page - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
+                  <span>Page {topDealsPage} of {dealsData.pagination.pages}</span>
+                  <button type="button" disabled={topDealsPage >= dealsData.pagination.pages} onClick={() => setTopDealsPage(page => page + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+                </div>}
+              </div>}
             </div>
           </div>
 

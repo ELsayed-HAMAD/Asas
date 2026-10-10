@@ -50,6 +50,7 @@ function stubPrisma(options: {
   employeeUpdate?: unknown
   payrollLineCount?: number
   timesheetCount?: number
+  tenantTimezone?: string
 }) {
   const calls: StubCalls = { countArgs: [] }
   let countIndex = 0
@@ -62,7 +63,7 @@ function stubPrisma(options: {
       },
       count: async (args: unknown) => {
         calls.countArgs.push(args)
-        const value = (options.employeeCounts ?? [0, 0, 0])[countIndex] ?? 0
+        const value = (options.employeeCounts ?? [0, 0, 0, 0])[countIndex] ?? 0
         countIndex += 1
         return value
       },
@@ -82,11 +83,18 @@ function stubPrisma(options: {
         calls.deleteArgs = args
       },
     },
+    tenant: {
+      findUnique: async () => ({ timezone: options.tenantTimezone ?? 'UTC' }),
+    },
     department: {
       findFirst: async () => options.departmentFindFirst ?? null,
     },
     payrollLine: { count: async () => options.payrollLineCount ?? 0 },
     timesheet: { count: async () => options.timesheetCount ?? 0 },
+    $transaction: async (work: (tx: unknown) => Promise<unknown>) => work({
+      candidate: { updateMany: async () => ({ count: 0 }) },
+      employee: { delete: async (args: unknown) => { calls.deleteArgs = args } },
+    }),
   } as unknown as PrismaClient
 
   return { prisma, calls }
@@ -94,18 +102,47 @@ function stubPrisma(options: {
 
 describe('listEmployees', () => {
   it('redacts salary when the caller lacks employee.salary.read', async () => {
-    const { prisma } = stubPrisma({ employeeFindMany: [baseRow], employeeCounts: [1, 0, 1] })
+    const { prisma } = stubPrisma({ employeeFindMany: [baseRow], employeeCounts: [1, 0, 1, 0] })
     const result = await listEmployees(prisma, 'tenant_1', { page: 1, limit: 25 }, false)
 
     expect(result.items[0]?.salary).toBeNull()
     expect(result.items[0]?.name).toBe('Ada Lovelace')
-    expect(result.summary).toEqual({ totalHeadcount: 1, onLeaveCount: 0, openRoles: 0 })
+    expect(result.summary).toEqual({ totalHeadcount: 1, onLeaveCount: 0, hiredThisMonth: 0, openRoles: 0 })
   })
 
   it('includes salary when the caller has employee.salary.read', async () => {
-    const { prisma } = stubPrisma({ employeeFindMany: [baseRow], employeeCounts: [1, 0, 1] })
+    const { prisma } = stubPrisma({ employeeFindMany: [baseRow], employeeCounts: [1, 0, 1, 0] })
     const result = await listEmployees(prisma, 'tenant_1', { page: 1, limit: 25 }, true)
     expect(result.items[0]?.salary).toBe('185000.0000')
+  })
+
+  it('applies the requested server-side name order and page offset', async () => {
+    const { prisma, calls } = stubPrisma({ employeeFindMany: [], employeeCounts: [60, 0, 60, 0] })
+    const result = await listEmployees(prisma, 'tenant_1', { page: 2, limit: 25, sort: 'NAME_DESC' }, false)
+
+    expect(calls.findManyArgs).toMatchObject({
+      skip: 25,
+      take: 25,
+      orderBy: [{ name: 'desc' }, { id: 'asc' }],
+    })
+    expect(result.pagination).toEqual({ page: 2, limit: 25, total: 60, pages: 3 })
+  })
+
+  it('reports hires this month from the fourth tenant-wide count', async () => {
+    const { prisma } = stubPrisma({ employeeFindMany: [], employeeCounts: [5, 1, 5, 2] })
+    const result = await listEmployees(prisma, 'tenant_1', { page: 1, limit: 25 }, false)
+    expect(result.summary.hiredThisMonth).toBe(2)
+  })
+
+  it('scopes the hired-this-month count to non-archived employees with a recorded hire date', async () => {
+    const { prisma, calls } = stubPrisma({ employeeFindMany: [], employeeCounts: [0, 0, 0, 0] })
+    await listEmployees(prisma, 'tenant_1', { page: 1, limit: 25 }, false)
+    const hiredCountWhere = (calls.countArgs[3] as { where: Record<string, unknown> }).where
+    expect(hiredCountWhere.tenantId).toBe('tenant_1')
+    expect(hiredCountWhere.status).toEqual({ not: 'ARCHIVED' })
+    // The month boundary is derived from the tenant-local today; the stub tenant is UTC and the
+    // test clock is irrelevant because the filter shape — a gte on hiredAt — is what matters.
+    expect(hiredCountWhere.hiredAt).toMatchObject({ gte: expect.any(Date) })
   })
 })
 

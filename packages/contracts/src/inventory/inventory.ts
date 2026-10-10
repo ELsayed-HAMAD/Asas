@@ -14,7 +14,7 @@
  */
 import { z } from 'zod'
 import { productStockStatusSchema } from '../enums.generated.js'
-import { idSchema, isoDateTimeSchema, boundedText, shortTextSchema, longTextSchema } from '../primitives/ids.js'
+import { idSchema, isoDateSchema, isoDateTimeSchema, boundedText, shortTextSchema, longTextSchema } from '../primitives/ids.js'
 import { decimalStringSchema } from '../primitives/money.js'
 import { collection, paginated, paginationQuerySchema } from '../primitives/pagination.js'
 
@@ -201,6 +201,16 @@ export type StockMovementListQuery = z.infer<typeof stockMovementListQuerySchema
 export const stockMovementSummarySchema = z.object({
   totalIn: z.int().min(0),
   totalOut: z.int().min(0),
+  recordedThisMonth: z.object({
+    totalIn: z.int().min(0),
+    totalOut: z.int().min(0),
+  }),
+  recordedThisMonthComparison: z.object({
+    previousStartDate: isoDateSchema,
+    previousEndDateExclusive: isoDateSchema,
+    totalIn: z.int().min(0),
+    totalOut: z.int().min(0),
+  }),
 })
 
 export type StockMovementSummary = z.infer<typeof stockMovementSummarySchema>

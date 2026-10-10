@@ -130,12 +130,22 @@ ehthumbs.db
 desktop.ini
 
 # =========================
+# AI Tools & Editors
+# =========================
+.claude/
+.zed/
+.gemini/
+.aider*/
+.codeium/
+.continue/
+filter-msg.js
+AUDIT.md
+
+# =========================
 # Custom Ignored Files
 # =========================
 check_errors.cjs
 lint_output.txt
 *backup*/
 *_backup_*
-# Local agent/session state — never shared, never committed.
-.claude/settings.local.json
 .monkeyscode/

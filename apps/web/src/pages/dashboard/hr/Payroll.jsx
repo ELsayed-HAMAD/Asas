@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
+import { validatePayrollPeriod } from '@asas/domain/payroll'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Download,
@@ -15,12 +16,14 @@ import FormDialog from '../../../components/common/FormDialog'
 import { hrApi } from '../../../lib/api/hr'
 import { queryKeys } from '../../../lib/queryKeys'
 import { formatMoney, formatDate } from '../../../lib/format'
+import { downloadCsv } from '../../../lib/csv'
 import { useActiveMemberRole } from '../../../lib/authClient'
 
 // The old page rendered deductions/taxes as a leading-minus negative; the minus only appears
 // for a positive amount (a zero rendered plain), so mirror that instead of an unconditional '-'.
-function formatNegativeDeduction(value) {
-  return Number(value) > 0 ? `-${formatMoney(value)}` : formatMoney(value)
+function formatNegativeDeduction(value, currency) {
+  const options = currency ? { currency } : {}
+  return Number(value) > 0 ? `-${formatMoney(value, options)}` : formatMoney(value, options)
 }
 
 // Shared input style for the New Payroll Run dialog — the page's existing token classes.
@@ -68,6 +71,7 @@ export default function Payroll() {
   const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState(null)
   const [selectedRunId, setSelectedRunId] = useState('')
+  const [payrollActionError, setPayrollActionError] = useState(null)
 
   const { data: listData, isLoading: isLoadingList, isError, error } = useQuery({
     queryKey: queryKeys.hr.payrollRuns.list(),
@@ -88,6 +92,9 @@ export default function Payroll() {
   const isLoading = isLoadingList || (!!activeRunId && isLoadingRun)
 
   const records = run?.lines ?? []
+  const money = value => formatMoney(value, run?.currency ? { currency: run.currency } : {})
+  const paidThisMonth = listData?.summary?.paidThisMonthTotal
+  const priorPeriodPaid = listData?.summary?.paidThisMonthComparison?.previousTotal
 
   // Exact aggregates over every stored line in this run, returned by the API as decimal strings.
   const totals = run?.totals ?? { gross: '0', deductions: '0', net: '0' }
@@ -113,18 +120,30 @@ export default function Payroll() {
       ['Payroll Run', 'Pay Date', 'Employee', 'Base Salary', 'Gross', 'Deductions', 'Net', 'Tax Detail'],
       ...records.map(line => [activeRun.label, activeRun.payDate || '', line.employee?.name, line.baseSalary || '', line.gross, line.deductions, line.net, line.taxLines.map(tax => `${tax.label}: ${tax.amount}`).join('; ')]),
     ]
-    const csv = rows.map(row => row.map(value => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\r\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${activeRun.label.trim().replace(/[^a-z0-9-_]+/gi, '-') || 'payroll'}-ledger.csv`
-    link.click()
-    URL.revokeObjectURL(url)
+    downloadCsv(rows, `${activeRun.label.trim().replace(/[^a-z0-9-_]+/gi, '-') || 'payroll'}-ledger.csv`)
   }
 
   const approveMutation = useMutation({
     mutationFn: () => hrApi.approvePayrollRun(activeRun.id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.hr.all() }),
+    onError: err => setPayrollActionError(err?.message || 'Unable to approve the payroll run.'),
+  })
+  const payMutation = useMutation({
+    mutationFn: () => hrApi.payPayrollRun(activeRun.id),
+    onSuccess: () => {
+      setPayrollActionError(null)
+      queryClient.invalidateQueries({ queryKey: queryKeys.hr.all() })
+    },
+    onError: err => setPayrollActionError(err?.message || 'Unable to record payroll payment.'),
+  })
+  const voidMutation = useMutation({
+    mutationFn: (reason) => hrApi.voidPayrollRun(activeRun.id, reason),
+    onSuccess: () => {
+      setPayrollActionError(null)
+      queryClient.invalidateQueries({ queryKey: queryKeys.hr.all() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.all() })
+    },
+    onError: err => setPayrollActionError(err?.message || 'Unable to void the payroll run.'),
   })
 
   const adjustLineMutation = useMutation({
@@ -165,13 +184,15 @@ export default function Payroll() {
 
   // ── New payroll run (ADMIN write — employee.write) ──────────────────────────────
   const { data: activeMemberRole } = useActiveMemberRole()
-  // `employee.write` is ADMIN-gated server-side; while the role is still loading the
-  // control renders enabled rather than flashing a disabled state.
-  const isAdmin = ['OWNER', 'ADMIN'].includes(activeMemberRole ?? 'ADMIN')
+  // Read the role object returned by Better Auth; unresolved roles do not grant write access.
+  const isAdmin = ['OWNER', 'ADMIN'].includes(activeMemberRole?.role)
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [label, setLabel] = useState('')
   const [payDate, setPayDate] = useState('')
+  const emptyPeriod = () => ({ salaryBasis: '', payFrequency: 'MONTHLY', periodsPerYear: 12, periodStart: '', periodEnd: '' })
+  const [periodForm, setPeriodForm] = useState(emptyPeriod)
+  const requestRef = useRef(null)
   const [taxRates, setTaxRates] = useState([{ label: 'Tax', rate: '10' }])
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState(() => new Set())
   const [dialogError, setDialogError] = useState(null)
@@ -193,6 +214,8 @@ export default function Payroll() {
   function resetDialogState() {
     setLabel('')
     setPayDate(new Date().toISOString().slice(0, 10))
+    setPeriodForm(emptyPeriod())
+    requestRef.current = null
     setTaxRates([{ label: 'Tax', rate: '10' }])
     setSelectedEmployeeIds(new Set())
     setDialogError(null)
@@ -263,13 +286,19 @@ export default function Payroll() {
       setDialogError('Select at least one employee to pay.')
       return
     }
+    if (!periodForm.salaryBasis) {
+      setDialogError('Confirm whether salaries without a stored basis are annual or monthly.')
+      return
+    }
+    try { validatePayrollPeriod(periodForm) } catch (error) {
+      setDialogError(error.message)
+      return
+    }
+    const payload = { label: trimmedLabel, payDate: payDate || null, ...periodForm, taxRates: rates, employeeIds }
+    const signature = JSON.stringify(payload)
+    if (requestRef.current?.signature !== signature) requestRef.current = { signature, requestKey: crypto.randomUUID() }
     setDialogError(null)
-    createRunMutation.mutate({
-      label: trimmedLabel,
-      payDate: payDate || null,
-      taxRates: rates,
-      employeeIds,
-    })
+    createRunMutation.mutate({ ...payload, requestKey: requestRef.current.requestKey })
   }
 
   return (
@@ -288,7 +317,10 @@ export default function Payroll() {
           <button type="button" disabled className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60">
             <Download size={16} /> Download ACH
           </button>
-          {activeRun?.status === 'PAID' ? (
+          {activeRun?.status === 'VOID' ? (
+            <span className="rounded-full bg-surface-muted px-3 py-1.5 text-sm font-semibold text-muted">Voided</span>
+          ) : activeRun?.status === 'PAID' ? (
+            <>
             <button
               type="button"
               onClick={exportLedger}
@@ -297,18 +329,52 @@ export default function Payroll() {
             >
               Export Ledger
             </button>
+            <button type="button" disabled={!isAdmin || voidMutation.isPending} onClick={() => {
+              const reason = window.prompt('Reason for voiding this payroll run:')?.trim()
+              if (reason) voidMutation.mutate(reason)
+            }} className="border border-danger/40 text-danger px-4 py-2 rounded-input text-sm font-medium hover:bg-danger/5 disabled:opacity-60">
+              {voidMutation.isPending ? 'Voiding…' : 'Void run'}
+            </button>
+            </>
+          ) : activeRun?.status === 'APPROVED' ? (
+            <>
+            <button
+              type="button"
+              disabled={payMutation.isPending}
+              title="Records payment after it has been completed outside Asas."
+              onClick={() => { setPayrollActionError(null); payMutation.mutate() }}
+              className="bg-primary text-white px-5 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {payMutation.isPending ? 'Recording Payment…' : 'Mark Run Paid'}
+            </button>
+            <button type="button" disabled={!isAdmin || voidMutation.isPending} onClick={() => {
+              const reason = window.prompt('Reason for voiding this payroll run:')?.trim()
+              if (reason) voidMutation.mutate(reason)
+            }} className="border border-danger/40 text-danger px-4 py-2 rounded-input text-sm font-medium hover:bg-danger/5 disabled:opacity-60">
+              {voidMutation.isPending ? 'Voiding…' : 'Void run'}
+            </button>
+            </>
           ) : (
+            <>
             <button
               type="button"
               disabled={!activeRun || activeRun.status === 'APPROVED' || approveMutation.isPending}
-              onClick={() => approveMutation.mutate()}
+              onClick={() => { setPayrollActionError(null); approveMutation.mutate() }}
               className="bg-primary text-white px-5 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {activeRun?.status === 'APPROVED' ? 'Pay Run Approved' : 'Approve Pay Run'}
             </button>
+            <button type="button" disabled={!activeRun || !isAdmin || voidMutation.isPending} onClick={() => {
+              const reason = window.prompt('Reason for voiding this payroll run:')?.trim()
+              if (reason) voidMutation.mutate(reason)
+            }} className="border border-danger/40 text-danger px-4 py-2 rounded-input text-sm font-medium hover:bg-danger/5 disabled:opacity-60">
+              {voidMutation.isPending ? 'Voiding…' : 'Void run'}
+            </button>
+            </>
           )}
         </div>
       </TopBarActions>
+      {payrollActionError && <p role="alert" className="px-6 pt-2 text-sm text-danger">{payrollActionError}</p>}
 
       <div className="px-6 py-5 flex-shrink-0 border-b border-border-subtle shadow-card z-10 relative">
         <div className="flex items-center justify-between mb-5">
@@ -333,21 +399,28 @@ export default function Payroll() {
           <div className="text-sm text-muted">
             {activeRun?.label || 'No payroll run'} · Pay date{' '}
             {activeRun?.payDate ? formatDate(activeRun.payDate) : '—'}
+            {' · Earning period '}{run?.periodStart && run?.periodEnd ? `${run.periodStart} – ${run.periodEnd}` : 'not recorded (legacy run)'}
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-4">
           <div className="border border-border-default rounded-button p-4 bg-surface-muted/40">
             <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1">Total Gross</p>
-            <p className="text-2xl font-bold text-heading">{formatMoney(totals.gross)}</p>
+            <p className="text-2xl font-bold text-heading">{money(totals.gross)}</p>
           </div>
           <div className="border border-border-default rounded-button p-4 bg-surface-muted/40">
             <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1">Taxes / Deductions</p>
-            <p className="text-2xl font-bold text-heading">{formatMoney(totals.deductions)}</p>
+            <p className="text-2xl font-bold text-heading">{money(totals.deductions)}</p>
           </div>
           <div className="border border-border-default rounded-button p-4 bg-surface-muted/40">
             <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1">Total Net</p>
-            <p className="text-2xl font-bold text-heading">{formatMoney(totals.net)}</p>
+            <p className="text-2xl font-bold text-heading">{money(totals.net)}</p>
+            <p className="mt-2 text-[11px] text-muted" title="Valued payroll payment journals in workspace base currency, net of linked reversals">
+              Workspace paid MTD: {paidThisMonth ? formatMoney(paidThisMonth) : 'Unavailable'}
+            </p>
+            <p className="text-[11px] text-muted" title="Same elapsed calendar dates in the previous tenant-local month">
+              Prior period: {priorPeriodPaid ? formatMoney(priorPeriodPaid) : 'Unavailable'}
+            </p>
           </div>
         </div>
       </div>
@@ -404,9 +477,9 @@ export default function Payroll() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-body">{formatMoney(record.gross)}</td>
-                      <td className="px-6 py-4 text-sm text-body">{formatNegativeDeduction(record.deductions)}</td>
-                      <td className="px-6 py-4 text-sm font-semibold text-heading">{formatMoney(record.net)}</td>
+                      <td className="px-6 py-4 text-sm text-body">{money(record.gross)}</td>
+                      <td className="px-6 py-4 text-sm text-body">{formatNegativeDeduction(record.deductions, run?.currency)}</td>
+                      <td className="px-6 py-4 text-sm font-semibold text-heading">{money(record.net)}</td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-1.5">
                           <PayslipButton
@@ -452,16 +525,21 @@ export default function Payroll() {
               </div>
               <div className="space-y-3 border border-border-default rounded-button p-4">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted">Base salary</span>
-                  <span className="font-medium text-heading">{formatMoney(selectedRecord.baseSalary || selectedRecord.gross)}</span>
+                  <span className="text-muted">Period base pay</span>
+                  <span className="font-medium text-heading">{money(selectedRecord.baseSalary ?? selectedRecord.gross)}</span>
                 </div>
+                {selectedRecord.sourceSalary != null && (
+                  <p className="text-xs text-muted">
+                    Source salary: {money(selectedRecord.sourceSalary)} {selectedRecord.salaryBasis?.toLowerCase()} · {run?.periodsPerYear} periods/year · {selectedRecord.eligibleDays}/{selectedRecord.periodDays} eligible calendar days. Period base pay may include manual adjustments.
+                  </p>
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-muted">Missed days ({selectedRecord.missedDaysCount || 0})</span>
-                  <span className="font-medium text-heading">{formatNegativeDeduction(selectedRecord.missedDaysAmount || '0')}</span>
+                  <span className="font-medium text-heading">{formatNegativeDeduction(selectedRecord.missedDaysAmount || '0', run?.currency)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted">Bonus {selectedRecord.bonusLabel ? `(${selectedRecord.bonusLabel})` : ''}</span>
-                  <span className="font-medium text-heading">{formatMoney(selectedRecord.bonusAmount || '0')}</span>
+                  <span className="font-medium text-heading">{money(selectedRecord.bonusAmount || '0')}</span>
                 </div>
                 {(selectedRecord.taxLines || []).map(tax => (
                   <div key={tax.id} className="flex justify-between text-sm">
@@ -469,7 +547,7 @@ export default function Payroll() {
                       <div className="w-1.5 h-1.5 rounded-full bg-muted" />
                       {tax.label}
                     </span>
-                    <span className="font-medium text-heading">{formatNegativeDeduction(tax.amount)}</span>
+                    <span className="font-medium text-heading">{formatNegativeDeduction(tax.amount, run?.currency)}</span>
                   </div>
                 ))}
               </div>
@@ -482,7 +560,7 @@ export default function Payroll() {
         open={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
         title="New payroll run"
-        subtitle="Price a run for the selected employees from their stored base salary."
+        subtitle="Calculate pay for an explicit earning period. Existing employee salary bases take precedence."
         confirmLabel="Create run"
         busy={createRunMutation.isPending}
         onConfirm={submitNewRun}
@@ -518,6 +596,35 @@ export default function Payroll() {
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="payroll-salary-basis" className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Unspecified salary basis</label>
+              <select id="payroll-salary-basis" value={periodForm.salaryBasis} onChange={event => setPeriodForm(current => ({ ...current, salaryBasis: event.target.value }))} className={DIALOG_INPUT}>
+                <option value="">Confirm salary basis</option><option value="ANNUAL">Annual salary</option><option value="MONTHLY">Monthly salary</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="payroll-frequency" className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Pay frequency</label>
+              <select id="payroll-frequency" value={periodForm.payFrequency} onChange={event => { const payFrequency = event.target.value; setPeriodForm(current => ({ ...current, payFrequency, periodsPerYear: { MONTHLY: 12, SEMIMONTHLY: 24, BIWEEKLY: 26, WEEKLY: 52 }[payFrequency] })) }} className={DIALOG_INPUT}>
+                <option value="MONTHLY">Monthly</option><option value="SEMIMONTHLY">Twice monthly</option><option value="BIWEEKLY">Every two weeks</option><option value="WEEKLY">Weekly</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="payroll-period-start" className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Earning period start</label>
+              <input id="payroll-period-start" type="date" value={periodForm.periodStart} onChange={event => setPeriodForm(current => ({ ...current, periodStart: event.target.value }))} className={DIALOG_INPUT} />
+            </div>
+            <div>
+              <label htmlFor="payroll-period-end" className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Earning period end</label>
+              <input id="payroll-period-end" type="date" value={periodForm.periodEnd} onChange={event => setPeriodForm(current => ({ ...current, periodEnd: event.target.value }))} className={DIALOG_INPUT} />
+            </div>
+            <div>
+              <label htmlFor="payroll-annual-periods" className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Periods per year</label>
+              <select id="payroll-annual-periods" value={periodForm.periodsPerYear} onChange={event => setPeriodForm(current => ({ ...current, periodsPerYear: Number(event.target.value) }))} className={DIALOG_INPUT}>
+                {({ MONTHLY: [12], SEMIMONTHLY: [24], BIWEEKLY: [26, 27], WEEKLY: [52, 53] }[periodForm.payFrequency]).map(count => <option key={count} value={count}>{count}</option>)}
+              </select>
+            </div>
+          </div>
+          <p className="text-xs text-muted">Equal-period pay is rounded once. Mid-period hires are prorated by inclusive calendar days; leave and other deductions remain explicit line adjustments. Choose 27/53 periods for a payroll calendar that requires them.</p>
           <div>
             <p className="text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Tax rates</p>
             <div className="space-y-2">
@@ -620,7 +727,7 @@ export default function Payroll() {
       >
         <div className="space-y-4">
           {[
-            ['baseSalary', 'Base salary', 'text'],
+            ['baseSalary', 'Period base pay', 'text'],
             ['missedDaysCount', 'Missed days', 'number'],
             ['missedDaysAmount', 'Missed days deduction', 'text'],
             ['bonusLabel', 'Bonus label', 'text'],
