@@ -26,6 +26,10 @@ export const inventoryApi = {
   getProduct: (id) => http.get(`/inventory/products/${id}`),
   listProductSuppliers: (id) => http.get(`/inventory/products/${id}/suppliers`),
   createPurchaseOrder: (body) => http.post('/inventory/purchase-orders', { body }),
+  listPurchaseOrders: ({ productId, status } = {}) =>
+    http.get('/inventory/purchase-orders', { query: { productId, status } }),
+  approvePurchaseOrder: (id) => http.post(`/inventory/purchase-orders/${id}/approve`),
+  receivePurchaseOrder: (id) => http.post(`/inventory/purchase-orders/${id}/receive`),
 
   listStockMovements: ({ page = 1, limit = 25, productId, warehouse, type } = {}) =>
     http.get('/inventory/stock/movements', { query: { page, limit, productId, warehouse, type } }),

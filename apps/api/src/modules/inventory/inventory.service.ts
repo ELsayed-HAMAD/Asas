@@ -25,6 +25,7 @@ import type {
   ProductSupplier,
   ProductSummary,
   PurchaseOrder,
+  PurchaseOrderListQuery,
   PurchaseOrderWriteInput,
   ProductUpdateInput,
   ProductWriteInput,
@@ -129,6 +130,120 @@ export async function createPurchaseOrder(prisma: PrismaClient, tenantId: string
       productName: line.product.name,
       sku: line.product.sku,
       quantity: line.quantity,
+    }
+  })
+}
+
+export async function listPurchaseOrders(
+  prisma: PrismaClient,
+  tenantId: string,
+  query?: PurchaseOrderListQuery,
+): Promise<PurchaseOrder[]> {
+  const where: Prisma.PurchaseOrderWhereInput = {
+    tenantId,
+    ...(query?.status && { status: query.status }),
+    ...(query?.productId && { lines: { some: { productId: query.productId } } }),
+  }
+
+  const orders = await prisma.purchaseOrder.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+  })
+
+  return orders.map(order => {
+    const line = order.lines[0]
+    return {
+      id: order.id,
+      status: order.status as PurchaseOrder['status'],
+      createdAt: order.createdAt.toISOString(),
+      productId: line?.product.id ?? '',
+      productName: line?.product.name ?? 'Unknown product',
+      sku: line?.product.sku ?? '',
+      quantity: line?.quantity ?? 0,
+    }
+  })
+}
+
+export async function approvePurchaseOrder(
+  prisma: PrismaClient,
+  tenantId: string,
+  id: string,
+): Promise<PurchaseOrder> {
+  const order = await prisma.purchaseOrder.findFirst({
+    where: { id, tenantId },
+    include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+  })
+  if (!order) throw new AppError(404, 'Purchase order not found')
+  if (order.status !== 'DRAFT') {
+    throw new AppError(400, `Cannot approve order with status "${order.status}"`)
+  }
+
+  const updated = await prisma.purchaseOrder.update({
+    where: { id },
+    data: { status: 'APPROVED' },
+    include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+  })
+  const line = updated.lines[0]
+  return {
+    id: updated.id,
+    status: 'APPROVED',
+    createdAt: updated.createdAt.toISOString(),
+    productId: line?.product.id ?? '',
+    productName: line?.product.name ?? 'Unknown product',
+    sku: line?.product.sku ?? '',
+    quantity: line?.quantity ?? 0,
+  }
+}
+
+export async function receivePurchaseOrder(
+  prisma: PrismaClient,
+  tenantId: string,
+  id: string,
+): Promise<PurchaseOrder> {
+  const order = await prisma.purchaseOrder.findFirst({
+    where: { id, tenantId },
+    include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+  })
+  if (!order) throw new AppError(404, 'Purchase order not found')
+  if (order.status === 'RECEIVED') {
+    throw new AppError(400, 'Purchase order is already received')
+  }
+  if (order.status === 'CANCELLED') {
+    throw new AppError(400, 'Cannot receive cancelled purchase order')
+  }
+
+  return prisma.$transaction(async tx => {
+    const updated = await tx.purchaseOrder.update({
+      where: { id },
+      data: { status: 'RECEIVED' },
+      include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+    })
+
+    for (const line of updated.lines) {
+      await tx.product.update({
+        where: { id: line.productId },
+        data: { stock: { increment: line.quantity } },
+      })
+      await tx.stockMovement.create({
+        data: {
+          tenantId,
+          productId: line.productId,
+          delta: line.quantity,
+          note: `PO #${order.id} received`,
+        },
+      })
+    }
+
+    const line = updated.lines[0]
+    return {
+      id: updated.id,
+      status: 'RECEIVED',
+      createdAt: updated.createdAt.toISOString(),
+      productId: line?.product.id ?? '',
+      productName: line?.product.name ?? 'Unknown product',
+      sku: line?.product.sku ?? '',
+      quantity: line?.quantity ?? 0,
     }
   })
 }

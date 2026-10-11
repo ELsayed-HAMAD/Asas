@@ -1,6 +1,7 @@
 import {
   customerListResponseSchema,
   customerSchema,
+  customerUpdateSchema,
   customerWriteSchema,
   collectionActivityListResponseSchema,
   collectionActivitySchema,
@@ -41,6 +42,7 @@ import {
   receivableWriteSchema,
   vendorListResponseSchema,
   vendorSchema,
+  vendorUpdateSchema,
   vendorWriteSchema,
 } from '@asas/contracts'
 import type { FastifyInstance } from 'fastify'
@@ -196,6 +198,60 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       reply.code(201)
       return { data: vendor }
+    },
+  )
+
+  server.patch(
+    '/vendors/:id',
+    {
+      preHandler: requirePermission('finance.partner.write'),
+      schema: {
+        params: idParamSchema,
+        body: vendorUpdateSchema,
+        response: { 200: envelope(vendorSchema), ...errorResponses },
+      },
+    },
+    async request => {
+      const { tenantId, userId } = requireAuthContext(request)
+      const vendor = await request.server.prisma.$transaction(async tx => {
+        const vendor = await financeController.updateVendor(tx, tenantId, request.params.id, request.body)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.vendor.update',
+          targetType: 'Vendor',
+          targetId: vendor.id,
+        })
+        return vendor
+      })
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
+      return { data: vendor }
+    },
+  )
+
+  server.delete(
+    '/vendors/:id',
+    {
+      preHandler: requirePermission('finance.partner.delete'),
+      schema: {
+        params: idParamSchema,
+        response: { 204: noContentSchema, ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const { tenantId, userId } = requireAuthContext(request)
+      await request.server.prisma.$transaction(async tx => {
+        await financeController.deleteVendor(tx, tenantId, request.params.id)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.partner.delete',
+          targetType: 'Vendor',
+          targetId: request.params.id,
+        })
+      })
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
+      reply.code(204)
     },
   )
 
@@ -470,6 +526,60 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       reply.code(201)
       return { data: customer }
+    },
+  )
+
+  server.patch(
+    '/customers/:id',
+    {
+      preHandler: requirePermission('finance.partner.write'),
+      schema: {
+        params: idParamSchema,
+        body: customerUpdateSchema,
+        response: { 200: envelope(customerSchema), ...errorResponses },
+      },
+    },
+    async request => {
+      const { tenantId, userId } = requireAuthContext(request)
+      const customer = await request.server.prisma.$transaction(async tx => {
+        const customer = await financeController.updateCustomer(tx, tenantId, request.params.id, request.body)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.customer.update',
+          targetType: 'Customer',
+          targetId: customer.id,
+        })
+        return customer
+      })
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
+      return { data: customer }
+    },
+  )
+
+  server.delete(
+    '/customers/:id',
+    {
+      preHandler: requirePermission('finance.partner.delete'),
+      schema: {
+        params: idParamSchema,
+        response: { 204: noContentSchema, ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const { tenantId, userId } = requireAuthContext(request)
+      await request.server.prisma.$transaction(async tx => {
+        await financeController.deleteCustomer(tx, tenantId, request.params.id)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.partner.delete',
+          targetType: 'Customer',
+          targetId: request.params.id,
+        })
+      })
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
+      reply.code(204)
     },
   )
 

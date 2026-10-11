@@ -5,6 +5,7 @@ import {
   Search, Download,
   TrendingUp, AlertTriangle, Pencil, Mail, Calendar,
   Banknote, Briefcase, Network, History, Trash2,
+  Building2, Plus, Check, X,
 } from 'lucide-react'
 import TopBarActions from '../../../components/TopBarActions'
 import QueryState from '../../../components/common/QueryState'
@@ -50,6 +51,12 @@ export default function EmployeeDirectory() {
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', title: '', email: '', location: '', departmentId: '', salary: '', salaryBasis: '', hiredAt: '', status: 'ACTIVE', band: '', equityOptions: '' })
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deptModalOpen, setDeptModalOpen] = useState(false)
+  const [newDeptName, setNewDeptName] = useState('')
+  const [editingDeptId, setEditingDeptId] = useState(null)
+  const [editingDeptName, setEditingDeptName] = useState('')
+  const [deptError, setDeptError] = useState('')
+  const [deletingDept, setDeletingDept] = useState(null)
   useEffect(() => {
     if (searchParams.get('new') === '1') {
       setCreateOpen(true)
@@ -115,6 +122,36 @@ export default function EmployeeDirectory() {
       setSelectedId(null)
     },
   })
+  const createDeptMutation = useMutation({
+    mutationFn: (name) => hrApi.createDepartment({ name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.hr.departments.all() })
+      setNewDeptName('')
+      setDeptError('')
+    },
+    onError: (err) => setDeptError(err?.message || 'Could not create department'),
+  })
+  const updateDeptMutation = useMutation({
+    mutationFn: ({ id, name }) => hrApi.updateDepartment(id, { name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.hr.departments.all() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.hr.employees.all() })
+      setEditingDeptId(null)
+      setEditingDeptName('')
+      setDeptError('')
+    },
+    onError: (err) => setDeptError(err?.message || 'Could not update department'),
+  })
+  const deleteDeptMutation = useMutation({
+    mutationFn: (id) => hrApi.deleteDepartment(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.hr.departments.all() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.hr.employees.all() })
+      setDeletingDept(null)
+      setDeptError('')
+    },
+    onError: (err) => setDeptError(err?.message || 'Could not delete department'),
+  })
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.hr.employees.list({ page, limit: 25, search: search || undefined, departmentId: departmentId || undefined, sort: sortAscending ? 'NAME_ASC' : 'NAME_DESC' }),
@@ -169,6 +206,9 @@ export default function EmployeeDirectory() {
             <option value="">Department: All</option>
             {(departmentsData?.items ?? departmentsData ?? []).map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
           </select>
+          <button type="button" onClick={() => { setDeptError(''); setDeptModalOpen(true) }} className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm hover:bg-surface-muted transition-colors bg-surface-raised font-medium" title="Manage departments">
+            <Building2 size={16} /> Departments
+          </button>
           <button type="button" onClick={() => setCreateOpen(true)} className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors">Add Employee</button>
           <button type="button" disabled={exportMutation.isPending} onClick={() => exportMutation.mutate()} className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors disabled:opacity-60">
             <Download size={16} /> {exportMutation.isPending ? 'Exporting...' : 'Export Directory'}
@@ -481,6 +521,150 @@ export default function EmployeeDirectory() {
         </div>
       </FormDialog>
       <ConfirmDialog open={deleteOpen} onClose={() => setDeleteOpen(false)} onConfirm={() => deleteMutation.mutate()} title="Delete employee?" description={`This permanently removes ${selected?.name || 'this employee'} and associated records.`} confirmLabel="Delete employee" busy={deleteMutation.isPending} danger />
+      {deptModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-card bg-surface-raised p-6 shadow-card border border-border-default">
+            <div className="flex items-center justify-between pb-4 border-b border-border-default">
+              <div>
+                <h3 className="text-lg font-bold text-heading">Departments</h3>
+                <p className="text-xs text-muted mt-0.5">Manage departments for employee organization.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setDeptModalOpen(false); setEditingDeptId(null); setDeptError('') }}
+                className="p-1 rounded-input hover:bg-surface-muted text-muted hover:text-body transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {deptError && (
+              <div role="alert" className="mt-4 p-3 rounded-button bg-danger-light border border-danger-border text-danger text-sm flex items-center gap-2">
+                <AlertTriangle size={16} className="shrink-0" />
+                <span>{deptError}</span>
+              </div>
+            )}
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                const trimmed = newDeptName.trim()
+                if (trimmed) createDeptMutation.mutate(trimmed)
+              }}
+              className="mt-4 flex gap-2"
+            >
+              <input
+                type="text"
+                placeholder="New department name..."
+                value={newDeptName}
+                onChange={(e) => setNewDeptName(e.target.value)}
+                className="flex-1 rounded-input border border-border-default px-3 py-2 text-sm bg-surface-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+              <button
+                type="submit"
+                disabled={!newDeptName.trim() || createDeptMutation.isPending}
+                className="flex items-center gap-1.5 bg-primary text-white px-4 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors disabled:opacity-50"
+              >
+                <Plus size={16} /> Add
+              </button>
+            </form>
+
+            <div className="mt-4 max-h-64 overflow-y-auto divide-y divide-border-default border border-border-default rounded-input">
+              {(departmentsData?.items ?? departmentsData ?? []).length === 0 ? (
+                <div className="p-4 text-center text-sm text-muted">No departments yet. Add one above.</div>
+              ) : (
+                (departmentsData?.items ?? departmentsData ?? []).map((dept) => (
+                  <div key={dept.id} className="flex items-center justify-between p-3 gap-2">
+                    {editingDeptId === dept.id ? (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          const trimmed = editingDeptName.trim()
+                          if (trimmed) updateDeptMutation.mutate({ id: dept.id, name: trimmed })
+                        }}
+                        className="flex flex-1 items-center gap-2"
+                      >
+                        <input
+                          type="text"
+                          value={editingDeptName}
+                          onChange={(e) => setEditingDeptName(e.target.value)}
+                          className="flex-1 rounded-input border border-border-default px-2.5 py-1 text-sm bg-surface-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                          autoFocus
+                        />
+                        <button
+                          type="submit"
+                          disabled={!editingDeptName.trim() || updateDeptMutation.isPending}
+                          className="p-1.5 text-success-text hover:bg-success-light rounded-input transition-colors disabled:opacity-50"
+                          title="Save"
+                        >
+                          <Check size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingDeptId(null)}
+                          className="p-1.5 text-muted hover:bg-surface-muted rounded-input transition-colors"
+                          title="Cancel"
+                        >
+                          <X size={16} />
+                        </button>
+                      </form>
+                    ) : (
+                      <>
+                        <span className="text-sm font-medium text-body">{dept.name}</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingDeptId(dept.id)
+                              setEditingDeptName(dept.name)
+                              setDeptError('')
+                            }}
+                            className="p-1.5 text-muted hover:text-body hover:bg-surface-muted rounded-input transition-colors"
+                            title="Rename"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDeptError('')
+                              setDeletingDept(dept)
+                            }}
+                            className="p-1.5 text-muted hover:text-danger hover:bg-danger-light rounded-input transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => { setDeptModalOpen(false); setEditingDeptId(null); setDeptError('') }}
+                className="px-4 py-2 border border-border-default rounded-input text-sm font-medium text-body hover:bg-surface-muted transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <ConfirmDialog
+        open={Boolean(deletingDept)}
+        onClose={() => setDeletingDept(null)}
+        onConfirm={() => deletingDept && deleteDeptMutation.mutate(deletingDept.id)}
+        title="Delete department?"
+        description={`Are you sure you want to delete "${deletingDept?.name}"? Any archived employees and projects will be unlinked.`}
+        confirmLabel="Delete department"
+        busy={deleteDeptMutation.isPending}
+        danger
+      />
     </div>
   )
 }

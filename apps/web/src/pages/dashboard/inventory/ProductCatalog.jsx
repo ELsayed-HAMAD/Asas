@@ -71,6 +71,12 @@ export default function Inventory() {
     queryFn: () => inventoryApi.listProductSuppliers(selectedId),
     enabled: activeTab === 'suppliers' && !!selectedProduct,
   });
+  const { data: ordersData, isLoading: isOrdersLoading, isError: isOrdersError } = useQuery({
+    queryKey: queryKeys.inventory.purchaseOrders.list({ productId: selectedId }),
+    queryFn: () => inventoryApi.listPurchaseOrders({ productId: selectedId }),
+    enabled: activeTab === 'orders' && !!selectedProduct,
+  });
+  const purchaseOrders = ordersData?.items ?? [];
 
   const queryClient = useQueryClient();
   const { data: activeMemberRole } = useActiveMemberRole();
@@ -143,6 +149,18 @@ export default function Inventory() {
       setArchiveDialogOpen(false);
       setSelectedId(null);
       setManualDeselect(false);
+    },
+  });
+  const approveOrderMutation = useMutation({
+    mutationFn: (orderId) => inventoryApi.approvePurchaseOrder(orderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all() });
+    },
+  });
+  const receiveOrderMutation = useMutation({
+    mutationFn: (orderId) => inventoryApi.receivePurchaseOrder(orderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all() });
     },
   });
 
@@ -482,6 +500,16 @@ export default function Inventory() {
                   >
                     History
                   </button>
+                  <button
+                    onClick={() => setActiveTab('orders')}
+                    className={`pb-2 text-sm transition-colors ${
+                      activeTab === 'orders'
+                        ? 'font-bold text-heading border-b-2 border-black'
+                        : 'font-medium text-muted hover:text-heading'
+                    }`}
+                  >
+                    Orders
+                  </button>
                 </div>
               </div>
 
@@ -533,6 +561,105 @@ export default function Inventory() {
               ) : activeTab === 'suppliers' ? (
                 <div className="flex-1 overflow-y-auto p-6">
                   {isSuppliersLoading ? <div className="flex h-full items-center justify-center"><Loader2 className="animate-spin text-muted" size={20} /></div> : isSuppliersError ? <p className="text-sm text-danger">Suppliers could not be loaded.</p> : (suppliersData?.items ?? []).length === 0 ? <div className="flex h-full items-center justify-center text-sm text-muted text-center">No suppliers are linked to this product yet.</div> : <ul className="space-y-3">{suppliersData.items.map(supplier => <li key={supplier.id} className="rounded-button border border-border-default bg-surface-muted px-4 py-3 text-sm font-semibold text-heading">{supplier.name}</li>)}</ul>}
+                </div>
+              ) : activeTab === 'orders' ? (
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-muted uppercase tracking-wider">Purchase Orders</p>
+                    <button
+                      type="button"
+                      onClick={() => { setPurchaseQuantity('1'); setPurchaseOrderError(''); setPurchaseOrderOpen(true); }}
+                      disabled={!canWrite || Boolean(selectedProduct.archivedAt)}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary-hover disabled:opacity-50"
+                    >
+                      <ShoppingCart size={14} /> New Order
+                    </button>
+                  </div>
+                  {isOrdersLoading ? (
+                    <div className="flex h-40 items-center justify-center">
+                      <Loader2 className="animate-spin text-muted" size={20} />
+                    </div>
+                  ) : isOrdersError ? (
+                    <p className="text-sm text-danger">Orders could not be loaded.</p>
+                  ) : purchaseOrders.length === 0 ? (
+                    <div className="flex h-40 items-center justify-center text-sm text-muted text-center">
+                      No purchase orders recorded for this product.
+                    </div>
+                  ) : (
+                    <div className="bg-surface-raised border border-border-default rounded-button shadow-card overflow-hidden">
+                      <table className="w-full text-left border-collapse">
+                        <thead className="bg-surface-muted/80 border-b border-border-default">
+                          <tr>
+                            <th className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider">Order</th>
+                            <th className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider">Date</th>
+                            <th className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Qty</th>
+                            <th className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider">Status</th>
+                            <th className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border-default">
+                          {purchaseOrders.map((po) => {
+                            const isDraft = po.status === 'DRAFT';
+                            const isApproved = po.status === 'APPROVED';
+                            const isReceived = po.status === 'RECEIVED';
+                            return (
+                              <tr key={po.id} className="hover:bg-surface-muted/50 transition-colors">
+                                <td className="px-4 py-3 text-xs font-semibold text-heading">
+                                  #{po.id.slice(-6).toUpperCase()}
+                                </td>
+                                <td className="px-4 py-3 text-xs text-muted">
+                                  {formatDate(po.createdAt)}
+                                </td>
+                                <td className="px-4 py-3 text-xs font-semibold text-heading tabular-nums text-right">
+                                  {po.quantity}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span
+                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      isReceived
+                                        ? 'bg-success-light text-success-text'
+                                        : isApproved
+                                        ? 'bg-blue-100 text-blue-700'
+                                        : 'bg-surface-strong text-body'
+                                    }`}
+                                  >
+                                    {po.status}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  {isDraft && (
+                                    <button
+                                      type="button"
+                                      disabled={!canWrite || approveOrderMutation.isPending}
+                                      onClick={() => approveOrderMutation.mutate(po.id)}
+                                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50 mr-2"
+                                      title="Approve order"
+                                    >
+                                      Approve
+                                    </button>
+                                  )}
+                                  {(isDraft || isApproved) && (
+                                    <button
+                                      type="button"
+                                      disabled={!canWrite || receiveOrderMutation.isPending}
+                                      onClick={() => receiveOrderMutation.mutate(po.id)}
+                                      className="text-xs font-semibold text-success-text hover:text-green-800 disabled:opacity-50"
+                                      title="Receive items into stock"
+                                    >
+                                      Receive
+                                    </button>
+                                  )}
+                                  {isReceived && (
+                                    <span className="text-xs text-muted">Done</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="flex-1 overflow-y-auto p-6">

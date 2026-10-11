@@ -16,6 +16,7 @@ import type {
   ProductUpdateInput,
   ProductWriteInput,
   PurchaseOrder,
+  PurchaseOrderListQuery,
   PurchaseOrderWriteInput,
   StockAlert,
   StockLevel,
@@ -34,6 +35,18 @@ export function listProductSuppliers(prisma: PrismaClient, tenantId: string, pro
 
 export function createPurchaseOrder(prisma: PrismaClient, tenantId: string, input: PurchaseOrderWriteInput): Promise<PurchaseOrder> {
   return service.createPurchaseOrder(prisma, tenantId, input)
+}
+
+export function listPurchaseOrders(prisma: PrismaClient, tenantId: string, query?: PurchaseOrderListQuery): Promise<PurchaseOrder[]> {
+  return service.listPurchaseOrders(prisma, tenantId, query)
+}
+
+export function approvePurchaseOrder(prisma: PrismaClient, tenantId: string, id: string): Promise<PurchaseOrder> {
+  return service.approvePurchaseOrder(prisma, tenantId, id)
+}
+
+export function receivePurchaseOrder(prisma: PrismaClient, tenantId: string, id: string): Promise<PurchaseOrder> {
+  return service.receivePurchaseOrder(prisma, tenantId, id)
 }
 
 // ── Products ─────────────────────────────────────────────────────────────────────

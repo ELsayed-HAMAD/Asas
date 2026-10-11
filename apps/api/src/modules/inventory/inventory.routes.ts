@@ -10,6 +10,8 @@ import {
   productSupplierListResponseSchema,
   productUpdateSchema,
   productWriteSchema,
+  purchaseOrderListQuerySchema,
+  purchaseOrderListResponseSchema,
   purchaseOrderSchema,
   purchaseOrderWriteSchema,
   stockAlertListResponseSchema,
@@ -86,6 +88,18 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
     return { data: { items } }
   })
 
+  server.get('/purchase-orders', {
+    preHandler: requireRole('MEMBER'),
+    schema: {
+      querystring: purchaseOrderListQuerySchema,
+      response: { 200: envelope(purchaseOrderListResponseSchema), ...errorResponses },
+    },
+  }, async request => {
+    const { tenantId } = requireAuthContext(request)
+    const items = await inventoryController.listPurchaseOrders(request.server.prisma, tenantId, request.query)
+    return { data: { items } }
+  })
+
   server.post('/purchase-orders', {
     preHandler: requirePermission('inventory.write'),
     schema: { body: purchaseOrderWriteSchema, response: { 201: envelope(purchaseOrderSchema), ...errorResponses } },
@@ -102,6 +116,47 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
     })
     request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
     reply.code(201)
+    return { data: order }
+  })
+
+  server.post('/purchase-orders/:id/approve', {
+    preHandler: requirePermission('inventory.write'),
+    schema: {
+      params: idParamSchema,
+      response: { 200: envelope(purchaseOrderSchema), ...errorResponses },
+    },
+  }, async request => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const order = await inventoryController.approvePurchaseOrder(request.server.prisma, tenantId, request.params.id)
+    await recordAuditLog(request.server.prisma, {
+      tenantId,
+      actorId: userId,
+      action: 'inventory.purchase-order.approve',
+      targetType: 'PurchaseOrder',
+      targetId: order.id,
+    })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
+    return { data: order }
+  })
+
+  server.post('/purchase-orders/:id/receive', {
+    preHandler: requirePermission('inventory.write'),
+    schema: {
+      params: idParamSchema,
+      response: { 200: envelope(purchaseOrderSchema), ...errorResponses },
+    },
+  }, async request => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const order = await inventoryController.receivePurchaseOrder(request.server.prisma, tenantId, request.params.id)
+    await recordAuditLog(request.server.prisma, {
+      tenantId,
+      actorId: userId,
+      action: 'inventory.purchase-order.receive',
+      targetType: 'PurchaseOrder',
+      targetId: order.id,
+      metadata: { productId: order.productId, quantity: order.quantity },
+    })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
     return { data: order }
   })
 

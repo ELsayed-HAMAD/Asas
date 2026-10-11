@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import {
   Search, Send, Filter, ChevronDown,
   Square, FileText, Paperclip, Phone,
-  CircleDot, Circle, Loader2
+  CircleDot, Circle, Loader2,
+  Users, Plus, Pencil, Trash2, X, Check, AlertTriangle
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../../../lib/api/finance';
@@ -24,6 +25,12 @@ export default function AccountsReceivable() {
   const [oldestFirst, setOldestFirst] = useState(true)
   const [paymentTargetId, setPaymentTargetId] = useState(null)
   const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [customerModalOpen, setCustomerModalOpen] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState('');
+  const [editingCustomerId, setEditingCustomerId] = useState(null);
+  const [editingCustomerName, setEditingCustomerName] = useState('');
+  const [customerError, setCustomerError] = useState('');
+  const [deletingCustomer, setDeletingCustomer] = useState(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.finance.receivables.list({ limit: 100 }),
@@ -54,6 +61,34 @@ export default function AccountsReceivable() {
       queryClient.invalidateQueries({ queryKey: [...queryKeys.finance.all(), 'customer-activities', selectedId] })
     },
   })
+  const updateCustomerMutation = useMutation({
+    mutationFn: ({ id, ...body }) => financeApi.updateCustomer(id, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.all() });
+      setEditingCustomerId(null);
+      setEditingCustomerName('');
+      setCustomerError('');
+    },
+    onError: (err) => setCustomerError(err?.message || 'Could not update customer.'),
+  });
+  const createCustomerMutation = useMutation({
+    mutationFn: (name) => financeApi.createCustomer({ name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.all() });
+      setNewCustomerName('');
+      setCustomerError('');
+    },
+    onError: (err) => setCustomerError(err?.message || 'Could not create customer.'),
+  });
+  const deleteCustomerMutation = useMutation({
+    mutationFn: (id) => financeApi.deleteCustomer(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.all() });
+      setDeletingCustomer(null);
+      setCustomerError('');
+    },
+    onError: (err) => setCustomerError(err?.message || 'Could not delete customer.'),
+  });
 
   const items = data?.items || [];
   const customers = customersData?.items || [];
@@ -151,6 +186,14 @@ export default function AccountsReceivable() {
             className="flex items-center gap-2 bg-surface-muted text-heading px-4 py-1.5 rounded-input text-sm font-medium hover:bg-surface-active transition-colors shadow-card border border-border-default disabled:opacity-60"
           >
             <Send size={14} /> Send Batch Reminders ({selectedIds.size})
+          </button>
+          <button 
+            type="button"
+            onClick={() => { setCustomerError(''); setCustomerModalOpen(true); }}
+            className="flex items-center gap-1.5 bg-surface-muted text-heading px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-active transition-colors shadow-card border border-border-default"
+            title="Manage customers"
+          >
+            <Users size={14} className="text-muted" /> Customers
           </button>
         </div>
       </TopBarActions>
@@ -291,9 +334,20 @@ export default function AccountsReceivable() {
                   )}
                   <div>
                     <h2 className="text-lg font-bold text-heading leading-tight">{selectedRecord.name}</h2>
-                    <button disabled className="flex items-center gap-1 text-[11px] font-semibold text-muted hover:text-body mt-1 disabled:opacity-60">
-                      Status: {selectedRecord.status?.replace('_', ' ')} <ChevronDown size={12} />
-                    </button>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="text-[11px] font-semibold text-muted">Status:</span>
+                      <select
+                        value={selectedRecord.status || 'CURRENT'}
+                        onChange={(e) => updateCustomerMutation.mutate({ id: selectedRecord.id, collectionStatus: e.target.value })}
+                        disabled={updateCustomerMutation.isPending}
+                        className="text-[11px] font-semibold text-body bg-surface-raised border border-border-default rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-accent"
+                      >
+                        <option value="CURRENT">CURRENT</option>
+                        <option value="AT_RISK">AT RISK</option>
+                        <option value="DELINQUENT">DELINQUENT</option>
+                      </select>
+                      {updateCustomerMutation.isPending && <Loader2 size={12} className="animate-spin text-muted" />}
+                    </div>
                   </div>
                 </div>
                 {selectedRecord.openBalance?.amount === 0 ? (
@@ -448,6 +502,148 @@ export default function AccountsReceivable() {
         description={paymentTarget ? `Mark invoice ${paymentTarget.number || paymentTarget.id} as paid? This updates the receivable status and customer balance.` : 'Mark this invoice as paid?'}
         confirmLabel="Mark as paid"
         busy={paymentMutation.isPending}
+      />
+      {customerModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-panel bg-surface-raised p-6 shadow-modal border border-border-default">
+            <div className="flex items-center justify-between pb-3 border-b border-border-default">
+              <h2 className="text-base font-semibold text-heading">Manage Customers</h2>
+              <button
+                type="button"
+                onClick={() => { setCustomerModalOpen(false); setEditingCustomerId(null); setCustomerError(''); }}
+                className="text-muted hover:text-body transition-colors"
+                title="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {customerError && (
+              <div className="mt-3 flex items-center gap-2 rounded-input bg-danger-light p-2.5 text-xs text-danger">
+                <AlertTriangle size={14} />
+                <span>{customerError}</span>
+              </div>
+            )}
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const trimmed = newCustomerName.trim();
+                if (trimmed) createCustomerMutation.mutate(trimmed);
+              }}
+              className="mt-4 flex gap-2"
+            >
+              <input
+                type="text"
+                placeholder="New customer name..."
+                value={newCustomerName}
+                onChange={(e) => setNewCustomerName(e.target.value)}
+                className="flex-1 rounded-input border border-border-default px-3 py-2 text-sm bg-surface-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+              <button
+                type="submit"
+                disabled={!newCustomerName.trim() || createCustomerMutation.isPending}
+                className="flex items-center gap-1.5 bg-primary text-white px-4 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors disabled:opacity-50"
+              >
+                <Plus size={16} /> Add
+              </button>
+            </form>
+
+            <div className="mt-4 max-h-64 overflow-y-auto divide-y divide-border-default border border-border-default rounded-input">
+              {(customersData?.items ?? []).length === 0 ? (
+                <div className="p-4 text-center text-sm text-muted">No customers yet. Add one above.</div>
+              ) : (
+                (customersData?.items ?? []).map((cust) => (
+                  <div key={cust.id} className="flex items-center justify-between p-3 gap-2">
+                    {editingCustomerId === cust.id ? (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const trimmed = editingCustomerName.trim();
+                          if (trimmed) updateCustomerMutation.mutate({ id: cust.id, name: trimmed });
+                        }}
+                        className="flex flex-1 items-center gap-2"
+                      >
+                        <input
+                          type="text"
+                          value={editingCustomerName}
+                          onChange={(e) => setEditingCustomerName(e.target.value)}
+                          className="flex-1 rounded-input border border-border-default px-2.5 py-1 text-sm bg-surface-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                          autoFocus
+                        />
+                        <button
+                          type="submit"
+                          disabled={!editingCustomerName.trim() || updateCustomerMutation.isPending}
+                          className="p-1.5 text-success-text hover:bg-success-light rounded-input transition-colors disabled:opacity-50"
+                          title="Save"
+                        >
+                          <Check size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingCustomerId(null)}
+                          className="p-1.5 text-muted hover:bg-surface-muted rounded-input transition-colors"
+                          title="Cancel"
+                        >
+                          <X size={16} />
+                        </button>
+                      </form>
+                    ) : (
+                      <>
+                        <span className="text-sm font-medium text-body">{cust.name}</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingCustomerId(cust.id);
+                              setEditingCustomerName(cust.name);
+                              setCustomerError('');
+                            }}
+                            className="p-1.5 text-muted hover:text-body hover:bg-surface-muted rounded-input transition-colors"
+                            title="Rename"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomerError('');
+                              setDeletingCustomer(cust);
+                            }}
+                            className="p-1.5 text-muted hover:text-danger hover:bg-danger-light rounded-input transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => { setCustomerModalOpen(false); setEditingCustomerId(null); setCustomerError(''); }}
+                className="px-4 py-2 border border-border-default rounded-input text-sm font-medium text-body hover:bg-surface-muted transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <ConfirmDialog
+        open={Boolean(deletingCustomer)}
+        onClose={() => setDeletingCustomer(null)}
+        onConfirm={() => deletingCustomer && deleteCustomerMutation.mutate(deletingCustomer.id)}
+        title="Delete customer?"
+        description={`Are you sure you want to delete "${deletingCustomer?.name}"? Deletion is only allowed if no receivable invoices exist for this customer.`}
+        confirmLabel="Delete customer"
+        busy={deleteCustomerMutation.isPending}
+        danger
       />
     </div>
   );

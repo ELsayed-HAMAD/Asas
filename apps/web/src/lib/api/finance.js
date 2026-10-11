@@ -28,9 +28,15 @@ export const financeApi = {
 
   /** GET /finance/vendors — { items } (payables master data). */
   listVendors: () => http.get('/finance/vendors'),
+  createVendor: (body) => http.post('/finance/vendors', { body }),
+  updateVendor: (id, body) => http.patch(`/finance/vendors/${id}`, { body }),
+  deleteVendor: (id) => http.delete(`/finance/vendors/${id}`),
 
   /** GET /finance/customers — { items } (receivables master data). */
   listCustomers: () => http.get('/finance/customers'),
+  createCustomer: (body) => http.post('/finance/customers', { body }),
+  updateCustomer: (id, body) => http.patch(`/finance/customers/${id}`, { body }),
+  deleteCustomer: (id) => http.delete(`/finance/customers/${id}`),
   listCollectionActivities: (customerId) => http.get(`/finance/customers/${customerId}/activities`),
   createCollectionActivity: (customerId, body) => http.post(`/finance/customers/${customerId}/activities`, { body }),
   createReceivable: (body) => http.post('/finance/receivables', { body }),
