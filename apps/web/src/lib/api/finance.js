@@ -52,4 +52,5 @@ export const financeApi = {
   updateExpenseStatus: (id, status) => http.post(`/finance/expenses/${id}/status`, { body: { status } }),
   voidExpense: (id, reason) => http.post(`/finance/expenses/${id}/void`, { body: { reason } }),
   updateReceivableStatus: (id, status) => http.post(`/finance/receivables/${id}/status`, { body: { status } }),
+  sendBatchReminders: (customerIds) => http.post('/finance/receivables/batch-remind', { body: { customerIds } }),
 }

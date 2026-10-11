@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
-import { signIn } from '../../lib/authClient'
+import { authClient, signIn } from '../../lib/authClient'
+import FormDialog from '../../components/common/FormDialog'
 
 function authErrorMessage(error) {
   if (!error) return 'Unable to sign in. Please try again.'
@@ -21,6 +22,36 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
+
+  const [forgotOpen, setForgotOpen] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
+  const [forgotError, setForgotError] = useState('')
+  const [forgotSuccess, setForgotSuccess] = useState('')
+
+  const submitForgotPassword = async () => {
+    if (!forgotEmail.trim()) {
+      setForgotError('Please enter your email address.')
+      return
+    }
+    setForgotLoading(true)
+    setForgotError('')
+    try {
+      const res = await authClient.forgetPassword({
+        email: forgotEmail.trim(),
+        redirectTo: window.location.origin + '/login',
+      })
+      if (res?.error) {
+        setForgotError(res.error?.message || 'Could not send reset link.')
+      } else {
+        setForgotSuccess('If an account exists for this email, password reset instructions have been sent.')
+      }
+    } catch (err) {
+      setForgotError(err?.message || 'Could not send reset link.')
+    } finally {
+      setForgotLoading(false)
+    }
+  }
 
   const handleChange = e =>
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
@@ -87,9 +118,18 @@ export default function Login() {
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className="text-sm font-medium text-body">Password</label>
-            <a href="#" className="text-xs text-muted hover:text-heading transition-colors">
+            <button
+              type="button"
+              onClick={() => {
+                setForgotEmail(form.email)
+                setForgotError('')
+                setForgotSuccess('')
+                setForgotOpen(true)
+              }}
+              className="text-xs text-muted hover:text-heading transition-colors"
+            >
               Forgot password?
-            </a>
+            </button>
           </div>
           <div className="relative">
             <input
@@ -158,6 +198,38 @@ export default function Login() {
           Create workspace
         </Link>
       </p>
+
+      <FormDialog
+        open={forgotOpen}
+        onClose={() => setForgotOpen(false)}
+        title="Reset your password"
+        subtitle="We will send you a link to reset your password."
+        confirmLabel="Send Reset Link"
+        busy={forgotLoading}
+        onConfirm={submitForgotPassword}
+      >
+        <div className="space-y-3">
+          {forgotSuccess ? (
+            <div className="p-3 bg-success-light border border-success-border rounded-button text-xs text-success-text">
+              {forgotSuccess}
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-medium text-body mb-1">Email address</label>
+              <input
+                type="email"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                placeholder="you@company.com"
+                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-2 focus:ring-border-subtle transition-all"
+              />
+            </div>
+          )}
+          {forgotError && (
+            <p role="alert" className="text-xs text-danger">{forgotError}</p>
+          )}
+        </div>
+      </FormDialog>
     </div>
   )
 }

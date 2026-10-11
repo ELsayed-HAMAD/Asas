@@ -89,6 +89,13 @@ export default function AccountsReceivable() {
     },
     onError: (err) => setCustomerError(err?.message || 'Could not delete customer.'),
   });
+  const batchRemindMutation = useMutation({
+    mutationFn: (customerIds) => financeApi.sendBatchReminders(customerIds),
+    onSuccess: () => {
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.all() });
+    },
+  });
 
   const items = data?.items || [];
   const customers = customersData?.items || [];
@@ -162,7 +169,8 @@ export default function AccountsReceivable() {
   };
 
   const handleBatchRemind = () => {
-    setSelectedIds(new Set());
+    if (selectedIds.size === 0) return;
+    batchRemindMutation.mutate(Array.from(selectedIds));
   };
 
   return (
@@ -181,11 +189,11 @@ export default function AccountsReceivable() {
             />
           </div>
           <button 
-            disabled={selectedIds.size === 0}
+            disabled={selectedIds.size === 0 || batchRemindMutation.isPending}
             onClick={handleBatchRemind}
             className="flex items-center gap-2 bg-surface-muted text-heading px-4 py-1.5 rounded-input text-sm font-medium hover:bg-surface-active transition-colors shadow-card border border-border-default disabled:opacity-60"
           >
-            <Send size={14} /> Send Batch Reminders ({selectedIds.size})
+            {batchRemindMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Send Batch Reminders ({selectedIds.size})
           </button>
           <button 
             type="button"

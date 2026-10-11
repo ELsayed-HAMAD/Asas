@@ -3,6 +3,7 @@ import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { createAccessControl, organization } from 'better-auth/plugins'
 import type { AsasEnv } from './config/env.js'
+import { mailer } from './services/mailer.js'
 
 /**
  * Better Auth, with the `organization` plugin mapped onto the existing `Tenant` table.
@@ -55,12 +56,39 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
     database: prismaAdapter(prisma, { provider: 'postgresql' }),
     emailAndPassword: {
       enabled: true,
+      sendResetPassword: async (data: { user: { email: string; name?: string | null }; url: string }) => {
+        await mailer.send({
+          to: data.user.email,
+          subject: 'Reset your Asas password',
+          text: `Reset your password by visiting: ${data.url}`,
+          html: `<p>Hello ${data.user.name || 'there'},</p><p>You requested a password reset. Click below to choose a new password:</p><p><a href="${data.url}">Reset Password</a></p>`,
+        })
+      },
+      sendEmailVerification: async (data: { user: { email: string; name?: string | null }; url: string }) => {
+        await mailer.send({
+          to: data.user.email,
+          subject: 'Verify your Asas email address',
+          text: `Verify your email by visiting: ${data.url}`,
+          html: `<p>Hello ${data.user.name || 'there'},</p><p>Click below to verify your email address:</p><p><a href="${data.url}">Verify Email</a></p>`,
+        })
+      },
     },
     plugins: [
       organization({
         creatorRole: 'OWNER',
         ac,
         roles: { OWNER: owner, ADMIN: admin, MEMBER: member },
+        sendInvitationEmail: async (data: { id: string; email: string; role: string; organization?: { name: string } | null }) => {
+          const frontendBase = (env.frontendOrigin.split(',')[0] ?? 'http://localhost:5173').trim()
+          const inviteUrl = `${frontendBase}/register?invitationId=${data.id}`
+          const orgName = data.organization?.name || 'Workspace'
+          await mailer.send({
+            to: data.email,
+            subject: `Invitation to join ${orgName} on Asas`,
+            text: `You have been invited to join ${orgName} on Asas as ${data.role}. Accept your invitation: ${inviteUrl}`,
+            html: `<p>You have been invited to join <strong>${orgName}</strong> as ${data.role}.</p><p><a href="${inviteUrl}">Accept Invitation</a></p>`,
+          })
+        },
         schema: {
           organization: {
             modelName: 'Tenant',
