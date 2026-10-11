@@ -1,0 +1,12 @@
+{
+  "env": {
+    "browser": true,
+    "es2024": true
+  },
+  "globals": {
+    "React": "readonly"
+  },
+  "rules": {
+    "no-undef": "error"
+  }
+}
