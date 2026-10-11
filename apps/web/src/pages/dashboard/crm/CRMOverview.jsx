@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search,
   Bell,
@@ -26,6 +27,8 @@ const formatCompact = (v, currency) => new Intl.NumberFormat('en-US', {
 }).format(v);
 
 export default function CRMOverview() {
+  const navigate = useNavigate()
+  const [search, setSearch] = useState('')
   const queryClient = useQueryClient()
   const [agendaTitle, setAgendaTitle] = useState('')
   const [dealOpen, setDealOpen] = useState(false)
@@ -125,15 +128,35 @@ export default function CRMOverview() {
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
             <input
               type="text"
-              placeholder="Search..."
+              placeholder="Search deals..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && search.trim()) {
+                  navigate(`/dashboard/crm/deals?search=${encodeURIComponent(search.trim())}`)
+                }
+              }}
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
           </div>
 
-          <button className="text-muted hover:text-heading transition-colors">
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard/settings/notifications')}
+            title="Notification Settings"
+            className="text-muted hover:text-heading transition-colors cursor-pointer"
+          >
             <Bell size={18} />
           </button>
-          <button className="text-muted hover:text-heading transition-colors">
+          <button
+            type="button"
+            onClick={() => {
+              const isDark = document.documentElement.classList.toggle('dark');
+              localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            }}
+            title="Toggle theme"
+            className="text-muted hover:text-heading transition-colors cursor-pointer"
+          >
             <Moon size={18} />
           </button>
 
@@ -244,7 +267,12 @@ export default function CRMOverview() {
           <div className="col-span-3 bg-surface-raised border border-border-default rounded-card-sm shadow-card p-6 flex flex-col min-h-[340px]">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-heading">Revenue Forecast</h2>
-              <button className="text-caption hover:text-body transition-colors">
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard/crm/forecast')}
+                title="View full revenue forecast"
+                className="text-caption hover:text-body transition-colors cursor-pointer"
+              >
                 <MoreHorizontal size={20} />
               </button>
             </div>

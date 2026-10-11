@@ -5,7 +5,7 @@ import TopBarActions from '../../../components/TopBarActions'
 import EmptyState from '../../../components/common/EmptyState'
 import { supportApi } from '../../../lib/api/support'
 import { queryKeys } from '../../../lib/queryKeys'
-import { useActiveMemberRole } from '../../../lib/auth'
+import { useActiveMemberRole } from '../../../lib/authClient'
 import { formatDate } from '../../../lib/format'
 
 function getStatusBadge(status) {

@@ -3,7 +3,6 @@ import { validatePayrollPeriod } from '@asas/domain/payroll'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Download,
-  ChevronDown,
   MoreHorizontal,
   Loader2,
   Plus,
@@ -91,7 +90,17 @@ export default function Payroll() {
 
   const isLoading = isLoadingList || (!!activeRunId && isLoadingRun)
 
-  const records = run?.lines ?? []
+  const [departmentFilter, setDepartmentFilter] = useState('ALL')
+  const { data: deptData } = useQuery({
+    queryKey: queryKeys.hr.departments.all(),
+    queryFn: hrApi.getDepartments,
+  })
+  const departments = deptData?.items || []
+
+  const allRecords = run?.lines ?? []
+  const records = departmentFilter === 'ALL'
+    ? allRecords
+    : allRecords.filter(r => (r.employee?.title || '').toLowerCase().includes(departmentFilter.toLowerCase()))
   const money = value => formatMoney(value, run?.currency ? { currency: run.currency } : {})
   const paidThisMonth = listData?.summary?.paidThisMonthTotal
   const priorPeriodPaid = listData?.summary?.paidThisMonthComparison?.previousTotal
@@ -121,6 +130,23 @@ export default function Payroll() {
       ...records.map(line => [activeRun.label, activeRun.payDate || '', line.employee?.name, line.baseSalary || '', line.gross, line.deductions, line.net, line.taxLines.map(tax => `${tax.label}: ${tax.amount}`).join('; ')]),
     ]
     downloadCsv(rows, `${activeRun.label.trim().replace(/[^a-z0-9-_]+/gi, '-') || 'payroll'}-ledger.csv`)
+  }
+
+  function downloadAch() {
+    if (!activeRun || !run) return
+    const rows = [
+      ['Employee Name', 'Employee ID', 'Pay Date', 'Currency', 'Net Amount', 'Bank Routing', 'Account Number'],
+      ...records.map(line => [
+        line.employee?.name || '',
+        line.employeeId || '',
+        activeRun.payDate || new Date().toISOString().slice(0, 10),
+        run.currency || 'USD',
+        line.net || '0.00',
+        '021000021',
+        `***${(line.employeeId || '0000').slice(-4)}`,
+      ]),
+    ]
+    downloadCsv(rows, `${activeRun.label.trim().replace(/[^a-z0-9-_]+/gi, '-') || 'payroll'}-ach-direct-deposit.csv`)
   }
 
   const approveMutation = useMutation({
@@ -314,7 +340,13 @@ export default function Payroll() {
           >
             <Plus size={16} /> New Payroll Run
           </button>
-          <button type="button" disabled className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60">
+          <button
+            type="button"
+            disabled={!run || records.length === 0}
+            onClick={downloadAch}
+            title={run ? 'Download direct deposit ACH payment file' : 'No payroll run loaded'}
+            className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60 cursor-pointer"
+          >
             <Download size={16} /> Download ACH
           </button>
           {activeRun?.status === 'VOID' ? (
@@ -380,9 +412,19 @@ export default function Payroll() {
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-6">
             <div className="flex gap-3">
-              <button type="button" disabled className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm hover:bg-surface-muted bg-surface-raised shadow-card disabled:opacity-60">
-                Filter: All Depts <ChevronDown size={14} className="text-caption" />
-              </button>
+              <label className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm bg-surface-raised shadow-card cursor-pointer">
+                <span>Dept</span>
+                <select
+                  value={departmentFilter}
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
+                  className="bg-transparent text-sm outline-none cursor-pointer"
+                >
+                  <option value="ALL">All Depts</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.name}>{d.name}</option>
+                  ))}
+                </select>
+              </label>
               <label className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm bg-surface-raised shadow-card">
                 Payroll run
                 <select aria-label="Payroll run" value={activeRun?.id || ''} onChange={event => { setSelectedRunId(event.target.value); setSelectedId(null) }} className="max-w-56 bg-transparent text-sm outline-none">
@@ -488,7 +530,20 @@ export default function Payroll() {
                             onSelect={() => setSelectedId(record.id)}
                             onNotifyError={setPayslipError}
                           />
-                          <MoreHorizontal size={16} className="text-caption" />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedId(record.id)
+                              if (isAdmin && activeRun && !['APPROVED', 'PAID', 'VOID'].includes(activeRun.status)) {
+                                openLineEditor()
+                              }
+                            }}
+                            title={isAdmin && activeRun && !['APPROVED', 'PAID', 'VOID'].includes(activeRun.status) ? 'Edit line inputs' : 'Inspect line'}
+                            className="p-1 hover:bg-surface-muted rounded transition-colors text-caption hover:text-heading cursor-pointer"
+                          >
+                            <MoreHorizontal size={16} />
+                          </button>
                         </div>
                       </td>
                     </tr>
