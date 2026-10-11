@@ -23,8 +23,11 @@ export const projectsApi = {
   createIssue: (body) => http.post('/projects/issues', { body }),
   listProjects: (params) => http.get('/projects/projects', { query: params }),
   createRoadmapPhase: (body) => http.post('/projects/roadmap/phases', { body }),
+  updateRoadmapPhase: (id, body) => http.patch(`/projects/roadmap/phases/${id}`, { body }),
+  deleteRoadmapPhase: (id) => http.delete(`/projects/roadmap/phases/${id}`),
   createRoadmapTask: (body) => http.post('/projects/roadmap/tasks', { body }),
   updateRoadmapTask: (id, body) => http.patch(`/projects/roadmap/tasks/${id}`, { body }),
+  deleteRoadmapTask: (id) => http.delete(`/projects/roadmap/tasks/${id}`),
   /** GET /projects/portfolio — portfolio utilization rows + tenant-wide summary. */
   getPortfolio: () => http.get('/projects/portfolio'),
   /** GET /projects/:id/sprint-velocity-comparison â€” latest two completed sprint estimates. */
