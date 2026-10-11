@@ -34,6 +34,7 @@ const DealsPipeline = lazy(() => import('./pages/dashboard/crm/DealsPipeline'))
 const SalesPerformance = lazy(() => import('./pages/dashboard/crm/SalesPerformance'))
 const RevenueForecast = lazy(() => import('./pages/dashboard/crm/RevenueForecast'))
 const ProductCatalog = lazy(() => import('./pages/dashboard/inventory/ProductCatalog'))
+const StockMovements = lazy(() => import('./pages/dashboard/inventory/StockMovements'))
 const PortfolioOverview = lazy(() => import('./pages/dashboard/projects/PortfolioOverview'))
 const ActiveSprints = lazy(() => import('./pages/dashboard/projects/ActiveSprints'))
 const Roadmap = lazy(() => import('./pages/dashboard/projects/Roadmap'))
@@ -85,7 +86,7 @@ const REAL_PAGES = {
   '/dashboard/crm/sales-performance': SalesPerformance,
   '/dashboard/crm/revenue-forecast': RevenueForecast,
   '/dashboard/inventory': ProductCatalog,
-  '/dashboard/inventory/movements': ProductCatalog,
+  '/dashboard/inventory/movements': StockMovements,
   '/dashboard/projects': PortfolioOverview,
   '/dashboard/projects/sprints': ActiveSprints,
   '/dashboard/projects/roadmap': Roadmap,

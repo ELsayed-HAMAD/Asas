@@ -1,4 +1,5 @@
-import React, { useDeferredValue, useState } from 'react';
+import React, { useDeferredValue, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Search,
   LayoutGrid,
@@ -135,7 +136,16 @@ function DealStageGroup({ group, selectedId, onSelect, disabled, onPageChange })
 
 export default function DealsPipeline() {
   const [selectedId, setSelectedId] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [newDealOpen, setNewDealOpen] = useState(false);
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setNewDealOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const [editDealOpen, setEditDealOpen] = useState(false)
   const [editForm, setEditForm] = useState(EMPTY_DEAL_FORM)
   const [dealForm, setDealForm] = useState(EMPTY_DEAL_FORM);

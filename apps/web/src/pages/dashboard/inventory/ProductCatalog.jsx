@@ -23,9 +23,11 @@ import { useDebouncedValue } from '../../../lib/useDebouncedValue';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import TopBarActions from '../../../components/TopBarActions';
+import { useSearchParams } from 'react-router-dom';
 
 export default function Inventory() {
   const [selectedId, setSelectedId] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [manualDeselect, setManualDeselect] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [searchInput, setSearchInput] = useState('');
@@ -154,6 +156,15 @@ export default function Inventory() {
     setProductError('');
     setProductDialog({ open: true, mode: 'create', product: null });
   };
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      openCreateDialog();
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const openEditDialog = (product) => {
     setProductForm({
