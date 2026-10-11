@@ -64,9 +64,11 @@ export const purchaseOrderWriteSchema = z.object({
   quantity: z.int().min(1),
 })
 export type PurchaseOrderWriteInput = z.infer<typeof purchaseOrderWriteSchema>
+export const purchaseOrderStatusSchema = z.enum(['DRAFT', 'APPROVED', 'RECEIVED', 'CANCELLED'])
+export type PurchaseOrderStatus = z.infer<typeof purchaseOrderStatusSchema>
 export const purchaseOrderSchema = z.object({
   id: idSchema,
-  status: z.literal('DRAFT'),
+  status: purchaseOrderStatusSchema,
   createdAt: isoDateTimeSchema,
   productId: idSchema,
   productName: z.string(),
@@ -74,6 +76,13 @@ export const purchaseOrderSchema = z.object({
   quantity: z.int().min(1),
 })
 export type PurchaseOrder = z.infer<typeof purchaseOrderSchema>
+export const purchaseOrderListQuerySchema = z.object({
+  productId: idSchema.optional(),
+  status: purchaseOrderStatusSchema.optional(),
+})
+export type PurchaseOrderListQuery = z.infer<typeof purchaseOrderListQuerySchema>
+export const purchaseOrderListResponseSchema = collection(purchaseOrderSchema)
+export type PurchaseOrderListResponse = z.infer<typeof purchaseOrderListResponseSchema>
 
 export const productListQuerySchema = paginationQuerySchema.extend({
   search: boundedText(200, 0).optional(),

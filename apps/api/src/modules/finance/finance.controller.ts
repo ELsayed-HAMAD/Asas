@@ -9,6 +9,7 @@
  */
 import type {
   Customer,
+  CustomerUpdateInput,
   CustomerWriteInput,
   CollectionActivity,
   CollectionActivityWriteInput,
@@ -34,6 +35,7 @@ import type {
   ReceivableUpdateInput,
   ReceivableWriteInput,
   Vendor,
+  VendorUpdateInput,
   VendorWriteInput,
 } from '@asas/contracts'
 import type { Prisma } from '@prisma/client'
@@ -54,6 +56,14 @@ export function getVendor(prisma: FinanceClient, tenantId: string, id: string): 
 
 export function createVendor(prisma: FinanceClient, tenantId: string, input: VendorWriteInput): Promise<Vendor> {
   return service.createVendor(prisma, tenantId, input)
+}
+
+export function updateVendor(prisma: FinanceClient, tenantId: string, id: string, input: VendorUpdateInput): Promise<Vendor> {
+  return service.updateVendor(prisma, tenantId, id, input)
+}
+
+export function deleteVendor(prisma: FinanceClient, tenantId: string, id: string): Promise<void> {
+  return service.deleteVendor(prisma, tenantId, id)
 }
 
 // ── Payables ────────────────────────────────────────────────────────────────────
@@ -113,6 +123,19 @@ export function createCustomer(
   input: CustomerWriteInput,
 ): Promise<Customer> {
   return service.createCustomer(prisma, tenantId, input)
+}
+
+export function updateCustomer(
+  prisma: FinanceClient,
+  tenantId: string,
+  id: string,
+  input: CustomerUpdateInput,
+): Promise<Customer> {
+  return service.updateCustomer(prisma, tenantId, id, input)
+}
+
+export function deleteCustomer(prisma: FinanceClient, tenantId: string, id: string): Promise<void> {
+  return service.deleteCustomer(prisma, tenantId, id)
 }
 
 export function listCollectionActivities(prisma: FinanceClient, tenantId: string, customerId: string): Promise<CollectionActivity[]> {

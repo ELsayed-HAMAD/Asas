@@ -29,6 +29,7 @@ export const PERMISSIONS = {
   'employee.write': 'ADMIN',
   'employee.delete': 'ADMIN',
   'department.write': 'ADMIN',
+  'department.delete': 'ADMIN',
   // Candidates — adding a candidate and moving its stage (including uploading a CV) are writes
   // to the recruitment pipeline, gated the same as the other module writes. Reads are open to
   // any MEMBER (requireRole in the route).
@@ -50,6 +51,7 @@ export const PERMISSIONS = {
   // CRM — creating deals and moving them (including stage changes) is a write to pipeline
   // money, so it follows the same ADMIN gate as the other module writes.
   'deal.write': 'ADMIN',
+  'deal.delete': 'ADMIN',
 
   // Finance — invoices and expenses are writes to the books, gated the same as the other
   // module writes. Master data (vendors/customers) shares the invoice write gate since a new
@@ -57,6 +59,7 @@ export const PERMISSIONS = {
   'finance.invoice.write': 'ADMIN',
   'finance.expense.write': 'ADMIN',
   'finance.partner.write': 'ADMIN',
+  'finance.partner.delete': 'ADMIN',
 
   // Projects / portfolio. Reads are open to any MEMBER (requireRole); writes and deletions
   // require ADMIN, mirroring the HR `employee.write`/`employee.delete` split.
@@ -92,6 +95,10 @@ export const AUDITED_PERMISSIONS: ReadonlySet<Permission> = new Set([
   'payroll.pay',
   'payroll.line.adjust',
   'employee.delete',
+  'department.delete',
+  'deal.delete',
+  'project.delete',
+  'finance.partner.delete',
   'member.role.update',
   'member.remove',
   'organization.delete',

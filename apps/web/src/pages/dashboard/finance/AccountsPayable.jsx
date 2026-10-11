@@ -9,7 +9,14 @@ import {
   ZoomIn,
   ZoomOut,
   Download,
-  Loader2
+  Loader2,
+  Users,
+  Plus,
+  Pencil,
+  Trash2,
+  X,
+  Check,
+  AlertTriangle
 } from 'lucide-react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../../../lib/api/finance';
@@ -27,6 +34,12 @@ export default function AccountsPayable() {
   const [selectedId, setSelectedId] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [billOpen, setBillOpen] = useState(false)
+  const [vendorModalOpen, setVendorModalOpen] = useState(false);
+  const [newVendorName, setNewVendorName] = useState('');
+  const [editingVendorId, setEditingVendorId] = useState(null);
+  const [editingVendorName, setEditingVendorName] = useState('');
+  const [vendorError, setVendorError] = useState('');
+  const [deletingVendor, setDeletingVendor] = useState(null);
   useEffect(() => {
     if (searchParams.get('new') === '1') {
       setBillOpen(true);
@@ -115,6 +128,34 @@ export default function AccountsPayable() {
       queryClient.invalidateQueries({ queryKey: queryKeys.finance.payables.all() })
     },
   })
+  const createVendorMutation = useMutation({
+    mutationFn: (name) => financeApi.createVendor({ name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.all() });
+      setNewVendorName('');
+      setVendorError('');
+    },
+    onError: (err) => setVendorError(err?.message || 'Could not create vendor.'),
+  });
+  const updateVendorMutation = useMutation({
+    mutationFn: ({ id, name }) => financeApi.updateVendor(id, { name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.all() });
+      setEditingVendorId(null);
+      setEditingVendorName('');
+      setVendorError('');
+    },
+    onError: (err) => setVendorError(err?.message || 'Could not update vendor.'),
+  });
+  const deleteVendorMutation = useMutation({
+    mutationFn: (id) => financeApi.deleteVendor(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.all() });
+      setDeletingVendor(null);
+      setVendorError('');
+    },
+    onError: (err) => setVendorError(err?.message || 'Could not delete vendor.'),
+  });
   const toggleInvoiceSelection = (id) => setSelectedIds(current => {
     const next = new Set(current)
     if (next.has(id)) next.delete(id)
@@ -214,6 +255,15 @@ export default function AccountsPayable() {
           </button>
           <button disabled={!selectedIds.size || batchPayment.isPending} onClick={() => setBatchConfirmOpen(true)} className="border border-border-default text-body px-4 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60">
             Batch Payment {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setVendorError(''); setVendorModalOpen(true); }}
+            className="flex items-center gap-1.5 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors"
+            title="Manage vendors"
+          >
+            <Users size={14} className="text-muted" />
+            Vendors
           </button>
           <button onClick={() => setBillOpen(true)} className="bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors">New Bill</button>
           <div className="w-px h-6 bg-surface-strong mx-1"></div>
@@ -508,6 +558,148 @@ export default function AccountsPayable() {
         confirmLabel="Mark as paid"
         busy={batchPayment.isPending}
         error={batchPayment.isError ? batchPayment.error?.message || 'Batch payment failed. No invoices were changed.' : undefined}
+      />
+      {vendorModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-panel bg-surface-raised p-6 shadow-modal border border-border-default">
+            <div className="flex items-center justify-between pb-3 border-b border-border-default">
+              <h2 className="text-base font-semibold text-heading">Manage Vendors</h2>
+              <button
+                type="button"
+                onClick={() => { setVendorModalOpen(false); setEditingVendorId(null); setVendorError(''); }}
+                className="text-muted hover:text-body transition-colors"
+                title="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {vendorError && (
+              <div className="mt-3 flex items-center gap-2 rounded-input bg-danger-light p-2.5 text-xs text-danger">
+                <AlertTriangle size={14} />
+                <span>{vendorError}</span>
+              </div>
+            )}
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const trimmed = newVendorName.trim();
+                if (trimmed) createVendorMutation.mutate(trimmed);
+              }}
+              className="mt-4 flex gap-2"
+            >
+              <input
+                type="text"
+                placeholder="New vendor name..."
+                value={newVendorName}
+                onChange={(e) => setNewVendorName(e.target.value)}
+                className="flex-1 rounded-input border border-border-default px-3 py-2 text-sm bg-surface-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+              <button
+                type="submit"
+                disabled={!newVendorName.trim() || createVendorMutation.isPending}
+                className="flex items-center gap-1.5 bg-primary text-white px-4 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors disabled:opacity-50"
+              >
+                <Plus size={16} /> Add
+              </button>
+            </form>
+
+            <div className="mt-4 max-h-64 overflow-y-auto divide-y divide-border-default border border-border-default rounded-input">
+              {(vendorsData?.items ?? []).length === 0 ? (
+                <div className="p-4 text-center text-sm text-muted">No vendors yet. Add one above.</div>
+              ) : (
+                (vendorsData?.items ?? []).map((vendor) => (
+                  <div key={vendor.id} className="flex items-center justify-between p-3 gap-2">
+                    {editingVendorId === vendor.id ? (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const trimmed = editingVendorName.trim();
+                          if (trimmed) updateVendorMutation.mutate({ id: vendor.id, name: trimmed });
+                        }}
+                        className="flex flex-1 items-center gap-2"
+                      >
+                        <input
+                          type="text"
+                          value={editingVendorName}
+                          onChange={(e) => setEditingVendorName(e.target.value)}
+                          className="flex-1 rounded-input border border-border-default px-2.5 py-1 text-sm bg-surface-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                          autoFocus
+                        />
+                        <button
+                          type="submit"
+                          disabled={!editingVendorName.trim() || updateVendorMutation.isPending}
+                          className="p-1.5 text-success-text hover:bg-success-light rounded-input transition-colors disabled:opacity-50"
+                          title="Save"
+                        >
+                          <Check size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingVendorId(null)}
+                          className="p-1.5 text-muted hover:bg-surface-muted rounded-input transition-colors"
+                          title="Cancel"
+                        >
+                          <X size={16} />
+                        </button>
+                      </form>
+                    ) : (
+                      <>
+                        <span className="text-sm font-medium text-body">{vendor.name}</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingVendorId(vendor.id);
+                              setEditingVendorName(vendor.name);
+                              setVendorError('');
+                            }}
+                            className="p-1.5 text-muted hover:text-body hover:bg-surface-muted rounded-input transition-colors"
+                            title="Rename"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setVendorError('');
+                              setDeletingVendor(vendor);
+                            }}
+                            className="p-1.5 text-muted hover:text-danger hover:bg-danger-light rounded-input transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => { setVendorModalOpen(false); setEditingVendorId(null); setVendorError(''); }}
+                className="px-4 py-2 border border-border-default rounded-input text-sm font-medium text-body hover:bg-surface-muted transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <ConfirmDialog
+        open={Boolean(deletingVendor)}
+        onClose={() => setDeletingVendor(null)}
+        onConfirm={() => deletingVendor && deleteVendorMutation.mutate(deletingVendor.id)}
+        title="Delete vendor?"
+        description={`Are you sure you want to delete "${deletingVendor?.name}"? Deletion is only allowed if no payable invoices exist for this vendor.`}
+        confirmLabel="Delete vendor"
+        busy={deleteVendorMutation.isPending}
+        danger
       />
     </div>
   );

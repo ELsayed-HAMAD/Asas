@@ -25,6 +25,7 @@ import type {
 } from '@prisma/client'
 import type {
   Customer,
+  CustomerUpdateInput,
   CustomerWriteInput,
   CollectionActivity,
   CollectionActivityWriteInput,
@@ -46,6 +47,7 @@ import type {
   ReceivableUpdateInput,
   ReceivableWriteInput,
   Vendor,
+  VendorUpdateInput,
   VendorWriteInput,
 } from '@asas/contracts'
 import { buildPaginationMeta, toPrismaPage } from '@asas/contracts'
@@ -200,6 +202,50 @@ export async function createVendor(
     data: { tenantId, name: input.name, avatarUrl: input.avatarUrl ?? null },
   })
   return mapVendor(vendor)
+}
+
+export async function updateVendor(
+  prisma: FinanceClient,
+  tenantId: string,
+  id: string,
+  input: VendorUpdateInput,
+): Promise<Vendor> {
+  const existing = await prisma.vendor.findFirst({ where: { id, tenantId } })
+  if (!existing) throw new AppError(404, 'Vendor not found')
+
+  if (input.name && input.name !== existing.name) {
+    const duplicate = await prisma.vendor.findFirst({
+      where: { tenantId, name: input.name, id: { not: id } },
+    })
+    if (duplicate) throw new AppError(409, 'A vendor with this name already exists')
+  }
+
+  const vendor = await prisma.vendor.update({
+    where: { id },
+    data: {
+      ...(input.name !== undefined && { name: input.name }),
+      ...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl ?? null }),
+    },
+  })
+  return mapVendor(vendor)
+}
+
+export async function deleteVendor(
+  prisma: FinanceClient,
+  tenantId: string,
+  id: string,
+): Promise<void> {
+  const existing = await prisma.vendor.findFirst({ where: { id, tenantId } })
+  if (!existing) throw new AppError(404, 'Vendor not found')
+
+  const invoiceCount = await prisma.payableInvoice.count({
+    where: { tenantId, vendorId: id },
+  })
+  if (invoiceCount > 0) {
+    throw new AppError(400, `Cannot delete vendor with ${invoiceCount} associated payable invoice(s)`)
+  }
+
+  await prisma.vendor.delete({ where: { id } })
 }
 
 // ── Payables ────────────────────────────────────────────────────────────────────
@@ -611,6 +657,54 @@ export async function createCustomer(
     data: { tenantId, name: input.name, avatarUrl: input.avatarUrl ?? null },
   })
   return mapCustomer(customer, new Prisma.Decimal(0), currency, 0)
+}
+
+export async function updateCustomer(
+  prisma: FinanceClient,
+  tenantId: string,
+  id: string,
+  input: CustomerUpdateInput,
+): Promise<Customer> {
+  const existing = await prisma.customer.findFirst({ where: { id, tenantId } })
+  if (!existing) throw new AppError(404, 'Customer not found')
+
+  if (input.name && input.name !== existing.name) {
+    const duplicate = await prisma.customer.findFirst({
+      where: { tenantId, name: input.name, id: { not: id } },
+    })
+    if (duplicate) throw new AppError(409, 'A customer with this name already exists')
+  }
+
+  const currency = await getTenantCurrency(prisma, tenantId)
+  const customer = await prisma.customer.update({
+    where: { id },
+    data: {
+      ...(input.name !== undefined && { name: input.name }),
+      ...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl ?? null }),
+      ...(input.collectionStatus !== undefined && { collectionStatus: input.collectionStatus }),
+    },
+  })
+
+  const balanceMap = await openReceivableBalanceByCustomer(prisma, tenantId)
+  return mapCustomer(customer, balanceMap.get(id) ?? new Prisma.Decimal(0), currency, 0)
+}
+
+export async function deleteCustomer(
+  prisma: FinanceClient,
+  tenantId: string,
+  id: string,
+): Promise<void> {
+  const existing = await prisma.customer.findFirst({ where: { id, tenantId } })
+  if (!existing) throw new AppError(404, 'Customer not found')
+
+  const invoiceCount = await prisma.receivableInvoice.count({
+    where: { tenantId, customerId: id },
+  })
+  if (invoiceCount > 0) {
+    throw new AppError(400, `Cannot delete customer with ${invoiceCount} associated receivable invoice(s)`)
+  }
+
+  await prisma.customer.delete({ where: { id } })
 }
 
 function mapCollectionActivity(row: { id: string; customerId: string; title: string; author: string | null; body: string | null; createdAt: Date }): CollectionActivity {

@@ -70,6 +70,8 @@ const financeBase = moduleKeys('finance')
 const financePayablesBase = () => [...financeBase.all(), 'payables']
 const financeReceivablesBase = () => [...financeBase.all(), 'receivables']
 const financeExpensesBase = () => [...financeBase.all(), 'expenses']
+const financeVendorsBase = () => [...financeBase.all(), 'vendors']
+const financeCustomersBase = () => [...financeBase.all(), 'customers']
 
 const crmBase = moduleKeys('crm')
 const crmDealsBase = () => [...crmBase.all(), 'deals']
@@ -86,6 +88,7 @@ const inventoryMovementsBase = () => [...inventoryBase.all(), 'movements']
 const inventoryStockLevelsBase = () => [...inventoryBase.all(), 'stock-levels']
 const inventoryStockAlertsBase = () => [...inventoryBase.all(), 'stock-alerts']
 const inventoryWarehousesBase = () => [...inventoryBase.all(), 'warehouses']
+const inventoryPurchaseOrdersBase = () => [...inventoryBase.all(), 'purchase-orders']
 
 const exportsBase = moduleKeys('exports')
 const settingsBase = moduleKeys('settings')
@@ -123,6 +126,8 @@ export const queryKeys = {
     payables: resourceKeys(financePayablesBase),
     receivables: resourceKeys(financeReceivablesBase),
     expenses: resourceKeys(financeExpensesBase),
+    vendors: resourceKeys(financeVendorsBase),
+    customers: resourceKeys(financeCustomersBase),
   },
 
   crm: {
@@ -155,6 +160,7 @@ export const queryKeys = {
     stockLevels: () => [...inventoryStockLevelsBase()],
     stockAlerts: () => [...inventoryStockAlertsBase()],
     warehouses: () => [...inventoryWarehousesBase()],
+    purchaseOrders: resourceKeys(inventoryPurchaseOrdersBase),
   },
 
   exports: {

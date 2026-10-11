@@ -11,6 +11,9 @@ import { http } from '../api/http'
 export const hrApi = {
   // Departments
   getDepartments: () => http.get('/hr/departments'),
+  createDepartment: (body) => http.post('/hr/departments', { body }),
+  updateDepartment: (id, body) => http.patch(`/hr/departments/${id}`, { body }),
+  deleteDepartment: (id) => http.delete(`/hr/departments/${id}`),
 
   // Employees
   listEmployees: (params) => http.get('/hr/employees', { query: params }),

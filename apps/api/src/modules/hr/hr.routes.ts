@@ -67,6 +67,55 @@ export async function hrRoutes(app: FastifyInstance): Promise<void> {
     },
   )
 
+  server.patch(
+    '/departments/:id',
+    {
+      preHandler: requirePermission('department.write'),
+      schema: {
+        params: idParamSchema,
+        body: departmentWriteSchema,
+        response: { 200: envelope(departmentSchema), ...errorResponses },
+      },
+    },
+    async request => {
+      const { tenantId } = requireAuthContext(request)
+      const department = await departmentsService.updateDepartment(
+        request.server.prisma,
+        tenantId,
+        request.params.id,
+        request.body,
+      )
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('hr')])
+      return { data: department }
+    },
+  )
+
+  server.delete(
+    '/departments/:id',
+    {
+      preHandler: requirePermission('department.delete'),
+      schema: {
+        params: idParamSchema,
+        response: { 204: noContentSchema, ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const { tenantId, userId } = requireAuthContext(request)
+      await request.server.prisma.$transaction(async tx => {
+        await departmentsService.deleteDepartment(tx, tenantId, request.params.id)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'department.delete',
+          targetType: 'Department',
+          targetId: request.params.id,
+        })
+      })
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('hr')])
+      reply.code(204)
+    },
+  )
+
   server.get(
     '/employees',
     {

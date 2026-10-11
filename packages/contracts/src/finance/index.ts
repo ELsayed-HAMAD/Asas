@@ -104,6 +104,13 @@ export const vendorWriteSchema = z.object({
 
 export type VendorWriteInput = z.infer<typeof vendorWriteSchema>
 
+export const vendorUpdateSchema = z.object({
+  name: shortTextSchema.optional(),
+  avatarUrl: z.url().optional().nullable(),
+})
+
+export type VendorUpdateInput = z.infer<typeof vendorUpdateSchema>
+
 // ── Payable invoices (accounts payable) ────────────────────────────────────────────────
 
 export const payableInvoiceSchema = z.object({
@@ -259,6 +266,14 @@ export const customerWriteSchema = z.object({
 })
 
 export type CustomerWriteInput = z.infer<typeof customerWriteSchema>
+
+export const customerUpdateSchema = z.object({
+  name: shortTextSchema.optional(),
+  avatarUrl: z.url().optional().nullable(),
+  collectionStatus: receivableStatusSchema.optional(),
+})
+
+export type CustomerUpdateInput = z.infer<typeof customerUpdateSchema>
 
 export const collectionActivitySchema = z.object({
   id: idSchema,
