@@ -292,4 +292,28 @@ export async function crmRoutes(app: FastifyInstance): Promise<void> {
       return { data: deal }
     },
   )
+
+  server.delete(
+    '/deals/:id',
+    {
+      preHandler: requirePermission('deal.delete'),
+      schema: {
+        params: idParamSchema,
+        response: { 204: noContentSchema, ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const { tenantId, userId } = requireAuthContext(request)
+      await request.server.prisma.$transaction(async tx => {
+        await crmController.deleteDeal(tx, tenantId, request.params.id)
+        await recordAuditLog(tx, {
+          tenantId, actorId: userId, action: 'crm.deal.delete',
+          targetType: 'Deal', targetId: request.params.id,
+          metadata: {},
+        })
+      })
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('crm')])
+      return reply.code(204).send()
+    },
+  )
 }

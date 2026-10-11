@@ -50,6 +50,10 @@ async function setup(options: { failHistory?: boolean; failAudit?: boolean; role
           expect(where).toEqual({ id_tenantId: { id, tenantId: 'tenant_1' } })
           write(); staged.deal = { ...staged.deal, ...data } as typeof base; return staged.deal
         },
+        delete: async ({ where }: { where: unknown }) => {
+          expect(where).toEqual({ id_tenantId: { id, tenantId: 'tenant_1' } })
+          write(); staged.deal = null as unknown as typeof base; return staged.deal
+        },
       },
       dealStageHistory: { create: async ({ data }: { data: Record<string, unknown> }) => {
         if (options.failHistory) throw new Error('History unavailable')
@@ -68,7 +72,8 @@ async function setup(options: { failHistory?: boolean; failAudit?: boolean; role
   app.decorate('ssePublish', publish)
   await app.register(crmRoutes)
   const patch = (payload: object) => app.inject({ method: 'PATCH', url: `/deals/${id}`, payload })
-  return { app, patch, transaction, publish, events, state: () => state, attempts: () => attempts }
+  const del = () => app.inject({ method: 'DELETE', url: `/deals/${id}` })
+  return { app, patch, del, transaction, publish, events, state: () => state, attempts: () => attempts }
 }
 
 afterEach(() => { vi.useRealTimers() })
@@ -182,6 +187,28 @@ describe('CRM outcome integrity', () => {
     const f = await setup({ role: 'MEMBER' })
     try {
       expect((await f.patch({ stage: 'CLOSED_WON' })).statusCode).toBe(403)
+      expect(f.transaction).not.toHaveBeenCalled()
+    } finally { await f.app.close() }
+  })
+  it('deletes deal atomically with audit log and SSE', async () => {
+    const f = await setup()
+    try {
+      const response = await f.del()
+      expect(response.statusCode).toBe(204)
+      expect(f.state().audits).toEqual([
+        expect.objectContaining({
+          action: 'crm.deal.delete',
+          targetType: 'Deal',
+          targetId: id,
+        }),
+      ])
+      expect(f.publish).toHaveBeenCalledWith('tenant_1', ['asas,crm'])
+    } finally { await f.app.close() }
+  })
+  it('blocks member from deleting a deal', async () => {
+    const f = await setup({ role: 'MEMBER' })
+    try {
+      expect((await f.del()).statusCode).toBe(403)
       expect(f.transaction).not.toHaveBeenCalled()
     } finally { await f.app.close() }
   })

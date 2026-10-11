@@ -5,7 +5,9 @@ import {
   ChevronsUpDown,
   Clock,
   Loader2,
-  ClipboardList
+  ClipboardList,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -14,6 +16,7 @@ import { queryKeys } from '../../../lib/queryKeys';
 import { formatDate, formatMoney } from '../../../lib/format';
 import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 const getBadgeStyle = (status) => {
   if (status === 'ACTIVE' || status === 'ON_TRACK') return "bg-success-light text-success-text";
@@ -42,6 +45,9 @@ export default function PortfolioOverview() {
   const [sprintOpen, setSprintOpen] = useState(false)
   const [projectForm, setProjectForm] = useState({ name: '', budget: '' })
   const [sprintForm, setSprintForm] = useState({ name: '', endsAt: '' })
+  const [editProjectOpen, setEditProjectOpen] = useState(false)
+  const [editProjectForm, setEditProjectForm] = useState({ name: '', budget: '', status: 'ACTIVE' })
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
   const { data: responseData, isLoading, isError } = useQuery({
     queryKey: queryKeys.projects.portfolio.list({}),
@@ -67,6 +73,25 @@ export default function PortfolioOverview() {
   const createSprint = useMutation({
     mutationFn: () => projectsApi.createSprint({ name: sprintForm.name.trim(), projectId: selectedProject?.id, endsAt: sprintForm.endsAt ? new Date(`${sprintForm.endsAt}T00:00:00`).toISOString() : null }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.projects.all() }); setSprintOpen(false); setSprintForm({ name: '', endsAt: '' }) },
+  })
+  const updateProject = useMutation({
+    mutationFn: () => projectsApi.updateProject(selectedId, {
+      name: editProjectForm.name.trim(),
+      budget: editProjectForm.budget === '' ? null : editProjectForm.budget,
+      status: editProjectForm.status,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.all() });
+      setEditProjectOpen(false);
+    },
+  })
+  const deleteProject = useMutation({
+    mutationFn: (id) => projectsApi.deleteProject(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.all() });
+      setDeleteConfirmOpen(false);
+      setSelectedId(null);
+    },
   })
 
   if (isLoading) {
@@ -106,6 +131,15 @@ export default function PortfolioOverview() {
   const totalBudget = summary?.totalBudget ?? null;
   const budgetUtilization = summary?.utilizationPct ?? null;
   const selectedBudgetUtil = selectedProject?.utilizationPct ?? null;
+
+  const openEditProject = (proj) => {
+    setEditProjectForm({
+      name: proj.name,
+      budget: proj.budget ? String(proj.budget.amount / 100) : '',
+      status: proj.status || 'ACTIVE',
+    });
+    setEditProjectOpen(true);
+  };
 
   return (
     <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
@@ -237,9 +271,29 @@ export default function PortfolioOverview() {
             <>
               {/* Header */}
               <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card flex items-center justify-between">
-                <h2 className="text-lg font-bold text-heading leading-tight">{selectedProject.name}</h2>
-                <div className={`px-3 py-1 rounded-full text-[11px] font-bold tracking-wider ${getBadgeStyle(selectedProject.status)}`}>
-                  Status: {formatStatus(selectedProject.status)}
+                <div>
+                  <h2 className="text-lg font-bold text-heading leading-tight">{selectedProject.name}</h2>
+                  <div className={`mt-1.5 inline-flex px-3 py-0.5 rounded-full text-[11px] font-bold tracking-wider ${getBadgeStyle(selectedProject.status)}`}>
+                    Status: {formatStatus(selectedProject.status)}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => openEditProject(selectedProject)}
+                    className="p-1.5 text-muted hover:text-body hover:bg-surface-muted rounded-input transition-colors"
+                    title="Edit project"
+                  >
+                    <Pencil size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirmOpen(true)}
+                    className="p-1.5 text-muted hover:text-danger hover:bg-danger-light rounded-input transition-colors"
+                    title="Delete project"
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </div>
               </div>
 
@@ -337,6 +391,62 @@ export default function PortfolioOverview() {
       <FormDialog open={sprintOpen} onClose={() => setSprintOpen(false)} title="Add sprint" subtitle={selectedProject?.name} busy={createSprint.isPending} onConfirm={() => createSprint.mutate()} confirmLabel="Create sprint">
         <div className="space-y-4"><label className="block text-sm font-medium text-body">Sprint name<input required value={sprintForm.name} onChange={event => setSprintForm(current => ({ ...current, name: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">End date<input type="date" value={sprintForm.endsAt} onChange={event => setSprintForm(current => ({ ...current, endsAt: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div>
       </FormDialog>
+      <FormDialog
+        open={editProjectOpen}
+        onClose={() => setEditProjectOpen(false)}
+        title="Edit project"
+        subtitle={selectedProject?.name}
+        busy={updateProject.isPending}
+        onConfirm={() => updateProject.mutate()}
+        confirmLabel="Save changes"
+        error={updateProject.error?.message}
+      >
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-body">Project name
+            <input
+              required
+              value={editProjectForm.name}
+              onChange={event => setEditProjectForm(current => ({ ...current, name: event.target.value }))}
+              className="mt-1 w-full rounded-input border border-border-default px-3 py-2"
+            />
+          </label>
+          <label className="block text-sm font-medium text-body">Budget
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={editProjectForm.budget}
+              onChange={event => setEditProjectForm(current => ({ ...current, budget: event.target.value }))}
+              className="mt-1 w-full rounded-input border border-border-default px-3 py-2"
+            />
+          </label>
+          <label className="block text-sm font-medium text-body">Status
+            <select
+              value={editProjectForm.status}
+              onChange={event => setEditProjectForm(current => ({ ...current, status: event.target.value }))}
+              className="mt-1 w-full rounded-input border border-border-default px-3 py-2"
+            >
+              <option value="PLANNING">Planning</option>
+              <option value="ACTIVE">Active</option>
+              <option value="ON_TRACK">On Track</option>
+              <option value="AT_RISK">At Risk</option>
+              <option value="DELAYED">Delayed</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+          </label>
+        </div>
+      </FormDialog>
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={() => selectedProject && deleteProject.mutate(selectedProject.id)}
+        title="Delete project?"
+        description={`Are you sure you want to delete "${selectedProject?.name}"? All associated sprints, issues, and roadmap tasks will be affected.`}
+        confirmLabel="Delete project"
+        busy={deleteProject.isPending}
+        danger
+      />
     </div>
   );
 }

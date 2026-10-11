@@ -38,4 +38,5 @@ export const crmApi = {
   createDeal: (body) => http.post('/crm/deals', { body }),
 
   updateDeal: (id, body) => http.patch(`/crm/deals/${id}`, { body }),
+  deleteDeal: (id) => http.delete(`/crm/deals/${id}`),
 }

@@ -16,6 +16,8 @@ import { http } from '../api/http'
  */
 export const projectsApi = {
   createProject: (body) => http.post('/projects/projects', { body }),
+  updateProject: (id, body) => http.patch(`/projects/projects/${id}`, { body }),
+  deleteProject: (id) => http.delete(`/projects/projects/${id}`),
   createSprint: (body) => http.post('/projects/sprints', { body }),
   updateSprint: (id, body) => http.patch(`/projects/sprints/${id}`, { body }),
   createIssue: (body) => http.post('/projects/issues', { body }),
