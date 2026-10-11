@@ -124,8 +124,8 @@ export default function Register() {
       {/* TOS Disclaimer */}
       <p className="mt-5 text-center text-xs text-caption leading-relaxed">
         By clicking "Create Account", you agree to our{' '}
-        <a href="#" className="underline hover:text-body">Terms of Service</a> and{' '}
-        <a href="#" className="underline hover:text-body">Privacy Policy</a>.
+        <Link to="/terms" className="underline hover:text-body">Terms of Service</Link> and{' '}
+        <Link to="/privacy" className="underline hover:text-body">Privacy Policy</Link>.
       </p>
 
       {/* Footer Link */}

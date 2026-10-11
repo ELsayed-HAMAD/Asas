@@ -112,6 +112,45 @@ export async function listProductSuppliers(prisma: PrismaClient, tenantId: strin
   return product.suppliers.map(({ supplier }) => supplier)
 }
 
+export async function addProductSupplier(
+  prisma: PrismaClient,
+  tenantId: string,
+  productId: string,
+  name: string,
+): Promise<ProductSupplier[]> {
+  const product = await prisma.product.findFirst({ where: { id: productId, tenantId }, select: { id: true } })
+  if (!product) throw new AppError(404, 'Product not found')
+
+  let supplier = await prisma.supplier.findFirst({ where: { tenantId, name } })
+  if (!supplier) {
+    supplier = await prisma.supplier.create({ data: { tenantId, name } })
+  }
+
+  await prisma.productSupplier.upsert({
+    where: { productId_supplierId: { productId, supplierId: supplier.id } },
+    create: { productId, supplierId: supplier.id },
+    update: {},
+  })
+
+  return listProductSuppliers(prisma, tenantId, productId)
+}
+
+export async function removeProductSupplier(
+  prisma: PrismaClient,
+  tenantId: string,
+  productId: string,
+  supplierId: string,
+): Promise<ProductSupplier[]> {
+  const product = await prisma.product.findFirst({ where: { id: productId, tenantId }, select: { id: true } })
+  if (!product) throw new AppError(404, 'Product not found')
+
+  await prisma.productSupplier.deleteMany({
+    where: { productId, supplierId },
+  })
+
+  return listProductSuppliers(prisma, tenantId, productId)
+}
+
 export async function createPurchaseOrder(prisma: PrismaClient, tenantId: string, input: PurchaseOrderWriteInput): Promise<PurchaseOrder> {
   return prisma.$transaction(async tx => {
     const product = await tx.product.findFirst({ where: { id: input.productId, tenantId, archivedAt: null }, select: { id: true } })

@@ -18,8 +18,8 @@ import { requirePermission } from '../../middlewares/permissions.js'
 import { moduleKeyPrefix } from '../../plugins/sse.js'
 import { recordAuditLog } from '../../services/auditLog.js'
 import { exportFileExtension, exportFilePath, type ExportHandler } from '../../services/queue.js'
-import { renderEmployeeDirectoryXlsx, renderLedgerXlsx } from '../../services/export.js'
-import type { EmployeeDirectoryRow, LedgerRow } from '../../services/export.js'
+import { renderEmployeeDirectoryXlsx, renderLedgerXlsx, renderProjectsXlsx } from '../../services/export.js'
+import type { EmployeeDirectoryRow, LedgerRow, ProjectExportRow } from '../../services/export.js'
 
 /**
  * The export surface — job-based bulk exports (employee directory, general ledger) that run
@@ -115,8 +115,32 @@ async function buildLedger(prisma: PrismaClient, tenantId: string): Promise<Buff
   return renderLedgerXlsx(rows)
 }
 
+/** The tenant's full project portfolio, including status, budget, spend, and sprint counts. */
+async function buildProjects(prisma: PrismaClient, tenantId: string): Promise<Buffer> {
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } })
+  const currency = tenant?.currency ?? 'USD'
+  const projects = await prisma.project.findMany({
+    where: { tenantId },
+    orderBy: { name: 'asc' },
+    include: {
+      department: { select: { name: true } },
+      _count: { select: { sprints: true } },
+    },
+  })
+  const rows: ProjectExportRow[] = projects.map(proj => ({
+    name: proj.name,
+    status: proj.status,
+    department: proj.department?.name ?? null,
+    budget: proj.budget ? proj.budget.toString() : null,
+    spent: proj.spent ? proj.spent.toString() : null,
+    currency,
+    sprintsCount: proj._count.sprints,
+  }))
+  return renderProjectsXlsx(rows)
+}
+
 /**
- * Register the queue's two export handlers. Called from `buildApp` after the queue plugin is
+ * Register the queue's export handlers. Called from `buildApp` after the queue plugin is
  * up, so the handlers are present before the first job could dispatch (inline or boss).
  */
 export function registerExportHandlers(
@@ -133,6 +157,7 @@ export function registerExportHandlers(
     return buildEmployeeDirectory(prisma, await jobTenantId(jobId), canReadSalary === true)
   })
   queue.register('ledger', async (_data, { jobId }) => buildLedger(prisma, await jobTenantId(jobId)))
+  queue.register('projects', async (_data, { jobId }) => buildProjects(prisma, await jobTenantId(jobId)))
 }
 
 export async function exportRoutes(app: FastifyInstance): Promise<void> {

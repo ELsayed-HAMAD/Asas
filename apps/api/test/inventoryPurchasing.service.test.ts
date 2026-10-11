@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
-import { createPurchaseOrder, listProductSuppliers } from '../src/modules/inventory/inventory.service.js'
+import { addProductSupplier, createPurchaseOrder, listProductSuppliers, removeProductSupplier } from '../src/modules/inventory/inventory.service.js'
 import { setProductArchived } from '../src/modules/inventory/inventory.service.js'
 
 describe('inventory purchasing', () => {
@@ -10,6 +10,43 @@ describe('inventory purchasing', () => {
 
     await expect(listProductSuppliers(prisma, 'tenant_1', 'product_1')).resolves.toEqual([{ id: 'supplier_1', name: 'Northwind' }])
     expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'product_1', tenantId: 'tenant_1' } }))
+  })
+
+  it('adds supplier to product and returns updated supplier list', async () => {
+    const productFindFirst = vi.fn().mockResolvedValue({ id: 'product_1', suppliers: [{ supplier: { id: 'supplier_1', name: 'Acme Corp' } }] })
+    const supplierFindFirst = vi.fn().mockResolvedValue(null)
+    const supplierCreate = vi.fn().mockResolvedValue({ id: 'supplier_1', tenantId: 'tenant_1', name: 'Acme Corp' })
+    const productSupplierUpsert = vi.fn().mockResolvedValue({ productId: 'product_1', supplierId: 'supplier_1' })
+
+    const prisma = {
+      product: { findFirst: productFindFirst },
+      supplier: { findFirst: supplierFindFirst, create: supplierCreate },
+      productSupplier: { upsert: productSupplierUpsert },
+    } as unknown as PrismaClient
+
+    const result = await addProductSupplier(prisma, 'tenant_1', 'product_1', 'Acme Corp')
+    expect(result).toEqual([{ id: 'supplier_1', name: 'Acme Corp' }])
+    expect(productSupplierUpsert).toHaveBeenCalledWith({
+      where: { productId_supplierId: { productId: 'product_1', supplierId: 'supplier_1' } },
+      create: { productId: 'product_1', supplierId: 'supplier_1' },
+      update: {},
+    })
+  })
+
+  it('removes supplier from product and returns updated supplier list', async () => {
+    const productFindFirst = vi.fn().mockResolvedValue({ id: 'product_1', suppliers: [] })
+    const productSupplierDeleteMany = vi.fn().mockResolvedValue({ count: 1 })
+
+    const prisma = {
+      product: { findFirst: productFindFirst },
+      productSupplier: { deleteMany: productSupplierDeleteMany },
+    } as unknown as PrismaClient
+
+    const result = await removeProductSupplier(prisma, 'tenant_1', 'product_1', 'supplier_1')
+    expect(result).toEqual([])
+    expect(productSupplierDeleteMany).toHaveBeenCalledWith({
+      where: { productId: 'product_1', supplierId: 'supplier_1' },
+    })
   })
 
   it('creates a draft purchase order with one validated, tenant-scoped line', async () => {

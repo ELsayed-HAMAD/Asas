@@ -1,7 +1,10 @@
+import { z } from 'zod'
 import {
+  addProductSupplierSchema,
   envelope,
   errorResponses,
   idParamSchema,
+  idSchema,
   noContentSchema,
   productListQuerySchema,
   productListResponseSchema,
@@ -85,6 +88,49 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
   }, async request => {
     const { tenantId } = requireAuthContext(request)
     const items = await inventoryController.listProductSuppliers(request.server.prisma, tenantId, request.params.id)
+    return { data: { items } }
+  })
+
+  server.post('/products/:id/suppliers', {
+    preHandler: requirePermission('inventory.write'),
+    schema: {
+      params: idParamSchema,
+      body: addProductSupplierSchema,
+      response: { 200: envelope(productSupplierListResponseSchema), ...errorResponses },
+    },
+  }, async request => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const items = await inventoryController.addProductSupplier(request.server.prisma, tenantId, request.params.id, request.body.name)
+    await recordAuditLog(request.server.prisma, {
+      tenantId,
+      actorId: userId,
+      action: 'inventory.product.supplier.add',
+      targetType: 'Product',
+      targetId: request.params.id,
+      metadata: { supplierName: request.body.name },
+    })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
+    return { data: { items } }
+  })
+
+  server.delete('/products/:id/suppliers/:supplierId', {
+    preHandler: requirePermission('inventory.write'),
+    schema: {
+      params: z.object({ id: idSchema, supplierId: idSchema }),
+      response: { 200: envelope(productSupplierListResponseSchema), ...errorResponses },
+    },
+  }, async request => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const items = await inventoryController.removeProductSupplier(request.server.prisma, tenantId, request.params.id, request.params.supplierId)
+    await recordAuditLog(request.server.prisma, {
+      tenantId,
+      actorId: userId,
+      action: 'inventory.product.supplier.remove',
+      targetType: 'Product',
+      targetId: request.params.id,
+      metadata: { supplierId: request.params.supplierId },
+    })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
     return { data: { items } }
   })
 

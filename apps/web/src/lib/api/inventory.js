@@ -25,6 +25,8 @@ export const inventoryApi = {
 
   getProduct: (id) => http.get(`/inventory/products/${id}`),
   listProductSuppliers: (id) => http.get(`/inventory/products/${id}/suppliers`),
+  addProductSupplier: (id, name) => http.post(`/inventory/products/${id}/suppliers`, { body: { name } }),
+  removeProductSupplier: (id, supplierId) => http.delete(`/inventory/products/${id}/suppliers/${supplierId}`),
   createPurchaseOrder: (body) => http.post('/inventory/purchase-orders', { body }),
   listPurchaseOrders: ({ productId, status } = {}) =>
     http.get('/inventory/purchase-orders', { query: { productId, status } }),

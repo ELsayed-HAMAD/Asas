@@ -48,6 +48,9 @@ export default function SettingsIntegrations() {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
+  const [newCredential, setNewCredential] = useState('');
+  const [showCredentialModal, setShowCredentialModal] = useState(false);
+  const [credentialInput, setCredentialInput] = useState('');
   const [showAllLogs, setShowAllLogs] = useState(false);
 
   const { data, isLoading, isError } = useQuery({
@@ -73,8 +76,18 @@ export default function SettingsIntegrations() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.settings.all() }),
   });
 
+  const connectMutation = useMutation({
+    mutationFn: (id) => settingsApi.updateIntegration(id, { status: 'CONNECTED' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.settings.all() }),
+  });
+
   const disconnectMutation = useMutation({
     mutationFn: (id) => settingsApi.updateIntegration(id, { status: 'DISCONNECTED' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.settings.all() }),
+  });
+
+  const testPingMutation = useMutation({
+    mutationFn: (id) => settingsApi.testIntegration(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.settings.all() }),
   });
 
@@ -86,6 +99,7 @@ export default function SettingsIntegrations() {
       setShowCreate(false);
       setNewName('');
       setNewDescription('');
+      setNewCredential('');
     },
   });
 
@@ -128,10 +142,10 @@ export default function SettingsIntegrations() {
 
           <button
             type="button"
-            onClick={() => setStatusFilter(statusFilter === 'ALL' ? 'CONNECTED' : statusFilter === 'CONNECTED' ? 'CONFIGURE' : 'ALL')}
+            onClick={() => setStatusFilter(statusFilter === 'ALL' ? 'CONNECTED' : statusFilter === 'CONNECTED' ? 'CONFIGURE' : statusFilter === 'CONFIGURE' ? 'DISCONNECTED' : 'ALL')}
             className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised disabled:opacity-60"
           >
-            Status: {statusFilter === 'ALL' ? 'All' : statusFilter === 'CONNECTED' ? 'Connected' : 'Configure'}
+            Status: {statusFilter === 'ALL' ? 'All' : statusFilter === 'CONNECTED' ? 'Connected' : statusFilter === 'CONFIGURE' ? 'Configure' : 'Disconnected'}
             <ChevronDown size={14} className="text-caption" />
           </button>
 
@@ -237,13 +251,42 @@ export default function SettingsIntegrations() {
                       </div>
                     </div>
 
+                    {/* Option 3: Credential */}
+                    <div className="flex items-center justify-between p-4">
+                      <div>
+                        <span className="text-sm font-semibold text-heading block">Secret / API Key</span>
+                        <span className="text-xs text-muted block mt-0.5">
+                          {selected.credential?.configured ? `Configured (${selected.credential.masked})` : 'Not configured'}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setCredentialInput(''); setShowCredentialModal(true); }}
+                        className="text-xs font-semibold text-accent hover:text-accent-hover"
+                      >
+                        {selected.credential?.configured ? 'Update Key' : 'Add Key'}
+                      </button>
+                    </div>
+
                   </div>
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest">Webhook Logs</h3>
-                    <button type="button" onClick={() => setShowAllLogs(current => !current)} className="text-[11px] font-bold text-accent hover:text-accent-hover transition-colors">{showAllLogs ? 'Show Recent' : 'View All'}</button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={!selected || testPingMutation.isPending}
+                        onClick={() => selected && testPingMutation.mutate(selected.id)}
+                        className="text-[11px] font-bold text-accent hover:text-accent-hover transition-colors disabled:opacity-50"
+                        title="Dispatch a test ping to verify webhook logging"
+                      >
+                        {testPingMutation.isPending ? 'Pinging…' : 'Send Test Ping'}
+                      </button>
+                      <span className="text-muted text-[10px]">·</span>
+                      <button type="button" onClick={() => setShowAllLogs(current => !current)} className="text-[11px] font-bold text-accent hover:text-accent-hover transition-colors">{showAllLogs ? 'Show Recent' : 'View All'}</button>
+                    </div>
                   </div>
 
                   <div className="bg-terminal rounded-card-sm p-4 font-mono text-[11px] shadow-card overflow-hidden flex flex-col gap-2.5">
@@ -272,33 +315,93 @@ export default function SettingsIntegrations() {
           </div>
 
           {/* Sticky Bottom Actions */}
-          <div className="p-8 bg-surface-raised border-t border-border-subtle mt-auto">
-            <button
-              type="button"
-              onClick={() => selected && disconnectMutation.mutate(selected.id)}
-              disabled={!selected || selected.status === 'DISCONNECTED' || disconnectMutation.isPending}
-              className="w-full flex items-center justify-center gap-2 bg-surface-raised border border-danger-border text-danger py-2.5 rounded-input text-sm font-bold hover:bg-danger-light transition-colors shadow-card disabled:opacity-60"
-            >
-              {disconnectMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Link2Off size={16} />}
-              Disconnect Integration
-            </button>
+          <div className="p-8 bg-surface-raised border-t border-border-subtle mt-auto space-y-3">
+            {selected && selected.status !== 'CONNECTED' ? (
+              <button
+                type="button"
+                onClick={() => connectMutation.mutate(selected.id)}
+                disabled={connectMutation.isPending}
+                className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary py-2.5 rounded-input text-sm font-bold hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60"
+              >
+                {connectMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : null}
+                Connect Integration
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  if (selected && window.confirm(`Are you sure you want to disconnect ${selected.name}?`)) {
+                    disconnectMutation.mutate(selected.id);
+                  }
+                }}
+                disabled={!selected || selected?.status === 'DISCONNECTED' || disconnectMutation.isPending}
+                className="w-full flex items-center justify-center gap-2 bg-surface-raised border border-danger-border text-danger py-2.5 rounded-input text-sm font-bold hover:bg-danger-light transition-colors shadow-card disabled:opacity-60"
+              >
+                {disconnectMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Link2Off size={16} />}
+                Disconnect Integration
+              </button>
+            )}
           </div>
 
         </div>
       </div>
+      {showCredentialModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">
+          <form className="w-full max-w-md rounded-card bg-surface-raised p-6 shadow-panel" onSubmit={(event) => {
+            event.preventDefault();
+            const val = credentialInput.trim();
+            if (val && selected) {
+              toggleMutation.mutate({ id: selected.id, patch: { credential: { value: val }, status: 'CONNECTED' } });
+              setShowCredentialModal(false);
+              setCredentialInput('');
+            }
+          }}>
+            <h2 className="mb-2 text-lg font-bold text-heading">Configure Credential</h2>
+            <p className="mb-4 text-xs text-muted">Enter the API key, token, or secret for {selected?.name}. Stored securely on the server.</p>
+            <label className="mb-4 block text-sm font-semibold text-heading">Secret / API Key
+              <input
+                type="password"
+                autoFocus
+                required
+                maxLength={4096}
+                value={credentialInput}
+                onChange={(event) => setCredentialInput(event.target.value)}
+                placeholder="Enter secret token or key..."
+                className="mt-1 w-full rounded-input border border-border-default bg-surface px-3 py-2 font-normal"
+              />
+            </label>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setShowCredentialModal(false)} className="rounded-input border border-border-default px-4 py-2 text-sm">Cancel</button>
+              <button type="submit" disabled={!credentialInput.trim() || toggleMutation.isPending} className="rounded-input bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:opacity-60">
+                {toggleMutation.isPending ? 'Saving…' : 'Save & Connect'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">
           <form className="w-full max-w-md rounded-card bg-surface-raised p-6 shadow-panel" onSubmit={(event) => {
             event.preventDefault();
             const name = newName.trim();
-            if (name) createMutation.mutate({ name, description: newDescription.trim() || undefined, status: 'CONFIGURE' });
+            if (name) {
+              createMutation.mutate({
+                name,
+                description: newDescription.trim() || undefined,
+                status: newCredential.trim() ? 'CONNECTED' : 'CONFIGURE',
+                credential: newCredential.trim() || undefined,
+              });
+            }
           }}>
             <h2 className="mb-4 text-lg font-bold text-heading">Add custom integration</h2>
             <label className="mb-3 block text-sm font-semibold text-heading">Name
               <input autoFocus required maxLength={120} value={newName} onChange={(event) => setNewName(event.target.value)} className="mt-1 w-full rounded-input border border-border-default bg-surface px-3 py-2 font-normal" />
             </label>
-            <label className="mb-5 block text-sm font-semibold text-heading">Description
+            <label className="mb-3 block text-sm font-semibold text-heading">Description
               <input maxLength={500} value={newDescription} onChange={(event) => setNewDescription(event.target.value)} className="mt-1 w-full rounded-input border border-border-default bg-surface px-3 py-2 font-normal" />
+            </label>
+            <label className="mb-5 block text-sm font-semibold text-heading">Secret / API Key (Optional)
+              <input type="password" maxLength={4096} value={newCredential} onChange={(event) => setNewCredential(event.target.value)} placeholder="Optional webhook token or secret..." className="mt-1 w-full rounded-input border border-border-default bg-surface px-3 py-2 font-normal" />
             </label>
             {createMutation.isError && <p className="mb-3 text-sm text-danger">Could not create integration. Check the name and try again.</p>}
             <div className="flex justify-end gap-2">

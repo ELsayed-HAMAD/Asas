@@ -12,6 +12,8 @@ import GuestGuard   from './guards/GuestGuard'
 
 // ── Marketing ──────────────────────────────────────────────
 import Landing from './pages/marketing/Landing'
+const Terms = lazy(() => import('./pages/marketing/Terms'))
+const Privacy = lazy(() => import('./pages/marketing/Privacy'))
 
 // ── Auth ───────────────────────────────────────────────────
 import Login    from './pages/auth/Login'
@@ -108,6 +110,8 @@ export default function App() {
       {/* ── Marketing ── */}
       <Route element={<Suspense fallback={<div className="flex h-screen items-center justify-center text-muted">Loading…</div>}><MarketingLayout /></Suspense>}>
         <Route path="/" element={<Landing />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
       </Route>
 
       {/* ── Auth (only for guests — redirect to dashboard if already logged in) ── */}

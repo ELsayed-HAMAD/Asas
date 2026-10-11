@@ -12,6 +12,7 @@ import type {
   IntegrationsListResponse,
   IntegrationUpdateInput,
   IntegrationWriteInput,
+  WebhookLog,
   WebhookLogsResponse,
   NotificationModule,
   NotificationSettings,
@@ -370,6 +371,33 @@ export async function updateIntegration(
     },
   })
   return mapIntegration(integration)
+}
+
+export async function testIntegration(
+  prisma: PrismaClient,
+  tenantId: string,
+  id: string,
+): Promise<{ success: boolean; log: WebhookLog }> {
+  const integration = await prisma.integration.findFirst({ where: { id, tenantId } })
+  if (!integration) throw new AppError(404, 'Integration not found')
+
+  const log = await prisma.webhookLog.create({
+    data: {
+      integrationId: integration.id,
+      statusCode: 200,
+      event: 'ping',
+    },
+  })
+
+  return {
+    success: true,
+    log: {
+      id: log.id,
+      statusCode: log.statusCode,
+      event: log.event,
+      createdAt: log.createdAt.toISOString(),
+    },
+  }
 }
 
 // ── Billing and backups ────────────────────────────────────────────────────

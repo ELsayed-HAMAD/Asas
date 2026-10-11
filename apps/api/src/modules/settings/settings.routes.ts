@@ -8,6 +8,7 @@ import {
   integrationsListResponseSchema,
   integrationUpdateSchema,
   integrationWriteSchema,
+  testIntegrationResponseSchema,
   webhookLogsResponseSchema,
   notificationSettingsSchema,
   notificationSettingsUpdateSchema,
@@ -282,6 +283,38 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('settings')])
       return { data: integration }
+    },
+  )
+
+  server.post(
+    '/integrations/:id/test',
+    {
+      preHandler: requirePermission('settings.integration.write'),
+      schema: {
+        params: idParamSchema,
+        response: {
+          200: envelope(testIntegrationResponseSchema),
+          ...errorResponses,
+        },
+      },
+    },
+    async request => {
+      const { tenantId, userId } = requireAuthContext(request)
+      const result = await settingsController.testIntegration(
+        request.server.prisma,
+        tenantId,
+        request.params.id,
+      )
+      await recordAuditLog(request.server.prisma, {
+        tenantId,
+        actorId: userId,
+        action: 'settings.integration.test',
+        targetType: 'Integration',
+        targetId: request.params.id,
+        metadata: { statusCode: result.log.statusCode, event: result.log.event },
+      })
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('settings')])
+      return { data: result }
     },
   )
 }

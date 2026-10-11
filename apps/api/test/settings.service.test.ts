@@ -157,3 +157,50 @@ describe('deleteWorkspace', () => {
   })
 })
 
+describe('testIntegration', () => {
+  it('creates a ping webhook log for the tenant-scoped integration', async () => {
+    const createdAt = new Date('2026-10-11T20:00:00.000Z')
+    const prisma = {
+      integration: { findFirst: vi.fn().mockResolvedValue({ id: 'integration_1' }) },
+      webhookLog: {
+        create: vi.fn().mockResolvedValue({
+          id: 'log_new',
+          statusCode: 200,
+          event: 'ping',
+          createdAt,
+        }),
+      },
+    } as unknown as PrismaClient
+
+    const { testIntegration } = await import('../src/modules/settings/settings.service.js')
+    const result = await testIntegration(prisma, 'tenant_1', 'integration_1')
+
+    expect(prisma.integration.findFirst).toHaveBeenCalledWith({ where: { id: 'integration_1', tenantId: 'tenant_1' } })
+    expect(prisma.webhookLog.create).toHaveBeenCalledWith({
+      data: {
+        integrationId: 'integration_1',
+        statusCode: 200,
+        event: 'ping',
+      },
+    })
+    expect(result.success).toBe(true)
+    expect(result.log).toEqual({
+      id: 'log_new',
+      statusCode: 200,
+      event: 'ping',
+      createdAt: createdAt.toISOString(),
+    })
+  })
+
+  it('rejects test ping for non-existent integration', async () => {
+    const prisma = {
+      integration: { findFirst: vi.fn().mockResolvedValue(null) },
+      webhookLog: { create: vi.fn() },
+    } as unknown as PrismaClient
+
+    const { testIntegration } = await import('../src/modules/settings/settings.service.js')
+    await expect(testIntegration(prisma, 'tenant_1', 'integration_missing')).rejects.toThrow('Integration not found')
+    expect(prisma.webhookLog.create).not.toHaveBeenCalled()
+  })
+})
+
