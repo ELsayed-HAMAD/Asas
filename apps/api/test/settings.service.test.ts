@@ -74,3 +74,86 @@ describe('updateTenantSettings', () => {
   })
 })
 
+describe('getBillingSettings', () => {
+  it('returns subscription usage with dynamic member count', async () => {
+    const prisma = {
+      subscription: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: 'sub_1',
+            planName: 'Pro Tier',
+            priceMonthly: 499,
+            status: 'ACTIVE',
+            renewsOn: new Date('2026-11-01T00:00:00.000Z'),
+            seatsUsed: 1,
+            seatLimit: 50,
+            storageUsedGb: 5,
+            storageLimitGb: 100,
+          },
+        ]),
+      },
+      paymentMethod: { findMany: vi.fn().mockResolvedValue([]) },
+      billingInvoice: { findMany: vi.fn().mockResolvedValue([]) },
+      member: { count: vi.fn().mockResolvedValue(12) },
+    } as unknown as PrismaClient
+
+    const { getBillingSettings } = await import('../src/modules/settings/settings.service.js')
+    const result = await getBillingSettings(prisma, 'tenant_1')
+
+    expect(prisma.member.count).toHaveBeenCalledWith({ where: { tenantId: 'tenant_1' } })
+    expect(result.subscriptions[0].seatsUsed).toBe(12)
+    expect(result.subscriptions[0].seatLimit).toBe(50)
+  })
+})
+
+describe('deleteWorkspace', () => {
+  it('cleans up restricted financial records and deletes tenant in transaction', async () => {
+    const tx = {
+      journalLine: { deleteMany: vi.fn().mockResolvedValue({ count: 10 }) },
+      journalEntry: { deleteMany: vi.fn().mockResolvedValue({ count: 5 }) },
+      ledgerAccount: { deleteMany: vi.fn().mockResolvedValue({ count: 4 }) },
+      exchangeRate: { deleteMany: vi.fn().mockResolvedValue({ count: 2 }) },
+      invitation: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      member: { deleteMany: vi.fn().mockResolvedValue({ count: 3 }) },
+      session: { updateMany: vi.fn().mockResolvedValue({ count: 2 }) },
+      tenant: { delete: vi.fn().mockResolvedValue({ id: 'tenant_1' }) },
+    }
+    const prisma = {
+      tenant: {
+        findUnique: vi.fn().mockResolvedValue({ id: 'tenant_1' }),
+      },
+      $transaction: vi.fn().mockImplementation(async (callback) => callback(tx)),
+    } as unknown as PrismaClient
+
+    const { deleteWorkspace } = await import('../src/modules/settings/settings.service.js')
+    const result = await deleteWorkspace(prisma, 'tenant_1', 'user_1')
+
+    expect(prisma.tenant.findUnique).toHaveBeenCalledWith({ where: { id: 'tenant_1' }, select: { id: true } })
+    expect(tx.journalLine.deleteMany).toHaveBeenCalledWith({ where: { entry: { tenantId: 'tenant_1' } } })
+    expect(tx.journalEntry.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 'tenant_1' } })
+    expect(tx.ledgerAccount.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 'tenant_1' } })
+    expect(tx.exchangeRate.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 'tenant_1' } })
+    expect(tx.invitation.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 'tenant_1' } })
+    expect(tx.member.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 'tenant_1' } })
+    expect(tx.session.updateMany).toHaveBeenCalledWith({
+      where: { activeOrganizationId: 'tenant_1' },
+      data: { activeOrganizationId: null },
+    })
+    expect(tx.tenant.delete).toHaveBeenCalledWith({ where: { id: 'tenant_1' } })
+    expect(result).toEqual({ success: true })
+  })
+
+  it('rejects deletion for non-existent workspace', async () => {
+    const prisma = {
+      tenant: {
+        findUnique: vi.fn().mockResolvedValue(null),
+      },
+      $transaction: vi.fn(),
+    } as unknown as PrismaClient
+
+    const { deleteWorkspace } = await import('../src/modules/settings/settings.service.js')
+    await expect(deleteWorkspace(prisma, 'tenant_nonexistent', 'user_1')).rejects.toThrow('Workspace not found')
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+})
+

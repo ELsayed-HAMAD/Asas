@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client'
+import { APIError } from 'better-auth/api'
 import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { createAccessControl, organization } from 'better-auth/plugins'
@@ -128,6 +129,57 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
               }
             }
             return { data: session }
+          },
+        },
+      },
+      member: {
+        delete: {
+          before: async (member: { id?: string }) => {
+            if (member?.id) {
+              const existing = await prisma.member.findUnique({ where: { id: member.id } })
+              if (existing && existing.role === 'OWNER') {
+                const ownerCount = await prisma.member.count({
+                  where: { tenantId: existing.tenantId, role: 'OWNER' },
+                })
+                if (ownerCount <= 1) {
+                  throw new APIError('BAD_REQUEST', {
+                    message: 'Cannot remove the last owner of the workspace',
+                  })
+                }
+              }
+            }
+            return { data: member }
+          },
+        },
+        update: {
+          before: async (member: { id?: string; role?: string }) => {
+            if (member?.id && member.role && member.role !== 'OWNER') {
+              const existing = await prisma.member.findUnique({ where: { id: member.id } })
+              if (existing && existing.role === 'OWNER') {
+                const ownerCount = await prisma.member.count({
+                  where: { tenantId: existing.tenantId, role: 'OWNER' },
+                })
+                if (ownerCount <= 1) {
+                  throw new APIError('BAD_REQUEST', {
+                    message: 'Cannot demote the last owner of the workspace',
+                  })
+                }
+              }
+            }
+            return { data: member }
+          },
+        },
+      },
+      tenant: {
+        delete: {
+          before: async (tenant: { id?: string }) => {
+            if (tenant?.id) {
+              await prisma.journalLine.deleteMany({ where: { entry: { tenantId: tenant.id } } })
+              await prisma.journalEntry.deleteMany({ where: { tenantId: tenant.id } })
+              await prisma.ledgerAccount.deleteMany({ where: { tenantId: tenant.id } })
+              await prisma.exchangeRate.deleteMany({ where: { tenantId: tenant.id } })
+            }
+            return { data: tenant }
           },
         },
       },

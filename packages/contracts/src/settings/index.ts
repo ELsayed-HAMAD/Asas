@@ -298,3 +298,8 @@ export const backupSchedulesResponseSchema = z.object({
 export type BackupSchedule = z.infer<typeof backupScheduleSchema>
 export type BackupScheduleWriteInput = z.infer<typeof backupScheduleWriteSchema>
 export type BackupScheduleUpdateInput = z.infer<typeof backupScheduleUpdateSchema>
+
+export const workspaceDeleteResponseSchema = z.object({
+  success: z.boolean(),
+})
+export type WorkspaceDeleteResponse = z.infer<typeof workspaceDeleteResponseSchema>

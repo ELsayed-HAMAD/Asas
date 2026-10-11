@@ -14,15 +14,21 @@ import {
 import TopBarActions from '../../../components/TopBarActions'
 import SettingsTabs from './SettingsTabs'
 import ConfirmDialog from '../../../components/common/ConfirmDialog'
+import FormDialog from '../../../components/common/FormDialog'
 import { http } from '../../../lib/api/http'
 import { onboardingApi } from '../../../lib/api/onboarding'
 import { settingsApi } from '../../../lib/api/settings'
 import { queryKeys } from '../../../lib/queryKeys'
+import { useActiveMemberRole, useActiveOrganization } from '../../../lib/authClient'
 
 export default function SettingsGeneral() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+  const { data: memberRole } = useActiveMemberRole()
+  const isOwner = memberRole?.role === 'OWNER'
+  const { data: activeOrg } = useActiveOrganization()
 
   const { data: settings, isLoading, isError } = useQuery({
     queryKey: queryKeys.settings.general(),
@@ -34,11 +40,19 @@ export default function SettingsGeneral() {
     queryFn: onboardingApi.status,
   })
 
+  const { data: billingData } = useQuery({
+    queryKey: queryKeys.settings.billing(),
+    queryFn: settingsApi.getBilling,
+  })
+
   const exchangeRateQuery = { page: 1, limit: 20 }
   const { data: exchangeRates } = useQuery({
     queryKey: queryKeys.settings.exchangeRates(exchangeRateQuery),
     queryFn: () => settingsApi.listExchangeRates(exchangeRateQuery),
   })
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteConfirmName, setDeleteConfirmName] = useState('')
 
   // Form fields are seeded from the server response (the old page used uncontrolled
   // defaultValue + a no-op Save button; now Save is a real PATCH).
@@ -105,6 +119,14 @@ export default function SettingsGeneral() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.settings.exchangeRates() })
       setRateForm((current) => ({ ...current, rateToBase: '', reference: '' }))
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => settingsApi.deleteWorkspace(),
+    onSuccess: () => {
+      queryClient.clear()
+      navigate('/onboarding', { replace: true })
     },
   })
 
@@ -378,7 +400,13 @@ export default function SettingsGeneral() {
                 <h3 className="text-sm font-bold text-heading">Delete Workspace</h3>
                 <p className="text-sm text-body-light mt-0.5">Permanently remove all data, projects, and users.</p>
               </div>
-              <button className="bg-danger-hover text-on-primary px-5 py-2.5 rounded-input text-sm font-semibold hover:bg-danger-text transition-colors shadow-card">
+              <button
+                type="button"
+                onClick={() => { setDeleteConfirmName(''); setDeleteDialogOpen(true) }}
+                disabled={!isOwner || deleteMutation.isPending}
+                title={!isOwner ? 'Only workspace owners can delete this workspace' : undefined}
+                className="bg-danger-hover text-on-primary px-5 py-2.5 rounded-input text-sm font-semibold hover:bg-danger-text transition-colors shadow-card disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 Delete Workspace...
               </button>
             </div>
@@ -397,14 +425,20 @@ export default function SettingsGeneral() {
               <div className="flex items-center justify-between mb-4">
                 <span className="text-sm font-medium text-body-light">Current Plan</span>
                 <span className="bg-primary text-on-primary px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase">
-                  Enterprise Tier
+                  {billingData?.subscriptions?.[0]?.planName || 'Enterprise Tier'}
                 </span>
               </div>
               <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-3xl font-extrabold text-heading tracking-tight">$2,400</span>
+                <span className="text-3xl font-extrabold text-heading tracking-tight">
+                  {billingData?.subscriptions?.[0]?.priceMonthly ? `$${Number(billingData.subscriptions[0].priceMonthly).toLocaleString()}` : '$2,400'}
+                </span>
                 <span className="text-sm font-medium text-muted">/ month</span>
               </div>
-              <p className="text-[11px] font-medium text-muted">Next billing date: Sept 22</p>
+              <p className="text-[11px] font-medium text-muted">
+                {billingData?.subscriptions?.[0]?.renewsOn
+                  ? `Next billing date: ${new Date(billingData.subscriptions[0].renewsOn).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                  : 'Next billing date: Sept 22'}
+              </p>
             </div>
 
             {/* Usage Card */}
@@ -414,10 +448,24 @@ export default function SettingsGeneral() {
               <div>
                 <div className="flex justify-between items-end mb-2">
                   <span className="text-sm font-bold text-heading">Active Seats</span>
-                  <span className="text-[11px] font-medium text-body-light">1,240 / 1,500</span>
+                  <span className="text-[11px] font-medium text-body-light">
+                    {billingData?.subscriptions?.[0]?.seatsUsed != null
+                      ? `${billingData.subscriptions[0].seatsUsed.toLocaleString()} / ${billingData.subscriptions[0].seatLimit.toLocaleString()}`
+                      : '1,240 / 1,500'}
+                  </span>
                 </div>
                 <div className="w-full bg-surface-strong rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-primary h-full rounded-full" style={{ width: '82.6%' }}></div>
+                  <div
+                    className="bg-primary h-full rounded-full"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        billingData?.subscriptions?.[0]?.seatLimit
+                          ? Math.round(((billingData.subscriptions[0].seatsUsed || 0) / billingData.subscriptions[0].seatLimit) * 100)
+                          : 82.6,
+                      )}%`,
+                    }}
+                  />
                 </div>
               </div>
 
@@ -425,10 +473,24 @@ export default function SettingsGeneral() {
               <div>
                 <div className="flex justify-between items-end mb-2">
                   <span className="text-sm font-bold text-heading">Storage</span>
-                  <span className="text-[11px] font-medium text-body-light">450GB / 1TB</span>
+                  <span className="text-[11px] font-medium text-body-light">
+                    {billingData?.subscriptions?.[0]?.storageUsedGb != null
+                      ? `${billingData.subscriptions[0].storageUsedGb}GB / ${billingData.subscriptions[0].storageLimitGb}GB`
+                      : '450GB / 1TB'}
+                  </span>
                 </div>
                 <div className="w-full bg-surface-strong rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-primary h-full rounded-full" style={{ width: '45%' }}></div>
+                  <div
+                    className="bg-primary h-full rounded-full"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        billingData?.subscriptions?.[0]?.storageLimitGb
+                          ? Math.round(((billingData.subscriptions[0].storageUsedGb || 0) / billingData.subscriptions[0].storageLimitGb) * 100)
+                          : 45,
+                      )}%`,
+                    }}
+                  />
                 </div>
               </div>
 
@@ -437,10 +499,18 @@ export default function SettingsGeneral() {
 
           {/* Sticky Bottom Actions */}
           <div className="p-8 bg-surface-raised border-t border-border-subtle flex flex-col gap-4 mt-auto">
-            <button className="w-full bg-primary text-on-primary py-2.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card">
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard/settings/billing')}
+              className="w-full bg-primary text-on-primary py-2.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card"
+            >
               Manage Billing
             </button>
-            <button className="w-full text-sm font-semibold text-body-light hover:text-heading transition-colors">
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard/settings/billing')}
+              className="w-full text-sm font-semibold text-body-light hover:text-heading transition-colors"
+            >
               View Invoices
             </button>
           </div>
@@ -458,6 +528,40 @@ export default function SettingsGeneral() {
         busy={clearMutation.isPending}
         danger
       />
+
+      <FormDialog
+        isOpen={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        title="Delete Workspace"
+        subtitle="This action is permanent and cannot be undone."
+        confirmLabel={deleteMutation.isPending ? 'Deleting...' : 'Permanently Delete'}
+        confirmVariant="danger"
+        isConfirmDisabled={deleteConfirmName !== (settings?.name || activeOrg?.name) || deleteMutation.isPending}
+        onConfirm={() => deleteMutation.mutate()}
+        error={deleteMutation.error?.message}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-body leading-relaxed">
+            This will permanently delete <strong className="text-heading">{settings?.name || activeOrg?.name}</strong>, including all projects, employees, financial records, and settings.
+          </p>
+          <div className="p-3 bg-danger-surface border border-danger-border rounded-input text-xs text-danger">
+            To confirm deletion, please type the workspace name below:
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">
+              Workspace Name ({settings?.name || activeOrg?.name})
+            </label>
+            <input
+              type="text"
+              value={deleteConfirmName}
+              onChange={(e) => setDeleteConfirmName(e.target.value)}
+              placeholder={settings?.name || activeOrg?.name}
+              className="w-full border border-border-default rounded-input px-3 py-2 text-sm bg-surface-muted text-heading focus:outline-none focus:ring-2 focus:ring-danger-hover"
+            />
+          </div>
+        </div>
+      </FormDialog>
     </div>
   )
 }
+
