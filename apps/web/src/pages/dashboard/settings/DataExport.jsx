@@ -24,7 +24,7 @@ import { settingsApi } from '../../../lib/api/settings';
  */
 const SCOPE_TO_KIND = {
   'Full Workspace': 'employees',
-  'Specific Projects': 'employees',
+  'Specific Projects': 'projects',
   'Financial Ledgers': 'ledger',
 };
 

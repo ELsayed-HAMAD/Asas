@@ -6,6 +6,7 @@ import type {
   IntegrationsListResponse,
   IntegrationUpdateInput,
   IntegrationWriteInput,
+  WebhookLog,
   WebhookLogsResponse,
   NotificationSettings,
   NotificationSettingsUpdateInput,
@@ -84,6 +85,14 @@ export function updateIntegration(
   input: IntegrationUpdateInput,
 ): Promise<Integration> {
   return settingsService.updateIntegration(prisma, tenantId, id, input)
+}
+
+export function testIntegration(
+  prisma: PrismaClient,
+  tenantId: string,
+  id: string,
+): Promise<{ success: boolean; log: WebhookLog }> {
+  return settingsService.testIntegration(prisma, tenantId, id)
 }
 
 export function getBilling(prisma: PrismaClient, tenantId: string): Promise<BillingSettings> {

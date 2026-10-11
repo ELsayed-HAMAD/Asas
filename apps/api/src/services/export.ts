@@ -121,3 +121,35 @@ export function renderLedgerXlsx(rows: LedgerRow[]): Promise<Buffer> {
     totalsRow.font = { bold: true }
   })
 }
+
+export interface ProjectExportRow {
+  name: string
+  status: string
+  department: string | null
+  budget: string | null
+  spent: string | null
+  currency: string
+  sprintsCount: number
+}
+
+export function renderProjectsXlsx(rows: ProjectExportRow[]): Promise<Buffer> {
+  return buildWorkbook(workbook => {
+    const sheet = workbook.addWorksheet('Projects')
+    applyHeader(
+      sheet,
+      ['Project Name', 'Status', 'Department', 'Budget', 'Settled Spend', 'Sprints'],
+      [30, 15, 20, 18, 18, 12],
+    )
+    for (const row of rows) {
+      sheet.addRow({
+        col0: row.name,
+        col1: row.status,
+        col2: row.department ?? '',
+        col3: formatMoneyDisplay(row.budget, row.currency),
+        col4: formatMoneyDisplay(row.spent, row.currency),
+        col5: row.sprintsCount,
+      })
+    }
+  })
+}
+

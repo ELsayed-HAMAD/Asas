@@ -58,6 +58,8 @@ export type Product = z.infer<typeof productSchema>
 export const productSupplierSchema = z.object({ id: idSchema, name: shortTextSchema })
 export const productSupplierListResponseSchema = collection(productSupplierSchema)
 export type ProductSupplier = z.infer<typeof productSupplierSchema>
+export const addProductSupplierSchema = z.object({ name: shortTextSchema })
+export type AddProductSupplierInput = z.infer<typeof addProductSupplierSchema>
 
 export const purchaseOrderWriteSchema = z.object({
   productId: idSchema,

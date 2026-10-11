@@ -95,6 +95,7 @@ const BOSS_QUEUE = 'exports'
 const KIND_FILENAME: Record<string, { filename: string; extension: string }> = {
   employees: { filename: 'employees.xlsx', extension: 'xlsx' },
   ledger: { filename: 'ledger.xlsx', extension: 'xlsx' },
+  projects: { filename: 'projects.xlsx', extension: 'xlsx' },
 }
 
 export interface CreateExportQueueOptions {

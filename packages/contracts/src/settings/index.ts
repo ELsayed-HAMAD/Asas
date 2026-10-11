@@ -232,6 +232,12 @@ export type WebhookLog = z.infer<typeof webhookLogSchema>
 export const webhookLogsResponseSchema = z.object({ items: z.array(webhookLogSchema) })
 export type WebhookLogsResponse = z.infer<typeof webhookLogsResponseSchema>
 
+export const testIntegrationResponseSchema = z.object({
+  success: z.boolean(),
+  log: webhookLogSchema,
+})
+export type TestIntegrationResponse = z.infer<typeof testIntegrationResponseSchema>
+
 // ── Billing and backups ────────────────────────────────────────────────────
 
 export const subscriptionSchema = z.object({

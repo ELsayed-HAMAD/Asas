@@ -13,7 +13,7 @@ import { exportJobStatusSchema } from './enums.generated.js'
 import { idSchema, isoDateTimeSchema } from './primitives/ids.js'
 import { paginationQuerySchema, paginated } from './primitives/pagination.js'
 
-export const exportJobKindSchema = z.enum(['employees', 'ledger'])
+export const exportJobKindSchema = z.enum(['employees', 'ledger', 'projects'])
 export type ExportJobKind = z.infer<typeof exportJobKindSchema>
 
 export const exportJobCreateSchema = z.object({

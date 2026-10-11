@@ -44,6 +44,7 @@ export const settingsApi = {
    * omitting `credential` leaves the stored secret untouched.
    */
   updateIntegration: (id, patch) => http.patch(`/settings/integrations/${id}`, { body: patch }),
+  testIntegration: (id) => http.post(`/settings/integrations/${id}/test`),
 
   /** DELETE /settings/workspace — permanently deletes the active tenant (OWNER only). */
   deleteWorkspace: () => http.delete('/settings/workspace'),

@@ -350,7 +350,13 @@ export default function Landing() {
 
           {/* Links */}
           <div className="flex items-center gap-6">
-            {['Privacy Policy', 'Terms of Service', 'Security', 'Status'].map(link => (
+            <Link to="/privacy" className="text-xs text-body-light hover:text-caption transition-colors">
+              Privacy Policy
+            </Link>
+            <Link to="/terms" className="text-xs text-body-light hover:text-caption transition-colors">
+              Terms of Service
+            </Link>
+            {['Security', 'Status'].map(link => (
               <a key={link} href="#" className="text-xs text-body-light hover:text-caption transition-colors">
                 {link}
               </a>

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Search,
-  ChevronDown,
   ChevronsUpDown,
   Clock,
   Loader2,
@@ -12,6 +11,7 @@ import {
 import { motion } from 'framer-motion';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { projectsApi } from '../../../lib/api/projects';
+import { hrApi } from '../../../lib/api/hr';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatDate, formatMoney } from '../../../lib/format';
 import TopBarActions from '../../../components/TopBarActions';
@@ -41,6 +41,8 @@ const pct = (value) => (value == null ? '—' : `${Math.round(value)}%`);
 export default function PortfolioOverview() {
   const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState(null);
+  const [search, setSearch] = useState('');
+  const [departmentId, setDepartmentId] = useState('ALL');
   const [projectOpen, setProjectOpen] = useState(false)
   const [sprintOpen, setSprintOpen] = useState(false)
   const [projectForm, setProjectForm] = useState({ name: '', budget: '' })
@@ -61,6 +63,12 @@ export default function PortfolioOverview() {
     queryKey: queryKeys.projects.sprints.list({}),
     queryFn: projectsApi.getSprints,
   });
+  const { data: deptData } = useQuery({
+    queryKey: queryKeys.hr.departments.list(),
+    queryFn: hrApi.getDepartments,
+  });
+  const departments = deptData?.items ?? [];
+
   const { data: velocityComparison } = useQuery({
     queryKey: [...queryKeys.projects.sprints.list({}), 'velocity-comparison', selectedId],
     queryFn: () => projectsApi.getSprintVelocityComparison(selectedId),
@@ -115,9 +123,15 @@ export default function PortfolioOverview() {
   const projects = (responseData.items || []).map(r => ({ ...r, id: r.projectId }));
   const sprints = sprintsData?.items || [];
 
+  const visibleProjects = projects.filter(p => {
+    const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
+    const matchesDept = departmentId === 'ALL' || p.departmentId === departmentId;
+    return matchesSearch && matchesDept;
+  });
+
   // Auto-select first project if none selected
-  if (!selectedId && projects.length > 0) {
-    setSelectedId(projects[0].id);
+  if (!selectedId && visibleProjects.length > 0) {
+    setSelectedId(visibleProjects[0].id);
   }
 
   const selectedProject = projects.find(p => p.id === selectedId);
@@ -146,18 +160,23 @@ export default function PortfolioOverview() {
 
       <TopBarActions>
         <div className="flex items-center gap-3">
-          <button
-            disabled
-            className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised disabled:opacity-60"
+          <select
+            value={departmentId}
+            onChange={(e) => setDepartmentId(e.target.value)}
+            className="border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent"
           >
-            Filter: All Depts
-            <ChevronDown size={14} className="text-caption" />
-          </button>
+            <option value="ALL">Filter: All Depts</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
 
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
             <input
               type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="Search..."
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-56 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
@@ -224,14 +243,14 @@ export default function PortfolioOverview() {
             </thead>
 
             <tbody className="divide-y divide-border-subtle">
-              {projects.length === 0 ? (
+              {visibleProjects.length === 0 ? (
                 <tr>
                   <td colSpan="4" className="px-6 py-8 text-center text-sm text-muted">
-                    No projects found.
+                    No projects found matching the selected filters.
                   </td>
                 </tr>
               ) : (
-                projects.map(project => {
+                visibleProjects.map(project => {
                   const isSelected = selectedId === project.id;
 
                   return (
@@ -330,7 +349,16 @@ export default function PortfolioOverview() {
 
               {/* Sprints Tracker Card */}
               <div className="bg-surface-raised border border-border-default rounded-card-sm p-6 shadow-card">
-                <h3 className="text-[11px] font-bold text-muted uppercase tracking-widest mb-6">Sprints</h3>
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-[11px] font-bold text-muted uppercase tracking-widest">Sprints</h3>
+                  <button
+                    type="button"
+                    onClick={() => setSprintOpen(true)}
+                    className="border border-border-default text-body px-3 py-1 rounded-button text-[11px] font-bold hover:bg-surface-muted transition-colors uppercase tracking-wider disabled:opacity-60"
+                  >
+                    + Add Sprint
+                  </button>
+                </div>
 
                 {velocityComparison?.current && velocityComparison?.previous ? (
                   <div className="mb-5 rounded-button bg-surface-muted p-3 text-xs text-body">

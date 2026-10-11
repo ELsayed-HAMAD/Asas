@@ -23,9 +23,10 @@ import { useDebouncedValue } from '../../../lib/useDebouncedValue';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import TopBarActions from '../../../components/TopBarActions';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 
 export default function Inventory() {
+  const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [manualDeselect, setManualDeselect] = useState(false);
@@ -162,6 +163,27 @@ export default function Inventory() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all() });
     },
+  });
+
+  const [newSupplierName, setNewSupplierName] = useState('');
+  const [supplierError, setSupplierError] = useState('');
+
+  const addSupplierMutation = useMutation({
+    mutationFn: (name) => inventoryApi.addProductSupplier(selectedProduct?.id, name),
+    onSuccess: () => {
+      setNewSupplierName('');
+      setSupplierError('');
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.inventory.all(), 'productSuppliers', selectedId] });
+    },
+    onError: (err) => setSupplierError(err?.message || 'Could not add supplier.'),
+  });
+
+  const removeSupplierMutation = useMutation({
+    mutationFn: (supplierId) => inventoryApi.removeProductSupplier(selectedProduct?.id, supplierId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.inventory.all(), 'productSuppliers', selectedId] });
+    },
+    onError: (err) => setSupplierError(err?.message || 'Could not remove supplier.'),
   });
 
   // Reset the transient on-hand override when a different product is inspected.
@@ -336,13 +358,31 @@ export default function Inventory() {
             />
           </div>
 
-          <button className="text-muted hover:text-heading transition-colors">
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard/settings/notifications')}
+            title="Notification Settings"
+            className="text-muted hover:text-heading transition-colors cursor-pointer"
+          >
             <Bell size={18} />
           </button>
-          <button className="text-muted hover:text-heading transition-colors">
+          <button
+            type="button"
+            onClick={() => {
+              const isDark = document.documentElement.classList.toggle('dark');
+              localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            }}
+            title="Toggle theme"
+            className="text-muted hover:text-heading transition-colors cursor-pointer"
+          >
             <Sun size={18} />
           </button>
-          <button className="text-muted hover:text-heading transition-colors">
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard/inventory/movements')}
+            title="Stock Movements"
+            className="text-muted hover:text-heading transition-colors cursor-pointer"
+          >
             <LayoutGrid size={18} />
           </button>
 
@@ -559,8 +599,71 @@ export default function Inventory() {
                   </div>
                 </div>
               ) : activeTab === 'suppliers' ? (
-                <div className="flex-1 overflow-y-auto p-6">
-                  {isSuppliersLoading ? <div className="flex h-full items-center justify-center"><Loader2 className="animate-spin text-muted" size={20} /></div> : isSuppliersError ? <p className="text-sm text-danger">Suppliers could not be loaded.</p> : (suppliersData?.items ?? []).length === 0 ? <div className="flex h-full items-center justify-center text-sm text-muted text-center">No suppliers are linked to this product yet.</div> : <ul className="space-y-3">{suppliersData.items.map(supplier => <li key={supplier.id} className="rounded-button border border-border-default bg-surface-muted px-4 py-3 text-sm font-semibold text-heading">{supplier.name}</li>)}</ul>}
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-muted uppercase tracking-wider">Product Suppliers</p>
+                  </div>
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const name = newSupplierName.trim();
+                      if (!name) return;
+                      addSupplierMutation.mutate(name);
+                    }}
+                    className="flex gap-2"
+                  >
+                    <input
+                      type="text"
+                      value={newSupplierName}
+                      onChange={(e) => setNewSupplierName(e.target.value)}
+                      placeholder="Add supplier name..."
+                      disabled={!canWrite || addSupplierMutation.isPending}
+                      className="flex-1 rounded-input border border-border-default bg-surface px-3 py-2 text-sm text-heading placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!canWrite || !newSupplierName.trim() || addSupplierMutation.isPending}
+                      className="rounded-input bg-primary px-3 py-2 text-xs font-semibold text-white hover:bg-primary-hover disabled:opacity-50"
+                    >
+                      {addSupplierMutation.isPending ? 'Adding…' : 'Add'}
+                    </button>
+                  </form>
+                  {supplierError && (
+                    <p className="text-xs text-danger">{supplierError}</p>
+                  )}
+
+                  {isSuppliersLoading ? (
+                    <div className="flex h-32 items-center justify-center">
+                      <Loader2 className="animate-spin text-muted" size={20} />
+                    </div>
+                  ) : isSuppliersError ? (
+                    <p className="text-sm text-danger">Suppliers could not be loaded.</p>
+                  ) : (suppliersData?.items ?? []).length === 0 ? (
+                    <div className="flex h-32 items-center justify-center text-sm text-muted text-center">
+                      No suppliers are linked to this product yet.
+                    </div>
+                  ) : (
+                    <ul className="space-y-2">
+                      {suppliersData.items.map(supplier => (
+                        <li
+                          key={supplier.id}
+                          className="flex items-center justify-between rounded-button border border-border-default bg-surface-muted px-4 py-3 text-sm font-semibold text-heading"
+                        >
+                          <span>{supplier.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeSupplierMutation.mutate(supplier.id)}
+                            disabled={!canWrite || removeSupplierMutation.isPending}
+                            title="Remove supplier from product"
+                            className="text-xs font-medium text-danger hover:text-danger-hover disabled:opacity-50"
+                          >
+                            Remove
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               ) : activeTab === 'orders' ? (
                 <div className="flex-1 overflow-y-auto p-6 space-y-4">

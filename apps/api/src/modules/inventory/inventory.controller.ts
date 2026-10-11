@@ -33,6 +33,14 @@ export function listProductSuppliers(prisma: PrismaClient, tenantId: string, pro
   return service.listProductSuppliers(prisma, tenantId, productId)
 }
 
+export function addProductSupplier(prisma: PrismaClient, tenantId: string, productId: string, name: string): Promise<ProductSupplier[]> {
+  return service.addProductSupplier(prisma, tenantId, productId, name)
+}
+
+export function removeProductSupplier(prisma: PrismaClient, tenantId: string, productId: string, supplierId: string): Promise<ProductSupplier[]> {
+  return service.removeProductSupplier(prisma, tenantId, productId, supplierId)
+}
+
 export function createPurchaseOrder(prisma: PrismaClient, tenantId: string, input: PurchaseOrderWriteInput): Promise<PurchaseOrder> {
   return service.createPurchaseOrder(prisma, tenantId, input)
 }
