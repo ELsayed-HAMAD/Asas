@@ -6,6 +6,7 @@ export default function SettingsTabs() {
   
   const tabs = [
     { name: 'General', path: '/dashboard/settings' },
+    { name: 'Members & Roles', path: '/dashboard/settings/members' },
     { name: 'Billing & Plans', path: '/dashboard/settings/billing' },
     { name: 'Integrations', path: '/dashboard/settings/integrations' },
     { name: 'Notifications', path: '/dashboard/settings/notifications' },

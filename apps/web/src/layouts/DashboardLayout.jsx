@@ -121,6 +121,7 @@ const BREADCRUMB_LABELS = {
   sprints:               'Active Sprints',
   roadmap:               'Roadmap',
   settings:              'Settings',
+  members:               'Members & Roles',
   billing:               'Billing & Plans',
   integrations:          'Integrations',
   notifications:         'Notifications',

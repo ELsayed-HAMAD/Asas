@@ -172,6 +172,7 @@ export const queryKeys = {
   settings: {
     ...settingsBase,
     general: () => [...settingsBase.all(), 'general'],
+    members: () => [...settingsBase.all(), 'members'],
     exchangeRates: (filters) => [...settingsBase.all(), 'exchange-rates', filters ?? {}],
     billing: () => [...settingsBase.all(), 'billing'],
     backups: () => [...settingsBase.all(), 'backups'],

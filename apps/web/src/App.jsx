@@ -39,6 +39,7 @@ const PortfolioOverview = lazy(() => import('./pages/dashboard/projects/Portfoli
 const ActiveSprints = lazy(() => import('./pages/dashboard/projects/ActiveSprints'))
 const Roadmap = lazy(() => import('./pages/dashboard/projects/Roadmap'))
 const SettingsGeneral = lazy(() => import('./pages/dashboard/settings/SettingsGeneral'))
+const MembersRoles = lazy(() => import('./pages/dashboard/settings/MembersRoles'))
 const BillingPlans = lazy(() => import('./pages/dashboard/settings/BillingPlans'))
 const Integrations = lazy(() => import('./pages/dashboard/settings/Integrations'))
 const Notifications = lazy(() => import('./pages/dashboard/settings/Notifications'))
@@ -65,7 +66,7 @@ const DASHBOARD_PATHS = [
   '/dashboard/crm', '/dashboard/crm/deals', '/dashboard/crm/sales-performance', '/dashboard/crm/revenue-forecast',
   '/dashboard/inventory', '/dashboard/inventory/movements',
   '/dashboard/projects', '/dashboard/projects/sprints', '/dashboard/projects/roadmap',
-  '/dashboard/settings', '/dashboard/settings/billing', '/dashboard/settings/integrations', '/dashboard/settings/notifications', '/dashboard/settings/data-export', '/dashboard/exports',
+  '/dashboard/settings', '/dashboard/settings/members', '/dashboard/settings/billing', '/dashboard/settings/integrations', '/dashboard/settings/notifications', '/dashboard/settings/data-export', '/dashboard/exports',
   '/dashboard/support',
 ]
 
@@ -91,6 +92,7 @@ const REAL_PAGES = {
   '/dashboard/projects/sprints': ActiveSprints,
   '/dashboard/projects/roadmap': Roadmap,
   '/dashboard/settings': SettingsGeneral,
+  '/dashboard/settings/members': MembersRoles,
   '/dashboard/settings/billing': BillingPlans,
   '/dashboard/settings/integrations': Integrations,
   '/dashboard/settings/notifications': Notifications,
