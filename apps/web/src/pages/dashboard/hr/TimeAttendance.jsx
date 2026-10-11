@@ -130,7 +130,7 @@ export default function TimeAttendance() {
   const eligibleTimesheets = timesheets.filter(item => item.approvalEligible);
   const visibleExceptions = exceptions.filter((item) => (!needsActionOnly || item.alert) && (autoFlagOvertime || item.type !== 'OVERTIME'));
   const visibleLeaveRequests = leaveRequests.filter((item) => !needsActionOnly || item.status === 'PENDING');
-  const summary = data?.summary ?? { exceptionCount: 0, exceptionCountPreviousPeriod: 0, onLeaveCount: 0, attendanceRate: null, attendanceRatePreviousPeriod: null, attendanceRateRangeDays, attendanceRateRecordedDays: 0, timesheetCount: 0, overtimeHours: 0 };
+  const summary = data?.summary ?? { exceptionCount: 0, exceptionCountPreviousPeriod: 0, onLeaveCount: 0, attendanceRate: null, attendanceRatePreviousPeriod: null, attendanceRateRangeDays: attendanceRangeDays, attendanceRateRecordedDays: 0, timesheetCount: 0, overtimeHours: 0 };
   const exceptionDelta = summary.exceptionCount - summary.exceptionCountPreviousPeriod;
   const attendanceRateDelta = summary.attendanceRate != null && summary.attendanceRatePreviousPeriod != null
     ? Math.round((summary.attendanceRate - summary.attendanceRatePreviousPeriod) * 10) / 10
