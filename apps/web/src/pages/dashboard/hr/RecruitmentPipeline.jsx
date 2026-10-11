@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Search, Filter, Download, X, FileText,
   Calendar, UserPlus, ArrowRight,
-  MapPin, Mail, Loader2, Upload, Eye,
+  MapPin, Mail, Loader2, Upload, Eye, Pencil,
 } from 'lucide-react'
 import { hrApi } from '../../../lib/api/hr'
 import { queryKeys } from '../../../lib/queryKeys'
@@ -57,7 +57,7 @@ function formatBytes(bytes) {
   return `PDF • ${Math.max(1, Math.round(bytes / 1024))} KB`
 }
 
-function CandidateInspector({ candidate, interviews = [], onClose, canWrite, canMoveStage, onMoveStage, onSchedule, onCancelInterview }) {
+function CandidateInspector({ candidate, interviews = [], onClose, canWrite, canMoveStage, onMoveStage, onSchedule, onCancelInterview, onEdit }) {
   if (!candidate) return null
   const profile = candidate.profile || {}
   const activity = candidate.activity || []
@@ -70,9 +70,21 @@ function CandidateInspector({ candidate, interviews = [], onClose, canWrite, can
       {/* Header Actions */}
       <div className="px-5 py-4 flex items-center justify-between border-b border-border-subtle">
         <h3 className="text-sm font-semibold text-heading">Candidate Profile</h3>
-        <button type="button" onClick={onClose} className="text-caption hover:text-body transition-colors">
-          <X size={16} />
-        </button>
+        <div className="flex items-center gap-2">
+          {canWrite && (
+            <button
+              type="button"
+              onClick={onEdit}
+              title="Edit Candidate"
+              className="text-caption hover:text-body transition-colors"
+            >
+              <Pencil size={15} />
+            </button>
+          )}
+          <button type="button" onClick={onClose} className="text-caption hover:text-body transition-colors">
+            <X size={16} />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -304,7 +316,56 @@ export default function RecruitmentPipeline() {
   const [exporting, setExporting] = useState(false)
 
   const { data: activeMemberRole } = useActiveMemberRole()
-  const canWrite = activeMemberRole === 'OWNER' || activeMemberRole === 'ADMIN'
+  const roleName = typeof activeMemberRole === 'string' ? activeMemberRole : activeMemberRole?.role
+  const canWrite = roleName === 'OWNER' || roleName === 'ADMIN'
+
+  const [editOpen, setEditOpen] = useState(false)
+  const [editForm, setEditForm] = useState({ name: '', role: '', email: '', location: '', source: '', experience: '', currentRole: '', education: '' })
+  const [editError, setEditError] = useState(null)
+
+  const updateCandidateMutation = useMutation({
+    mutationFn: (values) => hrApi.updateCandidate(selectedId, values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.hr.candidates.all() })
+      setEditOpen(false)
+      setEditError(null)
+    },
+    onError: (err) => setEditError(err?.message || 'Could not update the candidate'),
+  })
+
+  function openEditCandidate() {
+    if (!selectedCandidate) return
+    setEditForm({
+      name: selectedCandidate.name || '',
+      role: selectedCandidate.role || '',
+      email: selectedCandidate.email || '',
+      location: selectedCandidate.location || '',
+      source: selectedCandidate.source || '',
+      experience: selectedCandidate.experience || '',
+      currentRole: selectedCandidate.currentRole || '',
+      education: selectedCandidate.education || '',
+    })
+    setEditError(null)
+    setEditOpen(true)
+  }
+
+  function submitEditCandidate() {
+    const name = editForm.name.trim()
+    const role = editForm.role.trim()
+    if (!name || !role) {
+      setEditError('Name and role are required.')
+      return
+    }
+    updateCandidateMutation.mutate({
+      name,
+      role,
+      email: editForm.email.trim() || null,
+      location: editForm.location.trim() || null,
+      source: editForm.source.trim() || null,
+      experience: editForm.experience.trim() || null,
+      education: editForm.education.trim() || null,
+    })
+  }
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.hr.candidates.list({ search: search || undefined }),
@@ -585,6 +646,7 @@ export default function RecruitmentPipeline() {
           onMoveStage={() => { setNextStage(NEXT_STAGES[selectedCandidate.stage][0]); setStageOpen(true) }}
           onSchedule={() => { setInterviewError(null); setInterviewForm({ startsAt: '', durationMin: '60', stage: selectedCandidate?.stage === 'FINAL_INTERVIEW' ? 'FINAL_INTERVIEW' : 'TECH_INTERVIEW', interviewer: '', meetingUrl: '', notes: '' }); setScheduleOpen(true) }}
           onCancelInterview={interviewId => cancelInterviewMutation.mutate(interviewId)}
+          onEdit={openEditCandidate}
           onClose={() => setSelectedId(null)}
         />
       )}
@@ -671,6 +733,94 @@ export default function RecruitmentPipeline() {
           <label className="block text-sm font-medium text-body">Meeting URL<input type="url" value={interviewForm.meetingUrl} onChange={event => setInterviewForm(f => ({ ...f, meetingUrl: event.target.value }))} placeholder="https://..." className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
           <label className="block text-sm font-medium text-body">Notes<textarea value={interviewForm.notes} onChange={event => setInterviewForm(f => ({ ...f, notes: event.target.value }))} maxLength={2000} rows={3} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
           {interviewError && <p role="alert" className="text-xs text-danger">{interviewError}</p>}
+        </div>
+      </FormDialog>
+
+      <FormDialog
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        title="Edit Candidate"
+        subtitle={selectedCandidate?.name}
+        confirmLabel="Save Changes"
+        busy={updateCandidateMutation.isPending}
+        onConfirm={submitEditCandidate}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-muted mb-1">Name <span className="text-danger">*</span></label>
+            <input
+              type="text"
+              value={editForm.name}
+              onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="e.g. Jordan Blake"
+              className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-muted mb-1">Role <span className="text-danger">*</span></label>
+            <input
+              type="text"
+              value={editForm.role}
+              onChange={(e) => setEditForm(f => ({ ...f, role: e.target.value }))}
+              placeholder="e.g. Frontend Engineer"
+              className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-muted mb-1">Email</label>
+            <input
+              type="email"
+              value={editForm.email}
+              onChange={(e) => setEditForm(f => ({ ...f, email: e.target.value }))}
+              placeholder="jordan@example.com"
+              className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-muted mb-1">Location</label>
+              <input
+                type="text"
+                value={editForm.location}
+                onChange={(e) => setEditForm(f => ({ ...f, location: e.target.value }))}
+                placeholder="e.g. Remote"
+                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted mb-1">Source</label>
+              <input
+                type="text"
+                value={editForm.source}
+                onChange={(e) => setEditForm(f => ({ ...f, source: e.target.value }))}
+                placeholder="e.g. LinkedIn"
+                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-muted mb-1">Experience</label>
+              <input
+                type="text"
+                value={editForm.experience}
+                onChange={(e) => setEditForm(f => ({ ...f, experience: e.target.value }))}
+                placeholder="e.g. 5+ years"
+                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted mb-1">Education</label>
+              <input
+                type="text"
+                value={editForm.education}
+                onChange={(e) => setEditForm(f => ({ ...f, education: e.target.value }))}
+                placeholder="e.g. BSc Computer Science"
+                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
+              />
+            </div>
+          </div>
+          {editError && <p className="text-xs text-danger">{editError}</p>}
         </div>
       </FormDialog>
 

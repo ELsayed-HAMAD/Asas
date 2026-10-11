@@ -4,6 +4,7 @@ import type {
   CandidateListQuery,
   CandidateStageUpdateInput,
   CandidateWriteInput,
+  CandidateUpdateInput,
   CandidatePipelineSummary,
   CandidateInterviewWriteInput,
 } from '@asas/contracts'
@@ -316,4 +317,38 @@ export async function updateCandidateStageInTransaction(
   })
   const refreshed = await tx.candidate.findUniqueOrThrow({ where: { id: updated.id }, include: { activities: { orderBy: { createdAt: 'desc' }, take: 20 } } })
   return mapCandidate(refreshed)
+}
+
+export async function updateCandidate(
+  prisma: PrismaClient,
+  tenantId: string,
+  id: string,
+  input: CandidateUpdateInput,
+): Promise<Candidate> {
+  return prisma.$transaction(tx => updateCandidateInTransaction(tx, tenantId, id, input))
+}
+
+export async function updateCandidateInTransaction(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  id: string,
+  input: CandidateUpdateInput,
+): Promise<Candidate> {
+  const candidate = await tx.candidate.findFirst({ where: { id, tenantId } })
+  if (!candidate) throw new AppError(404, 'Candidate not found')
+
+  const updated = await tx.candidate.update({
+    where: { id_tenantId: { id: candidate.id, tenantId } },
+    data: {
+      ...(input.name !== undefined && { name: input.name }),
+      ...(input.role !== undefined && { role: input.role }),
+      ...(input.email !== undefined && { email: input.email }),
+      ...(input.source !== undefined && { source: input.source }),
+      ...(input.location !== undefined && { location: input.location }),
+      ...(input.experience !== undefined && { experience: input.experience }),
+      ...(input.education !== undefined && { education: input.education }),
+    },
+    include: { activities: { orderBy: { createdAt: 'desc' }, take: 20 } },
+  })
+  return mapCandidate(updated)
 }
