@@ -77,3 +77,4 @@ describe('DELETE /workspace', () => {
     expect(tx.tenant.delete).toHaveBeenCalledWith({ where: { id: 'tenant_1' } })
   })
 })
+

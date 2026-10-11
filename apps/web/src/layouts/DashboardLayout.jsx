@@ -238,6 +238,27 @@ function SidebarContent({ navProps, navigate }) {
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false)
   const [createWorkspaceError, setCreateWorkspaceError] = useState('')
 
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [profileName, setProfileName] = useState('')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [profileError, setProfileError] = useState('')
+  const [profileSuccess, setProfileSuccess] = useState('')
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false)
+
+  const [deferredPrompt, setDeferredPrompt] = useState(null)
+  const [installInfoOpen, setInstallInfoOpen] = useState(false)
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault()
+      setDeferredPrompt(e)
+    }
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+  }, [])
+
   const { data: session } = useSession()
   const { data: activeOrganization } = useActiveOrganization()
   const { data: activeMemberRole } = useActiveMemberRole()
@@ -328,6 +349,67 @@ function SidebarContent({ navProps, navigate }) {
     }
   }
 
+  const toggleTheme = () => {
+    setUserMenuOpen(false)
+    const isDark = document.documentElement.classList.toggle('dark')
+    localStorage.setItem('theme', isDark ? 'dark' : 'light')
+  }
+
+  const handleInstallApp = async () => {
+    setUserMenuOpen(false)
+    if (deferredPrompt) {
+      deferredPrompt.prompt()
+      const { outcome } = await deferredPrompt.userChoice
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null)
+      }
+    } else {
+      setInstallInfoOpen(true)
+    }
+  }
+
+  const handleUpdateProfile = async () => {
+    setIsUpdatingProfile(true)
+    setProfileError('')
+    setProfileSuccess('')
+    try {
+      if (profileName.trim() && profileName.trim() !== displayName) {
+        const updateRes = await authClient.updateUser({ name: profileName.trim() })
+        if (updateRes?.error) {
+          throw new Error(updateRes.error.message || 'Failed to update profile name')
+        }
+      }
+      if (newPassword) {
+        if (newPassword !== confirmPassword) {
+          throw new Error('New passwords do not match')
+        }
+        if (newPassword.length < 8) {
+          throw new Error('New password must be at least 8 characters')
+        }
+        if (!currentPassword) {
+          throw new Error('Current password is required to set a new password')
+        }
+        const pwRes = await authClient.changePassword({
+          currentPassword,
+          newPassword,
+          revokeOtherSessions: false,
+        })
+        if (pwRes?.error) {
+          throw new Error(pwRes.error.message || 'Failed to change password')
+        }
+      }
+      setProfileSuccess('Profile updated successfully.')
+      setTimeout(() => {
+        setProfileOpen(false)
+        window.location.reload()
+      }, 1000)
+    } catch (err) {
+      setProfileError(err?.message || 'Failed to update profile')
+    } finally {
+      setIsUpdatingProfile(false)
+    }
+  }
+
   const orgList = Array.isArray(organizations) ? organizations : []
 
   return (
@@ -339,7 +421,14 @@ function SidebarContent({ navProps, navigate }) {
           A
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-heading leading-tight">Asas</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-heading leading-tight">Asas</p>
+            {activeOrganization?.onboardingStatus === 'SAMPLE_LOADED' && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/20">
+                Sample
+              </span>
+            )}
+          </div>
           <p className="text-[11px] text-caption truncate">{tenantName}</p>
         </div>
       </div>
@@ -459,34 +548,34 @@ function SidebarContent({ navProps, navigate }) {
               {/* 3. Account Actions */}
               <div className="border-t border-border-subtle p-2 flex flex-col gap-1">
                 <button
-                  onClick={() => { setUserMenuOpen(false); navigate('/dashboard/settings'); }}
-                  className="flex items-center gap-3 text-left px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors"
+                  type="button"
+                  onClick={() => {
+                    setUserMenuOpen(false)
+                    setProfileName(displayName)
+                    setCurrentPassword('')
+                    setNewPassword('')
+                    setConfirmPassword('')
+                    setProfileError('')
+                    setProfileSuccess('')
+                    setProfileOpen(true)
+                  }}
+                  className="flex items-center gap-3 text-left px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
                 >
                   <User size={16} className="text-caption" />
                   Profile & Preferences
                 </button>
                 <button
-                  onClick={() => { setUserMenuOpen(false); document.documentElement.classList.toggle('dark'); }}
-                  className="flex items-center gap-3 text-left px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors"
+                  type="button"
+                  onClick={toggleTheme}
+                  className="flex items-center gap-3 text-left px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
                 >
                   <Moon size={16} className="text-caption" />
                   Toggle Theme
                 </button>
                 <button
-                  onClick={() => {
-                    setUserMenuOpen(false)
-                    const blob = new Blob(
-                      ["Asas ERP Desktop App Launcher\nVersion: 1.0.0\nPlatform: Windows x64\nLaunch URL: " + window.location.origin],
-                      { type: 'text/plain' }
-                    )
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = url
-                    a.download = 'asas-desktop-launcher.txt'
-                    a.click()
-                    URL.revokeObjectURL(url)
-                  }}
-                  className="flex items-center gap-3 text-left px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors"
+                  type="button"
+                  onClick={handleInstallApp}
+                  className="flex items-center gap-3 text-left px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
                 >
                   <Download size={16} className="text-caption" />
                   Download Desktop App
@@ -657,6 +746,110 @@ function SidebarContent({ navProps, navigate }) {
             placeholder="e.g. Acme Corporation"
             className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
           />
+        </div>
+      </FormDialog>
+
+      {/* ── Profile & Preferences Dialog ── */}
+      <FormDialog
+        open={profileOpen}
+        onClose={() => !isUpdatingProfile && setProfileOpen(false)}
+        title="Profile & Preferences"
+        subtitle="Manage your personal details and security credentials."
+        confirmLabel="Save Changes"
+        busy={isUpdatingProfile}
+        error={profileError}
+        onConfirm={handleUpdateProfile}
+        width="max-w-md"
+      >
+        <div className="space-y-4">
+          {profileSuccess && (
+            <div className="p-3 rounded-card-sm bg-success-light border border-success-border text-xs font-semibold text-success-text">
+              {profileSuccess}
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-bold text-heading mb-1.5">Email Address</label>
+            <input
+              type="email"
+              disabled
+              value={session?.user?.email || ''}
+              className="w-full border border-border-default rounded-input px-3 py-2 text-sm text-muted bg-surface-muted cursor-not-allowed"
+            />
+            <p className="text-[11px] text-caption mt-1">Primary account email cannot be modified directly.</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-heading mb-1.5">Display Name</label>
+            <input
+              type="text"
+              required
+              value={profileName}
+              onChange={(e) => setProfileName(e.target.value)}
+              placeholder="Your full name"
+              className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+            />
+          </div>
+
+          <div className="pt-3 border-t border-border-subtle">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-caption mb-3">Change Password (Optional)</h4>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-heading mb-1">Current Password</label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Required to set new password"
+                  className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-heading mb-1">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-heading mb-1">Confirm New Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Re-type new password"
+                  className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </FormDialog>
+
+      {/* ── Desktop App Installation Info Dialog ── */}
+      <FormDialog
+        open={installInfoOpen}
+        onClose={() => setInstallInfoOpen(false)}
+        title="Download Desktop App"
+        subtitle="Install Asas ERP as a Progressive Web Application (PWA) for desktop."
+        confirmLabel="Got It"
+        onConfirm={() => setInstallInfoOpen(false)}
+        width="max-w-md"
+      >
+        <div className="space-y-3 text-sm text-body">
+          <p>
+            Asas ERP is a Progressive Web Application (PWA) designed to run natively on Windows, macOS, and Linux without needing a separate installer package.
+          </p>
+          <div className="p-3 rounded-card-sm bg-surface-muted border border-border-subtle space-y-2 text-xs">
+            <p className="font-semibold text-heading">To install on your computer:</p>
+            <ol className="list-decimal list-inside space-y-1 text-muted">
+              <li>In Google Chrome or Microsoft Edge, look for the <strong className="text-heading">Install</strong> icon (⊕ or computer icon) in the right side of the address bar.</li>
+              <li>Or click the browser menu (three dots <strong className="text-heading">⋮</strong>) and select <strong className="text-heading">Install Asas</strong>.</li>
+              <li>Asas will launch in its own dedicated, distraction-free desktop window with offline caching and taskbar shortcuts.</li>
+            </ol>
+          </div>
         </div>
       </FormDialog>
 
