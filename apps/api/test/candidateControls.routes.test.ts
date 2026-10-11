@@ -15,8 +15,36 @@ async function setup(role: 'ADMIN' | 'MEMBER' = 'ADMIN') {
     stage: 'TECH_INTERVIEW', interviewer: 'Sam', meetingUrl: null, notes: null,
     status: 'SCHEDULED', createdAt: new Date(), updatedAt: new Date(),
   }
+  const candidateRecord = {
+    id: candidateId,
+    tenantId: 'tenant_1',
+    employeeId: null,
+    name: 'Ada Candidate',
+    role: 'Engineer',
+    stage: 'SCREENING',
+    stageEnteredAt: new Date(),
+    timeInStage: null,
+    appliedAt: new Date(),
+    avatarUrl: null,
+    currentRole: null,
+    experience: null,
+    source: 'LinkedIn',
+    location: null,
+    email: null,
+    education: null,
+    resumeUrl: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    activities: [],
+  }
   const tx = {
-    candidate: { findFirst: vi.fn().mockResolvedValue({ id: candidateId, tenantId: 'tenant_1', stage: 'SCREENING' }) },
+    candidate: {
+      findFirst: vi.fn().mockResolvedValue(candidateRecord),
+      update: vi.fn().mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+        ...candidateRecord,
+        ...data,
+      })),
+    },
     candidateInterview: { create: vi.fn().mockResolvedValue(interview) },
     candidateActivity: { create: vi.fn().mockResolvedValue({}) },
     auditLog: { create: vi.fn(async () => { events.push('audit') }) },
@@ -78,5 +106,51 @@ describe('candidate scheduling and export routes', () => {
       expect(response.statusCode).toBe(403)
       expect(member.prisma.candidate.findMany).not.toHaveBeenCalled()
     } finally { await member.app.close() }
+  })
+
+  it('updates candidate with audit log and publishes SSE before returning', async () => {
+    const { app, tx, events } = await setup()
+    try {
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/hr/candidates/${candidateId}`,
+        payload: { name: 'Ada Lovelace', role: 'Principal Engineer' },
+      })
+      expect(response.statusCode).toBe(200)
+      expect(response.json().data).toMatchObject({
+        id: candidateId,
+        name: 'Ada Lovelace',
+        role: 'Principal Engineer',
+      })
+      expect(tx.candidate.update).toHaveBeenCalledWith(expect.objectContaining({
+        where: { id_tenantId: { id: candidateId, tenantId: 'tenant_1' } },
+        data: expect.objectContaining({ name: 'Ada Lovelace', role: 'Principal Engineer' }),
+      }))
+      expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          actorId: 'user_1',
+          action: 'hr.candidate.update',
+          targetId: candidateId,
+        }),
+      }))
+      expect(events).toEqual(['audit', 'commit', 'sse'])
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('rejects candidate updates from MEMBER role without permissions', async () => {
+    const member = await setup('MEMBER')
+    try {
+      const response = await member.app.inject({
+        method: 'PATCH',
+        url: `/hr/candidates/${candidateId}`,
+        payload: { name: 'Ada Lovelace' },
+      })
+      expect(response.statusCode).toBe(403)
+      expect(member.tx.candidate.update).not.toHaveBeenCalled()
+    } finally {
+      await member.app.close()
+    }
   })
 })

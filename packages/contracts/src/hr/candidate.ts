@@ -54,6 +54,9 @@ export const candidateWriteSchema = z.object({
 })
 export type CandidateWriteInput = z.infer<typeof candidateWriteSchema>
 
+export const candidateUpdateSchema = candidateWriteSchema.partial()
+export type CandidateUpdateInput = z.infer<typeof candidateUpdateSchema>
+
 /** A narrow stage transition — the kanban drag. The service records a `CandidateActivity` row. */
 export const candidateStageUpdateSchema = z.object({
   stage: candidateStageSchema,

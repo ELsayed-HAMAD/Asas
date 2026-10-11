@@ -12,6 +12,7 @@ import {
   candidateInterviewWriteSchema,
   candidateSchema,
   candidateStageUpdateSchema,
+  candidateUpdateSchema,
   candidateWriteSchema,
   envelope,
   errorEnvelopeSchema,
@@ -215,6 +216,35 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
         }
         return updated
       }, { isolationLevel: 'Serializable' })
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('hr')])
+      return { data: candidate }
+    },
+  )
+
+  server.patch(
+    '/candidates/:id',
+    {
+      preHandler: requirePermission('candidate.write'),
+      schema: {
+        params: idParamSchema,
+        body: candidateUpdateSchema,
+        response: { 200: envelope(candidateSchema), ...errorResponses },
+      },
+    },
+    async request => {
+      const { tenantId, userId } = requireAuthContext(request)
+      const candidate = await request.server.prisma.$transaction(async tx => {
+        const updated = await candidatesService.updateCandidateInTransaction(tx, tenantId, request.params.id, request.body)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'hr.candidate.update',
+          targetType: 'Candidate',
+          targetId: request.params.id,
+          metadata: { fields: Object.keys(request.body) },
+        })
+        return updated
+      })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('hr')])
       return { data: candidate }
     },

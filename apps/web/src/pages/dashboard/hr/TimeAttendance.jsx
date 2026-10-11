@@ -6,7 +6,6 @@ import {
   X,
   AlertTriangle,
   Clock,
-  MoreHorizontal,
   Pencil,
   Loader2
 } from 'lucide-react';
@@ -42,7 +41,8 @@ export default function TimeAttendance() {
   const [policyType, setPolicyType] = useState('VACATION')
   const [policyDraft, setPolicyDraft] = useState({ annualAllowanceDays: '', weekdaysOnly: false })
   const { data: activeMemberRole } = useActiveMemberRole()
-  const isAdmin = ['OWNER', 'ADMIN'].includes(activeMemberRole?.role)
+  const roleName = typeof activeMemberRole === 'string' ? activeMemberRole : activeMemberRole?.role
+  const isAdmin = ['OWNER', 'ADMIN'].includes(roleName)
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.hr.attendance.list({ rangeDays: attendanceRangeDays }),
@@ -335,9 +335,23 @@ export default function TimeAttendance() {
                           {item.label}
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3">
                         <span className="text-sm text-muted">{formatShortDate(item.date)}</span>
-                        <MoreHorizontal size={16} className="text-caption" />
+                        {isAdmin && item.alert && (
+                          <button
+                            type="button"
+                            disabled={resolveExceptionMutation.isPending}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              resolveExceptionMutation.mutate(item.id);
+                            }}
+                            className="px-2.5 py-1 text-xs font-semibold rounded bg-primary text-white hover:bg-primary-hover transition-colors disabled:opacity-60"
+                            title="Resolve exception"
+                          >
+                            Resolve
+                          </button>
+                        )}
+                        {!item.alert && <span className="text-xs text-muted font-medium">Resolved</span>}
                       </div>
                     </div>
                   )
@@ -378,9 +392,30 @@ export default function TimeAttendance() {
                         <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">{item.status}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3">
                         <span className="text-sm text-muted whitespace-nowrap">{displayDate}</span>
-                        <MoreHorizontal size={16} className="text-caption" />
+                        {isAdmin && item.status === 'PENDING' ? (
+                          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              disabled={leaveDecisionMutation.isPending}
+                              onClick={() => leaveDecisionMutation.mutate({ id: item.id, decision: 'APPROVED' })}
+                              className="px-2 py-0.5 text-xs font-semibold rounded bg-primary text-white hover:bg-primary-hover transition-colors disabled:opacity-60"
+                              title="Approve leave"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              disabled={leaveDecisionMutation.isPending}
+                              onClick={() => leaveDecisionMutation.mutate({ id: item.id, decision: 'REJECTED' })}
+                              className="px-2 py-0.5 text-xs font-medium rounded border border-border-default text-body hover:bg-surface-muted transition-colors disabled:opacity-60"
+                              title="Reject leave"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   )

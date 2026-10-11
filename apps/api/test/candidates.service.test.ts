@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient } from '@prisma/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cancelCandidateInterview, getCandidatesForExport, listCandidates, scheduleCandidateInterview, updateCandidateStageInTransaction } from '../src/modules/hr/candidates.service.js'
+import { cancelCandidateInterview, getCandidatesForExport, listCandidates, scheduleCandidateInterview, updateCandidateInTransaction, updateCandidateStageInTransaction } from '../src/modules/hr/candidates.service.js'
 
 const appliedAt = new Date('2026-09-01T00:00:00.000Z')
 const enteredAt = new Date('2026-10-01T00:00:00.000Z')
@@ -198,5 +198,49 @@ describe('recruitment pipeline service', () => {
       orderBy: { appliedAt: 'desc' },
       select: { name: true, email: true, role: true, stage: true, appliedAt: true, location: true, source: true },
     })
+  })
+
+  it('updates candidate details scoped to the tenant in a transaction', async () => {
+    const candidate = { ...baseCandidate }
+    const tx = {
+      candidate: {
+        findFirst: vi.fn().mockResolvedValue(candidate),
+        update: vi.fn().mockResolvedValue({
+          ...candidate,
+          name: 'Updated Name',
+          role: 'Staff Engineer',
+          email: 'updated@example.com',
+          location: 'Alexandria',
+          source: 'Referral',
+          experience: '7 years',
+          education: 'MSc CS',
+          activities: [],
+        }),
+      },
+    }
+    const result = await updateCandidateInTransaction(tx as unknown as Prisma.TransactionClient, 'tenant_1', candidate.id, {
+      name: 'Updated Name',
+      role: 'Staff Engineer',
+      email: 'updated@example.com',
+      location: 'Alexandria',
+      source: 'Referral',
+      experience: '7 years',
+      education: 'MSc CS',
+    })
+    expect(tx.candidate.findFirst).toHaveBeenCalledWith({ where: { id: candidate.id, tenantId: 'tenant_1' } })
+    expect(tx.candidate.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id_tenantId: { id: candidate.id, tenantId: 'tenant_1' } },
+      data: {
+        name: 'Updated Name',
+        role: 'Staff Engineer',
+        email: 'updated@example.com',
+        location: 'Alexandria',
+        source: 'Referral',
+        experience: '7 years',
+        education: 'MSc CS',
+      },
+    }))
+    expect(result.name).toBe('Updated Name')
+    expect(result.role).toBe('Staff Engineer')
   })
 })
