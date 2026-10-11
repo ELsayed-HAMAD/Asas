@@ -379,6 +379,17 @@ export const receivableStatusUpdateSchema = z.object({
 
 export type ReceivableStatusUpdateInput = z.infer<typeof receivableStatusUpdateSchema>
 
+export const receivableBatchRemindSchema = z.object({
+  customerIds: z.array(idSchema).min(1),
+})
+export type ReceivableBatchRemindInput = z.infer<typeof receivableBatchRemindSchema>
+
+export const receivableBatchRemindResponseSchema = z.object({
+  remindedCount: z.number().int().min(0),
+  customerIds: z.array(idSchema),
+})
+export type ReceivableBatchRemindResponse = z.infer<typeof receivableBatchRemindResponseSchema>
+
 // ── Expenses ───────────────────────────────────────────────────────────────────────────
 
 export const expenseSchema = z.object({

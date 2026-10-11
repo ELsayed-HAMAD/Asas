@@ -34,6 +34,8 @@ import {
   payableWriteSchema,
   payableBatchPaymentSchema,
   payableChangeRequestSchema,
+  receivableBatchRemindSchema,
+  receivableBatchRemindResponseSchema,
   receivableInvoiceSchema,
   receivableListQuerySchema,
   receivableListResponseSchema,
@@ -630,6 +632,42 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     async request => {
       const { tenantId } = requireAuthContext(request)
       const result = await financeController.listReceivables(request.server.prisma, tenantId, request.query)
+      return { data: result }
+    },
+  )
+
+  server.post(
+    '/receivables/batch-remind',
+    {
+      preHandler: requirePermission('finance.invoice.write'),
+      schema: {
+        body: receivableBatchRemindSchema,
+        response: { 200: envelope(receivableBatchRemindResponseSchema), ...errorResponses },
+      },
+    },
+    async request => {
+      const { tenantId, userId } = requireAuthContext(request)
+      const user = await request.server.prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
+      const result = await request.server.prisma.$transaction(async tx => {
+        const res = await financeService.sendBatchRemindersInTransaction(
+          tx,
+          tenantId,
+          user?.name ?? 'Finance Team',
+          request.body.customerIds,
+        )
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.receivable.batch_remind',
+          targetType: 'Customer',
+          metadata: {
+            customerIds: res.customerIds,
+            count: res.remindedCount,
+          },
+        })
+        return res
+      })
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
       return { data: result }
     },
   )

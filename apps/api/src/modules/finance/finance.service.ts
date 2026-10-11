@@ -737,6 +737,51 @@ export async function createCollectionActivity(
   return mapCollectionActivity(row)
 }
 
+export async function sendBatchRemindersInTransaction(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  author: string,
+  customerIds: string[],
+): Promise<{ remindedCount: number; customerIds: string[] }> {
+  const uniqueIds = Array.from(new Set(customerIds))
+  const customers = await tx.customer.findMany({
+    where: { id: { in: uniqueIds }, tenantId },
+    select: { id: true, name: true },
+  })
+
+  const invoices = await tx.receivableInvoice.findMany({
+    where: {
+      customerId: { in: customers.map(c => c.id) },
+      tenantId,
+      status: { in: ['CURRENT', 'OVERDUE', 'IN_COLLECTIONS'] },
+    },
+    select: { customerId: true },
+  })
+
+  const invoiceCountByCustomer = new Map<string, number>()
+  for (const inv of invoices) {
+    invoiceCountByCustomer.set(inv.customerId, (invoiceCountByCustomer.get(inv.customerId) ?? 0) + 1)
+  }
+
+  for (const customer of customers) {
+    const count = invoiceCountByCustomer.get(customer.id) ?? 0
+    await tx.collectionActivity.create({
+      data: {
+        tenantId,
+        customerId: customer.id,
+        title: 'Payment Reminder Sent',
+        author,
+        body: `Automated payment reminder issued for ${count} outstanding invoice${count === 1 ? '' : 's'}.`,
+      },
+    })
+  }
+
+  return {
+    remindedCount: customers.length,
+    customerIds: customers.map(c => c.id),
+  }
+}
+
 function mapCustomer(
   customer: PrismaCustomer,
   openBalance: Prisma.Decimal,
