@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, ChevronRight } from 'lucide-react'
 
@@ -201,6 +202,11 @@ const COMPANIES = ['AcmeCorp', 'Globex', 'Soylent', 'Initech', 'MassiveDynamic']
 
 // ── Landing page ────────────────────────────────────────────
 export default function Landing() {
+  useEffect(() => {
+    // Landing page always stays in original Light mode
+    document.documentElement.classList.remove('dark')
+  }, [])
+
   return (
     <div className="bg-surface-raised min-h-screen">
 

@@ -13,9 +13,9 @@ import './index.css'
 
 initSentry()
 
-// Initialize theme from localStorage or system preference
+// Initialize theme: always default to the original Light mode unless explicitly toggled
 const savedTheme = localStorage.getItem('theme')
-if (savedTheme === 'dark' || (!savedTheme && window.matchMedia?.('(prefers-color-scheme: dark)').matches)) {
+if (savedTheme === 'dark') {
   document.documentElement.classList.add('dark')
 } else {
   document.documentElement.classList.remove('dark')
