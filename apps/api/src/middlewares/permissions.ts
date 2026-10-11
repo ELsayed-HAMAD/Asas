@@ -85,6 +85,7 @@ export const PERMISSIONS = {
   'settings.integration.write': 'ADMIN',
   'settings.billing.write': 'ADMIN',
   'support.ticket.write': 'MEMBER',
+  'support.ticket.manage': 'ADMIN',
 } as const satisfies Record<string, UserRole>
 
 export type Permission = keyof typeof PERMISSIONS
@@ -103,6 +104,7 @@ export const AUDITED_PERMISSIONS: ReadonlySet<Permission> = new Set([
   'member.remove',
   'organization.delete',
   'onboarding.write',
+  'support.ticket.manage',
 ])
 
 /**
