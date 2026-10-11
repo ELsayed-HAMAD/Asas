@@ -33,7 +33,7 @@ export default function CRMOverview() {
   const [agendaTitle, setAgendaTitle] = useState('')
   const [dealOpen, setDealOpen] = useState(false)
   const [dealForm, setDealForm] = useState({ name: '', value: '', stage: 'LEADS', closeDate: '' })
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: queryKeys.crm.overview(),
     queryFn: () => crmApi.getOverview(),
   });
@@ -80,8 +80,15 @@ export default function CRMOverview() {
 
   if (isError || !data) {
     return (
-      <div className="flex h-full items-center justify-center bg-surface text-danger">
-        Failed to load CRM overview.
+      <div className="flex flex-col h-full items-center justify-center gap-2 bg-surface text-danger">
+        <p className="text-sm font-medium">{error?.message || 'Failed to load CRM overview.'}</p>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          className="text-xs text-body hover:text-heading underline"
+        >
+          Retry
+        </button>
       </div>
     );
   }
