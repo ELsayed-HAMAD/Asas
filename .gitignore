@@ -51,6 +51,7 @@ out/
 .cache/
 .vite/
 .eslintcache
+.oxlintcache
 .stylelintcache
 .parcel-cache/
 .vuepress/dist/
@@ -117,6 +118,7 @@ allure-report/
 *.njsproj
 *.sln
 *.sw?
+*.code-workspace
 
 # =========================
 # OS-Specific Files
@@ -129,6 +131,9 @@ allure-report/
 Thumbs.db
 ehthumbs.db
 desktop.ini
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
 
 # =========================
 # AI Tools & Editors
@@ -136,17 +141,26 @@ desktop.ini
 .claude/
 .zed/
 .gemini/
+.antigravity/
 .aider*/
 .codeium/
 .continue/
-filter-msg.js
-AUDIT.md
+.windsurf/
+.copilot/
+.v0/
 
 # =========================
-# Custom Ignored Files
+# Scratch, Maintenance & Local Scripts
 # =========================
+filter.py
+rebase.ps1
+filter-msg.*
+scripts/filter-msg.*
+AUDIT.md
 check_errors.cjs
 lint_output.txt
+scratch/
+*.scratch.*
 *backup*/
 *_backup_*
 .monkeyscode/
