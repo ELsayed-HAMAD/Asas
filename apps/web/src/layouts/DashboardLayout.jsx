@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, CreditCard, Briefcase,
   Package, FolderKanban, Settings, HelpCircle,
   ChevronDown, ChevronRight, Plus, LogOut, Menu,
-  Check, User, Moon, Download, X
+  Check, User, Moon, Download, X, Search
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -13,6 +13,7 @@ import {
   useListOrganizations, signOut
 } from '../lib/authClient'
 import FormDialog from '../components/common/FormDialog'
+import CommandPalette from '../components/CommandPalette'
 
 // ── Navigation config ──────────────────────────────────────
 const NAV = [
@@ -673,6 +674,19 @@ export default function DashboardLayout() {
 
   const [openSections, setOpenSections]         = useState({})
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+
+  // Listen for ⌘K / Ctrl+K to toggle Command Palette
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setCommandPaletteOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Auto-expand the section that contains the current route
   useEffect(() => {
@@ -775,8 +789,22 @@ export default function DashboardLayout() {
             </nav>
           </div>
 
-          {/* Right: dynamically injected page controls */}
-          <div id="topbar-actions-portal" className="flex items-center gap-2 flex-shrink-0 min-h-[32px]">
+          {/* Right: search trigger button + dynamically injected page controls */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setCommandPaletteOpen(true)}
+              className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-xs text-muted bg-surface-muted hover:bg-surface border border-border-default rounded-input transition-colors shadow-sm"
+              title="Global search (⌘K or Ctrl+K)"
+            >
+              <Search size={14} className="text-caption" />
+              <span className="hidden md:inline text-body-light">Search or jump to...</span>
+              <kbd className="px-1.5 py-0.5 text-[10px] bg-surface-raised border border-border-default rounded text-caption font-mono font-semibold">
+                ⌘K
+              </kbd>
+            </button>
+            <div id="topbar-actions-portal" className="flex items-center gap-2 flex-shrink-0 min-h-[32px]">
+            </div>
           </div>
         </header>
 
@@ -786,6 +814,12 @@ export default function DashboardLayout() {
         </main>
 
       </div>
+
+      {/* Global Command Palette (⌘K) */}
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+      />
     </div>
   )
 }
