@@ -27,6 +27,8 @@ export const crmApi = {
   getDeal: (id) => http.get(`/crm/deals/${id}`),
   listDealActivities: (id, filters = {}) => http.get(`/crm/deals/${id}/activities`, { query: filters }),
   createDealActivity: (id, body) => http.post(`/crm/deals/${id}/activities`, { body }),
+  listRecentActivities: (filters = {}) => http.get('/crm/activities', { query: filters }),
+
 
   /** `forecastByRep` (ForecastSnapshot rows) + `quotas` + real open-deal `monthlyPipeline`. */
   getForecast: (year) => http.get('/crm/forecast', { query: year ? { year } : undefined }),

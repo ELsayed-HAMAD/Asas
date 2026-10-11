@@ -7,6 +7,66 @@ import { issuePrioritySchema, issueStatusSchema } from '../enums.generated.js'
 import { idSchema, isoDateTimeSchema, boundedText } from '../primitives/ids.js'
 import { collection } from '../primitives/pagination.js'
 
+export const issueChecklistItemSchema = z.object({
+  id: idSchema,
+  issueId: idSchema,
+  text: boundedText(255),
+  done: z.boolean(),
+})
+
+export type IssueChecklistItem = z.infer<typeof issueChecklistItemSchema>
+
+export const issueChecklistItemWriteSchema = z.object({
+  text: boundedText(255),
+})
+
+export type IssueChecklistItemWriteInput = z.infer<typeof issueChecklistItemWriteSchema>
+
+export const issueChecklistItemUpdateSchema = z.object({
+  text: boundedText(255).optional(),
+  done: z.boolean().optional(),
+})
+
+export type IssueChecklistItemUpdateInput = z.infer<typeof issueChecklistItemUpdateSchema>
+
+export const issueCommentSchema = z.object({
+  id: idSchema,
+  issueId: idSchema,
+  author: z.string(),
+  body: boundedText(5000),
+  createdAt: isoDateTimeSchema,
+})
+
+export type IssueComment = z.infer<typeof issueCommentSchema>
+
+export const issueCommentWriteSchema = z.object({
+  body: boundedText(5000),
+})
+
+export type IssueCommentWriteInput = z.infer<typeof issueCommentWriteSchema>
+
+export const issueAssigneeEmployeeSchema = z.object({
+  id: idSchema,
+  name: z.string(),
+  title: z.string().nullable().optional(),
+  avatarUrl: z.string().nullable().optional(),
+})
+
+export const issueAssigneeSchema = z.object({
+  id: idSchema,
+  issueId: idSchema,
+  employeeId: idSchema,
+  employee: issueAssigneeEmployeeSchema.nullable().optional(),
+})
+
+export type IssueAssignee = z.infer<typeof issueAssigneeSchema>
+
+export const issueAssigneeWriteSchema = z.object({
+  employeeId: idSchema,
+})
+
+export type IssueAssigneeWriteInput = z.infer<typeof issueAssigneeWriteSchema>
+
 export const issueSchema = z.object({
   id: idSchema,
   sprintId: idSchema.nullable(),
@@ -21,6 +81,9 @@ export const issueSchema = z.object({
   completedAt: isoDateTimeSchema.nullable(),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
+  checklist: z.array(issueChecklistItemSchema).default([]),
+  comments: z.array(issueCommentSchema).default([]),
+  assignees: z.array(issueAssigneeSchema).default([]),
 })
 
 export type Issue = z.infer<typeof issueSchema>
@@ -43,3 +106,4 @@ export type IssueWriteInput = z.infer<typeof issueWriteSchema>
 export const issueUpdateSchema = issueWriteSchema.partial()
 
 export type IssueUpdateInput = z.infer<typeof issueUpdateSchema>
+

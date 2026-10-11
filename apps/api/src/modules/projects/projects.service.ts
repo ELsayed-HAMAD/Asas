@@ -22,6 +22,13 @@ import type {
   BurndownQuery,
   BurndownResponse,
   Issue,
+  IssueAssignee,
+  IssueAssigneeWriteInput,
+  IssueChecklistItem,
+  IssueChecklistItemUpdateInput,
+  IssueChecklistItemWriteInput,
+  IssueComment,
+  IssueCommentWriteInput,
   IssueUpdateInput,
   IssueWriteInput,
   PortfolioUtilizationResponse,
@@ -42,6 +49,8 @@ import type {
 } from '@asas/contracts'
 import { buildPaginationMeta, toPrismaPage } from '@asas/contracts'
 import { AppError } from '../../utils/errors.js'
+
+export type ProjectsClient = PrismaClient | Prisma.TransactionClient
 
 /** The `ProjectStatus` values that count as "active" for the portfolio KPI. */
 const ACTIVE_STATUSES = ['ON_TRACK', 'DELAYED', 'AT_RISK'] as const
@@ -597,6 +606,14 @@ function mapIssue(issue: {
   completedAt: Date | null
   createdAt: Date
   updatedAt: Date
+  checklist?: Array<{ id: string; issueId: string; text: string; done: boolean }>
+  comments?: Array<{ id: string; issueId: string; author: string; body: string; createdAt: Date }>
+  assignees?: Array<{
+    id: string
+    issueId: string
+    employeeId: string
+    employee?: { id: string; name: string; title: string | null; avatarUrl: string | null } | null
+  }>
 }): Issue {
   return {
     id: issue.id,
@@ -611,6 +628,30 @@ function mapIssue(issue: {
     completedAt: issue.completedAt?.toISOString() ?? null,
     createdAt: issue.createdAt.toISOString(),
     updatedAt: issue.updatedAt.toISOString(),
+    checklist: (issue.checklist ?? []).map(c => ({
+      id: c.id,
+      issueId: c.issueId,
+      text: c.text,
+      done: c.done,
+    })),
+    comments: (issue.comments ?? []).map(c => ({
+      id: c.id,
+      issueId: c.issueId,
+      author: c.author,
+      body: c.body,
+      createdAt: c.createdAt.toISOString(),
+    })),
+    assignees: (issue.assignees ?? []).map(a => ({
+      id: a.id,
+      issueId: a.issueId,
+      employeeId: a.employeeId,
+      employee: a.employee ? {
+        id: a.employee.id,
+        name: a.employee.name,
+        title: a.employee.title ?? null,
+        avatarUrl: a.employee.avatarUrl ?? null,
+      } : null,
+    })),
   }
 }
 
@@ -619,9 +660,39 @@ export async function listIssues(prisma: PrismaClient, tenantId: string, sprintI
   if (!sprint) throw new AppError(404, 'Sprint not found')
   const issues = await prisma.issue.findMany({
     where: { tenantId, sprintId },
+    include: {
+      checklist: { orderBy: { id: 'asc' } },
+      comments: { orderBy: { createdAt: 'asc' } },
+      assignees: {
+        include: {
+          employee: {
+            select: { id: true, name: true, title: true, avatarUrl: true },
+          },
+        },
+      },
+    },
     orderBy: [{ status: 'asc' }, { priority: 'asc' }, { createdAt: 'asc' }],
   })
   return issues.map(mapIssue)
+}
+
+export async function getIssue(prisma: PrismaClient, tenantId: string, id: string): Promise<Issue> {
+  const issue = await prisma.issue.findFirst({
+    where: { id, tenantId },
+    include: {
+      checklist: { orderBy: { id: 'asc' } },
+      comments: { orderBy: { createdAt: 'asc' } },
+      assignees: {
+        include: {
+          employee: {
+            select: { id: true, name: true, title: true, avatarUrl: true },
+          },
+        },
+      },
+    },
+  })
+  if (!issue) throw new AppError(404, 'Issue not found')
+  return mapIssue(issue)
 }
 
 async function assertSprintInTenant(
@@ -653,12 +724,17 @@ export async function createIssue(prisma: PrismaClient, tenantId: string, input:
   const projectId = input.projectId ?? sprintProjectId
   await assertIssueProjectInTenant(prisma, tenantId, projectId)
   const status = input.status ?? 'TODO'
+  let key = input.key ?? null
+  if (!key) {
+    const count = typeof prisma.issue.count === 'function' ? await prisma.issue.count({ where: { tenantId } }) : 0
+    key = `ISS-${count + 1}`
+  }
   const issue = await prisma.issue.create({
     data: {
       tenantId,
       sprintId: input.sprintId ?? null,
       projectId,
-      key: input.key ?? null,
+      key,
       title: input.title,
       tag: input.tag ?? null,
       priority: input.priority ?? 'MEDIUM',
@@ -700,6 +776,17 @@ export async function updateIssue(
         completedAt: nextStatus === 'DONE' ? new Date() : null,
       }),
     },
+    include: {
+      checklist: { orderBy: { id: 'asc' } },
+      comments: { orderBy: { createdAt: 'asc' } },
+      assignees: {
+        include: {
+          employee: {
+            select: { id: true, name: true, title: true, avatarUrl: true },
+          },
+        },
+      },
+    },
   })
   return mapIssue(issue)
 }
@@ -709,6 +796,146 @@ export async function deleteIssue(prisma: PrismaClient, tenantId: string, id: st
   if (!existing) throw new AppError(404, 'Issue not found')
   await prisma.issue.delete({ where: { id_tenantId: { id, tenantId } } })
 }
+
+// ── Issue Checklist Items ──────────────────────────────────────────────────────
+
+export async function createChecklistItem(
+  prisma: ProjectsClient,
+  tenantId: string,
+  issueId: string,
+  input: IssueChecklistItemWriteInput,
+): Promise<IssueChecklistItem> {
+  const issue = await prisma.issue.findFirst({ where: { id: issueId, tenantId } })
+  if (!issue) throw new AppError(404, 'Issue not found')
+  const item = await prisma.issueChecklistItem.create({
+    data: {
+      issueId,
+      text: input.text.trim(),
+      done: false,
+    },
+  })
+  return {
+    id: item.id,
+    issueId: item.issueId,
+    text: item.text,
+    done: item.done,
+  }
+}
+
+export async function updateChecklistItem(
+  prisma: ProjectsClient,
+  tenantId: string,
+  issueId: string,
+  itemId: string,
+  input: IssueChecklistItemUpdateInput,
+): Promise<IssueChecklistItem> {
+  const issue = await prisma.issue.findFirst({ where: { id: issueId, tenantId } })
+  if (!issue) throw new AppError(404, 'Issue not found')
+  const existing = await prisma.issueChecklistItem.findFirst({ where: { id: itemId, issueId } })
+  if (!existing) throw new AppError(404, 'Checklist item not found')
+  const updated = await prisma.issueChecklistItem.update({
+    where: { id: itemId },
+    data: {
+      ...(input.text !== undefined && { text: input.text.trim() }),
+      ...(input.done !== undefined && { done: input.done }),
+    },
+  })
+  return {
+    id: updated.id,
+    issueId: updated.issueId,
+    text: updated.text,
+    done: updated.done,
+  }
+}
+
+export async function deleteChecklistItem(
+  prisma: ProjectsClient,
+  tenantId: string,
+  issueId: string,
+  itemId: string,
+): Promise<void> {
+  const issue = await prisma.issue.findFirst({ where: { id: issueId, tenantId } })
+  if (!issue) throw new AppError(404, 'Issue not found')
+  const existing = await prisma.issueChecklistItem.findFirst({ where: { id: itemId, issueId } })
+  if (!existing) throw new AppError(404, 'Checklist item not found')
+  await prisma.issueChecklistItem.delete({ where: { id: itemId } })
+}
+
+// ── Issue Comments ─────────────────────────────────────────────────────────────
+
+export async function createIssueComment(
+  prisma: ProjectsClient,
+  tenantId: string,
+  issueId: string,
+  author: string,
+  input: IssueCommentWriteInput,
+): Promise<IssueComment> {
+  const issue = await prisma.issue.findFirst({ where: { id: issueId, tenantId } })
+  if (!issue) throw new AppError(404, 'Issue not found')
+  const comment = await prisma.issueComment.create({
+    data: {
+      issueId,
+      author,
+      body: input.body.trim(),
+    },
+  })
+  return {
+    id: comment.id,
+    issueId: comment.issueId,
+    author: comment.author,
+    body: comment.body,
+    createdAt: comment.createdAt.toISOString(),
+  }
+}
+
+// ── Issue Assignees ────────────────────────────────────────────────────────────
+
+export async function addIssueAssignee(
+  prisma: ProjectsClient,
+  tenantId: string,
+  issueId: string,
+  employeeId: string,
+): Promise<IssueAssignee> {
+  const issue = await prisma.issue.findFirst({ where: { id: issueId, tenantId } })
+  if (!issue) throw new AppError(404, 'Issue not found')
+  const employee = await prisma.employee.findFirst({ where: { id: employeeId, tenantId } })
+  if (!employee) throw new AppError(404, 'Employee not found')
+  const assignee = await prisma.issueAssignee.upsert({
+    where: { issueId_employeeId: { issueId, employeeId } },
+    create: { issueId, employeeId },
+    update: {},
+    include: {
+      employee: {
+        select: { id: true, name: true, title: true, avatarUrl: true },
+      },
+    },
+  })
+  return {
+    id: assignee.id,
+    issueId: assignee.issueId,
+    employeeId: assignee.employeeId,
+    employee: assignee.employee ? {
+      id: assignee.employee.id,
+      name: assignee.employee.name,
+      title: assignee.employee.title ?? null,
+      avatarUrl: assignee.employee.avatarUrl ?? null,
+    } : null,
+  }
+}
+
+export async function removeIssueAssignee(
+  prisma: ProjectsClient,
+  tenantId: string,
+  issueId: string,
+  employeeId: string,
+): Promise<void> {
+  const issue = await prisma.issue.findFirst({ where: { id: issueId, tenantId } })
+  if (!issue) throw new AppError(404, 'Issue not found')
+  await prisma.issueAssignee.deleteMany({
+    where: { issueId, employeeId },
+  })
+}
+
 
 // ── Project writes ──────────────────────────────────────────────────────────────
 

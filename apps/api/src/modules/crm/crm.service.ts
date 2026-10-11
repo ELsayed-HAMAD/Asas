@@ -34,6 +34,7 @@ import type {
   DealActivity,
   DealActivityListQuery,
   DealActivityWriteInput,
+  DealRecentActivity,
   AgendaItemUpdateInput,
   AgendaItemWriteInput,
   SalesQuotaRow,
@@ -89,6 +90,29 @@ export async function createDealActivity(
     },
   })
   return mapDealActivity(row)
+}
+
+export async function listRecentDealActivities(
+  prisma: PrismaClient,
+  tenantId: string,
+  limit = 10,
+): Promise<DealRecentActivity[]> {
+  const rows = await prisma.dealActivity.findMany({
+    where: { tenantId },
+    take: limit,
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    include: {
+      deal: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  })
+  return rows.map(row => ({
+    ...mapDealActivity(row),
+    dealName: row.deal?.name ?? null,
+  }))
 }
 
 export async function listAgendaItems(prisma: PrismaClient, tenantId: string): Promise<{ items: AgendaItem[] }> {

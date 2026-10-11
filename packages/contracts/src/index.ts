@@ -5,6 +5,7 @@
 export * from './enums.generated.js'
 export * from './envelope.js'
 export * from './exports.js'
+export * from './auditLog.js'
 export * from './crm/index.js'
 export * from './crm/agenda.js'
 export * from './finance/index.js'

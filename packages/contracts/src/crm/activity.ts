@@ -26,3 +26,16 @@ export const dealActivityWriteSchema = z.object({
 export type DealActivity = z.infer<typeof dealActivitySchema>
 export type DealActivityListQuery = z.infer<typeof dealActivityListQuerySchema>
 export type DealActivityWriteInput = z.infer<typeof dealActivityWriteSchema>
+
+export const dealRecentActivitySchema = dealActivitySchema.extend({
+  dealName: z.string().nullable().optional(),
+})
+
+export type DealRecentActivity = z.infer<typeof dealRecentActivitySchema>
+
+export const dealRecentActivityListResponseSchema = z.object({
+  items: z.array(dealRecentActivitySchema),
+})
+
+export type DealRecentActivityListResponse = z.infer<typeof dealRecentActivityListResponseSchema>
+

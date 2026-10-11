@@ -47,6 +47,11 @@ export function listDealActivities(prisma: PrismaClient, tenantId: string, dealI
   return service.listDealActivities(prisma, tenantId, dealId, query)
 }
 
+export function listRecentDealActivities(prisma: PrismaClient, tenantId: string, limit?: number) {
+  return service.listRecentDealActivities(prisma, tenantId, limit)
+}
+
+
 // ── Analytics (SQL aggregates, never client-side) ─────────────────────────────────
 
 export function getOverview(prisma: PrismaClient, tenantId: string): Promise<CrmOverview> {
