@@ -20,6 +20,7 @@ import {
   exchangeRateListResponseSchema,
   exchangeRateSchema,
   exchangeRateWriteSchema,
+  workspaceDeleteResponseSchema,
 } from '@asas/contracts'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
@@ -104,6 +105,22 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('settings')])
       return { data: settings }
+    },
+  )
+
+  server.delete(
+    '/workspace',
+    {
+      preHandler: requirePermission('organization.delete'),
+      schema: {
+        response: { 200: envelope(workspaceDeleteResponseSchema), ...errorResponses },
+      },
+    },
+    async (request) => {
+      const { tenantId, userId } = requireAuthContext(request)
+      request.log.info({ tenantId, userId, action: 'organization.delete' }, 'Workspace deleted')
+      const result = await settingsController.deleteWorkspace(request.server.prisma, tenantId, userId)
+      return { data: result }
     },
   )
 

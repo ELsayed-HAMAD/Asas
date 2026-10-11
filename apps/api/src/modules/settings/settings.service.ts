@@ -375,10 +375,11 @@ export async function updateIntegration(
 // ── Billing and backups ────────────────────────────────────────────────────
 
 export async function getBillingSettings(prisma: PrismaClient, tenantId: string): Promise<BillingSettings> {
-  const [subscriptions, paymentMethods, invoices] = await Promise.all([
+  const [subscriptions, paymentMethods, invoices, memberCount] = await Promise.all([
     prisma.subscription.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } }),
     prisma.paymentMethod.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } }),
     prisma.billingInvoice.findMany({ where: { tenantId }, orderBy: { date: 'desc' } }),
+    prisma.member.count({ where: { tenantId } }),
   ])
 
   return {
@@ -388,7 +389,7 @@ export async function getBillingSettings(prisma: PrismaClient, tenantId: string)
       priceMonthly: row.priceMonthly.toString(),
       status: row.status,
       renewsOn: row.renewsOn?.toISOString() ?? null,
-      seatsUsed: row.seatsUsed,
+      seatsUsed: memberCount > 0 ? memberCount : row.seatsUsed,
       seatLimit: row.seatLimit,
       storageUsedGb: row.storageUsedGb,
       storageLimitGb: row.storageLimitGb,
@@ -439,7 +440,39 @@ export async function updateBackupSchedule(prisma: PrismaClient, tenantId: strin
 
 // ── Shared ──────────────────────────────────────────────────────────────────
 
+export async function deleteWorkspace(
+  prisma: PrismaClient,
+  tenantId: string,
+  _userId: string,
+): Promise<{ success: boolean }> {
+  await assertTenantExists(prisma, tenantId)
+
+  await prisma.$transaction(async tx => {
+    // 1. Clean up restricted financial models
+    await tx.journalLine.deleteMany({ where: { entry: { tenantId } } })
+    await tx.journalEntry.deleteMany({ where: { tenantId } })
+    await tx.ledgerAccount.deleteMany({ where: { tenantId } })
+    await tx.exchangeRate.deleteMany({ where: { tenantId } })
+
+    // 2. Clean up invitations and memberships
+    await tx.invitation.deleteMany({ where: { tenantId } })
+    await tx.member.deleteMany({ where: { tenantId } })
+
+    // 3. Clear activeOrganizationId on sessions
+    await tx.session.updateMany({
+      where: { activeOrganizationId: tenantId },
+      data: { activeOrganizationId: null },
+    })
+
+    // 4. Delete the tenant itself (cascading deletes will handle all remaining tables)
+    await tx.tenant.delete({ where: { id: tenantId } })
+  })
+
+  return { success: true }
+}
+
 async function assertTenantExists(prisma: PrismaClient, tenantId: string): Promise<void> {
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } })
   if (!tenant) throw new AppError(404, 'Workspace not found')
 }
+

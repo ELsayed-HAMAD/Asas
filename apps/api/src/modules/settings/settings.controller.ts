@@ -102,6 +102,10 @@ export function updateBackup(prisma: PrismaClient, tenantId: string, id: string,
   return settingsService.updateBackupSchedule(prisma, tenantId, id, input)
 }
 
+export function deleteWorkspace(prisma: PrismaClient, tenantId: string, userId: string): Promise<{ success: boolean }> {
+  return settingsService.deleteWorkspace(prisma, tenantId, userId)
+}
+
 export type {
   GeneralSettings,
   Integration,
