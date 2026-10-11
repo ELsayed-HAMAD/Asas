@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Search,
   ChevronDown,
@@ -26,6 +26,7 @@ import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
 
 export default function ActiveSprints() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState(null);
   const [search, setSearch] = useState('');
@@ -310,7 +311,12 @@ export default function ActiveSprints() {
             </div>
 
             <div className="flex items-center gap-4">
-              <button className="text-muted hover:text-heading transition-colors">
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard/settings/notifications')}
+                title="Notification Settings"
+                className="text-muted hover:text-heading transition-colors cursor-pointer"
+              >
                 <Bell size={18} />
               </button>
               <div className="w-7 h-7 bg-surface-strong rounded-full border border-border-strong"></div>

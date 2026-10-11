@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, CreditCard, Briefcase,
   Package, FolderKanban, Settings, HelpCircle,
   ChevronDown, ChevronRight, Plus, LogOut, Menu,
-  Check, User, Moon, Download, X, Search
+  Check, User, Moon, Download, X, Search, Bell
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -995,6 +995,14 @@ export default function DashboardLayout() {
               <kbd className="px-1.5 py-0.5 text-[10px] bg-surface-raised border border-border-default rounded text-caption font-mono font-semibold">
                 ⌘K
               </kbd>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard/settings/notifications')}
+              className="p-1.5 text-muted hover:text-heading hover:bg-surface-muted rounded-input transition-colors cursor-pointer"
+              title="Notification Settings"
+            >
+              <Bell size={16} />
             </button>
             <div id="topbar-actions-portal" className="flex items-center gap-2 flex-shrink-0 min-h-[32px]">
             </div>

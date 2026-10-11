@@ -28,6 +28,7 @@ import { useDebouncedValue } from '../../../lib/useDebouncedValue';
 import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import { downloadCsv } from '../../../lib/csv';
 
 export default function AccountsPayable() {
   const queryClient = useQueryClient();
@@ -268,7 +269,26 @@ export default function AccountsPayable() {
           <button onClick={() => setBillOpen(true)} className="bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors">New Bill</button>
           <div className="w-px h-6 bg-surface-strong mx-1"></div>
           <button onClick={() => setDateFilter(current => current === 'ALL' ? 'MONTH' : 'ALL')} aria-label="Toggle date filter" title={`Date filter: ${dateFilter === 'ALL' ? 'all dates' : 'this month'}`} className="text-muted hover:text-body transition-colors"><Filter size={18} /></button>
-          <button className="text-muted hover:text-body transition-colors">
+          <button
+            type="button"
+            onClick={() => {
+              const rows = [
+                ['Vendor', 'Invoice Number', 'Date', 'Due Date', 'Amount', 'Currency', 'Status'],
+                ...items.map(item => [
+                  item.vendor,
+                  item.invoiceNumber || '',
+                  item.date || '',
+                  item.dueDate || '',
+                  typeof item.amount === 'object' ? item.amount.amount : item.amount,
+                  typeof item.amount === 'object' ? item.amount.currency : 'USD',
+                  item.status,
+                ]),
+              ]
+              downloadCsv(rows, 'accounts-payable.csv')
+            }}
+            title="Export Accounts Payable CSV"
+            className="text-muted hover:text-body transition-colors cursor-pointer"
+          >
             <MoreVertical size={18} />
           </button>
         </div>
