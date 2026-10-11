@@ -100,7 +100,42 @@ function DraggableDealRow({ deal, selected, onSelect, disabled }) {
   );
 }
 
-function DealStageGroup({ group, selectedId, onSelect, disabled, onPageChange }) {
+function DraggableDealCard({ deal, selected, onSelect, disabled }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform) }}
+      {...listeners}
+      {...attributes}
+      onClick={() => onSelect(deal.id)}
+      className={`p-3.5 rounded-card-sm border cursor-grab transition-all ${
+        selected ? 'border-accent bg-accent/5 shadow-card' : 'border-border-default bg-surface-raised hover:border-border-strong hover:shadow-card'
+      } ${isDragging || disabled ? 'opacity-60' : ''}`}
+    >
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-button bg-primary flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+            {initials(deal)}
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-heading truncate">{deal.name}</p>
+            <p className="text-[10px] text-muted truncate">{deal.company || 'No company'}</p>
+          </div>
+        </div>
+        <span className="text-xs font-bold text-heading tabular-nums flex-shrink-0">{formatMoney(deal.value)}</span>
+      </div>
+      <div className="flex items-center justify-between text-[10px] text-muted pt-2 border-t border-border-subtle">
+        <span className={`inline-flex px-2 py-0.5 font-semibold rounded-full border ${getStageBadgeColors(deal.stage)}`}>
+          {STAGE_LABELS[deal.stage] || deal.stage}
+        </span>
+        {deal.winProbability != null && <span>{Math.round(deal.winProbability)}% win</span>}
+      </div>
+    </div>
+  );
+}
+
+function DealStageGroup({ group, selectedId, onSelect, disabled, onPageChange, viewMode = 'list' }) {
   const { setNodeRef, isOver } = useDroppable({ id: group.stage });
   const summaryKey = group.stage === 'CLOSED_WON' ? 'wonValue' : group.stage === 'CLOSED_LOST' ? 'lostValue' : 'openPipelineValue';
   const totalValue = group.summary?.[summaryKey];
@@ -118,12 +153,21 @@ function DealStageGroup({ group, selectedId, onSelect, disabled, onPageChange })
         </span>
         <span className="text-[11px] font-bold text-body-light tabular-nums">{formatMoney(totalValue)}</span>
       </div>
-      <div className="divide-y divide-border-subtle">
-        {group.deals.map(deal => (
-          <DraggableDealRow key={deal.id} deal={deal} selected={selectedId === deal.id} onSelect={onSelect} disabled={disabled} />
-        ))}
-        {group.deals.length === 0 && <p className="px-6 py-4 text-center text-xs text-muted">No deals</p>}
-      </div>
+      {viewMode === 'grid' ? (
+        <div className="grid grid-cols-2 gap-3 p-4">
+          {group.deals.map(deal => (
+            <DraggableDealCard key={deal.id} deal={deal} selected={selectedId === deal.id} onSelect={onSelect} disabled={disabled} />
+          ))}
+          {group.deals.length === 0 && <p className="col-span-2 py-4 text-center text-xs text-muted">No deals</p>}
+        </div>
+      ) : (
+        <div className="divide-y divide-border-subtle">
+          {group.deals.map(deal => (
+            <DraggableDealRow key={deal.id} deal={deal} selected={selectedId === deal.id} onSelect={onSelect} disabled={disabled} />
+          ))}
+          {group.deals.length === 0 && <p className="px-6 py-4 text-center text-xs text-muted">No deals</p>}
+        </div>
+      )}
       {total > 0 && <div className="flex items-center justify-between border-t border-border-subtle px-6 py-2 text-xs text-muted">
         <span>Showing {first}–{last} of {total}</span>
         <div className="flex items-center gap-2">
@@ -160,6 +204,7 @@ export default function DealsPipeline() {
   const [activityTitle, setActivityTitle] = useState('');
   const [activityBody, setActivityBody] = useState('');
   const [activityPage, setActivityPage] = useState(1);
+  const [viewMode, setViewMode] = useState('list');
   const [search, setSearch] = useState('');
   const [pageByStage, setPageByStage] = useState(() => Object.fromEntries(STAGE_ORDER.map(stage => [stage, 1])));
   const deferredSearch = useDeferredValue(search.trim());
@@ -356,10 +401,28 @@ export default function DealsPipeline() {
           </div>
 
           <div className="flex items-center border border-border-default rounded-input overflow-hidden bg-surface-muted">
-            <button className="p-1.5 text-caption hover:text-body hover:bg-surface-raised transition-colors border-r border-border-default">
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              aria-label="Grid view"
+              className={`p-1.5 transition-colors border-r border-border-default ${
+                viewMode === 'grid'
+                  ? 'text-heading bg-surface-raised shadow-card'
+                  : 'text-caption hover:text-body hover:bg-surface-raised'
+              }`}
+            >
               <LayoutGrid size={16} />
             </button>
-            <button className="p-1.5 text-heading bg-surface-raised shadow-card">
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              aria-label="List view"
+              className={`p-1.5 transition-colors ${
+                viewMode === 'list'
+                  ? 'text-heading bg-surface-raised shadow-card'
+                  : 'text-caption hover:text-body hover:bg-surface-raised'
+              }`}
+            >
               <List size={16} />
             </button>
           </div>
@@ -381,12 +444,14 @@ export default function DealsPipeline() {
         {/* Left: Deal List Area */}
         <div className="w-[55%] flex flex-col bg-surface-raised border-r border-border-default overflow-y-auto">
 
-          {/* Table Header */}
-          <div className="grid grid-cols-12 px-6 py-3 border-b border-border-default bg-surface-raised flex-shrink-0">
-            <div className="col-span-6 text-[10px] font-bold text-muted uppercase tracking-wider">Deal Name</div>
-            <div className="col-span-3 text-[10px] font-bold text-muted uppercase tracking-wider text-center">Stage</div>
-            <div className="col-span-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Value</div>
-          </div>
+          {/* Table Header (list view only) */}
+          {viewMode === 'list' && (
+            <div className="grid grid-cols-12 px-6 py-3 border-b border-border-default bg-surface-raised flex-shrink-0">
+              <div className="col-span-6 text-[10px] font-bold text-muted uppercase tracking-wider">Deal Name</div>
+              <div className="col-span-3 text-[10px] font-bold text-muted uppercase tracking-wider text-center">Stage</div>
+              <div className="col-span-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Value</div>
+            </div>
+          )}
 
           <div className="flex-1 pb-10">
             <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
@@ -395,9 +460,10 @@ export default function DealsPipeline() {
                   key={group.stage}
                   group={group}
                   selectedId={effectiveSelectedId}
-                    onSelect={selectDeal}
+                  onSelect={selectDeal}
                   onPageChange={changeStagePage}
                   disabled={stageMutation.isPending || !canWrite}
+                  viewMode={viewMode}
                 />
               ))}
             </DndContext>

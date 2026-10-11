@@ -451,7 +451,7 @@ export default function AccountsReceivable() {
                   />
                   <div className="flex items-center justify-between p-2 border-t border-border-subtle">
                     <div className="flex items-center gap-2 text-caption px-2">
-                      <button disabled className="hover:text-body-light transition-colors disabled:opacity-60"><Paperclip size={16} /></button>
+                      <button type="button" disabled title="Attachments are not supported for collection activity notes" aria-label="Attach file (not supported)" className="hover:text-body-light transition-colors disabled:opacity-60"><Paperclip size={16} /></button>
                       <button type="button" aria-label={activityType === 'Call' ? 'Log a call' : 'Add a note'} onClick={() => setActivityType(current => current === 'Note' ? 'Call' : 'Note')} className={`transition-colors ${activityType === 'Call' ? 'text-accent' : 'hover:text-body-light'}`}><Phone size={16} /></button>
                     </div>
                     <button disabled={!activityBody.trim() || activityMutation.isPending} onClick={() => activityMutation.mutate()} className="bg-primary text-white text-xs font-semibold px-4 py-1.5 rounded hover:bg-primary-hover transition-colors disabled:opacity-60">
