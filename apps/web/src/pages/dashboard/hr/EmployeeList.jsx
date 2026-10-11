@@ -14,6 +14,7 @@ import { auditLogApi } from '../../../lib/api/auditLog'
 import { queryKeys } from '../../../lib/queryKeys'
 import { formatMoney, formatDate } from '../../../lib/format'
 import { exportsApi } from '../../../lib/api/exports'
+import { downloadCsv } from '../../../lib/csv'
 import FormDialog from '../../../components/common/FormDialog'
 import ConfirmDialog from '../../../components/common/ConfirmDialog'
 import { useActiveMemberRole } from '../../../lib/authClient'
@@ -68,7 +69,32 @@ export default function EmployeeDirectory() {
   const { data: activeMemberRole } = useActiveMemberRole()
   const roleName = typeof activeMemberRole === 'string' ? activeMemberRole : activeMemberRole?.role
   const canDelete = roleName === 'OWNER' || roleName === 'ADMIN'
-  const exportMutation = useMutation({ mutationFn: () => exportsApi.createJob({ kind: 'employees' }) })
+  const exportMutation = useMutation({
+    mutationFn: async () => {
+      let job = await exportsApi.createJob({ kind: 'employees' })
+      const maxAttempts = 15
+      let attempts = 0
+      while (job.status !== 'DONE' && job.status !== 'FAILED' && attempts < maxAttempts) {
+        await new Promise(r => setTimeout(r, 1000))
+        attempts++
+        const list = await exportsApi.listJobs({ limit: 10 })
+        const found = list.items?.find(j => j.id === job.id)
+        if (found) job = found
+      }
+      if (job.status === 'FAILED') throw new Error('Employee directory export failed.')
+      if (job.status !== 'DONE') throw new Error('Export is taking longer than expected. Check Settings > Data Export.')
+      const blob = await exportsApi.downloadJob(job.id)
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = job.filename || 'employees.xlsx'
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      return job
+    },
+  })
   const { data: departmentsData } = useQuery({
     queryKey: queryKeys.hr.departments.list(),
     queryFn: hrApi.getDepartments,
@@ -188,6 +214,23 @@ export default function EmployeeDirectory() {
     [employees, selectedId],
   )
 
+  const exportSelected = () => {
+    if (!selectedIds.length) return
+    const selectedRows = employees.filter(e => selectedIds.includes(e.id))
+    const header = ['ID', 'Name', 'Title', 'Department', 'Email', 'Status', 'Location', 'Hired At']
+    const records = selectedRows.map(e => [
+      e.id,
+      e.name,
+      e.title || '',
+      e.department?.name || '',
+      e.email || '',
+      e.status || '',
+      e.location || '',
+      e.hiredAt || '',
+    ])
+    downloadCsv([header, ...records], `employees-selected-${new Date().toISOString().slice(0, 10)}.csv`)
+  }
+
   return (
     <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-[1000px]">
       <TopBarActions>
@@ -252,6 +295,15 @@ export default function EmployeeDirectory() {
             <div className="flex items-center gap-3">
               <input type="checkbox" checked={allSelected} onChange={event => setSelectedIds(event.target.checked ? employees.map(employee => employee.id) : [])} aria-label="Select all employees on this page" className="w-4 h-4 rounded border-border-strong text-accent focus:ring-accent" />
               <span className="text-sm font-medium text-body-light">{selectedIds.length ? `${selectedIds.length} selected` : 'Select All'}</span>
+              {selectedIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={exportSelected}
+                  className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 ml-2 cursor-pointer"
+                >
+                  <Download size={12} /> Export Selected ({selectedIds.length})
+                </button>
+              )}
             </div>
             <button type="button" onClick={() => { setSortAscending(value => !value); setPage(1) }} aria-label={`Sort employee names ${sortAscending ? 'descending' : 'ascending'}`} className="text-sm font-medium text-body-light hover:text-heading">Name {sortAscending ? 'A-Z' : 'Z-A'} ↕</button>
           </div>

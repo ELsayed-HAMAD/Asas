@@ -31,6 +31,7 @@ import { motion, AnimatePresence } from 'framer-motion'
  */
 export default function FormDialog({
   open,
+  isOpen,
   onClose,
   title,
   subtitle,
@@ -41,9 +42,14 @@ export default function FormDialog({
   error,
   onConfirm,
   width = 'max-w-lg',
+  disabled = false,
+  isConfirmDisabled = false,
+  confirmVariant = 'primary',
 }) {
+  const isDialogOpen = open ?? isOpen
+
   useEffect(() => {
-    if (!open) return
+    if (!isDialogOpen) return
     function onKeyDown(event) {
       if (event.key === 'Escape' && !busy) onClose()
     }
@@ -54,18 +60,18 @@ export default function FormDialog({
       document.removeEventListener('keydown', onKeyDown)
       document.body.style.overflow = previousOverflow
     }
-  }, [open, busy, onClose])
+  }, [isDialogOpen, busy, onClose])
 
   // Native form submit: Enter in a field and the submit button both land here. We prevent the
   // browser's default navigation and delegate to the page's handler, but never while busy.
   function handleSubmit(event) {
     event.preventDefault()
-    if (!busy) onConfirm?.()
+    if (!busy && !disabled && !isConfirmDisabled) onConfirm?.()
   }
 
   return (
     <AnimatePresence>
-      {open && (
+      {isDialogOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <motion.div
             initial={{ opacity: 0 }}
@@ -113,8 +119,12 @@ export default function FormDialog({
                 </button>
                 <button
                   type="submit"
-                  disabled={busy}
-                  className="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-button text-sm font-semibold hover:bg-primary-hover transition-colors active:scale-[0.99] disabled:opacity-60"
+                  disabled={busy || disabled || isConfirmDisabled}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-button text-sm font-semibold transition-colors active:scale-[0.99] disabled:opacity-60 ${
+                    confirmVariant === 'danger'
+                      ? 'bg-danger-hover hover:bg-danger-text text-on-primary'
+                      : 'bg-primary text-on-primary hover:bg-primary-hover'
+                  }`}
                 >
                   {busy && <Loader2 size={14} className="animate-spin" />}
                   {confirmLabel}

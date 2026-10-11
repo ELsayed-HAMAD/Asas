@@ -421,7 +421,7 @@ export default function MembersRoles() {
 
       {/* Invite Member Modal */}
       <FormDialog
-        isOpen={inviteOpen}
+        open={inviteOpen}
         onClose={() => setInviteOpen(false)}
         title="Invite New Member"
         subtitle="Send an invitation link by email to join this workspace."
@@ -464,7 +464,7 @@ export default function MembersRoles() {
 
       {/* Change Role Modal */}
       <FormDialog
-        isOpen={roleDialogOpen}
+        open={roleDialogOpen}
         onClose={() => {
           setRoleDialogOpen(false)
           setSelectedMember(null)
