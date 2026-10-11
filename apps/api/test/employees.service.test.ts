@@ -39,6 +39,7 @@ interface StubCalls {
   createArgs?: unknown
   updateArgs?: unknown
   deleteArgs?: unknown
+  candidateFindManyArgs?: unknown
 }
 
 function stubPrisma(options: {
@@ -51,6 +52,7 @@ function stubPrisma(options: {
   payrollLineCount?: number
   timesheetCount?: number
   tenantTimezone?: string
+  candidateRoles?: string[]
 }) {
   const calls: StubCalls = { countArgs: [] }
   let countIndex = 0
@@ -89,6 +91,13 @@ function stubPrisma(options: {
     department: {
       findFirst: async () => options.departmentFindFirst ?? null,
     },
+    candidate: {
+      // The database applies DISTINCT and the stage filter; the stub returns the resulting rows.
+      findMany: async (args: unknown) => {
+        calls.candidateFindManyArgs = args
+        return (options.candidateRoles ?? []).map(role => ({ role }))
+      },
+    },
     payrollLine: { count: async () => options.payrollLineCount ?? 0 },
     timesheet: { count: async () => options.timesheetCount ?? 0 },
     $transaction: async (work: (tx: unknown) => Promise<unknown>) => work({
@@ -108,6 +117,23 @@ describe('listEmployees', () => {
     expect(result.items[0]?.salary).toBeNull()
     expect(result.items[0]?.name).toBe('Ada Lovelace')
     expect(result.summary).toEqual({ totalHeadcount: 1, onLeaveCount: 0, hiredThisMonth: 0, openRoles: 0 })
+  })
+
+  it('counts distinct recruitment roles with an open pipeline candidate as openRoles', async () => {
+    const { prisma, calls } = stubPrisma({
+      employeeFindMany: [baseRow],
+      employeeCounts: [1, 0, 1, 0],
+      candidateRoles: ['Staff Engineer', 'Product Designer'],
+    })
+    const result = await listEmployees(prisma, 'tenant_1', { page: 1, limit: 25 }, false)
+
+    // Terminal stages (HIRED/REJECTED) are excluded and roles are de-duplicated in SQL.
+    expect(calls.candidateFindManyArgs).toMatchObject({
+      where: { tenantId: 'tenant_1', stage: { notIn: ['HIRED', 'REJECTED'] } },
+      select: { role: true },
+      distinct: ['role'],
+    })
+    expect(result.summary.openRoles).toBe(2)
   })
 
   it('includes salary when the caller has employee.salary.read', async () => {

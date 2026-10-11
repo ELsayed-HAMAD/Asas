@@ -41,6 +41,16 @@ export default function FinanceOverview() {
     queryFn: () => financeApi.getOverview({ year: selectedYear }),
   });
   const { data: customersData } = useQuery({ queryKey: [...queryKeys.finance.all(), 'customers'], queryFn: financeApi.listCustomers })
+  // Tenant-local month-to-date settlement summaries (null before ledger coverage) — they turn
+  // the receivable/payable card badges from static labels into real period figures.
+  const { data: receivablesData } = useQuery({
+    queryKey: queryKeys.finance.receivables.list({ limit: 1 }),
+    queryFn: () => financeApi.listReceivables({ limit: 1 }),
+  })
+  const { data: payablesData } = useQuery({
+    queryKey: queryKeys.finance.payables.list({ limit: 1 }),
+    queryFn: () => financeApi.listPayables({ limit: 1 }),
+  })
   const createInvoice = useMutation({
     mutationFn: () => financeApi.createReceivable({ ...invoiceForm, number: invoiceForm.number || null, dueDate: invoiceForm.dueDate || null, status: 'CURRENT' }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.finance.all() }); setInvoiceOpen(false); setInvoiceForm({ customerId: '', number: '', amount: '', dueDate: '' }) },
@@ -111,6 +121,19 @@ export default function FinanceOverview() {
   const fullYearSelected = data.cashFlowComparison.current.endDateExclusive === `${Number(selectedYear) + 1}-01-01`
   const cashFlowChangeText = `${selectedYear}${fullYearSelected ? ' full year' : ' year-to-date'} vs ${Number(selectedYear) - 1} matching period: ${formatMoney(data.cashFlowComparison.previous.net)} prior, ${cashFlowDeltaMinor > 0 ? '+' : ''}${formatMoney({ amount: cashFlowDeltaMinor, currency: data.cashFlowComparison.current.net.currency })}`
 
+  // Real month-to-date settlement badges; the static label stays when ledger coverage does
+  // not yet include the current month (the totals are null then, never guessed).
+  const collectedMtd = receivablesData?.summary?.collectedThisMonthTotal ?? null
+  const collectedMtdPrior = receivablesData?.summary?.collectedThisMonthComparison?.previousTotal ?? null
+  const receivablesBadgeText = collectedMtd == null
+    ? 'To collect'
+    : `${formatMoney(collectedMtd)} collected MTD${collectedMtdPrior == null ? '' : ` (vs ${formatMoney(collectedMtdPrior)})`}`
+  const paidMtd = payablesData?.summary?.paidThisMonthTotal ?? null
+  const paidMtdPrior = payablesData?.summary?.paidThisMonthComparison?.previousTotal ?? null
+  const payablesBadgeText = paidMtd == null
+    ? 'To pay'
+    : `${formatMoney(paidMtd)} paid MTD${paidMtdPrior == null ? '' : ` (vs ${formatMoney(paidMtdPrior)})`}`
+
   // Operating-expenses donut: split the real expense total into pending vs approved.
   const totalExp = major(data.expensesTotal);
   const pendExp = major(data.expensesPendingTotal);
@@ -177,7 +200,7 @@ export default function FinanceOverview() {
             <div className="flex items-center gap-3">
               <p className="text-3xl font-extrabold text-heading tracking-tight">{formatMoney(data.receivableOutstanding)}</p>
               <span className="flex items-center gap-1 bg-success-light text-success-text px-2 py-0.5 rounded text-xs font-bold">
-                <TrendingUp size={12} strokeWidth={3} /> To collect
+                <TrendingUp size={12} strokeWidth={3} /> {receivablesBadgeText}
               </span>
             </div>
           </div>
@@ -215,7 +238,7 @@ export default function FinanceOverview() {
             <p className="text-3xl font-extrabold text-heading tracking-tight">{formatMoney(data.payableOutstanding)}</p>
             <div className="flex items-center gap-1.5 text-danger text-xs font-bold mt-2.5">
               <TrendingUp size={14} strokeWidth={2.5} className="rotate-180" />
-              To pay
+              {payablesBadgeText}
             </div>
           </div>
 

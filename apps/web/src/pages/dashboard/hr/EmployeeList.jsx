@@ -118,7 +118,7 @@ export default function EmployeeDirectory() {
 
   const employees = data?.items ?? EMPTY_EMPLOYEES
   const allSelected = employees.length > 0 && employees.every(employee => selectedIds.includes(employee.id))
-  const stats = data?.summary ?? { totalHeadcount: 0, onLeaveCount: 0, openRoles: 0 }
+  const stats = data?.summary ?? { totalHeadcount: 0, onLeaveCount: 0, openRoles: 0, hiredThisMonth: 0 }
 
   useEffect(() => {
     if (!employees.length) {
@@ -173,7 +173,7 @@ export default function EmployeeDirectory() {
             <div className="flex items-baseline gap-3">
               <p className="text-3xl font-bold text-heading">{stats.totalHeadcount}</p>
               <span className="flex items-center gap-1 text-sm font-semibold text-accent">
-                <TrendingUp size={14} /> Live
+                <TrendingUp size={14} /> {stats.hiredThisMonth > 0 ? `+${stats.hiredThisMonth} this month` : 'No hires this month'}
               </span>
             </div>
           </div>

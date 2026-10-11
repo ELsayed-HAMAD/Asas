@@ -10,12 +10,13 @@ import {
   Download,
   Loader2
 } from 'lucide-react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../../../lib/api/finance';
 import { projectsApi } from '../../../lib/api/projects';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney } from '../../../lib/format';
 import { http } from '../../../lib/api/http';
+import { useDebouncedValue } from '../../../lib/useDebouncedValue';
 import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
@@ -27,7 +28,9 @@ export default function AccountsPayable() {
   const [changeRequestOpen, setChangeRequestOpen] = useState(false)
   const [changeRequestReason, setChangeRequestReason] = useState('')
   const [changeRequestSaved, setChangeRequestSaved] = useState(false)
-  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+    // Debounce the search box so each keystroke doesn't fire a list request and collapse the table.
+    const search = useDebouncedValue(searchInput)
   const [pdfZoom, setPdfZoom] = useState(100)
   const [pdfUrl, setPdfUrl] = useState(null)
   const [selectedIds, setSelectedIds] = useState(() => new Set())
@@ -40,6 +43,7 @@ export default function AccountsPayable() {
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.finance.payables.list({ limit: 100, search: search || undefined }),
     queryFn: () => financeApi.listPayables({ limit: 100, search: search || undefined }),
+    placeholderData: keepPreviousData,
   });
   const { data: detailData } = useQuery({
     queryKey: [...queryKeys.finance.payables.all(), 'detail', selectedId],
@@ -189,8 +193,8 @@ export default function AccountsPayable() {
             <input
               type="text"
               placeholder="Search invoices..."
-              value={search}
-              onChange={event => setSearch(event.target.value)}
+              value={searchInput}
+              onChange={event => setSearchInput(event.target.value)}
               className="pl-9 pr-4 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
           </div>
@@ -413,6 +417,7 @@ export default function AccountsPayable() {
                   Reject
                 </button>
               </div>
+              {statusMutation.isError && <p role="alert" className="mt-3 text-sm text-danger">{statusMutation.error?.message || 'Could not update the invoice status.'}</p>}
               {changeRequestSaved && <p role="status" className="mt-3 text-xs text-success-text">Change request recorded in the invoice audit history.</p>}
             </div>
 
@@ -464,15 +469,16 @@ export default function AccountsPayable() {
           </div>
         )}
       </div>
-      <FormDialog open={billOpen} onClose={() => setBillOpen(false)} title="New bill" subtitle="Add a vendor invoice to accounts payable." busy={createBill.isPending} onConfirm={() => createBill.mutate()} confirmLabel="Create bill">
+      <FormDialog open={billOpen} onClose={() => { setBillOpen(false); createBill.reset() }} title="New bill" subtitle="Add a vendor invoice to accounts payable." busy={createBill.isPending} error={createBill.isError ? createBill.error?.message || 'Could not create the bill.' : undefined} onConfirm={() => createBill.mutate()} confirmLabel="Create bill">
         <div className="space-y-4"><label className="block text-sm font-medium text-body">Vendor<select required value={billForm.vendorId} onChange={event => setBillForm(current => ({ ...current, vendorId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="">Select a vendor</option>{(vendorsData?.items ?? []).map(vendor => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}</select></label><label className="block text-sm font-medium text-body">Project<select value={billForm.projectId} onChange={event => setBillForm(current => ({ ...current, projectId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="">Unassigned</option>{(projectsData?.items ?? []).map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><label className="block text-sm font-medium text-body">Invoice number<input value={billForm.invoiceNumber} onChange={event => setBillForm(current => ({ ...current, invoiceNumber: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Invoice date<input type="date" required value={billForm.date} onChange={event => setBillForm(current => ({ ...current, date: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Due date<input type="date" required value={billForm.dueDate} onChange={event => setBillForm(current => ({ ...current, dueDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Amount<input required type="number" min="0" step="0.01" value={billForm.amount} onChange={event => setBillForm(current => ({ ...current, amount: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div>
       </FormDialog>
       <FormDialog
         open={changeRequestOpen}
-        onClose={() => setChangeRequestOpen(false)}
+        onClose={() => { setChangeRequestOpen(false); requestChanges.reset() }}
         title="Request invoice changes"
         subtitle="The invoice returns to Pending and this reason is recorded in the audit history."
         busy={requestChanges.isPending}
+        error={requestChanges.isError ? requestChanges.error?.message || 'Could not record the change request.' : undefined}
         onConfirm={() => {
           const reason = changeRequestReason.trim()
           if (selectedRecord && reason) requestChanges.mutate({ id: selectedRecord.id, reason })
@@ -482,18 +488,17 @@ export default function AccountsPayable() {
         <label className="block text-sm font-medium text-body">Reason
           <textarea required maxLength={2000} rows={4} value={changeRequestReason} onChange={event => setChangeRequestReason(event.target.value)} className="mt-1 w-full resize-y rounded-input border border-border-default px-3 py-2" placeholder="Describe the correction needed" />
         </label>
-        {requestChanges.isError && <p role="alert" className="mt-3 text-sm text-danger">{requestChanges.error?.message || 'Could not record the change request.'}</p>}
       </FormDialog>
       <ConfirmDialog
         open={batchConfirmOpen}
-        onClose={() => setBatchConfirmOpen(false)}
+        onClose={() => { setBatchConfirmOpen(false); batchPayment.reset() }}
         onConfirm={() => batchPayment.mutate()}
         title={`Mark ${selectedIds.size} invoices paid?`}
         description="This records these approved or scheduled invoices as paid in the accounts payable ledger. Confirm that payment has already been made outside this application."
         confirmLabel="Mark as paid"
         busy={batchPayment.isPending}
+        error={batchPayment.isError ? batchPayment.error?.message || 'Batch payment failed. No invoices were changed.' : undefined}
       />
-      {batchPayment.isError && <div role="alert" className="fixed bottom-4 right-4 z-50 rounded-button border border-danger/30 bg-surface-raised p-3 text-sm text-danger shadow-card">{batchPayment.error?.message || 'Batch payment failed. No invoices were changed.'}<button onClick={() => batchPayment.reset()} className="ml-3 underline">Dismiss</button></div>}
     </div>
   );
 }

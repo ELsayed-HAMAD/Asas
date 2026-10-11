@@ -63,10 +63,10 @@ export const employeeSummarySchema = z.object({
    */
   hiredThisMonth: z.int().min(0),
   /**
-   * TODO(phase-2-hr): always `0` until a real requisition/job-opening model exists to compute
-   * it from. Previously this was read straight off a client-supplied query parameter (any
-   * caller could report any number) — see the rebuild plan's Phase 0 audit finding. Zero and
-   * honest is the correct interim value, not a plausible-looking guess.
+   * Distinct recruitment roles with at least one candidate in a non-terminal pipeline stage
+   * (HIRED/REJECTED excluded), counted from the candidate pipeline's free-text `role` values.
+   * No requisition model exists yet, so this counts recruited-for roles, not approved
+   * headcount requisitions.
    */
   openRoles: z.int().min(0),
 })

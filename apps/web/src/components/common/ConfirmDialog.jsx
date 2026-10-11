@@ -29,6 +29,7 @@ export default function ConfirmDialog({
   cancelLabel = 'Cancel',
   busy = false,
   danger = false,
+  error,
 }) {
   // Close on Escape (when not busy) and lock background scroll while open.
   useEffect(() => {
@@ -70,6 +71,12 @@ export default function ConfirmDialog({
               {title}
             </h2>
             {description && <p className="text-sm text-muted leading-relaxed mb-6">{description}</p>}
+
+            {error && (
+              <p role="alert" className="mb-4 text-sm text-danger">
+                {error}
+              </p>
+            )}
 
             <div className="flex items-center justify-end gap-3">
               <button

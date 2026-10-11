@@ -665,13 +665,15 @@ export async function getForecast(prisma: PrismaClient, tenantId: string, year =
       ) AS years
       ORDER BY year DESC
     `,
-    prisma.$queryRaw<Array<{ value: Prisma.Decimal; weightedValue: Prisma.Decimal; unweightedValue: Prisma.Decimal; unweightedCount: bigint; dealCommit: Prisma.Decimal; dealBestCase: Prisma.Decimal }>>`
+    prisma.$queryRaw<Array<{ value: Prisma.Decimal; weightedValue: Prisma.Decimal; unweightedValue: Prisma.Decimal; unweightedCount: bigint; dealCommit: Prisma.Decimal; dealBestCase: Prisma.Decimal; dealCommitCount: bigint; dealBestCaseCount: bigint }>>`
       SELECT COALESCE(sum("value"), 0) AS value,
         COALESCE(sum("value" * ("winProbability"::numeric / 100)) FILTER (WHERE "winProbability" BETWEEN 0 AND 100), 0) AS "weightedValue",
         COALESCE(sum("value") FILTER (WHERE "winProbability" IS NULL OR "winProbability" < 0 OR "winProbability" > 100), 0) AS "unweightedValue",
         count(*) FILTER (WHERE "winProbability" IS NULL OR "winProbability" < 0 OR "winProbability" > 100)::bigint AS "unweightedCount",
         COALESCE(sum("value") FILTER (WHERE upper("forecastBucket") = 'COMMIT'), 0) AS "dealCommit",
-        COALESCE(sum("value") FILTER (WHERE upper("forecastBucket") IN ('COMMIT', 'BEST_CASE')), 0) AS "dealBestCase"
+        COALESCE(sum("value") FILTER (WHERE upper("forecastBucket") IN ('COMMIT', 'BEST_CASE')), 0) AS "dealBestCase",
+        count(*) FILTER (WHERE upper("forecastBucket") = 'COMMIT')::bigint AS "dealCommitCount",
+        count(*) FILTER (WHERE upper("forecastBucket") IN ('COMMIT', 'BEST_CASE'))::bigint AS "dealBestCaseCount"
       FROM "Deal"
       WHERE "tenantId" = ${tenantId}
         AND "stage"::text IN (${Prisma.join([...OPEN_STAGES])})
@@ -750,6 +752,8 @@ export async function getForecast(prisma: PrismaClient, tenantId: string, year =
       unweightedDealCount: Number(totals?.unweightedCount ?? 0),
       dealCommit,
       dealBestCase,
+      dealCommitCount: Number(totals?.dealCommitCount ?? 0),
+      dealBestCaseCount: Number(totals?.dealBestCaseCount ?? 0),
       quotaAttainmentPct: totalQuota === 0 ? null : Math.round((totalPipeline / totalQuota) * 10000) / 100,
       excludedQuotaCount: quotas.length - annualBaseQuotas.length,
     },

@@ -36,6 +36,8 @@ describe('getForecast', () => {
           unweightedCount: 1n,
           dealCommit: new Prisma.Decimal('15'),
           dealBestCase: new Prisma.Decimal('40'),
+          dealCommitCount: 2n,
+          dealBestCaseCount: 3n,
         }]),
     } as unknown as PrismaClient
 
@@ -57,6 +59,8 @@ describe('getForecast', () => {
     expect(result.summary.unweightedDealCount).toBe(1)
     expect(result.summary.dealCommit).toEqual({ amount: 1500, currency: 'USD' })
     expect(result.summary.dealBestCase).toEqual({ amount: 4000, currency: 'USD' })
+    expect(result.summary.dealCommitCount).toBe(2)
+    expect(result.summary.dealBestCaseCount).toBe(3)
     expect(forecastResponseSchema.parse(result)).toEqual(result)
     const rawQueries = (prisma.$queryRaw as unknown as { mock: { calls: [TemplateStringsArray, ...unknown[]][] } }).mock.calls
     const weightedSql = rawQueries[2]![0].join(' ')
@@ -65,5 +69,7 @@ describe('getForecast', () => {
     const aggregateSql = rawQueries[4]![0].join(' ')
     expect(aggregateSql).toContain("upper(\"forecastBucket\") = 'COMMIT'")
     expect(aggregateSql).toContain("IN ('COMMIT', 'BEST_CASE')")
+    expect(aggregateSql).toContain('count(*) FILTER (WHERE upper("forecastBucket") = \'COMMIT\')::bigint AS "dealCommitCount"')
+    expect(aggregateSql).toContain('count(*) FILTER (WHERE upper("forecastBucket") IN (\'COMMIT\', \'BEST_CASE\'))::bigint AS "dealBestCaseCount"')
   })
 })

@@ -104,6 +104,10 @@ export const forecastResponseSchema = z.object({
     dealCommit: moneySchema,
     /** COMMIT plus BEST_CASE open deals, using their recorded full values. */
     dealBestCase: moneySchema,
+    /** Number of open deals tagged COMMIT in the same selected-year close-date scope. */
+    dealCommitCount: z.int().min(0),
+    /** Number of open deals tagged COMMIT or BEST_CASE in the same scope. */
+    dealBestCaseCount: z.int().min(0),
     quotaAttainmentPct: z.number().min(0).nullable(),
     /** Number of selected-year quota rows excluded from base-currency totals due to period/currency scope. */
     excludedQuotaCount: z.int().min(0),
