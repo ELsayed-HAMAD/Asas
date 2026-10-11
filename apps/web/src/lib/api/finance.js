@@ -35,6 +35,7 @@ export const financeApi = {
   createCollectionActivity: (customerId, body) => http.post(`/finance/customers/${customerId}/activities`, { body }),
   createReceivable: (body) => http.post('/finance/receivables', { body }),
   createPayable: (body) => http.post('/finance/payables', { body }),
+  createExpense: (body) => http.post('/finance/expenses', { body }),
 
   /** POST /finance/payables/:id/status — approve, schedule, pay, or reject an invoice. */
   updatePayableStatus: (id, status) => http.post(`/finance/payables/${id}/status`, { body: { status } }),

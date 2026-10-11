@@ -12,6 +12,7 @@ import {
   authClient, useSession, useActiveOrganization, useActiveMemberRole,
   useListOrganizations, signOut
 } from '../lib/authClient'
+import FormDialog from '../components/common/FormDialog'
 
 // ── Navigation config ──────────────────────────────────────
 const NAV = [
@@ -115,12 +116,16 @@ const BREADCRUMB_LABELS = {
   'sales-performance':   'Sales Performance',
   'revenue-forecast':    'Revenue Forecast',
   inventory:             'Inventory',
+  movements:             'Stock Movements',
   projects:              'Projects',
   sprints:               'Active Sprints',
   roadmap:               'Roadmap',
   settings:              'Settings',
   billing:               'Billing & Plans',
   integrations:          'Integrations',
+  notifications:         'Notifications',
+  'data-export':         'Data Export',
+  exports:               'Data Export',
   support:               'Support',
 }
 
@@ -226,6 +231,10 @@ function SidebarContent({ navProps, navigate }) {
   const [switchingOrgId, setSwitchingOrgId] = useState(null)
   const [orgSwitchError, setOrgSwitchError] = useState('')
   const [quickEntryOpen, setQuickEntryOpen] = useState(false)
+  const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false)
+  const [newWorkspaceName, setNewWorkspaceName] = useState('')
+  const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false)
+  const [createWorkspaceError, setCreateWorkspaceError] = useState('')
 
   const { data: session } = useSession()
   const { data: activeOrganization } = useActiveOrganization()
@@ -286,6 +295,34 @@ function SidebarContent({ navProps, navigate }) {
     } catch (err) {
       setOrgSwitchError(err?.message || 'Could not switch workspace')
       setSwitchingOrgId(null)
+    }
+  }
+
+  const handleCreateWorkspace = async () => {
+    if (!newWorkspaceName.trim()) return
+    setIsCreatingWorkspace(true)
+    setCreateWorkspaceError('')
+    try {
+      const name = newWorkspaceName.trim()
+      const slug = (name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'workspace') + '-' + Math.random().toString(36).slice(2, 6)
+      const createRes = await authClient.organization.create({
+        name,
+        slug,
+      })
+      if (createRes?.error) {
+        throw new Error(createRes.error?.message || 'Could not create workspace.')
+      }
+      const setActiveRes = await authClient.organization.setActive({
+        organizationId: createRes.data.id,
+      })
+      if (setActiveRes?.error) {
+        throw new Error(setActiveRes.error?.message || 'Could not activate new workspace.')
+      }
+      queryClient.clear()
+      window.location.assign('/onboarding')
+    } catch (err) {
+      setCreateWorkspaceError(err?.message || 'Could not create workspace.')
+      setIsCreatingWorkspace(false)
     }
   }
 
@@ -391,7 +428,13 @@ function SidebarContent({ navProps, navigate }) {
                     )}
                   </>
                 ) : (
-                  <div className="px-3 py-2 flex items-center justify-between hover:bg-surface-muted rounded-input cursor-pointer transition-colors">
+                  <div
+                    onClick={() => {
+                      setUserMenuOpen(false)
+                      navigate('/dashboard/settings')
+                    }}
+                    className="px-3 py-2 flex items-center justify-between hover:bg-surface-muted rounded-input cursor-pointer transition-colors"
+                  >
                     <span className="text-sm font-semibold text-heading truncate">{tenantName}</span>
                     <Check size={16} className="text-accent shrink-0" />
                   </div>
@@ -400,7 +443,9 @@ function SidebarContent({ navProps, navigate }) {
                   type="button"
                   onClick={() => {
                     setUserMenuOpen(false)
-                    navigate('/onboarding')
+                    setNewWorkspaceName('')
+                    setCreateWorkspaceError('')
+                    setCreateWorkspaceOpen(true)
                   }}
                   className="w-full px-3 py-2 flex items-center gap-3 text-sm font-semibold text-accent hover:bg-surface-muted rounded-input cursor-pointer transition-colors mt-1 text-left"
                 >
@@ -506,7 +551,7 @@ function SidebarContent({ navProps, navigate }) {
               <div className="p-4 grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/hr/employees'); }}
+                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/hr/employees?new=1'); }}
                   className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
                 >
                   <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
@@ -519,7 +564,7 @@ function SidebarContent({ navProps, navigate }) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/finance/accounts-payable'); }}
+                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/finance/accounts-payable?new=1'); }}
                   className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
                 >
                   <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
@@ -532,7 +577,7 @@ function SidebarContent({ navProps, navigate }) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/finance/expenses'); }}
+                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/finance/expenses?new=1'); }}
                   className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
                 >
                   <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
@@ -545,7 +590,7 @@ function SidebarContent({ navProps, navigate }) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/crm/deals'); }}
+                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/crm/deals?new=1'); }}
                   className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
                 >
                   <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
@@ -558,7 +603,7 @@ function SidebarContent({ navProps, navigate }) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/inventory'); }}
+                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/inventory?new=1'); }}
                   className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
                 >
                   <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
@@ -571,7 +616,7 @@ function SidebarContent({ navProps, navigate }) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/projects/sprints'); }}
+                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/projects/sprints?new=1'); }}
                   className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
                 >
                   <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
@@ -587,6 +632,31 @@ function SidebarContent({ navProps, navigate }) {
           </div>
         )}
       </AnimatePresence>
+
+      {/* ── Create New Workspace Dialog ── */}
+      <FormDialog
+        open={createWorkspaceOpen}
+        onClose={() => !isCreatingWorkspace && setCreateWorkspaceOpen(false)}
+        title="Create New Workspace"
+        subtitle="Set up a new workspace for your organization or team."
+        confirmLabel="Create & Continue"
+        busy={isCreatingWorkspace}
+        error={createWorkspaceError}
+        onConfirm={handleCreateWorkspace}
+        width="max-w-md"
+      >
+        <div>
+          <label className="block text-xs font-bold text-heading mb-1.5">Workspace Name</label>
+          <input
+            type="text"
+            required
+            value={newWorkspaceName}
+            onChange={(e) => setNewWorkspaceName(e.target.value)}
+            placeholder="e.g. Acme Corporation"
+            className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+          />
+        </div>
+      </FormDialog>
 
     </div>
   )
@@ -677,23 +747,30 @@ export default function DashboardLayout() {
             </button>
 
             {/* Breadcrumb */}
-            <nav className="flex items-center gap-1 text-sm min-w-0">
-              {breadcrumbs.map((crumb, i) => (
-                <span key={i} className="flex items-center gap-1 min-w-0">
-                  {i > 0 && (
-                    <ChevronRight size={13} className="text-faint flex-shrink-0" />
-                  )}
-                  <span
-                    className={`truncate ${
-                      i === breadcrumbs.length - 1
-                        ? 'font-semibold text-heading'
-                        : 'text-caption'
-                    }`}
-                  >
-                    {crumb}
+            <nav className="flex items-center gap-1 text-sm min-w-0" aria-label="Breadcrumb">
+              {breadcrumbs.map((crumb, i) => {
+                const isLast = i === breadcrumbs.length - 1
+                const crumbPath = '/' + pathname.split('/').filter(Boolean).slice(0, i + 1).join('/')
+                return (
+                  <span key={i} className="flex items-center gap-1 min-w-0">
+                    {i > 0 && (
+                      <ChevronRight size={13} className="text-faint flex-shrink-0" />
+                    )}
+                    {isLast ? (
+                      <span className="truncate font-semibold text-heading" aria-current="page">
+                        {crumb}
+                      </span>
+                    ) : (
+                      <Link
+                        to={crumbPath}
+                        className="truncate text-caption hover:text-heading transition-colors"
+                      >
+                        {crumb}
+                      </Link>
+                    )}
                   </span>
-                </span>
-              ))}
+                )
+              })}
             </nav>
           </div>
 

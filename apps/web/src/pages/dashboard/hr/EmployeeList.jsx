@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Search, Download,
@@ -37,6 +38,7 @@ const EMPTY_EMPLOYEES = []
 
 export default function EmployeeDirectory() {
   const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [selectedId, setSelectedId] = useState(null)
   const [selectedIds, setSelectedIds] = useState([])
   const [sortAscending, setSortAscending] = useState(true)
@@ -48,6 +50,14 @@ export default function EmployeeDirectory() {
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', title: '', email: '', location: '', departmentId: '', salary: '', salaryBasis: '', hiredAt: '', status: 'ACTIVE', band: '', equityOptions: '' })
   const [deleteOpen, setDeleteOpen] = useState(false)
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setCreateOpen(true)
+      const next = new URLSearchParams(searchParams)
+      next.delete('new')
+      setSearchParams(next, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
   const { data: activeMemberRole } = useActiveMemberRole()
   const roleName = typeof activeMemberRole === 'string' ? activeMemberRole : activeMemberRole?.role
   const canDelete = roleName === 'OWNER' || roleName === 'ADMIN'

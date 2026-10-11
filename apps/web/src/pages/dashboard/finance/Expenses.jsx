@@ -12,7 +12,8 @@ import {
   ZoomOut,
   ChevronLeft,
   Download,
-  Loader2
+  Loader2,
+  Plus
 } from 'lucide-react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../../../lib/api/finance';
@@ -22,6 +23,8 @@ import { formatMoney } from '../../../lib/format';
 import { downloadCsv } from '../../../lib/csv';
 import { useDebouncedValue } from '../../../lib/useDebouncedValue';
 import TopBarActions from '../../../components/TopBarActions';
+import FormDialog from '../../../components/common/FormDialog';
+import { useSearchParams } from 'react-router-dom';
 
 export default function Expenses() {
   const queryClient = useQueryClient();
@@ -32,7 +35,63 @@ export default function Expenses() {
   const [departmentId, setDepartmentId] = useState('')
   const [sort, setSort] = useState('desc')
   const [receiptZoom, setReceiptZoom] = useState(100)
-  const [receiptOpen, setReceiptOpen] = useState(true)
+  const [receiptOpen, setReceiptOpen] = useState(true);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    category: 'OFFICE',
+    merchant: '',
+    amount: '',
+    tax: '',
+    date: new Date().toISOString().slice(0, 10),
+    employeeId: '',
+  });
+  const [createError, setCreateError] = useState('');
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setCreateOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  const { data: employeesData } = useQuery({
+    queryKey: queryKeys.hr.employees.list({ limit: 100 }),
+    queryFn: () => hrApi.listEmployees({ limit: 100 }),
+    enabled: createOpen,
+  });
+
+  const createExpenseMutation = useMutation({
+    mutationFn: () => financeApi.createExpense({
+      name: createForm.name.trim(),
+      category: createForm.category || 'OFFICE',
+      merchant: createForm.merchant.trim() || null,
+      amount: createForm.amount.trim(),
+      tax: createForm.tax.trim() || null,
+      date: createForm.date,
+      employeeId: createForm.employeeId || null,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.all() });
+      setCreateOpen(false);
+      setCreateForm({
+        name: '',
+        category: 'OFFICE',
+        merchant: '',
+        amount: '',
+        tax: '',
+        date: new Date().toISOString().slice(0, 10),
+        employeeId: '',
+      });
+      setCreateError('');
+    },
+    onError: (err) => {
+      setCreateError(err.message || 'Failed to submit expense.');
+    },
+  });
   const { data: departmentsData } = useQuery({ queryKey: queryKeys.hr.departments.list(), queryFn: hrApi.getDepartments })
 
   const { data, isLoading, isError } = useQuery({
@@ -125,6 +184,13 @@ export default function Expenses() {
           </label>
           <button disabled={exportMutation.isPending} onClick={() => exportMutation.mutate()} className="flex items-center gap-2 bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
             <Download size={14} /> {exportMutation.isPending ? 'Exporting...' : 'Export CSV'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setCreateError(''); setCreateOpen(true); }}
+            className="flex items-center gap-2 bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card"
+          >
+            <Plus size={14} /> New Expense
           </button>
         </div>
         {exportMutation.isError && <p role="alert" className="mt-2 text-xs text-danger">{exportMutation.error?.message || 'Could not export expenses.'}</p>}
@@ -419,6 +485,118 @@ export default function Expenses() {
           </div>
         )}
       </div>
+
+      {/* ── New Expense Dialog ── */}
+      <FormDialog
+        open={createOpen}
+        onClose={() => !createExpenseMutation.isPending && setCreateOpen(false)}
+        title="New Expense"
+        subtitle="Submit an employee expense for approval and reimbursement."
+        confirmLabel="Submit Expense"
+        busy={createExpenseMutation.isPending}
+        error={createError}
+        onConfirm={() => createExpenseMutation.mutate()}
+        width="max-w-md"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-heading mb-1.5">Description / Purpose</label>
+            <input
+              type="text"
+              required
+              value={createForm.name}
+              onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="e.g. Client lunch meeting"
+              className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-heading mb-1.5">Category</label>
+              <select
+                value={createForm.category}
+                onChange={(e) => setCreateForm((f) => ({ ...f, category: e.target.value }))}
+                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="OFFICE">Office</option>
+                <option value="TRAVEL">Travel</option>
+                <option value="MEALS">Meals</option>
+                <option value="SOFTWARE">Software</option>
+                <option value="EQUIPMENT">Equipment</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-heading mb-1.5">Merchant</label>
+              <input
+                type="text"
+                value={createForm.merchant}
+                onChange={(e) => setCreateForm((f) => ({ ...f, merchant: e.target.value }))}
+                placeholder="e.g. AWS, Uber"
+                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-heading mb-1.5">Amount</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                required
+                value={createForm.amount}
+                onChange={(e) => setCreateForm((f) => ({ ...f, amount: e.target.value }))}
+                placeholder="0.00"
+                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-heading mb-1.5">Tax (Optional)</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={createForm.tax}
+                onChange={(e) => setCreateForm((f) => ({ ...f, tax: e.target.value }))}
+                placeholder="0.00"
+                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-heading mb-1.5">Date Incurred</label>
+              <input
+                type="date"
+                required
+                value={createForm.date}
+                onChange={(e) => setCreateForm((f) => ({ ...f, date: e.target.value }))}
+                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-heading mb-1.5">Employee (Optional)</label>
+              <select
+                value={createForm.employeeId}
+                onChange={(e) => setCreateForm((f) => ({ ...f, employeeId: e.target.value }))}
+                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="">Select employee...</option>
+                {(employeesData?.items ?? []).map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      </FormDialog>
     </div>
   );
 }

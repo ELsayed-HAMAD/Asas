@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Search,
   ChevronDown,
@@ -29,7 +30,16 @@ export default function ActiveSprints() {
   const [selectedId, setSelectedId] = useState(null);
   const [search, setSearch] = useState('');
   const [groupBy, setGroupBy] = useState('status');
+  const [searchParams, setSearchParams] = useSearchParams();
   const [issueOpen, setIssueOpen] = useState(false);
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setIssueOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const [issueTitle, setIssueTitle] = useState('');
   const [issueStoryPoints, setIssueStoryPoints] = useState('');
 

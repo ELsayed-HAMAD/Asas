@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Search,
   Calendar,
@@ -24,7 +25,16 @@ import ConfirmDialog from '../../../components/common/ConfirmDialog';
 export default function AccountsPayable() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [billOpen, setBillOpen] = useState(false)
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setBillOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const [changeRequestOpen, setChangeRequestOpen] = useState(false)
   const [changeRequestReason, setChangeRequestReason] = useState('')
   const [changeRequestSaved, setChangeRequestSaved] = useState(false)
