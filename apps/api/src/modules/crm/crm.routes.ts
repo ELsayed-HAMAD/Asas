@@ -3,6 +3,7 @@ import {
   dealListResponseSchema,
   dealActivityListQuerySchema,
   dealActivityListResponseSchema,
+  dealRecentActivityListResponseSchema,
   dealActivitySchema,
   dealActivityWriteSchema,
   dealSchema,
@@ -26,6 +27,7 @@ import {
 } from '@asas/contracts'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
+import { z } from 'zod'
 import { requireAuthContext, requireRole } from '../../middlewares/rbac.js'
 import { requirePermission } from '../../middlewares/permissions.js'
 import { recordAuditLog } from '../../services/auditLog.js'
@@ -185,6 +187,28 @@ export async function crmRoutes(app: FastifyInstance): Promise<void> {
     request.server.ssePublish(tenantId, [moduleKeyPrefix('crm')])
     return reply.code(204).send()
   })
+
+  server.get(
+    '/activities',
+    {
+      preHandler: requireRole('MEMBER'),
+      schema: {
+        querystring: z.object({
+          limit: z.coerce.number().int().min(1).max(50).default(10),
+        }),
+        response: { 200: envelope(dealRecentActivityListResponseSchema), ...errorResponses },
+      },
+    },
+    async request => {
+      const { tenantId } = requireAuthContext(request)
+      const items = await crmController.listRecentDealActivities(
+        request.server.prisma,
+        tenantId,
+        request.query.limit,
+      )
+      return { data: { items } }
+    },
+  )
 
   server.get(
     '/deals/:id',

@@ -38,7 +38,18 @@ export const projectsApi = {
 
   /** GET /projects/sprints/:id/issues — the work items a sprint burndowns. */
   getIssues: (sprintId) => http.get(`/projects/sprints/${sprintId}/issues`),
+  getIssue: (id) => http.get(`/projects/issues/${id}`),
   updateIssue: (id, patch) => http.patch(`/projects/issues/${id}`, { body: patch }),
+  deleteIssue: (id) => http.delete(`/projects/issues/${id}`),
+
+  createChecklistItem: (issueId, body) => http.post(`/projects/issues/${issueId}/checklist`, { body }),
+  updateChecklistItem: (issueId, itemId, body) => http.patch(`/projects/issues/${issueId}/checklist/${itemId}`, { body }),
+  deleteChecklistItem: (issueId, itemId) => http.delete(`/projects/issues/${issueId}/checklist/${itemId}`),
+
+  createIssueComment: (issueId, body) => http.post(`/projects/issues/${issueId}/comments`, { body }),
+
+  addIssueAssignee: (issueId, body) => http.post(`/projects/issues/${issueId}/assignees`, { body }),
+  removeIssueAssignee: (issueId, employeeId) => http.delete(`/projects/issues/${issueId}/assignees/${employeeId}`),
 
   /** GET /projects/roadmap — ordered phases with their dated tasks. */
   getRoadmap: () => http.get('/projects/roadmap'),

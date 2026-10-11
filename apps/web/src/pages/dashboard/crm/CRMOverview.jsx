@@ -4,13 +4,16 @@ import {
   Bell,
   Moon,
   MoreHorizontal,
-  Loader2
+  Loader2,
+  Mail,
+  Phone,
+  Circle,
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { crmApi } from '../../../lib/api/crm';
 import { queryKeys } from '../../../lib/queryKeys';
-import { formatMoney, formatPercent, moneyToMajor } from '../../../lib/format';
+import { formatDate, formatMoney, formatPercent, moneyToMajor } from '../../../lib/format';
 import TopBarActions from '../../../components/TopBarActions';
 import EmptyState from '../../../components/common/EmptyState';
 import FormDialog from '../../../components/common/FormDialog';
@@ -46,6 +49,11 @@ export default function CRMOverview() {
     queryFn: () => crmApi.getSalesPerformance(currentYear),
   });
   const { data: agenda } = useQuery({ queryKey: queryKeys.crm.agenda(), queryFn: () => crmApi.listAgenda() })
+  const { data: recentActivitiesData, isLoading: activitiesLoading } = useQuery({
+    queryKey: queryKeys.crm.activities({ limit: 10 }),
+    queryFn: () => crmApi.listRecentActivities({ limit: 10 }),
+  })
+  const recentActivities = recentActivitiesData?.items || []
   const createAgenda = useMutation({
     mutationFn: () => crmApi.createAgenda({ title: agendaTitle.trim() }),
     onSuccess: () => { setAgendaTitle(''); queryClient.invalidateQueries({ queryKey: queryKeys.crm.agenda() }) },
@@ -333,25 +341,55 @@ export default function CRMOverview() {
             {agenda?.items?.length ? <div className="space-y-3">{agenda.items.map(item => <div key={item.id} className="flex items-center gap-3 border-b border-border-subtle pb-3"><input type="checkbox" checked={item.done} onChange={() => crmApi.updateAgenda(item.id, { done: !item.done }).then(() => queryClient.invalidateQueries({ queryKey: queryKeys.crm.agenda() }))} /><span className={item.done ? 'text-sm text-muted line-through' : 'text-sm font-medium text-heading'}>{item.title}</span></div>)}</div> : <EmptyState title="No agenda items" description="Add a task for this workspace." />}
           </div>
 
-          {/* Recent Activity — the CRM API has no activity feed; honest empty state */}
+          {/* Recent Activity */}
           <div className="bg-surface-raised border border-border-default rounded-card-sm shadow-card p-6">
             <h2 className="text-lg font-bold text-heading mb-6">Recent Activity</h2>
 
-            <div className="relative pl-3 space-y-6">
-              {/* Continuous Line */}
-              <div className="absolute left-[15px] top-2 bottom-4 w-px bg-surface-strong"></div>
-
-              {/* Timeline Item */}
-              <div className="relative z-10 flex gap-4">
-                <div className="bg-surface-raised ring-4 ring-white mt-1 relative left-0.5">
-                  <div className="w-2.5 h-2.5 bg-surface-muted0 rounded-full"></div>
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-muted">No recent activity to show yet.</p>
+            {activitiesLoading ? (
+              <p className="text-sm text-muted">Loading activity…</p>
+            ) : recentActivities.length === 0 ? (
+              <div className="relative pl-3 space-y-6">
+                <div className="absolute left-[15px] top-2 bottom-4 w-px bg-surface-strong"></div>
+                <div className="relative z-10 flex gap-4">
+                  <div className="bg-surface-raised ring-4 ring-white mt-1 relative left-0.5">
+                    <div className="w-2.5 h-2.5 bg-surface-muted rounded-full"></div>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-muted">No recent activity to show yet.</p>
+                  </div>
                 </div>
               </div>
-
-            </div>
+            ) : (
+              <div className="relative pl-3 space-y-6">
+                <div className="absolute left-[15px] top-2 bottom-4 w-px bg-surface-strong"></div>
+                {recentActivities.map(activity => (
+                  <div key={activity.id} className="relative z-10 flex gap-4">
+                    <div className="bg-surface-raised ring-4 ring-white mt-0.5">
+                      {activity.type === 'EMAIL' ? (
+                        <Mail size={16} className="text-caption" />
+                      ) : activity.type === 'CALL' ? (
+                        <Phone size={16} className="text-caption" />
+                      ) : (
+                        <Circle size={16} className="text-caption" strokeWidth={2.5} />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-heading truncate">
+                        {activity.title} {activity.dealName ? <span className="font-normal text-muted">· {activity.dealName}</span> : null}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-muted">
+                        {activity.type === 'EMAIL' ? 'Email' : activity.type === 'CALL' ? 'Call' : 'Note'} · {activity.actorName || 'Unknown author'} · {formatDate(activity.createdAt, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                      {activity.body && (
+                        <p className="mt-1.5 whitespace-pre-wrap break-words text-xs text-body line-clamp-2">
+                          {activity.body}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
         </div>

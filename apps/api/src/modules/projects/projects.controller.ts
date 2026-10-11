@@ -13,6 +13,13 @@ import type {
   BurndownQuery,
   BurndownResponse,
   Issue,
+  IssueAssignee,
+  IssueAssigneeWriteInput,
+  IssueChecklistItem,
+  IssueChecklistItemUpdateInput,
+  IssueChecklistItemWriteInput,
+  IssueComment,
+  IssueCommentWriteInput,
   IssueUpdateInput,
   IssueWriteInput,
   PortfolioUtilizationResponse,
@@ -30,8 +37,9 @@ import type {
   SprintWriteInput,
 } from '@asas/contracts'
 import * as service from './projects.service.js'
+import type { ProjectsClient } from './projects.service.js'
 
-export type { ProjectListResult } from './projects.service.js'
+export type { ProjectListResult, ProjectsClient } from './projects.service.js'
 
 // ── Projects ────────────────────────────────────────────────────────────────────
 
@@ -123,6 +131,10 @@ export function listIssues(prisma: PrismaClient, tenantId: string, sprintId: str
   return service.listIssues(prisma, tenantId, sprintId)
 }
 
+export function getIssue(prisma: PrismaClient, tenantId: string, id: string): Promise<Issue> {
+  return service.getIssue(prisma, tenantId, id)
+}
+
 export function createIssue(prisma: PrismaClient, tenantId: string, input: IssueWriteInput): Promise<Issue> {
   return service.createIssue(prisma, tenantId, input)
 }
@@ -139,6 +151,63 @@ export function updateIssue(
 export function deleteIssue(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
   return service.deleteIssue(prisma, tenantId, id)
 }
+
+export function createChecklistItem(
+  prisma: ProjectsClient,
+  tenantId: string,
+  issueId: string,
+  input: IssueChecklistItemWriteInput,
+): Promise<IssueChecklistItem> {
+  return service.createChecklistItem(prisma, tenantId, issueId, input)
+}
+
+export function updateChecklistItem(
+  prisma: ProjectsClient,
+  tenantId: string,
+  issueId: string,
+  itemId: string,
+  input: IssueChecklistItemUpdateInput,
+): Promise<IssueChecklistItem> {
+  return service.updateChecklistItem(prisma, tenantId, issueId, itemId, input)
+}
+
+export function deleteChecklistItem(
+  prisma: ProjectsClient,
+  tenantId: string,
+  issueId: string,
+  itemId: string,
+): Promise<void> {
+  return service.deleteChecklistItem(prisma, tenantId, issueId, itemId)
+}
+
+export function createIssueComment(
+  prisma: ProjectsClient,
+  tenantId: string,
+  issueId: string,
+  author: string,
+  input: IssueCommentWriteInput,
+): Promise<IssueComment> {
+  return service.createIssueComment(prisma, tenantId, issueId, author, input)
+}
+
+export function addIssueAssignee(
+  prisma: ProjectsClient,
+  tenantId: string,
+  issueId: string,
+  employeeId: string,
+): Promise<IssueAssignee> {
+  return service.addIssueAssignee(prisma, tenantId, issueId, employeeId)
+}
+
+export function removeIssueAssignee(
+  prisma: ProjectsClient,
+  tenantId: string,
+  issueId: string,
+  employeeId: string,
+): Promise<void> {
+  return service.removeIssueAssignee(prisma, tenantId, issueId, employeeId)
+}
+
 
 // ── Roadmap (Gantt) ─────────────────────────────────────────────────────────────
 

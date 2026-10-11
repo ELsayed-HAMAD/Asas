@@ -108,4 +108,43 @@ describe('CRM deal activities', () => {
       expect(member.transaction).not.toHaveBeenCalled()
     } finally { await member.app.close() }
   })
+
+  it('lists tenant-wide recent deal activities with deal title', async () => {
+    const f = await setup({ role: 'MEMBER' })
+    ;(f.prisma.dealActivity.findMany as any).mockResolvedValueOnce([
+      {
+        id: activityId,
+        dealId,
+        deal: { name: 'Enterprise Expansion' },
+        type: 'CALL',
+        title: 'Follow-up Call',
+        body: 'Discussed requirements',
+        actorId: 'admin_1',
+        actorName: 'Ada Lovelace',
+        createdAt: stamp,
+      },
+    ])
+
+    try {
+      const response = await f.app.inject({ method: 'GET', url: '/activities?limit=5' })
+      expect(response.statusCode, response.body).toBe(200)
+      expect(f.prisma.dealActivity.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { tenantId: 'tenant_1' },
+          take: 5,
+          include: { deal: { select: { name: true } } },
+        }),
+      )
+      const json = response.json()
+      expect(json.data.items).toHaveLength(1)
+      expect(json.data.items[0]).toMatchObject({
+        id: activityId,
+        dealName: 'Enterprise Expansion',
+        title: 'Follow-up Call',
+      })
+    } finally {
+      await f.app.close()
+    }
+  })
 })
+

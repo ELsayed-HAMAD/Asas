@@ -42,6 +42,8 @@ export default function ActiveSprints() {
   }, [searchParams, setSearchParams]);
   const [issueTitle, setIssueTitle] = useState('');
   const [issueStoryPoints, setIssueStoryPoints] = useState('');
+  const [newChecklistText, setNewChecklistText] = useState('');
+  const [commentText, setCommentText] = useState('');
 
   const { data: sprintsData, isLoading, isError } = useQuery({
     queryKey: queryKeys.projects.sprints.list({}),
@@ -82,6 +84,33 @@ export default function ActiveSprints() {
       setIssueStoryPoints('')
     },
   })
+  const createChecklistMutation = useMutation({
+    mutationFn: (text) => projectsApi.createChecklistItem(selectedId, { text }),
+    onSuccess: () => {
+      setNewChecklistText('');
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.issues.all() });
+    },
+  });
+  const updateChecklistMutation = useMutation({
+    mutationFn: ({ itemId, done }) => projectsApi.updateChecklistItem(selectedId, itemId, { done }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.issues.all() });
+    },
+  });
+  const deleteChecklistMutation = useMutation({
+    mutationFn: (itemId) => projectsApi.deleteChecklistItem(selectedId, itemId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.issues.all() });
+    },
+  });
+  const createCommentMutation = useMutation({
+    mutationFn: (body) => projectsApi.createIssueComment(selectedId, { body }),
+    onSuccess: () => {
+      setCommentText('');
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.issues.all() });
+    },
+  });
+
 
   if (isLoading) {
     return (
@@ -175,7 +204,30 @@ export default function ActiveSprints() {
               <Equal size={16} className="text-caption" strokeWidth={3} />
             )
           )}
-          <div className="w-6 h-6 rounded-full bg-surface-active border border-border-default" />
+          {issue.assignees && issue.assignees.length > 0 ? (
+            <div className="flex -space-x-1.5 overflow-hidden">
+              {issue.assignees.slice(0, 3).map((a, idx) => (
+                <div
+                  key={a.id || idx}
+                  title={a.employee?.name || 'Assignee'}
+                  className="w-6 h-6 rounded-full bg-surface-raised border border-border-default flex items-center justify-center text-[9px] font-bold text-heading overflow-hidden"
+                >
+                  {a.employee?.avatarUrl ? (
+                    <img src={a.employee.avatarUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    (a.employee?.name || 'U').slice(0, 2).toUpperCase()
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div
+              title="Unassigned"
+              className="w-6 h-6 rounded-full bg-surface-active border border-border-default flex items-center justify-center text-[9px] text-muted font-medium"
+            >
+              —
+            </div>
+          )}
         </div>
       </div>
     );
@@ -446,14 +498,73 @@ export default function ActiveSprints() {
                       ) : null}
                     </div>
 
-                    {/* Checklist Box (Stub for now) */}
+                    {/* Checklist Box */}
                     <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card mb-6">
                       <div className="flex items-center justify-between mb-5">
-                        <h3 className="text-sm font-bold text-heading">Checklist</h3>
+                        <h3 className="text-sm font-bold text-heading">
+                          Checklist
+                          {selectedIssue.checklist?.length ? (
+                            <span className="ml-2 text-xs font-normal text-muted">
+                              ({selectedIssue.checklist.filter(c => c.done).length}/{selectedIssue.checklist.length})
+                            </span>
+                          ) : null}
+                        </h3>
                       </div>
 
                       <div className="space-y-3">
-                        <div className="text-sm text-muted">No checklist items yet.</div>
+                        {(!selectedIssue.checklist || selectedIssue.checklist.length === 0) ? (
+                          <div className="text-sm text-muted">No checklist items yet.</div>
+                        ) : (
+                          selectedIssue.checklist.map((item) => (
+                            <div key={item.id} className="flex items-center justify-between group text-sm">
+                              <label className="flex items-center gap-2.5 cursor-pointer select-none flex-1">
+                                <input
+                                  type="checkbox"
+                                  checked={item.done}
+                                  onChange={(e) => updateChecklistMutation.mutate({ itemId: item.id, done: e.target.checked })}
+                                  className="rounded border-border-default text-accent focus:ring-accent"
+                                />
+                                <span className={item.done ? "line-through text-muted" : "text-body"}>
+                                  {item.text}
+                                </span>
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => deleteChecklistMutation.mutate(item.id)}
+                                className="opacity-0 group-hover:opacity-100 text-caption hover:text-danger p-1 transition-opacity"
+                                title="Delete item"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))
+                        )}
+
+                        {/* Inline Add Checklist Item */}
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            if (newChecklistText.trim()) {
+                              createChecklistMutation.mutate(newChecklistText.trim());
+                            }
+                          }}
+                          className="pt-2 flex items-center gap-2"
+                        >
+                          <input
+                            type="text"
+                            value={newChecklistText}
+                            onChange={(e) => setNewChecklistText(e.target.value)}
+                            placeholder="Add item..."
+                            className="flex-1 bg-surface border border-border-default rounded-input px-3 py-1.5 text-xs text-body focus:outline-none focus:ring-1 focus:ring-accent"
+                          />
+                          <button
+                            type="submit"
+                            disabled={!newChecklistText.trim() || createChecklistMutation.isPending}
+                            className="px-2.5 py-1.5 bg-accent text-white rounded-button text-xs font-medium hover:bg-accent/90 disabled:opacity-50"
+                          >
+                            Add
+                          </button>
+                        </form>
                       </div>
                     </div>
 
@@ -461,26 +572,64 @@ export default function ActiveSprints() {
                     <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card">
                       <h3 className="text-sm font-bold text-heading mb-6">Activity</h3>
 
-                      <div className="relative pl-4 space-y-8">
-                        <div className="text-sm text-muted">No recent activity.</div>
+                      <div className="relative pl-4 space-y-6">
+                        {(!selectedIssue.comments || selectedIssue.comments.length === 0) ? (
+                          <div className="text-sm text-muted">No recent activity.</div>
+                        ) : (
+                          selectedIssue.comments.map((comment) => (
+                            <div key={comment.id} className="relative text-sm">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-semibold text-heading text-xs">
+                                  {comment.authorName || 'Team Member'}
+                                </span>
+                                <span className="text-[11px] text-caption">
+                                  {formatDate(comment.createdAt)}
+                                </span>
+                              </div>
+                              <p className="text-body text-xs whitespace-pre-wrap">{comment.body}</p>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </div>
 
                   </div>
 
                   {/* Comment Footer (Sticky) */}
-                  <div className="p-6 bg-surface border-t border-border-default">
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (commentText.trim()) {
+                        createCommentMutation.mutate(commentText.trim());
+                      }
+                    }}
+                    className="p-6 bg-surface border-t border-border-default"
+                  >
                     <div className="relative">
                       <input
                         type="text"
+                        value={commentText}
+                        onChange={(e) => setCommentText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                            e.preventDefault();
+                            if (commentText.trim()) {
+                              createCommentMutation.mutate(commentText.trim());
+                            }
+                          }
+                        }}
                         placeholder="Add a comment... ⌘+Enter"
                         className="w-full bg-[#f1f5f9] border border-border-default rounded-button pl-4 pr-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:bg-surface-raised transition-colors placeholder-gray-400"
                       />
-                      <button disabled className="absolute right-3 top-1/2 -translate-y-1/2 text-caption hover:text-black transition-colors disabled:opacity-60">
+                      <button
+                        type="submit"
+                        disabled={!commentText.trim() || createCommentMutation.isPending}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-caption hover:text-black transition-colors disabled:opacity-40"
+                      >
                         <Send size={16} />
                       </button>
                     </div>
-                  </div>
+                  </form>
                 </>
               ) : (
                 <div className="flex h-full items-center justify-center text-muted">
