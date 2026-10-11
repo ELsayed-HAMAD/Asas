@@ -79,6 +79,8 @@ export default function StockMovements() {
   const rawItems = data?.items ?? []
   const summary = data?.summary
   const pagination = data?.pagination ?? { page: 1, limit: 25, total: 0, totalPages: 1 }
+  const warehouses = (Array.isArray(warehousesData) ? warehousesData : warehousesData?.items) ?? []
+  const products = (Array.isArray(productsData) ? productsData : productsData?.items) ?? []
 
   // Filter items client-side by debounced product name search if typed
   const movements = useMemo(() => {
@@ -269,7 +271,7 @@ export default function StockMovements() {
                 className="bg-surface-muted border border-border-default rounded-input px-3 py-1.5 text-xs text-heading focus:outline-none focus:ring-1 focus:ring-primary"
               >
                 <option value="">All Warehouses</option>
-                {warehousesData?.map((w) => (
+                {warehouses.map((w) => (
                   <option key={w.name} value={w.name}>
                     {w.name} ({w.productCount})
                   </option>
@@ -456,7 +458,7 @@ export default function StockMovements() {
               className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             >
               <option value="">Select a product...</option>
-              {productsData?.items?.map((product) => (
+              {products.map((product) => (
                 <option key={product.id} value={product.id}>
                   {product.name} ({product.sku}) — {product.stock} on hand
                 </option>
