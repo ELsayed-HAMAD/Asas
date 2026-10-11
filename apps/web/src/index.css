@@ -168,3 +168,33 @@ html {
     scrollbar-width: none;  /* Firefox */
   }
 }
+
+/* ── DARK THEME TOKENS ────────────────────────────────────────── */
+html.dark {
+  --color-surface: #090d16;
+  --color-surface-raised: #0f172a;
+  --color-surface-muted: #1e293b;
+  --color-surface-active: #334155;
+  --color-surface-strong: #1e293b;
+
+  --color-border-faint: #1e293b;
+  --color-border-subtle: #1e293b;
+  --color-border-default: #334155;
+  --color-border-strong: #475569;
+
+  --color-heading: #f8fafc;
+  --color-body: #e2e8f0;
+  --color-body-light: #cbd5e1;
+  --color-muted: #94a3b8;
+  --color-caption: #64748b;
+  --color-faint: #334155;
+
+  --color-primary: #6366f1;
+  --color-primary-hover: #4f46e5;
+  --color-primary-light: #1e1b4b;
+  --color-primary-subtle: #312e81;
+
+  --color-overlay: rgba(0, 0, 0, 0.7);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
