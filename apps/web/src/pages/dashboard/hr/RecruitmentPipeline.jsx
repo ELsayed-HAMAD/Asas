@@ -319,6 +319,7 @@ export default function RecruitmentPipeline() {
   const roleName = typeof activeMemberRole === 'string' ? activeMemberRole : activeMemberRole?.role
   const canWrite = roleName === 'OWNER' || roleName === 'ADMIN'
 
+  const [roleFilter, setRoleFilter] = useState('ALL')
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', role: '', email: '', location: '', source: '', experience: '', currentRole: '', education: '' })
   const [editError, setEditError] = useState(null)
@@ -373,6 +374,8 @@ export default function RecruitmentPipeline() {
   })
 
   const candidates = data?.items || []
+  const availableRoles = Array.from(new Set(candidates.map(c => c.role).filter(Boolean))).sort()
+  const visibleCandidates = roleFilter === 'ALL' ? candidates : candidates.filter(c => c.role === roleFilter)
   const selectedCandidate = candidates.find(c => c.id === selectedId)
   const { data: interviews = [] } = useQuery({
     queryKey: queryKeys.hr.candidates.detail(selectedId ? `${selectedId}:interviews` : 'none'),
@@ -551,10 +554,20 @@ export default function RecruitmentPipeline() {
                 className="pl-9 pr-4 py-1.5 text-sm border border-border-default rounded-button bg-surface-raised w-64 focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
               />
             </div>
-            <button disabled className="flex items-center gap-2 bg-surface-raised border border-border-default text-body text-sm px-3 py-1.5 rounded-button hover:bg-surface-muted disabled:opacity-60">
-              <Filter size={14} />
-              Role: All
-            </button>
+            <div className="relative flex items-center">
+              <Filter size={14} className="absolute left-3 pointer-events-none text-muted" />
+              <select
+                aria-label="Filter by candidate role"
+                value={roleFilter}
+                onChange={event => setRoleFilter(event.target.value)}
+                className="appearance-none bg-surface-raised border border-border-default text-body text-sm pl-8 pr-7 py-1.5 rounded-button hover:bg-surface-muted transition-colors cursor-pointer outline-none"
+              >
+                <option value="ALL">Role: All</option>
+                {availableRoles.map(role => (
+                  <option key={role} value={role}>{role}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <button type="button" disabled={!canWrite || exporting} title={canWrite ? 'Export all candidates matching the current search' : 'Requires the ADMIN role'} onClick={exportCandidates} className="flex items-center gap-2 text-muted text-sm hover:text-heading font-medium px-3 py-1.5 disabled:opacity-60">
             {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Export
@@ -568,7 +581,7 @@ export default function RecruitmentPipeline() {
             isLoading={isLoading}
             isError={isError}
             error={error}
-            isEmpty={!candidates.length}
+            isEmpty={!visibleCandidates.length}
             emptyTitle="No candidates found"
             emptyDescription="Add a candidate or load the sample pack to see data."
           >
@@ -582,7 +595,7 @@ export default function RecruitmentPipeline() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-faint">
-                {candidates.map(cand => {
+                {visibleCandidates.map(cand => {
                   const stageLabel = STAGE_LABELS[cand.stage] || cand.stage
                   return (
                     <tr
