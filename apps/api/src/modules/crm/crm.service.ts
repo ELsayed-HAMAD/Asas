@@ -1095,3 +1095,14 @@ export async function updateDeal(
   } })
   return mapDeal(deal, currency)
 }
+
+export async function deleteDeal(
+  prisma: CrmClient,
+  tenantId: string,
+  id: string,
+): Promise<void> {
+  if ('$transaction' in prisma) return prisma.$transaction(tx => deleteDeal(tx, tenantId, id))
+  const existing = await prisma.deal.findFirst({ where: { id, tenantId } })
+  if (!existing) throw new AppError(404, 'Deal not found')
+  await prisma.deal.delete({ where: { id_tenantId: { id, tenantId } } })
+}

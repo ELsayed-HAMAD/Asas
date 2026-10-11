@@ -98,6 +98,14 @@ export function updateDeal(
   return service.updateDeal(prisma, tenantId, id, input, actorId)
 }
 
+export function deleteDeal(
+  prisma: PrismaClient | Prisma.TransactionClient,
+  tenantId: string,
+  id: string,
+): Promise<void> {
+  return service.deleteDeal(prisma, tenantId, id)
+}
+
 export function createDealActivity(
   prisma: PrismaClient | Prisma.TransactionClient,
   tenantId: string,

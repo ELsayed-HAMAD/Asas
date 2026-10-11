@@ -9,7 +9,8 @@ import {
   Phone,
   Pencil,
   Circle,
-  Loader2
+  Loader2,
+  Trash2
 } from 'lucide-react';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from '@dnd-kit/core';
@@ -20,6 +21,7 @@ import { formatMoney, formatDate, moneyToMajor } from '../../../lib/format';
 import { useActiveMemberRole } from '../../../lib/authClient';
 import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 const STAGE_ORDER = ['LEADS', 'PROPOSAL', 'NEGOTIATION', 'CLOSED_WON', 'CLOSED_LOST'];
 
@@ -147,6 +149,8 @@ export default function DealsPipeline() {
     }
   }, [searchParams, setSearchParams]);
   const [editDealOpen, setEditDealOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [editForm, setEditForm] = useState(EMPTY_DEAL_FORM)
   const [dealForm, setDealForm] = useState(EMPTY_DEAL_FORM);
   const [formError, setFormError] = useState(null);
@@ -223,6 +227,14 @@ export default function DealsPipeline() {
   const editMutation = useMutation({
     mutationFn: () => crmApi.updateDeal(selectedDeal.id, { ...editForm, value: editForm.value || null, closeDate: editForm.closeDate || null, winProbability: editForm.winProbability === '' ? null : Number(editForm.winProbability) }),
     onSuccess: () => { invalidateCrmDeals(); setEditDealOpen(false) },
+  })
+  const deleteMutation = useMutation({
+    mutationFn: (id) => crmApi.deleteDeal(id),
+    onSuccess: () => {
+      invalidateCrmDeals();
+      setDeleteConfirmOpen(false);
+      setSelectedId(null);
+    },
   })
   const activityMutation = useMutation({
     mutationFn: () => crmApi.createDealActivity(activityDealId, { type: activityDialogType, title: activityTitle.trim(), body: activityBody.trim() || null }),
@@ -409,9 +421,28 @@ export default function DealsPipeline() {
                       <p className="text-sm text-muted mt-1">{selectedDeal.company || 'No company'} · {selectedDeal.owner?.title || 'Owner unassigned'}</p>
                     </div>
                   </div>
-                  <button className="text-caption hover:text-body transition-colors">
-                    <MoreHorizontal size={20} />
-                  </button>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setMenuOpen(prev => !prev)}
+                      className="text-caption hover:text-body transition-colors p-1 rounded hover:bg-surface-muted"
+                      title="Deal options"
+                    >
+                      <MoreHorizontal size={20} />
+                    </button>
+                    {menuOpen && (
+                      <div className="absolute right-0 mt-1 w-36 rounded-input bg-surface-raised border border-border-default shadow-modal py-1 z-20">
+                        <button
+                          type="button"
+                          onClick={() => { setMenuOpen(false); setDeleteConfirmOpen(true); }}
+                          disabled={!canWrite}
+                          className="w-full text-left px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger-light flex items-center gap-2 disabled:opacity-50"
+                        >
+                          <Trash2 size={14} /> Delete Deal
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mb-8">
@@ -622,6 +653,16 @@ export default function DealsPipeline() {
           {activityMutation.isError && <p role="alert" className="text-sm text-danger">{activityMutation.error?.message || 'Could not save activity.'}</p>}
         </div>
       </FormDialog>
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={() => selectedDeal && deleteMutation.mutate(selectedDeal.id)}
+        title="Delete deal?"
+        description={`Are you sure you want to delete "${selectedDeal?.name}"? All associated activities and stage history will be permanently deleted.`}
+        confirmLabel="Delete deal"
+        busy={deleteMutation.isPending}
+        danger
+      />
     </div>
   );
 }
