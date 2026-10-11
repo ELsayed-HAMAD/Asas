@@ -330,7 +330,7 @@ export async function getOverview(prisma: PrismaClient, tenantId: string): Promi
       WHERE "tenantId" = ${tenantId}
         AND "stage"::text IN ('CLOSED_WON', 'CLOSED_LOST')
         AND "closedAt" IS NOT NULL
-      GROUP BY to_char("closedAt" AT TIME ZONE ${timezone}, 'YYYY-MM'), "stage"
+      GROUP BY 1, 2
       ORDER BY month
     `,
     prisma.$queryRaw<Array<{ currentWonCount: bigint; currentLostCount: bigint; previousWonCount: bigint; previousLostCount: bigint }>>`
