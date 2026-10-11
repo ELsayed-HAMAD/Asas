@@ -21,6 +21,10 @@ import { settingsApi } from '../../../lib/api/settings'
 import { queryKeys } from '../../../lib/queryKeys'
 import { useActiveMemberRole, useActiveOrganization } from '../../../lib/authClient'
 
+const AVAILABLE_TIMEZONES = typeof Intl.supportedValuesOf === 'function'
+  ? Intl.supportedValuesOf('timeZone')
+  : ['UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Dubai', 'Asia/Tokyo', 'Asia/Singapore']
+
 export default function SettingsGeneral() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -276,11 +280,15 @@ export default function SettingsGeneral() {
                     value={form.timezone || localTimezone}
                     onChange={setField('timezone')}
                   >
-                    <option value="UTC">(GMT+00:00) UTC</option>
-                    <option value="PST">(GMT-08:00) Pacific Time</option>
-                    {localTimezone !== 'UTC' && localTimezone !== 'PST' && (
-                      <option value={localTimezone}>Local ({localTimezone})</option>
+                    <option value="UTC">UTC (Universal Coordinated Time)</option>
+                    {localTimezone && localTimezone !== 'UTC' && (
+                      <option value={localTimezone}>Local System Timezone ({localTimezone})</option>
                     )}
+                    {AVAILABLE_TIMEZONES.filter(tz => tz !== 'UTC' && tz !== localTimezone).map(tz => (
+                      <option key={tz} value={tz}>
+                        {tz.replaceAll('_', ' ')}
+                      </option>
+                    ))}
                   </select>
                   <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
                 </div>
@@ -530,7 +538,7 @@ export default function SettingsGeneral() {
       />
 
       <FormDialog
-        isOpen={deleteDialogOpen}
+        open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
         title="Delete Workspace"
         subtitle="This action is permanent and cannot be undone."

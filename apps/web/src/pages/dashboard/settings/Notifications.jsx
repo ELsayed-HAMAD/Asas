@@ -64,6 +64,7 @@ const getPreviewData = (event) => {
 export default function SettingsNotifications() {
   const queryClient = useQueryClient();
   const [previewEvent, setPreviewEvent] = useState('invoice');
+  const [criticalOverride, setCriticalOverride] = useState(true);
   const [search, setSearch] = useState('')
 
   const { data, isLoading, isError } = useQuery({
@@ -189,7 +190,7 @@ export default function SettingsNotifications() {
                   <Shield size={20} className="text-accent shrink-0" fill="var(--color-accent)" stroke="white" />
                   <h3 className="text-sm font-bold text-heading">Override for Critical Security Alerts</h3>
                 </div>
-                <Toggle on={true} color="green" />
+                <Toggle on={criticalOverride} color="green" onClick={() => setCriticalOverride(prev => !prev)} />
               </div>
             </div>
           </div>

@@ -24,11 +24,14 @@ import { formatDate } from '../../../lib/format';
 import { selectActiveSprint } from '../../../lib/projectSprint';
 import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 export default function ActiveSprints() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState(null);
+  const [selectedSprintId, setSelectedSprintId] = useState(null);
+  const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [groupBy, setGroupBy] = useState('status');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -54,7 +57,8 @@ export default function ActiveSprints() {
   // A Sprint does not embed its issues on the wire, so the board is a second read
   // scoped to the selected (first) sprint.
   const sprints = sprintsData?.items || [];
-  const activeSprint = selectActiveSprint(sprints);
+  const defaultSprint = selectActiveSprint(sprints);
+  const activeSprint = (selectedSprintId ? sprints.find(s => s.id === selectedSprintId) : null) || defaultSprint;
 
   const { data: issuesData } = useQuery({
     queryKey: queryKeys.projects.issues.list({ sprintId: activeSprint?.id }),
@@ -73,7 +77,11 @@ export default function ActiveSprints() {
   });
   const completeSprint = useMutation({
     mutationFn: () => projectsApi.updateSprint(activeSprint.id, { status: 'COMPLETED' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.projects.all() }),
+    onSuccess: () => {
+      setSelectedSprintId(null);
+      setCompleteConfirmOpen(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.all() });
+    },
   })
   const createIssue = useMutation({
     mutationFn: () => projectsApi.createIssue({ title: issueTitle.trim(), sprintId: activeSprint.id, storyPoints: issueStoryPoints === '' ? null : Number(issueStoryPoints) }),
@@ -268,7 +276,7 @@ export default function ActiveSprints() {
 
           <button
             type="button"
-            onClick={() => completeSprint.mutate()}
+            onClick={() => setCompleteConfirmOpen(true)}
             disabled={!activeSprint || activeSprint.status !== 'ACTIVE' || completeSprint.isPending}
             className="bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer"
           >
@@ -284,7 +292,22 @@ export default function ActiveSprints() {
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2 font-bold text-heading">
                 <Rocket size={16} className="text-body" />
-                {activeSprint.name}
+                {sprints.length > 1 ? (
+                  <select
+                    value={activeSprint.id}
+                    onChange={(e) => setSelectedSprintId(e.target.value)}
+                    className="bg-transparent font-bold text-heading border-none focus:outline-none cursor-pointer pr-1"
+                    aria-label="Select sprint"
+                  >
+                    {sprints.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.status})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span>{activeSprint.name}</span>
+                )}
               </div>
 
               <div className="w-px h-4 bg-gray-300"></div>
@@ -656,6 +679,18 @@ export default function ActiveSprints() {
           <label className="block text-sm font-medium text-body">Story points<input type="number" min="0" max="1000" step="1" value={issueStoryPoints} onChange={event => setIssueStoryPoints(event.target.value)} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
         </div>
       </FormDialog>
+      <ConfirmDialog
+        open={completeConfirmOpen}
+        onClose={() => setCompleteConfirmOpen(false)}
+        onConfirm={() => {
+          setCompleteConfirmOpen(false);
+          completeSprint.mutate();
+        }}
+        title={`Complete ${activeSprint?.name}?`}
+        description="This will mark the sprint as completed. Open issues will remain in their current state."
+        confirmLabel="Complete Sprint"
+        busy={completeSprint.isPending}
+      />
     </div>
   );
 }

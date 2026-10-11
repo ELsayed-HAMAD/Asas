@@ -21,6 +21,7 @@ import { motion, AnimatePresence } from 'framer-motion'
  */
 export default function ConfirmDialog({
   open,
+  isOpen,
   onClose,
   onConfirm,
   title,
@@ -31,9 +32,11 @@ export default function ConfirmDialog({
   danger = false,
   error,
 }) {
+  const isDialogOpen = open ?? isOpen
+
   // Close on Escape (when not busy) and lock background scroll while open.
   useEffect(() => {
-    if (!open) return
+    if (!isDialogOpen) return
     function onKeyDown(event) {
       if (event.key === 'Escape' && !busy) onClose()
     }
@@ -44,11 +47,11 @@ export default function ConfirmDialog({
       document.removeEventListener('keydown', onKeyDown)
       document.body.style.overflow = previousOverflow
     }
-  }, [open, busy, onClose])
+  }, [isDialogOpen, busy, onClose])
 
   return (
     <AnimatePresence>
-      {open && (
+      {isDialogOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <motion.div
             initial={{ opacity: 0 }}
