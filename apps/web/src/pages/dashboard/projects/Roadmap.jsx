@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   ChevronRight,
   Search,
@@ -6,6 +7,7 @@ import {
   X,
   Folder,
   Edit2,
+  Trash2,
   Loader2,
   Clock
 } from 'lucide-react';
@@ -20,13 +22,25 @@ export default function Roadmap() {
   const queryClient = useQueryClient()
   const [isInspectorOpen, setInspectorOpen] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
-  const [phaseOpen, setPhaseOpen] = useState(false)
-  const [taskOpen, setTaskOpen] = useState(false)
-  const [timelineOpen, setTimelineOpen] = useState(false)
-  const [timelineTaskId, setTimelineTaskId] = useState(null)
-  const [phaseTitle, setPhaseTitle] = useState('')
-  const [taskForm, setTaskForm] = useState({ title: '', phaseId: '' })
-  const [timelineForm, setTimelineForm] = useState({ startDate: '', endDate: '', progressPct: 0 })
+  const [search, setSearch] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [phaseOpen, setPhaseOpen] = useState(false);
+  const [taskOpen, setTaskOpen] = useState(false);
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [teamOpen, setTeamOpen] = useState(false);
+  const [timelineTaskId, setTimelineTaskId] = useState(null);
+  const [phaseTitle, setPhaseTitle] = useState('');
+  const [taskForm, setTaskForm] = useState({ title: '', phaseId: '' });
+  const [timelineForm, setTimelineForm] = useState({ startDate: '', endDate: '', progressPct: 0 });
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setTaskOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const { data: responseData, isLoading, isError } = useQuery({
     queryKey: queryKeys.projects.roadmap(),
@@ -49,10 +63,12 @@ export default function Roadmap() {
   }
 
   // Mutation hooks must run on every render (before the loading/error early returns).
-  const refreshRoadmap = () => queryClient.invalidateQueries({ queryKey: queryKeys.projects.roadmap() })
-  const createPhase = useMutation({ mutationFn: () => projectsApi.createRoadmapPhase({ title: phaseTitle.trim(), sortOrder: phases.length }), onSuccess: () => { setPhaseOpen(false); setPhaseTitle(''); refreshRoadmap() } })
-  const createTask = useMutation({ mutationFn: () => projectsApi.createRoadmapTask({ title: taskForm.title.trim(), phaseId: taskForm.phaseId || phases[0]?.id }), onSuccess: () => { setTaskOpen(false); setTaskForm({ title: '', phaseId: '' }); refreshRoadmap() } })
-  const updateTimeline = useMutation({ mutationFn: () => projectsApi.updateRoadmapTask(timelineTaskId, { ...timelineForm, startDate: timelineForm.startDate || null, endDate: timelineForm.endDate || null }), onSuccess: () => { setTimelineOpen(false); refreshRoadmap() } })
+  const refreshRoadmap = () => queryClient.invalidateQueries({ queryKey: queryKeys.projects.roadmap() });
+  const createPhase = useMutation({ mutationFn: () => projectsApi.createRoadmapPhase({ title: phaseTitle.trim(), sortOrder: phases.length }), onSuccess: () => { setPhaseOpen(false); setPhaseTitle(''); refreshRoadmap(); } });
+  const deletePhase = useMutation({ mutationFn: (id) => projectsApi.deleteRoadmapPhase(id), onSuccess: () => refreshRoadmap() });
+  const createTask = useMutation({ mutationFn: () => projectsApi.createRoadmapTask({ title: taskForm.title.trim(), phaseId: taskForm.phaseId || phases[0]?.id }), onSuccess: () => { setTaskOpen(false); setTaskForm({ title: '', phaseId: '' }); refreshRoadmap(); } });
+  const updateTimeline = useMutation({ mutationFn: () => projectsApi.updateRoadmapTask(timelineTaskId, { ...timelineForm, startDate: timelineForm.startDate || null, endDate: timelineForm.endDate || null }), onSuccess: () => { setTimelineOpen(false); refreshRoadmap(); } });
+  const deleteTask = useMutation({ mutationFn: (id) => projectsApi.deleteRoadmapTask(id), onSuccess: () => { setSelectedId(null); refreshRoadmap(); } });
 
   if (isLoading) {
     return (
@@ -73,6 +89,19 @@ export default function Roadmap() {
   // Count total tasks for the header
   const totalTasks = phases.reduce((acc, p) => acc + (p.tasks?.length || 0), 0);
 
+  const filteredPhases = phases.map(p => {
+    if (!search.trim()) return p;
+    const q = search.toLowerCase();
+    const matchPhase = p.title.toLowerCase().includes(q);
+    const matchingTasks = (p.tasks || []).filter(t =>
+      t.title.toLowerCase().includes(q) ||
+      (t.taskCode && t.taskCode.toLowerCase().includes(q)) ||
+      (t.description && t.description.toLowerCase().includes(q))
+    );
+    if (matchPhase) return p;
+    return { ...p, tasks: matchingTasks };
+  }).filter(p => !search.trim() || p.tasks.length > 0 || p.title.toLowerCase().includes(search.toLowerCase()));
+
   return (
     <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-0">
 
@@ -82,15 +111,17 @@ export default function Roadmap() {
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
             <input
               type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
               placeholder="Search..."
-              className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className="pl-9 pr-4 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
-          <button type="button" onClick={() => setPhaseOpen(true)} className="border border-border-default bg-surface-raised text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted">New Phase</button>
-          <button type="button" disabled={!phases.length} onClick={() => { setTaskForm({ title: '', phaseId: phases[0]?.id || '' }); setTaskOpen(true) }} className="border border-border-default bg-surface-raised text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted disabled:opacity-60">New Task</button>
           </div>
+          <button type="button" onClick={() => setPhaseOpen(true)} className="border border-border-default bg-surface-raised text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted">New Phase</button>
+          <button type="button" disabled={!phases.length} onClick={() => { setTaskForm({ title: '', phaseId: phases[0]?.id || '' }); setTaskOpen(true); }} className="border border-border-default bg-surface-raised text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted disabled:opacity-60">New Task</button>
 
-              <button
-                onClick={() => downloadRoadmapCsv(phases)}
+          <button
+            onClick={() => downloadRoadmapCsv(phases)}
             className="bg-primary text-white px-5 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
           >
             Export
@@ -129,19 +160,34 @@ export default function Roadmap() {
           <div className="flex-1 overflow-y-auto p-6 md:p-8">
 
           <div className="max-w-4xl mx-auto space-y-8 pb-12">
-            {phases.length === 0 ? (
+            {filteredPhases.length === 0 ? (
               <div className="flex w-full items-center justify-center text-sm text-muted py-12">No roadmap data found.</div>
             ) : (
-              phases.map(phase => (
+              filteredPhases.map(phase => (
                 <div key={phase.id} className="space-y-4">
 
                   {/* Phase Header */}
-                  <div className="flex items-center gap-3 border-b border-border-default pb-2">
-                    <Folder size={18} className="text-muted" />
-                    <h3 className="text-sm font-bold text-heading uppercase tracking-widest">{phase.title}</h3>
-                    <span className="text-[10px] font-bold text-muted bg-surface-muted px-2 py-0.5 rounded-full">
-                      {phase.tasks?.length || 0} Tasks
-                    </span>
+                  <div className="flex items-center justify-between border-b border-border-default pb-2">
+                    <div className="flex items-center gap-3">
+                      <Folder size={18} className="text-muted" />
+                      <h3 className="text-sm font-bold text-heading uppercase tracking-widest">{phase.title}</h3>
+                      <span className="text-[10px] font-bold text-muted bg-surface-muted px-2 py-0.5 rounded-full">
+                        {phase.tasks?.length || 0} Tasks
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={deletePhase.isPending}
+                      onClick={() => {
+                        if (window.confirm(`Delete phase "${phase.title}" and its tasks?`)) {
+                          deletePhase.mutate(phase.id);
+                        }
+                      }}
+                      className="text-caption hover:text-danger p-1 rounded transition-colors text-xs disabled:opacity-50"
+                      title="Delete phase"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
 
                   {/* Task List */}
@@ -270,14 +316,25 @@ export default function Roadmap() {
                         <div className="flex -space-x-2">
                           {selectedTask.assignees.map((assignee, idx) => (
                             <div key={idx} className="w-7 h-7 rounded-full bg-surface-strong border-2 border-white flex items-center justify-center text-[10px] font-bold text-body z-20" style={{ zIndex: 10 - idx }}>
-                              {assignee.employee?.firstName?.[0]}{assignee.employee?.lastName?.[0]}
+                              {assignee.employee?.name ? (
+                                assignee.employee.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                              ) : (
+                                (assignee.employee?.firstName?.[0] || '') + (assignee.employee?.lastName?.[0] || '') || '?'
+                              )}
                             </div>
                           ))}
                         </div>
                       ) : (
                         <div className="text-sm text-muted">No assignees</div>
                       )}
-                      <button disabled className="text-[11px] font-bold text-heading hover:underline disabled:opacity-60">View All</button>
+                      <button
+                        type="button"
+                        disabled={!selectedTask.assignees || selectedTask.assignees.length === 0}
+                        onClick={() => setTeamOpen(true)}
+                        className="text-[11px] font-bold text-heading hover:underline disabled:opacity-60"
+                      >
+                        View All
+                      </button>
                     </div>
                   </div>
                 </>
@@ -290,13 +347,26 @@ export default function Roadmap() {
 
             {/* Inspector Footer */}
             {selectedTask && (
-              <div className="p-5 border-t border-border-default bg-surface-raised mt-auto">
+              <div className="p-5 border-t border-border-default bg-surface-raised mt-auto space-y-2">
                 <button
-                  onClick={() => { setTimelineTaskId(selectedTask.id); setTimelineForm({ startDate: selectedTask.startDate?.slice(0, 10) || '', endDate: selectedTask.endDate?.slice(0, 10) || '', progressPct: selectedTask.progressPct || 0 }); setTimelineOpen(true) }}
+                  onClick={() => { setTimelineTaskId(selectedTask.id); setTimelineForm({ startDate: selectedTask.startDate?.slice(0, 10) || '', endDate: selectedTask.endDate?.slice(0, 10) || '', progressPct: selectedTask.progressPct || 0 }); setTimelineOpen(true); }}
                   className="w-full flex items-center justify-center gap-2 bg-primary text-white py-3 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
                 >
                   <Edit2 size={14} />
                   Edit Timeline
+                </button>
+                <button
+                  type="button"
+                  disabled={deleteTask.isPending}
+                  onClick={() => {
+                    if (window.confirm(`Delete task "${selectedTask.title}"?`)) {
+                      deleteTask.mutate(selectedTask.id);
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-2 border border-danger/30 text-danger bg-danger-light/10 py-2.5 rounded-input text-xs font-semibold hover:bg-danger-light/20 transition-colors disabled:opacity-60"
+                >
+                  <Trash2 size={13} />
+                  Delete Task
                 </button>
               </div>
             )}
@@ -308,6 +378,34 @@ export default function Roadmap() {
       <FormDialog open={phaseOpen} onClose={() => setPhaseOpen(false)} title="New roadmap phase" busy={createPhase.isPending} onConfirm={() => createPhase.mutate()} confirmLabel="Create phase"><label className="block text-sm font-medium text-body">Phase name<input required value={phaseTitle} onChange={event => setPhaseTitle(event.target.value)} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></FormDialog>
       <FormDialog open={taskOpen} onClose={() => setTaskOpen(false)} title="New roadmap task" busy={createTask.isPending} onConfirm={() => createTask.mutate()} confirmLabel="Create task"><div className="space-y-4"><label className="block text-sm font-medium text-body">Task name<input required value={taskForm.title} onChange={event => setTaskForm(current => ({ ...current, title: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Phase<select value={taskForm.phaseId || phases[0]?.id || ''} onChange={event => setTaskForm(current => ({ ...current, phaseId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2">{phases.map(phase => <option key={phase.id} value={phase.id}>{phase.title}</option>)}</select></label></div></FormDialog>
       <FormDialog open={timelineOpen} onClose={() => setTimelineOpen(false)} title="Edit task timeline" subtitle={selectedTask?.title} busy={updateTimeline.isPending} onConfirm={() => updateTimeline.mutate()} confirmLabel="Save timeline"><div className="space-y-4"><label className="block text-sm font-medium text-body">Start date<input type="date" value={timelineForm.startDate} onChange={event => setTimelineForm(current => ({ ...current, startDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">End date<input type="date" value={timelineForm.endDate} onChange={event => setTimelineForm(current => ({ ...current, endDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Progress (%)<input type="number" min="0" max="100" value={timelineForm.progressPct} onChange={event => setTimelineForm(current => ({ ...current, progressPct: Number(event.target.value) }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div></FormDialog>
+      <FormDialog
+        open={teamOpen}
+        onClose={() => setTeamOpen(false)}
+        title="Assigned Execution Team"
+        subtitle={selectedTask?.title}
+        confirmLabel="Close"
+        onConfirm={() => setTeamOpen(false)}
+      >
+        <div className="space-y-3">
+          {(!selectedTask?.assignees || selectedTask.assignees.length === 0) ? (
+            <div className="text-sm text-muted">No team members assigned.</div>
+          ) : (
+            selectedTask.assignees.map((assignee, idx) => (
+              <div key={idx} className="flex items-center justify-between py-2 border-b border-border-default last:border-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-surface-strong flex items-center justify-center text-xs font-bold text-heading">
+                    {assignee.employee?.name ? assignee.employee.name.slice(0, 2).toUpperCase() : '?'}
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-heading">{assignee.employee?.name || 'Team Member'}</div>
+                    {assignee.employee?.title ? <div className="text-xs text-caption">{assignee.employee.title}</div> : null}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </FormDialog>
     </div>
   );
 }
