@@ -42,7 +42,7 @@ export default function SettingsGeneral() {
 
   // Form fields are seeded from the server response (the old page used uncontrolled
   // defaultValue + a no-op Save button; now Save is a real PATCH).
-  const [form, setForm] = useState({ name: '', supportEmail: '', timezone: '', currency: '', dateFormat: '', overtimeThresholdHours: '8' })
+  const [form, setForm] = useState({ name: '', supportEmail: '', logoUrl: '', timezone: '', currency: '', dateFormat: '', overtimeThresholdHours: '8' })
   const [saved, setSaved] = useState(false)
   const [rateForm, setRateForm] = useState({ currency: '', rateToBase: '', effectiveAt: '', reference: '' })
 
@@ -51,6 +51,7 @@ export default function SettingsGeneral() {
       setForm({
         name: settings.name ?? '',
         supportEmail: settings.supportEmail ?? '',
+        logoUrl: settings.logoUrl ?? '',
         timezone: settings.timezone ?? '',
         currency: settings.currency ?? '',
         dateFormat: settings.dateFormat ?? '',
@@ -60,12 +61,13 @@ export default function SettingsGeneral() {
   }, [settings])
 
   const saveMutation = useMutation({
-    // Blank fields: `supportEmail` is nullable (clears it); the rest are non-nullable, so a
+    // Blank fields: `supportEmail` and `logoUrl` are nullable (clears them); the rest are non-nullable, so a
     // blank value is omitted rather than sent as '' (the API's Zod schema rejects empty strings).
     mutationFn: () => http.patch('/settings/general', {
       body: {
         name: form.name.trim() ? form.name : undefined,
         supportEmail: form.supportEmail.trim() ? form.supportEmail.trim() : null,
+        logoUrl: form.logoUrl.trim() ? form.logoUrl.trim() : null,
         timezone: form.timezone.trim() ? form.timezone : undefined,
         currency: !settings?.currencyLockedAt && form.currency.trim() ? form.currency : undefined,
         dateFormat: form.dateFormat.trim() ? form.dateFormat : undefined,
@@ -177,11 +179,31 @@ export default function SettingsGeneral() {
 
             <div className="flex items-start gap-6">
               {/* Logo Upload */}
-              <div className="w-32 h-32 rounded-button border-2 border-dashed border-border-strong bg-surface-muted flex flex-col items-center justify-center text-caption hover:bg-surface-active hover:border-caption transition-colors cursor-pointer shrink-0">
-                <div className="w-10 h-10 bg-surface-strong rounded-full flex items-center justify-center mb-2">
-                  <Cloud size={20} className="text-muted" />
-                </div>
-                <span className="text-xs font-semibold text-body-light">Upload Logo</span>
+              <div
+                onClick={() => {
+                  const url = window.prompt('Enter image URL for workspace logo (or leave empty to remove):', form.logoUrl || '');
+                  if (url !== null) {
+                    setForm(curr => ({ ...curr, logoUrl: url.trim() }));
+                  }
+                }}
+                className="w-32 h-32 rounded-button border-2 border-dashed border-border-strong bg-surface-muted flex flex-col items-center justify-center text-caption hover:bg-surface-active hover:border-caption transition-colors cursor-pointer shrink-0 overflow-hidden relative group"
+                title="Click to set logo URL"
+              >
+                {form.logoUrl ? (
+                  <>
+                    <img src={form.logoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-semibold transition-opacity">
+                      Change Logo
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-10 h-10 bg-surface-strong rounded-full flex items-center justify-center mb-2">
+                      <Cloud size={20} className="text-muted" />
+                    </div>
+                    <span className="text-xs font-semibold text-body-light">Upload Logo</span>
+                  </>
+                )}
               </div>
 
               {/* Form Fields */}
@@ -201,6 +223,16 @@ export default function SettingsGeneral() {
                     type="email"
                     value={form.supportEmail}
                     onChange={setField('supportEmail')}
+                    className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-heading mb-1.5">Logo URL</label>
+                  <input
+                    type="url"
+                    value={form.logoUrl}
+                    onChange={setField('logoUrl')}
+                    placeholder="https://example.com/logo.png"
                     className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>

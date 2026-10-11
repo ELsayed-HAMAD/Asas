@@ -24,3 +24,53 @@ describe('getIntegrationWebhookLogs', () => {
     expect(prisma.webhookLog.findMany).not.toHaveBeenCalled()
   })
 })
+
+describe('updateTenantSettings', () => {
+  it('updates workspace logoUrl and general profile within tenant boundary', async () => {
+    const now = new Date('2026-10-11T12:00:00.000Z')
+    const existing = {
+      name: 'Old Name',
+      slug: 'old-slug',
+      supportEmail: null,
+      logoUrl: null,
+      timezone: 'UTC',
+      currency: 'USD',
+      currencyLockedAt: null,
+      dateFormat: 'MMM d, yyyy',
+      overtimeThresholdHours: 8,
+      createdAt: now,
+      updatedAt: now,
+    }
+    const updated = {
+      ...existing,
+      name: 'New Name',
+      logoUrl: 'https://example.com/logo.png',
+      updatedAt: now,
+    }
+    const prisma = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: 'tenant_1' }]),
+      tenant: {
+        findUnique: vi.fn().mockResolvedValue(existing),
+        update: vi.fn().mockResolvedValue(updated),
+      },
+    } as unknown as PrismaClient
+
+    const { updateTenantSettings } = await import('../src/modules/settings/settings.service.js')
+    const result = await updateTenantSettings(prisma, 'tenant_1', {
+      name: 'New Name',
+      logoUrl: 'https://example.com/logo.png',
+    })
+
+    expect(prisma.tenant.update).toHaveBeenCalledWith({
+      where: { id: 'tenant_1' },
+      data: expect.objectContaining({
+        name: 'New Name',
+        logoUrl: 'https://example.com/logo.png',
+      }),
+      select: expect.any(Object),
+    })
+    expect(result.logoUrl).toBe('https://example.com/logo.png')
+    expect(result.name).toBe('New Name')
+  })
+})
+
