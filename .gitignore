@@ -91,6 +91,7 @@ storage/
 tmp/
 temp/
 .tmp/
+.tmp-shims/
 
 # =========================
 # Testing & Coverage

@@ -14,11 +14,12 @@ import {
   ArrowDownUp,
   Check
 } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { inventoryApi } from '../../../lib/api/inventory';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney, formatDate } from '../../../lib/format';
 import { useActiveMemberRole } from '../../../lib/authClient';
+import { useDebouncedValue } from '../../../lib/useDebouncedValue';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import TopBarActions from '../../../components/TopBarActions';
@@ -28,7 +29,8 @@ export default function Inventory() {
   const [manualDeselect, setManualDeselect] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
+  // Debounce the top-bar search into the list query's `search` param (shared helper).
+  const search = useDebouncedValue(searchInput);
   const [stockFilter, setStockFilter] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
@@ -37,15 +39,10 @@ export default function Inventory() {
   const [purchaseOrderError, setPurchaseOrderError] = useState('');
   const [createdOrder, setCreatedOrder] = useState(null);
 
-  // Debounce the top-bar search into the list query's `search` param.
-  useEffect(() => {
-    const timer = setTimeout(() => setSearch(searchInput.trim()), 300);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
-
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.inventory.products.list({ search: search || undefined, status: stockFilter || undefined, archived: showArchived, limit: 100 }),
     queryFn: () => inventoryApi.listProducts({ search: search || undefined, status: stockFilter || undefined, archived: showArchived, limit: 100 }),
+    placeholderData: keepPreviousData,
   });
 
   const products = data?.items ?? [];
@@ -514,11 +511,11 @@ export default function Inventory() {
                   <div className="grid grid-cols-2 gap-4 pt-2">
                     <div className="border border-border-default rounded-button p-4 bg-surface-raised">
                       <p className="text-[11px] font-medium text-muted mb-1">Avg. Monthly Usage</p>
-                      <p className="text-lg font-bold text-heading">{selectedProduct.avgMonthlyUsage || 0} Units</p>
+                      <p className="text-lg font-bold text-heading">{selectedProduct.avgMonthlyUsage == null ? '—' : `${selectedProduct.avgMonthlyUsage} Units`}</p>
                     </div>
                     <div className="border border-border-default rounded-button p-4 bg-surface-raised">
                       <p className="text-[11px] font-medium text-muted mb-1">Lead Time</p>
-                      <p className="text-lg font-bold text-heading">{selectedProduct.leadTimeDays || 0} Days</p>
+                      <p className="text-lg font-bold text-heading">{selectedProduct.leadTimeDays == null ? '—' : `${selectedProduct.leadTimeDays} Days`}</p>
                     </div>
                   </div>
                 </div>

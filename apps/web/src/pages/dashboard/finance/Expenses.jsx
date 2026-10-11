@@ -14,18 +14,21 @@ import {
   Download,
   Loader2
 } from 'lucide-react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../../../lib/api/finance';
 import { hrApi } from '../../../lib/api/hr';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney } from '../../../lib/format';
 import { downloadCsv } from '../../../lib/csv';
+import { useDebouncedValue } from '../../../lib/useDebouncedValue';
 import TopBarActions from '../../../components/TopBarActions';
 
 export default function Expenses() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState(null);
-  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  // Debounce the search box so each keystroke doesn't fire a list request and collapse the table.
+  const search = useDebouncedValue(searchInput)
   const [departmentId, setDepartmentId] = useState('')
   const [sort, setSort] = useState('desc')
   const [receiptZoom, setReceiptZoom] = useState(100)
@@ -35,6 +38,7 @@ export default function Expenses() {
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.finance.expenses.list({ limit: 100, search: search || undefined, departmentId: departmentId || undefined, sort }),
     queryFn: () => financeApi.listExpenses({ limit: 100, search: search || undefined, departmentId: departmentId || undefined, sort }),
+    placeholderData: keepPreviousData,
   });
   useEffect(() => {
     const rows = data?.items || []
@@ -105,8 +109,8 @@ export default function Expenses() {
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
             <input
               type="text"
-              value={search}
-              onChange={event => setSearch(event.target.value)}
+              value={searchInput}
+              onChange={event => setSearchInput(event.target.value)}
               placeholder="Search..."
               className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-56 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />

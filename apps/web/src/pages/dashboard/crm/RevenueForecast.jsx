@@ -243,7 +243,7 @@ export default function RevenueForecast() {
               <p className="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">{committedTotal === 0 ? '—' : formatCurrency(committedTotal)}</p>
               <span className="inline-flex items-center gap-1.5 bg-[#eff6ff] text-[#1d4ed8] px-2.5 py-1 rounded text-[10px] font-bold">
                 <div className="w-1.5 h-1.5 bg-[#3b82f6] rounded-full"></div>
-                High Confidence
+                High Confidence · {summary.dealCommitCount} {summary.dealCommitCount === 1 ? 'deal' : 'deals'}
               </span>
             </div>
           </div>
@@ -258,7 +258,7 @@ export default function RevenueForecast() {
               <p className="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">{bestCaseTotal === 0 ? '—' : formatCurrency(bestCaseTotal)}</p>
               <span className="inline-flex items-center gap-1.5 bg-[#fefce8] text-[#a16207] px-2.5 py-1 rounded text-[10px] font-bold">
                 <div className="w-1.5 h-1.5 bg-[#eab308] rounded-full"></div>
-                Medium Confidence
+                Medium Confidence · {summary.dealBestCaseCount} {summary.dealBestCaseCount === 1 ? 'deal' : 'deals'}
               </span>
             </div>
           </div>

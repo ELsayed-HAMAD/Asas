@@ -37,6 +37,13 @@ export default function CRMOverview() {
   const { data: forecast } = useQuery({
     queryKey: queryKeys.crm.forecast(),
     queryFn: () => crmApi.getForecast(),
+  })
+  // Current-year closed-won from recorded actual closures — the quota bar must compare
+  // this year's won value with this year's quota, not the all-time stage inventory.
+  const currentYear = String(new Date().getFullYear())
+  const { data: perf } = useQuery({
+    queryKey: queryKeys.crm.salesPerformance(currentYear),
+    queryFn: () => crmApi.getSalesPerformance(currentYear),
   });
   const { data: agenda } = useQuery({ queryKey: queryKeys.crm.agenda(), queryFn: () => crmApi.listAgenda() })
   const createAgenda = useMutation({
@@ -96,9 +103,10 @@ export default function CRMOverview() {
     : null;
   const currency = pipeline.openTotal?.currency || forecast?.summary?.totalPipeline?.currency || 'USD';
 
-  // Closed-Won progress bar: closed-won value against the stored quota goal (when any).
+  // Closed-Won progress bar: this year's actual closed-won value against the stored quota
+  // goal (when any). Legacy undated closures stay excluded, as on Sales Performance.
   const quotaMajor = toMajor(forecast?.summary?.totalQuota);
-  const closedPctOfQuota = quotaMajor > 0 ? (toMajor(pipeline.wonTotal) / quotaMajor) * 100 : null;
+  const closedPctOfQuota = quotaMajor > 0 && perf ? (toMajor(perf.yearWonTotal) / quotaMajor) * 100 : null;
 
   return (
     <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
@@ -205,14 +213,14 @@ export default function CRMOverview() {
             </div>
           </div>
 
-          {/* Closed Won */}
+          {/* Closed Won — current calendar year, from recorded actual closure dates */}
           <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card flex flex-col justify-between h-28">
             <div className="flex justify-between items-center">
-              <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Closed Won</p>
-              <p className="text-[11px] text-muted font-medium">{pipeline.wonCount} deals</p>
+              <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Closed Won ({perf?.year ?? currentYear})</p>
+              <p className="text-[11px] text-muted font-medium">{perf ? `${perf.summary.totalWonCount} deals` : '…'}</p>
             </div>
             <div>
-              <p className="text-3xl font-bold text-heading tracking-tight mb-2">{formatMoney(pipeline.wonTotal)}</p>
+              <p className="text-3xl font-bold text-heading tracking-tight mb-2">{perf ? formatMoney(perf.yearWonTotal) : '…'}</p>
               <div className="w-full bg-surface-active rounded-full h-1.5 overflow-hidden">
                 <div className="bg-accent h-1.5 rounded-full" style={{ width: `${closedPctOfQuota == null ? 0 : Math.min(100, closedPctOfQuota)}%` }}></div>
               </div>

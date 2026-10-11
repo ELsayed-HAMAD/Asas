@@ -106,7 +106,7 @@ export async function listEmployees(
   const today = tenantToday(timezone)
   const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1))
 
-  const [items, total, onLeaveCount, totalHeadcount, hiredThisMonth] = await Promise.all([
+  const [items, total, onLeaveCount, totalHeadcount, hiredThisMonth, openRoleRows] = await Promise.all([
     prisma.employee.findMany({
       where, skip, take,
       orderBy: query.sort === 'NAME_DESC' ? [{ name: 'desc' }, { id: 'asc' }] : [{ name: 'asc' }, { id: 'asc' }],
@@ -116,6 +116,12 @@ export async function listEmployees(
     prisma.employee.count({ where: { tenantId, status: 'ON_LEAVE' } }),
     prisma.employee.count({ where: { tenantId, status: { not: 'ARCHIVED' } } }),
     prisma.employee.count({ where: { tenantId, status: { not: 'ARCHIVED' }, hiredAt: { gte: monthStart } } }),
+    // Distinct recruitment roles with at least one candidate still in a non-terminal stage.
+    prisma.candidate.findMany({
+      where: { tenantId, stage: { notIn: ['HIRED', 'REJECTED'] } },
+      select: { role: true },
+      distinct: ['role'],
+    }),
   ])
 
   return {
@@ -125,8 +131,10 @@ export async function listEmployees(
       totalHeadcount,
       onLeaveCount,
       hiredThisMonth,
-      // See employeeSummarySchema.openRoles: no requisition model exists yet to compute this from.
-      openRoles: 0,
+      // Real count of distinct candidate `role` values with an open (non-HIRED/non-REJECTED)
+      // pipeline candidate. No requisition model exists yet, so this counts recruited-for
+      // roles, not approved headcount requisitions.
+      openRoles: openRoleRows.length,
     },
   }
 }
