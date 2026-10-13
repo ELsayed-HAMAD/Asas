@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, ChevronRight } from 'lucide-react'
+import { useSession } from '../../lib/authClient'
 
 // ── Mini previews inside feature cards ─────────────────────
 
@@ -202,6 +203,8 @@ const COMPANIES = ['AcmeCorp', 'Globex', 'Soylent', 'Initech', 'MassiveDynamic']
 
 // ── Landing page ────────────────────────────────────────────
 export default function Landing() {
+  const { data: session } = useSession()
+
   useEffect(() => {
     // Landing page always stays in original Light mode
     document.documentElement.classList.remove('dark')
@@ -229,12 +232,21 @@ export default function Landing() {
           </nav>
 
           {/* CTA */}
-          <Link
-            to="/register"
-            className="bg-primary text-white text-sm font-medium px-4 py-2 rounded-button hover:bg-primary-hover transition-colors"
-          >
-            Book a Demo
-          </Link>
+          {session?.user ? (
+            <Link
+              to="/dashboard"
+              className="bg-primary text-white text-sm font-medium px-4 py-2 rounded-button hover:bg-primary-hover transition-colors"
+            >
+              Go to Workspace
+            </Link>
+          ) : (
+            <Link
+              to="/register"
+              className="bg-primary text-white text-sm font-medium px-4 py-2 rounded-button hover:bg-primary-hover transition-colors"
+            >
+              Book a Demo
+            </Link>
+          )}
         </div>
       </header>
 
@@ -261,19 +273,39 @@ export default function Landing() {
 
         {/* CTAs */}
         <div className="flex items-center justify-center gap-3 flex-wrap">
-          <Link
-            to="/register"
-            className="inline-flex items-center gap-2 bg-primary text-white text-sm font-semibold px-5 py-2.5 rounded-button hover:bg-primary-hover transition-colors"
-          >
-            Start Free Trial
-            <ArrowRight size={15} />
-          </Link>
-          <Link
-            to="/login"
-            className="inline-flex items-center gap-2 border border-border-default text-body text-sm font-medium px-5 py-2.5 rounded-button hover:bg-surface-muted transition-colors"
-          >
-            Explore the Platform
-          </Link>
+          {session?.user ? (
+            <>
+              <Link
+                to="/dashboard"
+                className="inline-flex items-center gap-2 bg-primary text-white text-sm font-semibold px-5 py-2.5 rounded-button hover:bg-primary-hover transition-colors"
+              >
+                Go to Workspace
+                <ArrowRight size={15} />
+              </Link>
+              <Link
+                to="/register"
+                className="inline-flex items-center gap-2 border border-border-default text-body text-sm font-medium px-5 py-2.5 rounded-button hover:bg-surface-muted transition-colors"
+              >
+                Switch Account
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/register"
+                className="inline-flex items-center gap-2 bg-primary text-white text-sm font-semibold px-5 py-2.5 rounded-button hover:bg-primary-hover transition-colors"
+              >
+                Start Free Trial
+                <ArrowRight size={15} />
+              </Link>
+              <Link
+                to="/login"
+                className="inline-flex items-center gap-2 border border-border-default text-body text-sm font-medium px-5 py-2.5 rounded-button hover:bg-surface-muted transition-colors"
+              >
+                Explore the Platform
+              </Link>
+            </>
+          )}
         </div>
       </section>
 
@@ -335,10 +367,10 @@ export default function Landing() {
             Deployment takes minutes, not months.
           </p>
           <Link
-            to="/register"
+            to={session?.user ? "/dashboard" : "/register"}
             className="inline-flex items-center gap-2 bg-surface-raised text-heading text-sm font-semibold px-6 py-3 rounded-button hover:bg-surface-active transition-colors"
           >
-            Deploy Asas Today
+            {session?.user ? "Go to Workspace" : "Deploy Asas Today"}
           </Link>
           <p className="text-body-light text-xs mt-4">No credit card required for 14-day trial</p>
         </div>

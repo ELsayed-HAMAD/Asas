@@ -85,6 +85,8 @@ export default function DashboardOverview() {
   const headcount = employees.isLoading ? '…' : employees.isError ? '—' : employees.data?.summary?.totalHeadcount ?? 0
   const onLeaveCount = employees.data?.summary?.onLeaveCount ?? 0
   const hiredThisMonth = employees.data?.summary?.hiredThisMonth ?? 0
+  const hiredPreviousMonthToDate = employees.data?.summary?.hiredPreviousMonthToDate ?? 0
+  const hiresDelta = hiredThisMonth - hiredPreviousMonthToDate
   const openCount = crm.data?.pipeline?.openCount ?? 0
   const previousOpenCount = crm.data?.pipeline?.openCountComparison?.previousCount
   const openCountDelta = previousOpenCount == null ? null : openCount - previousOpenCount
@@ -125,9 +127,7 @@ export default function DashboardOverview() {
     {
       label: 'Headcount',
       value: headcount.toString(),
-      change: hiredThisMonth > 0
-        ? `+${hiredThisMonth} this month${onLeaveCount > 0 ? ` · ${onLeaveCount} on leave` : ''}`
-        : onLeaveCount > 0 ? `${onLeaveCount} on leave` : 'All active',
+      change: `${hiredThisMonth} hired MTD (${hiresDelta > 0 ? '+' : ''}${hiresDelta} vs same period last month)${onLeaveCount > 0 ? ` · ${onLeaveCount} on leave` : ''}`,
       trend: 'neutral',
       icon: Users,
     },

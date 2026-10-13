@@ -314,6 +314,12 @@ export async function correctAttendancePunchInTransaction(
       data: { alert: false },
     })
   }
+  if (clockOutAt) {
+    await tx.attendanceException.updateMany({
+      where: { tenantId, employeeId: day.timesheet.employeeId, type: 'MISSING_OUT', date: exceptionDate, alert: true },
+      data: { alert: false },
+    })
+  }
 
   return {
     correction: {
@@ -389,6 +395,10 @@ export async function clockAttendance(
       elapsedHours = Math.round((elapsedMinutes / 60) * 100) / 100
     }
     const updated = await tx.timesheetDay.update({ where: { id: day.id }, data: { clockOut: localTime, ...(day.clockInAt ? { clockOutAt: now } : {}), totalHours: elapsedHours } })
+    await tx.attendanceException.updateMany({
+      where: { tenantId, employeeId, type: 'MISSING_OUT', date: day.date ?? date, alert: true },
+      data: { alert: false },
+    })
     const recordedDays = await tx.timesheetDay.findMany({ where: { timesheetId: day.timesheetId }, select: { totalHours: true } })
     const dailyHours = recordedDays.map(row => row.totalHours ?? 0)
     const totalHours = Math.round(dailyHours.reduce((sum, hours) => sum + hours, 0) * 100) / 100
@@ -403,6 +413,72 @@ export async function clockAttendance(
     }
     return { employeeId, clockIn: updated.clockIn, clockOut: updated.clockOut }
   }, { isolationLevel: 'Serializable' })
+}
+
+/**
+ * Flag timestamped punches that have remained open for 24 hours. This signals an admin to
+ * review/correct the record; without employee schedules it does not assert when a shift ended.
+ * Row locks make concurrent API replicas skip work already being handled, and the existing
+ * exception lookup makes repeated scans idempotent without a schema change.
+ */
+export async function generateStalePunchExceptions(prisma: PrismaClient): Promise<number> {
+  return prisma.$transaction(async tx => {
+    const stalePunches = await tx.$queryRaw<Array<{ tenantId: string; employeeId: string; date: Date }>>`
+      SELECT sheet."tenantId", sheet."employeeId", day."date"
+      FROM "TimesheetDay" day
+      JOIN "Timesheet" sheet ON sheet."id" = day."timesheetId"
+      WHERE day."date" IS NOT NULL
+        AND day."clockInAt" IS NOT NULL
+        AND day."clockOutAt" IS NULL
+        AND day."clockInAt" <= CURRENT_TIMESTAMP - INTERVAL '24 hours'
+        AND sheet."approvedAt" IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM "AttendanceException" exception
+          WHERE exception."tenantId" = sheet."tenantId"
+            AND exception."employeeId" = sheet."employeeId"
+            AND exception."type" = 'MISSING_OUT'::"AttendanceExceptionType"
+            AND exception."date" = day."date"
+        )
+      ORDER BY day."clockInAt" ASC
+      LIMIT 500
+      FOR UPDATE OF day SKIP LOCKED
+    `
+    if (stalePunches.length === 0) return 0
+
+    const existing = await tx.attendanceException.findMany({
+      where: {
+        type: 'MISSING_OUT',
+        OR: stalePunches.map(punch => ({ tenantId: punch.tenantId, employeeId: punch.employeeId, date: punch.date })),
+      },
+      select: { tenantId: true, employeeId: true, date: true },
+    })
+    const existingKeys = new Set(existing.map(row => `${row.tenantId}:${row.employeeId}:${row.date.toISOString().slice(0, 10)}`))
+    const candidates = stalePunches.filter(punch => !existingKeys.has(`${punch.tenantId}:${punch.employeeId}:${punch.date.toISOString().slice(0, 10)}`))
+    if (candidates.length === 0) return 0
+
+    const created = await tx.attendanceException.createManyAndReturn({
+      data: candidates.map(punch => ({
+        tenantId: punch.tenantId,
+        employeeId: punch.employeeId,
+        type: 'MISSING_OUT',
+        label: 'Punch remained open for at least 24 hours; review and correct the time entry',
+        date: punch.date,
+        alert: true,
+      })),
+      select: { id: true, tenantId: true },
+    })
+    await tx.auditLog.createMany({
+      data: created.map(exception => ({
+        tenantId: exception.tenantId,
+        actorId: null,
+        action: 'hr.attendance.exception.missing_out.detected',
+        targetType: 'AttendanceException',
+        targetId: exception.id,
+        metadata: JSON.stringify({ source: 'stale_punch_scan', thresholdHours: 24 }),
+      })),
+    })
+    return created.length
+  })
 }
 
 export async function approveTimesheet(

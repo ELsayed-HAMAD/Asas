@@ -14,6 +14,7 @@ import {
   expenseStatusUpdateSchema,
   expenseUpdateSchema,
   expenseWriteSchema,
+  selfExpenseWriteSchema,
   financeOverviewResponseSchema,
   financeOverviewQuerySchema,
   journalEntrySchema,
@@ -46,17 +47,25 @@ import {
   vendorSchema,
   vendorUpdateSchema,
   vendorWriteSchema,
+  bankStatementImportRequestSchema,
+  bankStatementImportSchema,
+  bankStatementImportListSchema,
+  bankStatementMatchRequestSchema,
+  idSchema,
 } from '@asas/contracts'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
-import { requireAuthContext, requireRole } from '../../middlewares/rbac.js'
-import { requirePermission } from '../../middlewares/permissions.js'
+import { hasRequiredRole, requireAuthContext, requireRole } from '../../middlewares/rbac.js'
+import { PERMISSIONS, requirePermission } from '../../middlewares/permissions.js'
 import { recordAuditLog } from '../../services/auditLog.js'
+import { mailer } from '../../services/mailer.js'
 import { moduleKeyPrefix } from '../../plugins/sse.js'
 import { renderInvoicePdf } from '../../services/pdf.js'
+import { AppError } from '../../utils/errors.js'
 import * as financeController from './finance.controller.js'
 import * as financeService from './finance.service.js'
+import * as reconciliationService from './reconciliation.service.js'
 
 /**
  * Finance — accounts payable, accounts receivable, and expenses.
@@ -142,6 +151,81 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     const { tenantId } = requireAuthContext(request)
     const entry = await financeController.getJournal(request.server.prisma, tenantId, request.params.id)
     return { data: entry }
+  })
+
+  server.get('/bank-statements', {
+    preHandler: requireRole('MEMBER'),
+    schema: { response: { 200: envelope(bankStatementImportListSchema), ...errorResponses } },
+  }, async request => {
+    const { tenantId } = requireAuthContext(request)
+    const batches = await request.server.prisma.bankStatementImport.findMany({
+      where: { tenantId }, orderBy: { createdAt: 'desc' }, take: 20, select: { id: true },
+    })
+    const items = await Promise.all(batches.map(batch => reconciliationService.getBankStatementImport(request.server.prisma, tenantId, batch.id)))
+    return { data: { items } }
+  })
+
+  server.post('/bank-statements', {
+    preHandler: requirePermission('finance.invoice.write'),
+    schema: {
+      body: bankStatementImportRequestSchema,
+      response: { 201: envelope(bankStatementImportSchema), 200: envelope(bankStatementImportSchema), ...errorResponses },
+    },
+  }, async (request, reply) => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const imported = await reconciliationService.importBankStatement(request.server.prisma, tenantId, request.body, async (tx, id) => {
+      await recordAuditLog(tx, {
+        tenantId, actorId: userId, action: 'finance.bank_statement.import', targetType: 'BankStatementImport', targetId: id,
+        metadata: { fileName: request.body.fileName, lineCount: request.body.rows.length, matchedCount: 0 },
+      })
+    })
+    const batch = await reconciliationService.getBankStatementImport(request.server.prisma, tenantId, imported.id)
+    if (imported.created) {
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
+      reply.code(201)
+    } else {
+      reply.code(200)
+    }
+    return { data: batch }
+  })
+
+  server.get('/bank-statements/:id', {
+    preHandler: requireRole('MEMBER'),
+    schema: { params: idParamSchema, response: { 200: envelope(bankStatementImportSchema), ...errorResponses } },
+  }, async request => {
+    const { tenantId } = requireAuthContext(request)
+    return { data: await reconciliationService.getBankStatementImport(request.server.prisma, tenantId, request.params.id) }
+  })
+
+  server.post('/bank-statements/:id/lines/:lineId/match', {
+    preHandler: requirePermission('finance.invoice.write'),
+    schema: { params: z.object({ id: idSchema, lineId: idSchema }), body: bankStatementMatchRequestSchema, response: { 200: envelope(z.object({ id: idSchema, journalLineId: idSchema, matchedAt: z.string() })), ...errorResponses } },
+  }, async request => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const result = await request.server.prisma.$transaction(async tx => {
+      const batch = await tx.bankStatementImport.findFirst({ where: { id: request.params.id, tenantId }, select: { id: true } })
+      if (!batch) throw new AppError(404, 'Bank statement import not found')
+      const match = await reconciliationService.confirmBankStatementMatch(tx, tenantId, batch.id, request.params.lineId, request.body.journalLineId)
+      await recordAuditLog(tx, { tenantId, actorId: userId, action: 'finance.bank_statement.match', targetType: 'BankStatementLine', targetId: match.id, metadata: { journalLineId: match.journalLineId, importId: batch.id } })
+      return match
+    }, { isolationLevel: 'Serializable' })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
+    return { data: result }
+  })
+
+  server.delete('/bank-statements/:id/lines/:lineId/match', {
+    preHandler: requirePermission('finance.invoice.write'),
+    schema: { params: z.object({ id: idSchema, lineId: idSchema }), response: { 204: noContentSchema, ...errorResponses } },
+  }, async (request, reply) => {
+    const { tenantId, userId } = requireAuthContext(request)
+    await request.server.prisma.$transaction(async tx => {
+      const batch = await tx.bankStatementImport.findFirst({ where: { id: request.params.id, tenantId }, select: { id: true } })
+      if (!batch) throw new AppError(404, 'Bank statement import not found')
+      await reconciliationService.undoBankStatementMatch(tx, tenantId, batch.id, request.params.lineId)
+      await recordAuditLog(tx, { tenantId, actorId: userId, action: 'finance.bank_statement.unmatch', targetType: 'BankStatementLine', targetId: request.params.lineId, metadata: { importId: batch.id } })
+    })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
+    return reply.code(204).send()
   })
 
   // ── Vendors ─────────────────────────────────────────────────────────────────
@@ -365,7 +449,13 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request, reply) => {
-      const { tenantId, userId } = requireAuthContext(request)
+      const { tenantId, userId, role } = requireAuthContext(request)
+      if (request.body.status === 'APPROVED' && !hasRequiredRole(role, PERMISSIONS['finance.invoice.approve'])) {
+        throw new AppError(403, 'Approving payable invoices requires the ADMIN role')
+      }
+      if (request.body.status === 'PAID' && !hasRequiredRole(role, PERMISSIONS['finance.invoice.pay'])) {
+        throw new AppError(403, 'Paying payable invoices requires the ADMIN role')
+      }
       const invoice = await request.server.prisma.$transaction(async tx => {
         const invoice = await financeController.updatePayableStatus(
           tx,
@@ -415,7 +505,7 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
   })
 
   server.post('/payables/batch-payment', {
-    preHandler: requirePermission('finance.invoice.write'),
+    preHandler: requirePermission('finance.invoice.pay'),
     schema: {
       body: payableBatchPaymentSchema,
       response: { 200: envelope(z.array(payableInvoiceSchema)), ...errorResponses },
@@ -467,7 +557,7 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
   )
 
   server.post('/payables/:id/void', {
-    preHandler: requirePermission('finance.invoice.write'),
+    preHandler: requirePermission('finance.invoice.void'),
     schema: {
       params: idParamSchema,
       body: financeVoidSchema,
@@ -667,8 +757,22 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
         })
         return res
       })
+      for (const reminder of result.notifications) {
+        const invoiceLines = reminder.invoices.map(invoice =>
+          `- ${invoice.number || 'Invoice'}: ${invoice.amount} ${invoice.currency}${invoice.dueDate ? ` (due ${invoice.dueDate.slice(0, 10)})` : ''}`,
+        ).join('\n')
+        try {
+          await mailer.enqueue({
+            to: reminder.to,
+            subject: 'Payment reminder',
+            text: `Hello ${reminder.customerName},\n\nOur records show these outstanding invoices:\n${invoiceLines}\n\nPlease contact us if you have already made payment.`,
+          })
+        } catch (error) {
+          request.log.error({ err: error, customerId: reminder.customerId }, 'Could not queue receivables reminder email')
+        }
+      }
       request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
-      return { data: result }
+      return { data: { remindedCount: result.remindedCount, customerIds: result.customerIds } }
     },
   )
 
@@ -814,7 +918,7 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
   )
 
   server.post('/receivables/:id/void', {
-    preHandler: requirePermission('finance.invoice.write'),
+    preHandler: requirePermission('finance.invoice.void'),
     schema: {
       params: idParamSchema,
       body: financeVoidSchema,
@@ -847,8 +951,12 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async request => {
-      const { tenantId } = requireAuthContext(request)
-      const result = await financeController.listExpenses(request.server.prisma, tenantId, request.query)
+      const { tenantId, role, employeeId } = requireAuthContext(request)
+      const query = { ...request.query }
+      if (!hasRequiredRole(role, PERMISSIONS['finance.read'])) {
+        query.employeeId = employeeId ?? 'none'
+      }
+      const result = await financeController.listExpenses(request.server.prisma, tenantId, query)
       return { data: result }
     },
   )
@@ -862,9 +970,47 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
         response: { 200: envelope(expenseSchema), ...errorResponses },
       },
     },
-    async request => {
-      const { tenantId } = requireAuthContext(request)
+    async (request, reply) => {
+      const { tenantId, role, employeeId } = requireAuthContext(request)
       const expense = await financeController.getExpense(request.server.prisma, tenantId, request.params.id)
+      if (!hasRequiredRole(role, PERMISSIONS['finance.read'])) {
+        if (!employeeId || expense.employeeId !== employeeId) {
+          reply.code(403)
+          return { error: { message: 'You may only view your own expenses' } }
+        }
+      }
+      return { data: expense }
+    },
+  )
+
+  server.post(
+    '/expenses/self',
+    {
+      preHandler: requirePermission('finance.expense.self'),
+      schema: {
+        body: selfExpenseWriteSchema,
+        response: { 201: envelope(expenseSchema), ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const { tenantId, userId, employeeId } = requireAuthContext(request)
+      if (!employeeId) {
+        throw new AppError(409, 'Link this account to an employee record before submitting expenses')
+      }
+      const expense = await request.server.prisma.$transaction(async tx => {
+        const expense = await financeController.createExpense(tx, tenantId, { ...request.body, employeeId }, userId)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'finance.expense.create',
+          targetType: 'Expense',
+          targetId: expense.id,
+          metadata: { selfService: true, amount: expense.amount },
+        })
+        return expense
+      })
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
+      reply.code(201)
       return { data: expense }
     },
   )
@@ -943,7 +1089,16 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request, reply) => {
-      const { tenantId, userId } = requireAuthContext(request)
+      const { tenantId, userId, role } = requireAuthContext(request)
+      if (request.body.status === 'APPROVED' && !hasRequiredRole(role, PERMISSIONS['finance.expense.approve'])) {
+        throw new AppError(403, 'Approving expenses requires the ADMIN role')
+      }
+      if (request.body.status === 'REIMBURSED' && !hasRequiredRole(role, PERMISSIONS['finance.expense.reimburse'])) {
+        throw new AppError(403, 'Reimbursing expenses requires the ADMIN role')
+      }
+      if (request.body.status === 'REJECTED' && !hasRequiredRole(role, PERMISSIONS['finance.expense.approve'])) {
+        throw new AppError(403, 'Rejecting expenses requires the ADMIN role')
+      }
       const expense = await request.server.prisma.$transaction(async tx => {
         const expense = await financeController.updateExpenseStatus(
           tx,
@@ -970,7 +1125,7 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
   server.post(
     '/expenses/:id/void',
     {
-      preHandler: requirePermission('finance.expense.write'),
+      preHandler: requirePermission('finance.expense.void'),
       schema: {
         params: idParamSchema,
         body: financeVoidSchema,
@@ -995,7 +1150,7 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
   server.delete(
     '/expenses/:id',
     {
-      preHandler: requirePermission('finance.expense.write'),
+      preHandler: requirePermission('finance.expense.void'),
       schema: {
         params: idParamSchema,
         response: { 204: noContentSchema, ...errorResponses },

@@ -69,6 +69,8 @@ export interface CandidateListResult {
   pagination: ReturnType<typeof buildPaginationMeta>
   /** Summary covers every record matching this query, independent of the page size. */
   summary: CandidatePipelineSummary
+  /** Role choices matching search, independent of the selected role filter. */
+  roleOptions: string[]
 }
 
 export async function listCandidates(
@@ -76,15 +78,17 @@ export async function listCandidates(
   tenantId: string,
   query: CandidateListQuery,
 ): Promise<CandidateListResult> {
-  const where: Prisma.CandidateWhereInput = { tenantId }
-  if (query.stage) where.stage = query.stage
+  const roleOptionsWhere: Prisma.CandidateWhereInput = { tenantId }
+  if (query.stage) roleOptionsWhere.stage = query.stage
   if (query.search) {
-    where.OR = [
+    roleOptionsWhere.OR = [
       { name: { contains: query.search, mode: 'insensitive' } },
       { role: { contains: query.search, mode: 'insensitive' } },
       { email: { contains: query.search, mode: 'insensitive' } },
     ]
   }
+  const where: Prisma.CandidateWhereInput = { ...roleOptionsWhere }
+  if (query.role) where.role = query.role
 
   const { skip, take } = toPrismaPage(query)
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { timezone: true } })
@@ -98,12 +102,13 @@ export async function listCandidates(
   const previousMonthLength = new Date(Date.UTC(previousStart.getUTCFullYear(), previousStart.getUTCMonth() + 1, 0)).getUTCDate()
   const previousEnd = new Date(previousStart)
   previousEnd.setUTCDate(Math.min(today.getUTCDate(), previousMonthLength) + 1)
-  const [items, total, allCandidates, hireActivities, offerDecisions] = await Promise.all([
+  const [items, total, allCandidates, hireActivities, offerDecisions, roleRows] = await Promise.all([
     prisma.candidate.findMany({ where, skip, take, orderBy: { appliedAt: 'desc' }, include: { activities: { orderBy: { createdAt: 'desc' }, take: 20 } } }),
     prisma.candidate.count({ where }),
     prisma.candidate.findMany({ where, select: { id: true, stage: true } }),
     prisma.candidateActivity.findMany({ where: { action: 'stage.changed', toStage: 'HIRED', candidate: { is: where } }, select: { createdAt: true, candidate: { select: { appliedAt: true } } } }),
     prisma.candidateActivity.findMany({ where: { action: 'stage.changed', fromStage: 'OFFER_SENT', candidate: { is: where } }, select: { fromStage: true, toStage: true, createdAt: true } }),
+    prisma.candidate.findMany({ where: roleOptionsWhere, distinct: ['role'], orderBy: { role: 'asc' }, select: { role: true } }),
   ])
   const stageCounts = Object.fromEntries(['APPLIED', 'SCREENING', 'TECH_INTERVIEW', 'FINAL_INTERVIEW', 'OFFER_SENT', 'HIRED', 'REJECTED'].map(stage => [stage, 0])) as Record<string, number>
   for (const candidate of allCandidates) stageCounts[candidate.stage] = (stageCounts[candidate.stage] ?? 0) + 1
@@ -147,7 +152,7 @@ export async function listCandidates(
     offersDecidedThisPeriod: currentOffers.length,
     offersDecidedPreviousPeriod: previousOffers.length,
   }
-  return { items: items.map(mapCandidate), pagination: buildPaginationMeta(query, total), summary }
+  return { items: items.map(mapCandidate), pagination: buildPaginationMeta(query, total), summary, roleOptions: roleRows.map(row => row.role) }
 }
 
 export async function getCandidatesForExport(prisma: PrismaClient, tenantId: string, query: Pick<CandidateListQuery, 'search' | 'stage'>) {

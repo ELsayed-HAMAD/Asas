@@ -26,6 +26,7 @@ export const employeeSchema = z.object({
   directReports: z.int().min(0),
   avatarUrl: z.string().nullable(),
   hiredAt: isoDateTimeSchema.nullable(),
+  employmentEndDate: isoDateSchema.nullable(),
   /**
    * Redacted to `null` for callers without the `employee.salary.read` permission \u2014 see
    * `apps/api/src/modules/hr/employees.service.ts`. The wire shape cannot distinguish "no
@@ -34,6 +35,13 @@ export const employeeSchema = z.object({
    */
   salary: decimalStringSchema.nullable(),
   salaryBasis: salaryBasisSchema.nullable(),
+  salaryEffectiveFrom: isoDateSchema.nullable(),
+  salaryHistory: z.array(z.object({
+    salary: decimalStringSchema,
+    salaryBasis: salaryBasisSchema.nullable(),
+    currency: z.string(),
+    effectiveFrom: isoDateSchema,
+  })),
   equityOptions: z.int().nonnegative().nullable(),
   band: z.string().nullable(),
   location: z.string().nullable(),
@@ -57,11 +65,10 @@ export type EmployeeListQuery = z.infer<typeof employeeListQuerySchema>
 export const employeeSummarySchema = z.object({
   totalHeadcount: z.int().min(0),
   onLeaveCount: z.int().min(0),
-  /**
-   * Employees with a recorded `hiredAt` in the current tenant-local calendar month who are
-   * not archived. Zero when no hires occurred this month or `hiredAt` is null.
-   */
+  /** Employees with recorded hire dates from the start of this tenant-local month through today. */
   hiredThisMonth: z.int().min(0),
+  /** Employees hired in the matching elapsed date range of the previous tenant-local month. */
+  hiredPreviousMonthToDate: z.int().min(0),
   /**
    * Distinct recruitment roles with at least one candidate in a non-terminal pipeline stage
    * (HIRED/REJECTED excluded), counted from the candidate pipeline's free-text `role` values.
@@ -75,7 +82,7 @@ export type EmployeeSummary = z.infer<typeof employeeSummarySchema>
 
 export const employeeListResponseSchema = paginated(employeeSchema, employeeSummarySchema)
 
-export const employeeWriteSchema = z.object({
+const employeeWriteFields = {
   name: shortTextSchema,
   title: shortTextSchema,
   departmentId: idSchema.optional().nullable(),
@@ -83,17 +90,25 @@ export const employeeWriteSchema = z.object({
   status: employeeStatusSchema.optional(),
   avatarUrl: z.url().optional().nullable(),
   hiredAt: isoDateSchema.optional().nullable(),
+  employmentEndDate: isoDateSchema.optional().nullable(),
   salary: decimalStringSchema.optional().nullable(),
   salaryBasis: salaryBasisSchema.optional().nullable(),
+  salaryEffectiveFrom: isoDateSchema.optional().nullable(),
   equityOptions: z.int().nonnegative().optional().nullable(),
   band: boundedText(64).optional().nullable(),
   location: boundedText(200).optional().nullable(),
   employeeNumber: boundedText(64).optional().nullable(),
   email: z.email().optional().nullable(),
+}
+
+export const employeeWriteSchema = z.object(employeeWriteFields).superRefine((value, context) => {
+  if (value.salary != null && !value.salaryEffectiveFrom) {
+    context.addIssue({ code: 'custom', path: ['salaryEffectiveFrom'], message: 'Choose the date this salary becomes effective' })
+  }
 })
 
 export type EmployeeWriteInput = z.infer<typeof employeeWriteSchema>
 
-export const employeeUpdateSchema = employeeWriteSchema.partial()
+export const employeeUpdateSchema = z.object(employeeWriteFields).partial()
 
 export type EmployeeUpdateInput = z.infer<typeof employeeUpdateSchema>

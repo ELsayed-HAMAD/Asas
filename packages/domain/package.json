@@ -17,6 +17,10 @@
     "./payroll": {
       "types": "./dist/payroll/index.d.ts",
       "import": "./dist/payroll/index.js"
+    },
+    "./banking": {
+      "types": "./dist/banking/index.d.ts",
+      "import": "./dist/banking/index.js"
     }
   },
   "files": ["dist"],

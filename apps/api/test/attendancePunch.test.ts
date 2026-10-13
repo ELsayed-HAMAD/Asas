@@ -53,7 +53,7 @@ describe('timestamp-backed attendance punches', () => {
         findMany: vi.fn().mockResolvedValue([{ totalHours: 12.5 }]),
       },
       timesheet: { update: vi.fn().mockResolvedValue({}) },
-      attendanceException: { create: vi.fn().mockResolvedValue({ id: 'exception_1' }) },
+      attendanceException: { create: vi.fn().mockResolvedValue({ id: 'exception_1' }), updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     }
     const result = await clockAttendance(clientFor(tx), 'tenant_1', 'employee_1', 'OUT')
     expect(tx.timesheetDay.findFirst).toHaveBeenCalledWith(expect.objectContaining({
@@ -66,6 +66,10 @@ describe('timestamp-backed attendance punches', () => {
     expect(tx.attendanceException.create).toHaveBeenCalledWith({ data: expect.objectContaining({
       type: 'OVERTIME', label: 'Overtime: 4.50 hours', date: day.date,
     }) })
+    expect(tx.attendanceException.updateMany).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant_1', employeeId: 'employee_1', type: 'MISSING_OUT', date: day.date, alert: true },
+      data: { alert: false },
+    })
     expect(result).toMatchObject({ employeeId: 'employee_1', clockIn: '23:00', clockOut: '11:30' })
   })
 
@@ -84,7 +88,7 @@ describe('timestamp-backed attendance punches', () => {
         findMany: vi.fn().mockResolvedValue([{ totalHours: 12.5 }]),
       },
       timesheet: { update: vi.fn().mockResolvedValue({}) },
-      attendanceException: { create: vi.fn().mockResolvedValue({ id: 'exception_1' }) },
+      attendanceException: { create: vi.fn().mockResolvedValue({ id: 'exception_1' }), updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     }
     await clockAttendance(clientFor(tx, 12), 'tenant_1', 'employee_1', 'OUT')
     expect(tx.timesheet.update).toHaveBeenCalledWith({ where: { id: 'sheet_1' }, data: { totalHours: 12.5, regularHours: 10, overtimeHours: 2.5 } })

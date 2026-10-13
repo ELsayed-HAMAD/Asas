@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Search,
   Calendar,
-  Filter,
   MoreVertical,
   FileText,
   ZoomIn,
@@ -60,15 +59,32 @@ export default function AccountsPayable() {
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [batchConfirmOpen, setBatchConfirmOpen] = useState(false)
   const [dateFilter, setDateFilter] = useState('ALL')
-  useEffect(() => setSelectedIds(new Set()), [search, dateFilter])
+  const [statusGroup, setStatusGroup] = useState('OPEN')
+  const [page, setPage] = useState(1)
+  useEffect(() => { setSelectedIds(new Set()); setPage(1) }, [search, dateFilter, statusGroup])
+  const [projectSearchInput, setProjectSearchInput] = useState('')
+  const projectSearch = useDebouncedValue(projectSearchInput)
+  const [projectPage, setProjectPage] = useState(1)
+  const [selectedProject, setSelectedProject] = useState(null)
   const emptyBillForm = () => ({ vendorId: '', projectId: '', invoiceNumber: '', date: new Date().toISOString().slice(0, 10), dueDate: new Date().toISOString().slice(0, 10), amount: '' })
   const [billForm, setBillForm] = useState(emptyBillForm)
+  useEffect(() => { setProjectPage(1) }, [projectSearch])
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: queryKeys.finance.payables.list({ limit: 100, search: search || undefined }),
-    queryFn: () => financeApi.listPayables({ limit: 100, search: search || undefined }),
+    queryKey: queryKeys.finance.payables.list({ page, limit: 25, search: search || undefined, statusGroup, dateRange: dateFilter === 'ALL' ? 'ALL' : 'CURRENT_MONTH' }),
+    queryFn: () => financeApi.listPayables({ page, limit: 25, search: search || undefined, statusGroup, dateRange: dateFilter === 'ALL' ? 'ALL' : 'CURRENT_MONTH' }),
     placeholderData: keepPreviousData,
   });
+  useEffect(() => {
+    const pages = data?.pagination?.pages
+    if (pages === undefined) return
+    if (pages === 0 && page !== 1) setPage(1)
+    else if (pages > 0 && page > pages) setPage(pages)
+  }, [data?.pagination?.pages, page])
+  useEffect(() => {
+    if (data?.items?.length && !data.items.some(item => item.id === selectedId)) setSelectedId(data.items[0].id)
+    else if (data?.items?.length === 0) setSelectedId(null)
+  }, [data?.items, selectedId])
   const { data: detailData } = useQuery({
     queryKey: [...queryKeys.finance.payables.all(), 'detail', selectedId],
     queryFn: () => financeApi.getPayable(selectedId),
@@ -95,9 +111,21 @@ export default function AccountsPayable() {
     queryFn: financeApi.listVendors,
   });
   const { data: projectsData } = useQuery({
-    queryKey: queryKeys.projects.portfolio.list({ limit: 100 }),
-    queryFn: () => projectsApi.listProjects({ limit: 100 }),
+    queryKey: queryKeys.projects.portfolio.list({ page: projectPage, limit: 25, search: projectSearch || undefined }),
+    queryFn: () => projectsApi.listProjects({ page: projectPage, limit: 25, search: projectSearch || undefined }),
+    enabled: billOpen,
+    placeholderData: keepPreviousData,
   });
+  useEffect(() => {
+    const pages = projectsData?.pagination?.pages
+    if (pages === undefined) return
+    if (pages === 0 && projectPage !== 1) setProjectPage(1)
+    else if (pages > 0 && projectPage > pages) setProjectPage(pages)
+  }, [projectsData?.pagination?.pages, projectPage])
+  const projectItems = projectsData?.items ?? []
+  const projectOptions = selectedProject && !projectItems.some(project => project.id === selectedProject.id)
+    ? [selectedProject, ...projectItems]
+    : projectItems
   const vendorAvatar = {};
   (vendorsData?.items ?? []).forEach((v) => {
     if (v.avatarUrl) vendorAvatar[v.id] = v.avatarUrl;
@@ -110,7 +138,7 @@ export default function AccountsPayable() {
   });
   const createBill = useMutation({
     mutationFn: () => financeApi.createPayable({ ...billForm, projectId: billForm.projectId || null, invoiceNumber: billForm.invoiceNumber || null, status: 'PENDING' }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.finance.payables.all() }); setBillOpen(false); setBillForm(emptyBillForm()) },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.finance.payables.all() }); setBillOpen(false); setBillForm(emptyBillForm()); setSelectedProject(null); setProjectSearchInput(''); setProjectPage(1) },
   })
   const requestChanges = useMutation({
     mutationFn: ({ id, reason }) => financeApi.requestPayableChanges(id, reason),
@@ -180,23 +208,14 @@ export default function AccountsPayable() {
     );
   }
 
-  const allItems = data.items || [];
-  const items = dateFilter === 'ALL' ? allItems : allItems.filter(item => {
-    const date = new Date(item.date)
-    const now = new Date()
-    return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()
-  });
+  const items = data.items || [];
   const summary = data.summary || {};
-
-  // Set initial selected item if not set
-  if (!selectedId && items.length > 0) {
-    setSelectedId(items[0].id);
-  }
 
   const selectedRecord = items.find(i => i.id === selectedId);
   const selectedDetail = detailData?.id === selectedId ? detailData : null
   const needsApproval = items.filter(i => i.status === 'PENDING');
   const scheduled = items.filter(i => i.status === 'SCHEDULED' || i.status === 'APPROVED');
+  const historyItems = statusGroup === 'HISTORY' ? items : []
 
   const pastDueTotal = summary.pastDueTotal
   const dueIn7DaysTotal = summary.dueIn7DaysTotal
@@ -250,6 +269,10 @@ export default function AccountsPayable() {
               className="pl-9 pr-4 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
           </div>
+          <select aria-label="Payables view" value={statusGroup} onChange={event => setStatusGroup(event.target.value)} className="border border-border-default text-body px-3 py-1.5 rounded-input text-sm bg-surface-raised">
+            <option value="OPEN">Open bills</option>
+            <option value="HISTORY">History</option>
+          </select>
           <button onClick={() => setDateFilter(current => current === 'ALL' ? 'MONTH' : 'ALL')} className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors">
             <Calendar size={14} className="text-muted" />
             {dateFilter === 'ALL' ? 'All Dates' : 'This Month'}
@@ -266,9 +289,8 @@ export default function AccountsPayable() {
             <Users size={14} className="text-muted" />
             Vendors
           </button>
-          <button onClick={() => setBillOpen(true)} className="bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors">New Bill</button>
+          <button onClick={() => { setProjectSearchInput(''); setProjectPage(1); setSelectedProject(null); setBillOpen(true) }} className="bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors">New Bill</button>
           <div className="w-px h-6 bg-surface-strong mx-1"></div>
-          <button onClick={() => setDateFilter(current => current === 'ALL' ? 'MONTH' : 'ALL')} aria-label="Toggle date filter" title={`Date filter: ${dateFilter === 'ALL' ? 'all dates' : 'this month'}`} className="text-muted hover:text-body transition-colors"><Filter size={18} /></button>
           <button
             type="button"
             onClick={() => {
@@ -443,6 +465,16 @@ export default function AccountsPayable() {
                 )
               })}
 
+              {historyItems.length > 0 && <tr className="bg-surface-muted/50"><td colSpan="4" className="px-6 py-2 border-b border-border-subtle border-t border-border-default"><span className="text-[10px] font-bold text-muted uppercase tracking-wider">History ({historyItems.length})</span></td></tr>}
+              {historyItems.map(item => (
+                <tr key={item.id} onClick={() => setSelectedId(item.id)} className={`cursor-pointer transition-colors ${selectedId === item.id ? 'bg-surface-active/60' : 'bg-surface-raised hover:bg-surface-muted'}`}>
+                  <td className="px-6 py-3.5 text-xs font-semibold text-muted">{item.status}</td>
+                  <td className="px-2 py-3.5"><span className="text-sm font-semibold text-heading">{item.vendor}</span><span className="ml-2 text-xs text-muted">#{item.invoiceNumber || 'N/A'}</span></td>
+                  <td className="px-6 py-3.5 text-sm text-body-light">{new Date(item.dueDate || item.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' })}</td>
+                  <td className="px-6 py-3.5 text-right text-sm font-bold text-heading tabular-nums">{formatMoney(item.amount)}</td>
+                </tr>
+              ))}
+
               {items.length === 0 && (
                  <tr>
                     <td colSpan={4} className="px-6 py-8 text-center text-muted text-sm">
@@ -453,6 +485,14 @@ export default function AccountsPayable() {
 
             </tbody>
           </table>
+          <div className="sticky bottom-0 mt-auto flex items-center justify-between border-t border-border-default bg-surface-raised px-4 py-2 text-xs text-muted">
+            <span>Showing {data.pagination.total === 0 ? 0 : (page - 1) * data.pagination.limit + 1}–{Math.min(page * data.pagination.limit, data.pagination.total)} of {data.pagination.total}</span>
+            <div className="flex items-center gap-2">
+              <button type="button" disabled={page <= 1} onClick={() => setPage(current => current - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
+              <span>Page {data.pagination.pages === 0 ? 0 : page} of {data.pagination.pages}</span>
+              <button type="button" disabled={page >= data.pagination.pages} onClick={() => setPage(current => current + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+            </div>
+          </div>
         </div>
 
         {/* Right: Detail Panel */}
@@ -549,8 +589,8 @@ export default function AccountsPayable() {
           </div>
         )}
       </div>
-      <FormDialog open={billOpen} onClose={() => { setBillOpen(false); createBill.reset() }} title="New bill" subtitle="Add a vendor invoice to accounts payable." busy={createBill.isPending} error={createBill.isError ? createBill.error?.message || 'Could not create the bill.' : undefined} onConfirm={() => createBill.mutate()} confirmLabel="Create bill">
-        <div className="space-y-4"><label className="block text-sm font-medium text-body">Vendor<select required value={billForm.vendorId} onChange={event => setBillForm(current => ({ ...current, vendorId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="">Select a vendor</option>{(vendorsData?.items ?? []).map(vendor => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}</select></label><label className="block text-sm font-medium text-body">Project<select value={billForm.projectId} onChange={event => setBillForm(current => ({ ...current, projectId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="">Unassigned</option>{(projectsData?.items ?? []).map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><label className="block text-sm font-medium text-body">Invoice number<input value={billForm.invoiceNumber} onChange={event => setBillForm(current => ({ ...current, invoiceNumber: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Invoice date<input type="date" required value={billForm.date} onChange={event => setBillForm(current => ({ ...current, date: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Due date<input type="date" required value={billForm.dueDate} onChange={event => setBillForm(current => ({ ...current, dueDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Amount<input required type="number" min="0" step="0.01" value={billForm.amount} onChange={event => setBillForm(current => ({ ...current, amount: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div>
+      <FormDialog open={billOpen} onClose={() => { setBillOpen(false); setSelectedProject(null); createBill.reset() }} title="New bill" subtitle="Add a vendor invoice to accounts payable." busy={createBill.isPending} error={createBill.isError ? createBill.error?.message || 'Could not create the bill.' : undefined} onConfirm={() => createBill.mutate()} confirmLabel="Create bill">
+        <div className="space-y-4"><label className="block text-sm font-medium text-body">Vendor<select required value={billForm.vendorId} onChange={event => setBillForm(current => ({ ...current, vendorId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="">Select a vendor</option>{(vendorsData?.items ?? []).map(vendor => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}</select></label><label className="block text-sm font-medium text-body">Project<input type="search" aria-label="Search projects" value={projectSearchInput} onChange={event => setProjectSearchInput(event.target.value)} placeholder="Search projects..." className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /><select aria-label="Project" value={billForm.projectId} onChange={event => { const project = projectOptions.find(item => item.id === event.target.value) ?? null; setSelectedProject(project); setBillForm(current => ({ ...current, projectId: event.target.value })) }} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="">Unassigned</option>{projectOptions.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select>{projectsData?.pagination?.pages > 1 && <div className="mt-2 flex items-center justify-between text-xs text-muted"><span>{projectsData.pagination.total.toLocaleString()} projects · page {projectPage} of {projectsData.pagination.pages}</span><div className="flex gap-2"><button type="button" aria-label="Previous project page" disabled={projectPage <= 1} onClick={() => setProjectPage(current => Math.max(1, current - 1))} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button><button type="button" aria-label="Next project page" disabled={projectPage >= projectsData.pagination.pages} onClick={() => setProjectPage(current => Math.min(projectsData.pagination.pages, current + 1))} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button></div></div>}</label><label className="block text-sm font-medium text-body">Invoice number<input value={billForm.invoiceNumber} onChange={event => setBillForm(current => ({ ...current, invoiceNumber: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Invoice date<input type="date" required value={billForm.date} onChange={event => setBillForm(current => ({ ...current, date: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Due date<input type="date" required value={billForm.dueDate} onChange={event => setBillForm(current => ({ ...current, dueDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Amount<input required type="number" min="0" step="0.01" value={billForm.amount} onChange={event => setBillForm(current => ({ ...current, amount: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div>
       </FormDialog>
       <FormDialog
         open={changeRequestOpen}

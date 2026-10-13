@@ -6,6 +6,7 @@ import {
   approvePayrollRun,
   createPayrollRun,
   getPayrollRun,
+  getPayrollRoundingReconciliation,
   getPayslipDoc,
   listPayrollRuns,
 } from '../src/modules/hr/payroll.service.js'
@@ -62,6 +63,9 @@ interface StubOptions {
   netSum?: Prisma.Decimal
   lineCount?: number
   currency?: string
+  reconciliationLines?: Row[]
+  onLineBatch?: (rows: Row[]) => void
+  onTaxBatch?: (rows: Row[]) => void
 }
 
 /**
@@ -88,6 +92,16 @@ function stubPrisma(options: StubOptions = {}) {
       findMany: async (args: { where: { id: { in: string[] } } }) =>
         employees.filter(e => (args.where.id.in as string[]).includes(e.id as string)),
     },
+    employeeSalaryHistory: {
+      findMany: async ({ where }: { where: { employeeId: { in: string[] } } }) => employees
+        .filter(employee => (where.employeeId.in as string[]).includes(String(employee.id)))
+        .filter(employee => employee.salary != null)
+        .map(employee => ({
+          tenantId: TENANT, employeeId: String(employee.id), salary: employee.salary as Prisma.Decimal,
+          salaryBasis: (employee.salaryBasis as 'ANNUAL' | 'MONTHLY' | null | undefined) ?? null,
+          currency: options.currency ?? 'USD', effectiveFrom: new Date('2020-01-01T00:00:00.000Z'),
+        })),
+    },
     payrollRun: {
       findFirst: async ({ where }: { where: Row }) => where.requestKey ? (currentRun?.requestKey === where.requestKey ? currentRun : null) : currentRun,
       updateMany: async ({ data }: { data: Row }) => {
@@ -107,7 +121,11 @@ function stubPrisma(options: StubOptions = {}) {
     payrollLine: {
       count: async () => 0,
       create: async (args: { data: Row }) => ({ id: 'line_1', ...args.data }),
-      findMany: async () => lines,
+      createManyAndReturn: async ({ data }: { data: Row[] }) => {
+        options.onLineBatch?.(data)
+        return data.map((row, index) => ({ id: `created_line_${index}`, employeeId: row.employeeId }))
+      },
+      findMany: async (args?: { where?: Row }) => args?.where?.payrollRun ? options.reconciliationLines ?? [] : lines,
       findFirst: async () => lineRow(),
       update: async () => {},
       aggregate: async () => ({
@@ -115,7 +133,7 @@ function stubPrisma(options: StubOptions = {}) {
         _sum: { gross: options.grossSum ?? dec('220000'), deductions: options.deductionsSum ?? dec('22000'), net: options.netSum ?? dec('198000') },
       }),
     },
-    payrollTaxLine: { deleteMany: async () => {}, createMany: async () => {} },
+    payrollTaxLine: { deleteMany: async () => {}, createMany: async ({ data }: { data: Row[] }) => { options.onTaxBatch?.(data) } },
     $queryRaw: async (strings: TemplateStringsArray) => {
       if (strings.join('').includes('SettlementHistoryCoverage')) return [{ currentTotal: null, previousTotal: null }]
       return currentRun ? [{ id: RUN_ID }] : []
@@ -129,6 +147,31 @@ function stubPrisma(options: StubOptions = {}) {
 }
 
 describe('payroll.service', () => {
+  it('reconciles yearly paycheck rounding by employee and identical saved rate schedule', async () => {
+    const rates = [{ label: 'A', rate: '0.2' }, { label: 'B', rate: '0.7' }]
+    const paidLine = {
+      employeeId: 'emp_1', employee: { name: 'Ada Lovelace' }, gross: dec('5.00'),
+      taxLines: [{ label: 'A', amount: dec('0.01'), override: false }, { label: 'B', amount: dec('0.04'), override: false }],
+      payrollRun: { currency: 'USD', taxRates: rates, periodStart: new Date('2026-01-01T00:00:00.000Z') },
+    }
+    const result = await getPayrollRoundingReconciliation(stubPrisma({ reconciliationLines: [
+      paidLine,
+      { ...paidLine, payrollRun: { ...paidLine.payrollRun, periodStart: new Date('2026-02-01T00:00:00.000Z') } },
+      { ...paidLine, taxLines: paidLine.taxLines.map(tax => ({ ...tax, override: tax.label === 'A' })) },
+      { ...paidLine, payrollRun: { ...paidLine.payrollRun, currency: null } },
+    ] }), TENANT, 2026)
+
+    expect(result).toMatchObject({ year: 2026, excludedManualOverrideLines: 1, excludedUnknownCurrencyLines: 1 })
+    expect(result.groups).toHaveLength(1)
+    expect(result.groups[0]).toMatchObject({
+      employeeId: 'emp_1', currency: 'USD', paidLineCount: 2, grossTotal: '10.00',
+      recordedDeductions: '0.10', aggregateRoundedDeductions: '0.09', variance: '0.01',
+      taxLines: [
+        { label: 'A', recorded: '0.02', aggregateRounded: '0.02', variance: '0.00' },
+        { label: 'B', recorded: '0.08', aggregateRounded: '0.07', variance: '0.01' },
+      ],
+    })
+  })
   it('preserves legacy amounts without inventing their earning policy', async () => {
     const run = await getPayrollRun(stubPrisma(), TENANT, RUN_ID)
     expect(run).toMatchObject({ periodStart: null, periodEnd: null, payFrequency: null, periodsPerYear: null, salaryBasis: null, currency: null })
@@ -175,6 +218,23 @@ describe('payroll.service', () => {
     expect(ada.taxLines).toEqual([
       { id: 'tax_1', label: 'Pension', amount: '833.33', override: false },
     ])
+  })
+
+  it('batches line and tax inserts while preserving the full employee set', async () => {
+    let lineBatch: Row[] = []
+    let taxBatch: Row[] = []
+    await createPayrollRun(stubPrisma({
+      onLineBatch: rows => { lineBatch = rows },
+      onTaxBatch: rows => { taxBatch = rows },
+    }), TENANT, {
+      ...PERIOD, label: 'August pay', taxRates: [{ label: 'Pension', rate: '10' }], employeeIds: ['emp_1', 'emp_2'],
+    })
+
+    expect(lineBatch).toHaveLength(2)
+    expect(lineBatch.map(line => line.employeeId)).toEqual(['emp_1', 'emp_2'])
+    expect(taxBatch).toHaveLength(2)
+    expect(taxBatch.map(line => line.label)).toEqual(['Pension', 'Pension'])
+    expect(taxBatch.map(line => line.payrollLineId)).toEqual(['created_line_0', 'created_line_1'])
   })
 
   it('rejects an employee the tenant does not own (tenant isolation on the run inputs)', async () => {

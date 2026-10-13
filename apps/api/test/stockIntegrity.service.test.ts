@@ -54,6 +54,43 @@ describe('stock integrity', () => {
     })
   })
 
+  it('searches stock movement product, warehouse, and note fields before pagination', async () => {
+    const stockMovement = {
+      findMany: vi.fn().mockResolvedValue([]), count: vi.fn().mockResolvedValue(0),
+      aggregate: vi.fn().mockResolvedValue({ _sum: { delta: null } }),
+    }
+    const queryRaw = vi.fn().mockResolvedValue([{ currentIn: 0n, currentOut: 0n, previousIn: 0n, previousOut: 0n }])
+    const prisma = {
+      tenant: { findUnique: vi.fn().mockResolvedValue({ timezone: 'UTC' }) },
+      $queryRaw: queryRaw,
+      stockMovement,
+    } as unknown as PrismaClient
+
+    await listStockMovements(prisma, 'tenant_1', { page: 2, limit: 25, search: 'Widget' })
+
+    expect(stockMovement.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        tenantId: 'tenant_1',
+        OR: [
+          { note: { contains: 'Widget', mode: 'insensitive' } },
+          { product: { name: { contains: 'Widget', mode: 'insensitive' } } },
+          { product: { warehouse: { contains: 'Widget', mode: 'insensitive' } } },
+        ],
+      },
+      skip: 25,
+      take: 25,
+    }))
+    expect(stockMovement.count).toHaveBeenCalledWith(expect.objectContaining({ where: {
+      tenantId: 'tenant_1',
+      OR: [
+        { note: { contains: 'Widget', mode: 'insensitive' } },
+        { product: { name: { contains: 'Widget', mode: 'insensitive' } } },
+        { product: { warehouse: { contains: 'Widget', mode: 'insensitive' } } },
+      ],
+    } }))
+    expect(queryRaw).toHaveBeenCalledTimes(1)
+  })
+
   it('compares recorded product movements in tenant-local month windows and isolates the product', async () => {
     const db = new PGlite()
     vi.useFakeTimers()

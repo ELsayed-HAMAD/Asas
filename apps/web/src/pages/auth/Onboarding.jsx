@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
-import { Database, FileUp, Loader2, Sparkles, SquarePen } from 'lucide-react'
+import { Navigate, Link } from 'react-router-dom'
+import { Database, FileUp, Loader2, Sparkles, SquarePen, Mail } from 'lucide-react'
 import { http } from '../../lib/api/http'
 
 import { useActiveOrganization, useSession, authClient } from '../../lib/authClient'
@@ -63,13 +63,21 @@ export default function Onboarding() {
         const workspaceName = session?.user?.name || 'My Workspace'
         const slug = workspaceName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || `org-${Date.now()}`
         
-        const createRes = await authClient.organization.create({
+        let createRes = await authClient.organization.create({
           name: workspaceName,
           slug,
         })
 
-        if (createRes.error) {
-          throw new Error(createRes.error.message || 'Could not create workspace.')
+        if (createRes?.error && /already exists/i.test(createRes.error.message || '')) {
+          const uniqueSlug = `${slug}-${Math.random().toString(36).substring(2, 6)}`
+          createRes = await authClient.organization.create({
+            name: workspaceName,
+            slug: uniqueSlug,
+          })
+        }
+
+        if (createRes?.error || !createRes?.data?.id) {
+          throw new Error(createRes?.error?.message || 'Could not create workspace.')
         }
 
         currentOrgId = createRes.data.id
@@ -176,9 +184,16 @@ export default function Onboarding() {
           type="button"
           disabled={isLoading}
           onClick={finish}
-          className="w-full bg-primary text-on-primary text-sm font-medium py-2.5 rounded-button hover:bg-primary-hover disabled:opacity-70 flex items-center justify-center gap-2"
+          className="w-full bg-primary text-on-primary text-sm font-medium py-2.5 rounded-button hover:bg-primary-hover disabled:opacity-70 flex items-center justify-center gap-2 cursor-pointer"
         >
-          {isLoading ? <Loader2 size={16} className="animate-spin" /> : 'Continue to dashboard'}
+          {isLoading ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              <span>{selected === 'sample' ? 'Setting up workspace & seeding enterprise data...' : 'Setting up workspace...'}</span>
+            </>
+          ) : (
+            'Continue to dashboard'
+          )}
         </button>
       </div>
     </div>

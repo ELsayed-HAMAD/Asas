@@ -26,11 +26,37 @@ export interface AsasEnv {
    * production the docs are always mounted.
    */
   enableApiDocs: boolean
+  /**
+   * Redis URL for distributed rate limiting and cross-node SSE fanout.
+   * If empty (default), in-memory fallback is used automatically.
+   */
+  redisUrl: string
+  /** Resend API key; email delivery fails explicitly when this is not configured. */
+  resendApiKey: string
+  /** Verified sender address configured with the email provider. */
+  mailFrom: string
+  /** File backend. Local storage is intended for development; S3-compatible storage is durable. */
+  objectStorageDriver: 'local' | 's3'
+  objectStorageBucket: string
+  objectStorageRegion: string
+  objectStorageEndpoint: string
+  objectStorageAccessKeyId: string
+  objectStorageSecretAccessKey: string
+  /** Stripe API key. Empty disables hosted billing operations. */
+  stripeSecretKey: string
+  /** Stripe webhook signing secret. Empty disables webhook processing. */
+  stripeWebhookSecret: string
+  /** Comma-separated allow-list of Stripe recurring Price IDs. */
+  stripePriceIds: string[]
 }
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
   const nodeEnv = source.NODE_ENV || 'development'
   const frontendOrigin = source.FRONTEND_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173'
+  const objectStorageDriver = source.OBJECT_STORAGE_DRIVER ?? 'local'
+  if (objectStorageDriver !== 'local' && objectStorageDriver !== 's3') {
+    throw new Error('OBJECT_STORAGE_DRIVER must be either local or s3')
+  }
   return {
     databaseUrl: source.DATABASE_URL ?? '',
     authSecret: source.AUTH_SECRET ?? source.BETTER_AUTH_SECRET ?? '',
@@ -41,6 +67,18 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
     isProduction: nodeEnv === 'production',
     queueUrl: source.QUEUE_URL ?? '',
     enableApiDocs: source.ENABLE_API_DOCS === 'true',
+    redisUrl: source.REDIS_URL ?? '',
+    resendApiKey: source.RESEND_API_KEY ?? '',
+    mailFrom: source.MAIL_FROM?.trim() ?? '',
+    objectStorageDriver,
+    objectStorageBucket: source.S3_BUCKET ?? '',
+    objectStorageRegion: source.S3_REGION ?? 'us-east-1',
+    objectStorageEndpoint: source.S3_ENDPOINT ?? '',
+    objectStorageAccessKeyId: source.S3_ACCESS_KEY_ID ?? '',
+    objectStorageSecretAccessKey: source.S3_SECRET_ACCESS_KEY ?? '',
+    stripeSecretKey: source.STRIPE_SECRET_KEY ?? '',
+    stripeWebhookSecret: source.STRIPE_WEBHOOK_SECRET ?? '',
+    stripePriceIds: (source.STRIPE_PRICE_IDS ?? '').split(',').map(value => value.trim()).filter(Boolean),
   }
 }
 
@@ -51,6 +89,30 @@ export function assertEnv(environment: AsasEnv = loadEnv()): AsasEnv {
   }
   if (environment.nodeEnv === 'production' && !environment.authSecret) {
     throw new Error('Missing required environment variable: AUTH_SECRET (required in production)')
+  }
+  if (environment.nodeEnv === 'production' && environment.resendApiKey && !environment.mailFrom) {
+    throw new Error('Missing required environment variable: MAIL_FROM (required with RESEND_API_KEY)')
+  }
+  if (environment.objectStorageDriver === 's3' && !environment.objectStorageBucket.trim()) {
+    throw new Error('Missing required environment variable: S3_BUCKET (required with OBJECT_STORAGE_DRIVER=s3)')
+  }
+  if (environment.isProduction && environment.objectStorageDriver !== 's3') {
+    throw new Error('OBJECT_STORAGE_DRIVER=s3 is required in production to prevent files being stored on ephemeral disk')
+  }
+  if (Boolean(environment.objectStorageAccessKeyId) !== Boolean(environment.objectStorageSecretAccessKey)) {
+    throw new Error('S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must be configured together')
+  }
+  if (environment.objectStorageEndpoint && !environment.objectStorageAccessKeyId) {
+    throw new Error('S3 credentials are required when using a custom S3_ENDPOINT')
+  }
+  if (Boolean(environment.stripeSecretKey) !== Boolean(environment.stripeWebhookSecret)) {
+    throw new Error('STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET must be configured together')
+  }
+  if (environment.stripePriceIds.some(priceId => !/^price_[A-Za-z0-9]+$/.test(priceId))) {
+    throw new Error('STRIPE_PRICE_IDS must contain comma-separated Stripe Price IDs')
+  }
+  if (environment.stripePriceIds.length && !environment.stripeSecretKey) {
+    throw new Error('STRIPE_SECRET_KEY is required when STRIPE_PRICE_IDS are configured')
   }
   return environment
 }

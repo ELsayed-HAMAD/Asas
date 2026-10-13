@@ -1,8 +1,8 @@
 import { createRequire } from 'node:module'
-import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { ExportJobStatus } from '@prisma/client'
 import type { FastifyInstance } from 'fastify'
+import { exportObjectKey, type ObjectStorage } from './objectStorage.js'
 
 /**
  * The API's job queue — pg-boss, per the rebuild plan ("all queued through pg-boss in
@@ -77,6 +77,7 @@ export interface ExportQueue {
 export interface ExportJobStore {
   create(data: { tenantId: string; filename: string; dataScope: string; status: ExportJobStatus }): Promise<{ id: string }>
   updateMany(args: { where: { id: string }; data: Record<string, unknown> }): Promise<unknown>
+  getTenantId(jobId: string): Promise<string | null>
 }
 
 /** Where every exported file lands, keyed by job id — the download endpoint's read path. */
@@ -102,10 +103,11 @@ export interface CreateExportQueueOptions {
   /** When set, jobs ride pg-boss on this connection string; when undefined, they run inline. */
   url?: string | undefined
   store: ExportJobStore
+  storage: ObjectStorage
 }
 
 export async function createExportQueue(options: CreateExportQueueOptions): Promise<ExportQueue> {
-  const { url, store } = options
+  const { url, store, storage } = options
   let boss: BossClient | null = null
   const handlers = new Map<string, ExportHandler>()
 
@@ -133,9 +135,9 @@ export async function createExportQueue(options: CreateExportQueueOptions): Prom
     try {
       const extension = (KIND_FILENAME[job.kind] ?? { extension: 'xlsx' }).extension
       const buffer = await handler(job.data, { jobId: job.jobId })
-      const file = exportFilePath(job.jobId, extension)
-      await mkdir(path.dirname(file), { recursive: true })
-      await writeFile(file, buffer)
+      const tenantId = await store.getTenantId(job.jobId)
+      if (!tenantId) throw new Error(`Export job ${job.jobId} not found`)
+      await storage.put(exportObjectKey(tenantId, job.jobId, extension), buffer, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
       await updateRow(job.jobId, { status: 'DONE', progressPct: 100 })
     } catch (error) {
       await updateRow(job.jobId, { status: 'FAILED' })
@@ -192,9 +194,9 @@ declare module 'fastify' {
  */
 export async function exportQueuePlugin(
   app: FastifyInstance,
-  options: { queueUrl?: string | undefined; store: ExportJobStore },
+  options: { queueUrl?: string | undefined; store: ExportJobStore; storage: ObjectStorage },
 ): Promise<void> {
-  const queue = await createExportQueue({ url: options.queueUrl, store: options.store })
+  const queue = await createExportQueue({ url: options.queueUrl, store: options.store, storage: options.storage })
   app.decorate('exportQueue', queue)
   // Handlers are registered by buildApp before workers start polling existing jobs.
   app.addHook('onReady', () => queue.start())

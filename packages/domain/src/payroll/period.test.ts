@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Money } from '../money/money.js'
-import { computePeriodBaseSalary, validatePayrollPeriod } from './period.js'
+import { computePeriodBaseSalary, computePeriodSalarySchedule, validatePayrollPeriod } from './period.js'
 
 const monthly = { periodStart: '2026-10-01', periodEnd: '2026-10-31', payFrequency: 'MONTHLY' as const }
 
@@ -26,6 +26,48 @@ describe('explicit payroll periods', () => {
     const pay = computePeriodBaseSalary(Money.fromDecimal('120000', 'USD'), 'ANNUAL', monthly, '2026-10-16')
     expect(pay).toMatchObject({ eligibleDays: 16, periodDays: 31 })
     expect(pay.baseSalary.toDecimalString()).toBe('5161.29')
+  })
+  it('prorates through the inclusive employment end date', () => {
+    const pay = computePeriodBaseSalary(Money.fromDecimal('120000', 'USD'), 'ANNUAL', monthly, '2025-01-01', '2026-10-16')
+    expect(pay).toMatchObject({ eligibleDays: 16, periodDays: 31 })
+    expect(pay.baseSalary.toDecimalString()).toBe('5161.29')
+  })
+  it('combines hire and employment end dates and pays zero outside the eligible range', () => {
+    const salary = Money.fromDecimal('120000', 'USD')
+    expect(computePeriodBaseSalary(salary, 'ANNUAL', monthly, '2026-10-10', '2026-10-20')).toMatchObject({ eligibleDays: 11, periodDays: 31 })
+    expect(computePeriodBaseSalary(salary, 'ANNUAL', monthly, '2026-11-01', '2026-11-02')).toMatchObject({ eligibleDays: 0, periodDays: 31 })
+  })
+  it('rejects an employment end date before the hire date', () => {
+    expect(() => computePeriodBaseSalary(Money.fromDecimal('120000', 'USD'), 'ANNUAL', monthly, '2026-10-17', '2026-10-16')).toThrow(/before the hire date/)
+  })
+  it('splits an earning period across effective salary changes and rounds only the final total', () => {
+    const result = computePeriodSalarySchedule([
+      { salary: Money.fromDecimal('120000', 'USD'), salaryBasis: 'ANNUAL', effectiveFrom: '2026-10-01' },
+      { salary: Money.fromDecimal('240000', 'USD'), salaryBasis: 'ANNUAL', effectiveFrom: '2026-10-16' },
+    ], 'MONTHLY', monthly)
+    expect(result.baseSalary.toDecimalString()).toBe('15161.29')
+    expect(result.eligibleDays).toBe(31)
+    expect(result.salarySegments.map(segment => segment.eligibleDays)).toEqual([15, 16])
+  })
+  it('requires a known rate at the first eligible day and rejects overlapping effective dates', () => {
+    expect(() => computePeriodSalarySchedule([
+      { salary: Money.fromDecimal('120000', 'USD'), salaryBasis: 'ANNUAL', effectiveFrom: '2026-10-02' },
+    ], 'ANNUAL', monthly)).toThrow(/No salary rate is effective/)
+    expect(() => computePeriodSalarySchedule([
+      { salary: Money.fromDecimal('120000', 'USD'), salaryBasis: 'ANNUAL', effectiveFrom: '2026-10-01' },
+      { salary: Money.fromDecimal('130000', 'USD'), salaryBasis: 'ANNUAL', effectiveFrom: '2026-10-01' },
+    ], 'ANNUAL', monthly)).toThrow(/duplicate effective dates/)
+  })
+  it('rejects mixed currencies only when both rates are used in the earning period', () => {
+    expect(() => computePeriodSalarySchedule([
+      { salary: Money.fromDecimal('120000', 'USD'), salaryBasis: 'ANNUAL', effectiveFrom: '2026-10-01' },
+      { salary: Money.fromDecimal('120000', 'EUR'), salaryBasis: 'ANNUAL', effectiveFrom: '2026-10-16' },
+    ], 'ANNUAL', monthly)).toThrow(/currency changes inside an earning period/)
+    const currentOnly = computePeriodSalarySchedule([
+      { salary: Money.fromDecimal('120000', 'EUR'), salaryBasis: 'ANNUAL', effectiveFrom: '2026-09-01' },
+      { salary: Money.fromDecimal('120000', 'USD'), salaryBasis: 'ANNUAL', effectiveFrom: '2026-10-01' },
+    ], 'ANNUAL', monthly)
+    expect(currentOnly.baseSalary.currency).toBe('USD')
   })
   it('handles hires before, at, and after period boundaries', () => {
     const salary = Money.fromDecimal('120000', 'USD')

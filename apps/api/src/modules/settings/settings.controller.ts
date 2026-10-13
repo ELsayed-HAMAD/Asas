@@ -18,6 +18,8 @@ import type {
   ExchangeRateListQuery,
   ExchangeRateListResponse,
   ExchangeRateWriteInput,
+  GdprAnonymizeRequest,
+  GdprAnonymizeResponse,
 } from '@asas/contracts'
 import * as settingsService from './settings.service.js'
 
@@ -95,8 +97,8 @@ export function testIntegration(
   return settingsService.testIntegration(prisma, tenantId, id)
 }
 
-export function getBilling(prisma: PrismaClient, tenantId: string): Promise<BillingSettings> {
-  return settingsService.getBillingSettings(prisma, tenantId)
+export function getBilling(prisma: PrismaClient, tenantId: string, measuredStorageUsedGb: number | null = null): Promise<BillingSettings> {
+  return settingsService.getBillingSettings(prisma, tenantId, measuredStorageUsedGb)
 }
 
 export function listBackups(prisma: PrismaClient, tenantId: string): Promise<{ items: BackupSchedule[] }> {
@@ -113,6 +115,14 @@ export function updateBackup(prisma: PrismaClient, tenantId: string, id: string,
 
 export function deleteWorkspace(prisma: PrismaClient, tenantId: string, userId: string): Promise<{ success: boolean }> {
   return settingsService.deleteWorkspace(prisma, tenantId, userId)
+}
+
+export function anonymizeEntity(
+  prisma: PrismaClient | Prisma.TransactionClient,
+  tenantId: string,
+  input: GdprAnonymizeRequest,
+): Promise<GdprAnonymizeResponse> {
+  return settingsService.anonymizeEntity(prisma, tenantId, input)
 }
 
 export type {

@@ -56,10 +56,23 @@ export const PERMISSIONS = {
   // Finance — invoices and expenses are writes to the books, gated the same as the other
   // module writes. Master data (vendors/customers) shares the invoice write gate since a new
   // vendor/customer exists to carry an invoice.
+  'finance.read': 'ADMIN',
   'finance.invoice.write': 'ADMIN',
+  'finance.invoice.approve': 'ADMIN',
+  'finance.invoice.pay': 'ADMIN',
+  'finance.invoice.void': 'ADMIN',
   'finance.expense.write': 'ADMIN',
+  'finance.expense.approve': 'ADMIN',
+  'finance.expense.reimburse': 'ADMIN',
+  'finance.expense.void': 'ADMIN',
+  'finance.expense.self': 'MEMBER',
   'finance.partner.write': 'ADMIN',
   'finance.partner.delete': 'ADMIN',
+
+  // Self-service & attendance access
+  'attendance.read.all': 'ADMIN',
+  'attendance.read.self': 'MEMBER',
+  'payroll.read.self': 'MEMBER',
 
   // Projects / portfolio. Reads are open to any MEMBER (requireRole); writes and deletions
   // require ADMIN, mirroring the HR `employee.write`/`employee.delete` split.
@@ -84,6 +97,8 @@ export const PERMISSIONS = {
   'settings.notifications.update': 'ADMIN',
   'settings.integration.write': 'ADMIN',
   'settings.billing.write': 'ADMIN',
+  'compliance.gdpr.anonymize': 'ADMIN',
+  'compliance.dataRetention.cleanup': 'ADMIN',
   'support.ticket.write': 'MEMBER',
   'support.ticket.manage': 'ADMIN',
 } as const satisfies Record<string, UserRole>
@@ -99,12 +114,20 @@ export const AUDITED_PERMISSIONS: ReadonlySet<Permission> = new Set([
   'department.delete',
   'deal.delete',
   'project.delete',
+  'finance.invoice.approve',
+  'finance.invoice.pay',
+  'finance.invoice.void',
+  'finance.expense.approve',
+  'finance.expense.reimburse',
+  'finance.expense.void',
   'finance.partner.delete',
   'member.role.update',
   'member.remove',
   'organization.delete',
   'onboarding.write',
   'support.ticket.manage',
+  'compliance.gdpr.anonymize',
+  'compliance.dataRetention.cleanup',
 ])
 
 /**

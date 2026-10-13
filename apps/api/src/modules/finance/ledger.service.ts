@@ -18,6 +18,26 @@ const accounts = {
   FX_LOSS: { name: 'Realized foreign exchange loss', kind: 'EXPENSE' },
 } as const
 
+interface LedgerCacheEntry<T> {
+  value: T
+  expiresAt: number
+}
+
+const trialBalanceCache = new Map<string, LedgerCacheEntry<TrialBalance>>()
+
+export function invalidateLedgerCache(tenantId?: string): void {
+  if (!tenantId) {
+    trialBalanceCache.clear()
+    return
+  }
+  const prefix = `tb:${tenantId}:`
+  for (const key of trialBalanceCache.keys()) {
+    if (key.startsWith(prefix)) {
+      trialBalanceCache.delete(key)
+    }
+  }
+}
+
 async function resolveFxRate(client: LedgerClient, tenantId: string, currency: string, baseCurrency: string, postedAt: Date) {
   if (currency === baseCurrency) return { rate: new Prisma.Decimal(1), exchangeRateId: null as string | null }
   const quote = await client.exchangeRate.findFirst({
@@ -125,6 +145,7 @@ export async function recordCashSettlement(tx: Prisma.TransactionClient, input: 
     postedAt: input.postedAt, actorId: input.actorId, description: input.description,
   } })
   await tx.journalLine.createMany({ data: lines.map(line => ({ ...line, entryId: entry.id })) })
+  invalidateLedgerCache(input.tenantId)
   return entry.id
 }
 
@@ -174,6 +195,7 @@ export async function recordInvoiceRecognition(tx: Prisma.TransactionClient, inp
     { tenantId: input.tenantId, entryId: entry.id, accountId: debitAccount!.id, side: 'DEBIT', amount: decimal, baseAmount: basis.baseAmount },
     { tenantId: input.tenantId, entryId: entry.id, accountId: creditAccount!.id, side: 'CREDIT', amount: decimal, baseAmount: basis.baseAmount },
   ] })
+  invalidateLedgerCache(input.tenantId)
   return entry.id
 }
 
@@ -212,6 +234,7 @@ export async function reverseCashSettlement(tx: Prisma.TransactionClient, input:
     tenantId: input.tenantId, entryId: reversal.id, accountId: line.accountId,
     side: line.side === 'DEBIT' ? 'CREDIT' : 'DEBIT', amount: line.amount, baseAmount: line.baseAmount,
   })) })
+  invalidateLedgerCache(input.tenantId)
   return reversal.id
 }
 
@@ -314,11 +337,21 @@ export async function postOpeningBalance(
     actorId, postedAt,
   } })
   await tx.journalLine.createMany({ data: lines.map(line => ({ ...line, tenantId, entryId: entry.id })) })
+  invalidateLedgerCache(tenantId)
   return getJournal(tx, tenantId, entry.id)
 }
 
 /** Base-currency trial balance through an inclusive calendar date, with legacy gaps disclosed. */
 export async function trialBalance(prisma: LedgerClient, tenantId: string, asOf: string): Promise<TrialBalance> {
+  const isCacheable = '$connect' in prisma
+  const cacheKey = `tb:${tenantId}:${asOf}`
+  if (isCacheable) {
+    const cached = trialBalanceCache.get(cacheKey)
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value
+    }
+  }
+
   const asOfDate = new Date(`${asOf}T00:00:00.000Z`)
   const [tenant, rows, unvaluedJournalCount] = await Promise.all([
     prisma.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } }),
@@ -350,7 +383,7 @@ export async function trialBalance(prisma: LedgerClient, tenantId: string, asOf:
   const netDebitBase = (row: typeof rows[number]) => Prisma.Decimal.max(row.debitBase.minus(row.creditBase), 0)
   const netCreditBase = (row: typeof rows[number]) => Prisma.Decimal.max(row.creditBase.minus(row.debitBase), 0)
   const wire = (value: Prisma.Decimal, currency: string) => Money.fromDecimal(value.toString(), currency, 'DOWN').toWire()
-  return {
+  const result: TrialBalance = {
     asOf, baseCurrency,
     rows: rows.map(row => ({
       accountId: row.accountId, accountCode: row.accountCode, accountName: row.accountName,
@@ -362,6 +395,10 @@ export async function trialBalance(prisma: LedgerClient, tenantId: string, asOf:
     totalDebitBase: wire(totalDebit, baseCurrency), totalCreditBase: wire(totalCredit, baseCurrency),
     unvaluedJournalCount, isComplete: unvaluedJournalCount === 0,
   }
+  if (isCacheable) {
+    trialBalanceCache.set(cacheKey, { value: result, expiresAt: Date.now() + 5 * 60 * 1000 })
+  }
+  return result
 }
 
 /** Only recorded AP/AR/payroll/reimbursement settlements; legacy snapshots are not mixed into these sums. */

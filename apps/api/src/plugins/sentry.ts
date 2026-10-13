@@ -35,13 +35,15 @@ export async function sentryPlugin(app: FastifyInstance, options: SentryPluginOp
   // handler logs it; Sentry gets it too so it is visible even where log shipping is not set up.
   app.addHook('onResponse', (request, reply, done) => {
     if (reply.statusCode >= 500) {
-      Sentry.captureException(new Error(`Unhandled ${reply.statusCode} on ${request.method} ${request.url}`), {
-        extra: {
-          requestId: request.id,
-          method: request.method,
-          url: request.url,
-          statusCode: reply.statusCode,
-        },
+      const auth = (request as unknown as { authContext?: { tenantId?: string; userId?: string } }).authContext
+      Sentry.withScope(scope => {
+        if (auth?.tenantId) scope.setTag('tenantId', auth.tenantId)
+        if (auth?.userId) scope.setUser({ id: auth.userId })
+        scope.setExtra('requestId', request.id)
+        scope.setExtra('method', request.method)
+        scope.setExtra('url', request.url)
+        scope.setExtra('statusCode', reply.statusCode)
+        Sentry.captureException(new Error(`Unhandled ${reply.statusCode} on ${request.method} ${request.url}`))
       })
     }
     done()

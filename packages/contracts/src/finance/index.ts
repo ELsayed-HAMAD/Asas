@@ -146,6 +146,8 @@ export type PayableDetail = z.infer<typeof payableDetailSchema>
 
 export const payableListQuerySchema = paginationQuerySchema.extend({
   status: payableStatusSchema.optional(),
+  statusGroup: z.enum(['OPEN', 'HISTORY']).optional(),
+  dateRange: z.enum(['ALL', 'CURRENT_MONTH']).optional(),
   vendorId: idSchema.optional(),
   search: boundedText(200, 0).optional(),
 })
@@ -246,6 +248,7 @@ export type PayableBatchPaymentInput = z.infer<typeof payableBatchPaymentSchema>
 export const customerSchema = z.object({
   id: idSchema,
   name: z.string(),
+  email: z.email().nullable(),
   avatarUrl: z.string().nullable(),
   collectionStatus: receivableStatusSchema,
   openBalance: moneySchema,
@@ -262,6 +265,7 @@ export type CustomerListResponse = z.infer<typeof customerListResponseSchema>
 
 export const customerWriteSchema = z.object({
   name: shortTextSchema,
+  email: z.email().optional().nullable(),
   avatarUrl: z.url().optional().nullable(),
 })
 
@@ -269,6 +273,7 @@ export type CustomerWriteInput = z.infer<typeof customerWriteSchema>
 
 export const customerUpdateSchema = z.object({
   name: shortTextSchema.optional(),
+  email: z.email().optional().nullable(),
   avatarUrl: z.url().optional().nullable(),
   collectionStatus: receivableStatusSchema.optional(),
 })
@@ -301,6 +306,8 @@ export const receivableInvoiceSchema = z.object({
   number: z.string().nullable(),
   amount: moneySchema,
   dueDate: isoDateTimeSchema.nullable(),
+  /** Workspace-local calendar days past the due date; zero on the due date and after payment/void. */
+  daysPastDue: z.int().min(0),
   status: receivableStatusSchema,
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
@@ -310,6 +317,7 @@ export type ReceivableInvoice = z.infer<typeof receivableInvoiceSchema>
 
 export const receivableListQuerySchema = paginationQuerySchema.extend({
   status: receivableStatusSchema.optional(),
+  statusGroup: z.enum(['OPEN', 'HISTORY']).optional(),
   customerId: idSchema.optional(),
   /** When true, only invoices whose due date has passed and are not yet paid. */
   overdueOnly: booleanQueryParamSchema.optional(),
@@ -479,6 +487,21 @@ export const expenseWriteSchema = z
   .refine(taxWithinAmount, { message: 'Tax cannot exceed the expense amount', path: ['tax'] })
 
 export type ExpenseWriteInput = z.infer<typeof expenseWriteSchema>
+
+/** Employee self-service expense submission — caller identity binds employeeId. */
+export const selfExpenseWriteSchema = z
+  .object({
+    projectId: idSchema.optional().nullable(),
+    name: shortTextSchema,
+    category: expenseCategorySchema.optional(),
+    merchant: boundedText(200).optional().nullable(),
+    date: calendarDateSchema,
+    amount: positiveDecimalStringSchema,
+    tax: nonNegativeDecimalStringSchema.optional().nullable(),
+    policyMatch: z.boolean().optional().nullable(),
+  })
+  .refine(taxWithinAmount, { message: 'Tax cannot exceed the expense amount', path: ['tax'] })
+export type SelfExpenseWriteInput = z.infer<typeof selfExpenseWriteSchema>
 
 /** Edit an expense. Once approved or rejected only `name` stays editable (409 otherwise). */
 export const expenseUpdateSchema = z
@@ -662,3 +685,5 @@ export const journalListQuerySchema = paginationQuerySchema.extend({
 })
 export type JournalListQuery = z.infer<typeof journalListQuerySchema>
 export const journalListResponseSchema = paginated(journalEntrySchema, z.null())
+
+export * from './reconciliation.js'

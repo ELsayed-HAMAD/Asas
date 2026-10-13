@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises'
 import type { PrismaClient } from '@prisma/client'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
@@ -17,7 +16,8 @@ import { requireAuthContext, requireRole } from '../../middlewares/rbac.js'
 import { requirePermission } from '../../middlewares/permissions.js'
 import { moduleKeyPrefix } from '../../plugins/sse.js'
 import { recordAuditLog } from '../../services/auditLog.js'
-import { exportFileExtension, exportFilePath, type ExportHandler } from '../../services/queue.js'
+import { exportFileExtension, type ExportHandler } from '../../services/queue.js'
+import { exportObjectKey } from '../../services/objectStorage.js'
 import { renderEmployeeDirectoryXlsx, renderLedgerXlsx, renderProjectsXlsx } from '../../services/export.js'
 import type { EmployeeDirectoryRow, LedgerRow, ProjectExportRow } from '../../services/export.js'
 
@@ -277,12 +277,11 @@ export async function exportRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const extension = exportFileExtension(job.dataScope ?? '')
-      let bytes: Buffer | null
-      try {
-        bytes = await readFile(exportFilePath(job.id, extension))
-      } catch {
-        bytes = null
-      }
+      const storage = request.server.objectStorage
+      const key = exportObjectKey(tenantId, job.id, extension)
+      let bytes = await storage.get(key)
+      // Existing local export artifacts used an unscoped key before object storage was added.
+      if (!bytes && storage.mode === 'local') bytes = await storage.get(`exports/${job.id}.${extension}`)
       if (!bytes) {
         reply.code(404)
         return { error: { message: 'Export file not found' } }

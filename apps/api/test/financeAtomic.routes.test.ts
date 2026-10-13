@@ -70,7 +70,7 @@ async function setup(status: string, failAuditAt = 0, role = 'ADMIN', withSettle
       findMany: vi.fn(async () => [staged.row, { ...staged.row, id: secondId }]),
     }
     const tx = {
-      tenant: { findUnique: async () => ({ currency: 'USD' }) },
+      tenant: { findUnique: async () => ({ currency: 'USD', timezone: 'UTC' }) },
       $queryRaw: vi.fn(async (_strings: TemplateStringsArray, ...values: unknown[]) => values.includes('tenant_1') && values.includes(id) ? [{ id }] : []),
       payableInvoice: delegate, receivableInvoice: delegate, expense: delegate,
       vendor: delegate, customer: delegate, collectionActivity: delegate,

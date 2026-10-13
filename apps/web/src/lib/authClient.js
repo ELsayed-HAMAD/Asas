@@ -1,5 +1,5 @@
 import { createAuthClient } from 'better-auth/react'
-import { organizationClient } from 'better-auth/client/plugins'
+import { organizationClient, twoFactorClient } from 'better-auth/client/plugins'
 
 /**
  * Better Auth client, matching the `organization` plugin mounted at `/api/auth/*` in
@@ -14,7 +14,10 @@ export const authClient = createAuthClient({
   fetchOptions: {
     credentials: 'include',
   },
-  plugins: [organizationClient()],
+  plugins: [
+    organizationClient(),
+    twoFactorClient({ twoFactorPage: '/two-factor' }),
+  ],
 })
 
 export const {
@@ -25,4 +28,5 @@ export const {
   signIn,
   signOut,
   signUp,
+  twoFactor,
 } = authClient

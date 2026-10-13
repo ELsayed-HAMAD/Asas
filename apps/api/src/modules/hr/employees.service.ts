@@ -1,4 +1,4 @@
-import type { Employee as PrismaEmployee, Prisma, PrismaClient } from '@prisma/client'
+import { Prisma, type Employee as PrismaEmployee, type PrismaClient } from '@prisma/client'
 import type {
   Employee,
   EmployeeListQuery,
@@ -8,18 +8,21 @@ import type {
 } from '@asas/contracts'
 import { buildPaginationMeta, toPrismaPage } from '@asas/contracts'
 import { AppError } from '../../utils/errors.js'
-import { tenantToday } from '../../utils/dates.js'
+import { monthToDateComparisonPeriods, tenantToday } from '../../utils/dates.js'
+import { recordAuditLog } from '../../services/auditLog.js'
 
 const employeeInclude = {
   department: true,
   manager: { select: { id: true, name: true, title: true } },
   _count: { select: { reports: true } },
+  salaryHistory: { orderBy: { effectiveFrom: 'desc' } },
 } as const
 
 type PrismaEmployeeWithIncludes = PrismaEmployee & {
   department: { name: string } | null
   manager: { id: string; name: string; title: string } | null
   _count: { reports: number }
+  salaryHistory: { salary: Prisma.Decimal; salaryBasis: 'ANNUAL' | 'MONTHLY' | null; currency: string; effectiveFrom: Date }[]
 }
 
 /**
@@ -41,8 +44,14 @@ function mapEmployee(employee: PrismaEmployeeWithIncludes, canReadSalary: boolea
     directReports: employee._count.reports,
     avatarUrl: employee.avatarUrl,
     hiredAt: employee.hiredAt?.toISOString() ?? null,
+    employmentEndDate: employee.employmentEndDate?.toISOString().slice(0, 10) ?? null,
     salary: canReadSalary ? (employee.salary?.toString() ?? null) : null,
     salaryBasis: canReadSalary ? (employee.salaryBasis ?? null) : null,
+    salaryEffectiveFrom: canReadSalary ? employee.salaryHistory[0]?.effectiveFrom.toISOString().slice(0, 10) ?? null : null,
+    salaryHistory: canReadSalary ? employee.salaryHistory.map(rate => ({
+      salary: rate.salary.toString(), salaryBasis: rate.salaryBasis, currency: rate.currency,
+      effectiveFrom: rate.effectiveFrom.toISOString().slice(0, 10),
+    })) : [],
     equityOptions: employee.equityOptions,
     band: employee.band,
     location: employee.location,
@@ -103,10 +112,17 @@ export async function listEmployees(
   const { skip, take } = toPrismaPage(query)
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { timezone: true } })
   const timezone = tenant?.timezone ?? 'UTC'
-  const today = tenantToday(timezone)
-  const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1))
+  const periods = monthToDateComparisonPeriods(tenantToday(timezone))
+  const currentHirePeriod = {
+    gte: new Date(`${periods.current.startDate}T00:00:00.000Z`),
+    lt: new Date(`${periods.current.endDateExclusive}T00:00:00.000Z`),
+  }
+  const previousHirePeriod = {
+    gte: new Date(`${periods.previous.startDate}T00:00:00.000Z`),
+    lt: new Date(`${periods.previous.endDateExclusive}T00:00:00.000Z`),
+  }
 
-  const [items, total, onLeaveCount, totalHeadcount, hiredThisMonth, openRoleRows] = await Promise.all([
+  const [items, total, onLeaveCount, totalHeadcount, hiredThisMonth, hiredPreviousMonthToDate, openRoleRows] = await Promise.all([
     prisma.employee.findMany({
       where, skip, take,
       orderBy: query.sort === 'NAME_DESC' ? [{ name: 'desc' }, { id: 'asc' }] : [{ name: 'asc' }, { id: 'asc' }],
@@ -115,7 +131,8 @@ export async function listEmployees(
     prisma.employee.count({ where }),
     prisma.employee.count({ where: { tenantId, status: 'ON_LEAVE' } }),
     prisma.employee.count({ where: { tenantId, status: { not: 'ARCHIVED' } } }),
-    prisma.employee.count({ where: { tenantId, status: { not: 'ARCHIVED' }, hiredAt: { gte: monthStart } } }),
+    prisma.employee.count({ where: { tenantId, status: { not: 'ARCHIVED' }, hiredAt: currentHirePeriod } }),
+    prisma.employee.count({ where: { tenantId, status: { not: 'ARCHIVED' }, hiredAt: previousHirePeriod } }),
     // Distinct recruitment roles with at least one candidate still in a non-terminal stage.
     prisma.candidate.findMany({
       where: { tenantId, stage: { notIn: ['HIRED', 'REJECTED'] } },
@@ -131,6 +148,7 @@ export async function listEmployees(
       totalHeadcount,
       onLeaveCount,
       hiredThisMonth,
+      hiredPreviousMonthToDate,
       // Real count of distinct candidate `role` values with an open (non-HIRED/non-REJECTED)
       // pipeline candidate. No requisition model exists yet, so this counts recruited-for
       // roles, not approved headcount requisitions.
@@ -155,12 +173,21 @@ export async function createEmployee(
   tenantId: string,
   input: EmployeeWriteInput,
   canReadSalary: boolean,
+  actorId?: string,
 ): Promise<Employee> {
   await assertDepartmentInTenant(prisma, tenantId, input.departmentId)
   await assertManagerInTenant(prisma, tenantId, input.managerId)
+  if (input.hiredAt && input.employmentEndDate && input.employmentEndDate < input.hiredAt) {
+    throw new AppError(400, 'Employment end date cannot be before the hire date')
+  }
+  if (input.salaryEffectiveFrom && input.employmentEndDate && input.salaryEffectiveFrom > input.employmentEndDate) {
+    throw new AppError(400, 'Salary effective date cannot be after the employment end date')
+  }
 
-  const employee = await prisma.employee.create({
-    data: {
+  if (input.salary != null && !input.salaryEffectiveFrom) throw new AppError(400, 'Choose the date this salary becomes effective')
+  const employee = await prisma.$transaction(async tx => {
+    const created = await tx.employee.create({
+      data: {
       tenantId,
       name: input.name,
       title: input.title,
@@ -169,6 +196,7 @@ export async function createEmployee(
       status: input.status ?? 'ACTIVE',
       avatarUrl: input.avatarUrl ?? null,
       hiredAt: input.hiredAt ? new Date(input.hiredAt) : null,
+      employmentEndDate: input.employmentEndDate ? new Date(`${input.employmentEndDate}T00:00:00.000Z`) : null,
       salary: input.salary ?? null,
       salaryBasis: input.salaryBasis ?? null,
       equityOptions: input.equityOptions ?? null,
@@ -176,9 +204,26 @@ export async function createEmployee(
       location: input.location ?? null,
       employeeNumber: input.employeeNumber ?? null,
       email: input.email ?? null,
-    },
-    include: employeeInclude,
-  })
+      },
+      include: employeeInclude,
+    })
+    if (input.salary != null && input.salaryEffectiveFrom) {
+      const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } })
+      if (!tenant) throw new AppError(404, 'Workspace not found')
+      await tx.employeeSalaryHistory.create({ data: {
+        tenantId, employeeId: created.id, salary: input.salary, salaryBasis: input.salaryBasis ?? null,
+        currency: tenant.currency, effectiveFrom: new Date(`${input.salaryEffectiveFrom}T00:00:00.000Z`), createdById: actorId ?? null,
+      } })
+      if (actorId) await recordAuditLog(tx, {
+        tenantId, actorId, action: 'hr.employee.salary.rate.create', targetType: 'Employee', targetId: created.id,
+        metadata: { salary: input.salary, salaryBasis: input.salaryBasis ?? null, effectiveFrom: input.salaryEffectiveFrom, currency: tenant.currency },
+      })
+    }
+    if (input.salary == null) return created
+    const withHistory = await tx.employee.findFirst({ where: { id: created.id, tenantId }, include: employeeInclude })
+    if (!withHistory) throw new AppError(500, 'Created employee could not be loaded')
+    return withHistory
+  }, { isolationLevel: 'Serializable' })
   return mapEmployee(employee, canReadSalary)
 }
 
@@ -188,16 +233,47 @@ export async function updateEmployee(
   id: string,
   input: EmployeeUpdateInput,
   canReadSalary: boolean,
+  actorId?: string,
 ): Promise<Employee> {
-  const existing = await prisma.employee.findFirst({ where: { id, tenantId } })
+  const existing = await prisma.employee.findFirst({ where: { id, tenantId }, include: { salaryHistory: { orderBy: { effectiveFrom: 'desc' } } } })
   if (!existing) throw new AppError(404, 'Employee not found')
 
   if (input.departmentId !== undefined) await assertDepartmentInTenant(prisma, tenantId, input.departmentId)
   if (input.managerId !== undefined) await assertManagerInTenant(prisma, tenantId, input.managerId)
 
-  const employee = await prisma.employee.update({
-    where: { id_tenantId: { id, tenantId } },
-    data: {
+  const hiredAt = input.hiredAt !== undefined ? input.hiredAt : existing.hiredAt?.toISOString().slice(0, 10) ?? null
+  const employmentEndDate = input.employmentEndDate !== undefined ? input.employmentEndDate : existing.employmentEndDate?.toISOString().slice(0, 10) ?? null
+  if (hiredAt && employmentEndDate && employmentEndDate < hiredAt.slice(0, 10)) {
+    throw new AppError(400, 'Employment end date cannot be before the hire date')
+  }
+
+  const salaryChanged = input.salary !== undefined && (input.salary === null
+    ? existing.salary !== null
+    : existing.salary === null || !new Prisma.Decimal(input.salary).equals(new Prisma.Decimal(existing.salary.toString())))
+  const salaryBasisChanged = input.salaryBasis !== undefined && input.salaryBasis !== existing.salaryBasis
+  const salaryChangedAt = salaryChanged || salaryBasisChanged
+  if (input.salary === null && existing.salary !== null) throw new AppError(400, 'Use an explicit zero salary rate instead of clearing a recorded salary')
+  if (salaryChangedAt && !input.salaryEffectiveFrom) throw new AppError(400, 'Choose the date this salary change becomes effective')
+  if (salaryChangedAt && input.salaryEffectiveFrom && hiredAt && input.salaryEffectiveFrom < hiredAt.slice(0, 10)) {
+    throw new AppError(400, 'Salary effective date cannot be before the hire date')
+  }
+  if (salaryChangedAt && input.salaryEffectiveFrom && employmentEndDate && input.salaryEffectiveFrom > employmentEndDate) {
+    throw new AppError(400, 'Salary effective date cannot be after the employment end date')
+  }
+
+  const employee = await prisma.$transaction(async tx => {
+    const rateSalary = input.salary !== undefined ? input.salary : existing.salary?.toString() ?? null
+    const rateBasis = input.salaryBasis !== undefined ? input.salaryBasis : existing.salaryBasis
+    if (salaryChangedAt) {
+      if (rateSalary === null) throw new AppError(400, 'A salary rate is required for an effective-dated change')
+      const alreadyRecorded = await tx.employeeSalaryHistory.findUnique({ where: { employeeId_effectiveFrom: { employeeId: id, effectiveFrom: new Date(`${input.salaryEffectiveFrom}T00:00:00.000Z`) } } })
+      if (alreadyRecorded) throw new AppError(409, 'A salary rate is already recorded for that effective date; choose another date')
+    }
+    const latestRateDate = existing.salaryHistory[0]?.effectiveFrom
+    const updateCurrentSalary = salaryChangedAt && (!latestRateDate || new Date(`${input.salaryEffectiveFrom}T00:00:00.000Z`) > latestRateDate)
+    const updated = await tx.employee.update({
+      where: { id_tenantId: { id, tenantId } },
+      data: {
       ...(input.name !== undefined && { name: input.name }),
       ...(input.title !== undefined && { title: input.title }),
       ...(input.departmentId !== undefined && { departmentId: input.departmentId }),
@@ -205,16 +281,31 @@ export async function updateEmployee(
       ...(input.status !== undefined && { status: input.status }),
       ...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl }),
       ...(input.hiredAt !== undefined && { hiredAt: input.hiredAt ? new Date(input.hiredAt) : null }),
-      ...(input.salary !== undefined && { salary: input.salary }),
-      ...(input.salaryBasis !== undefined && { salaryBasis: input.salaryBasis }),
+      ...(input.employmentEndDate !== undefined && { employmentEndDate: input.employmentEndDate ? new Date(`${input.employmentEndDate}T00:00:00.000Z`) : null }),
+      ...(updateCurrentSalary && { salary: rateSalary, salaryBasis: rateBasis }),
       ...(input.equityOptions !== undefined && { equityOptions: input.equityOptions }),
       ...(input.band !== undefined && { band: input.band }),
       ...(input.location !== undefined && { location: input.location }),
       ...(input.employeeNumber !== undefined && { employeeNumber: input.employeeNumber }),
       ...(input.email !== undefined && { email: input.email }),
-    },
-    include: employeeInclude,
-  })
+      },
+    })
+    if (salaryChangedAt && input.salaryEffectiveFrom && rateSalary !== null) {
+      const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } })
+      if (!tenant) throw new AppError(404, 'Workspace not found')
+      await tx.employeeSalaryHistory.create({ data: {
+        tenantId, employeeId: id, salary: rateSalary, salaryBasis: rateBasis, currency: updated.currency ?? tenant.currency,
+        effectiveFrom: new Date(`${input.salaryEffectiveFrom}T00:00:00.000Z`), createdById: actorId ?? null,
+      } })
+      if (actorId) await recordAuditLog(tx, {
+        tenantId, actorId, action: 'hr.employee.salary.rate.create', targetType: 'Employee', targetId: id,
+        metadata: { salary: rateSalary, salaryBasis: rateBasis, effectiveFrom: input.salaryEffectiveFrom, currency: updated.currency ?? tenant.currency },
+      })
+    }
+    const withHistory = await tx.employee.findFirst({ where: { id, tenantId }, include: employeeInclude })
+    if (!withHistory) throw new AppError(404, 'Employee not found')
+    return withHistory
+  }, { isolationLevel: 'Serializable' })
   return mapEmployee(employee, canReadSalary)
 }
 

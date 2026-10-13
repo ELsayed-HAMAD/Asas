@@ -3,7 +3,7 @@ import { MailerService } from '../src/services/mailer.js'
 
 describe('mailer service', () => {
   it('records sent emails in history with unique ids and timestamps', async () => {
-    const mailer = new MailerService('noreply@test.asas')
+    const mailer = new MailerService('noreply@test.asas', { send: async () => undefined })
     expect(mailer.getSentEmails()).toHaveLength(0)
 
     const record = await mailer.send({
@@ -40,7 +40,7 @@ describe('mailer service', () => {
   })
 
   it('clears email history on request', async () => {
-    const mailer = new MailerService()
+    const mailer = new MailerService('noreply@asas.app', { send: async () => undefined })
     await mailer.send({ to: 'test@example.com', subject: 'Test' })
     expect(mailer.getSentEmails()).toHaveLength(1)
 
@@ -60,8 +60,17 @@ describe('mailer service', () => {
     expect(queueCalls).toEqual([{ queue: 'emails', data: { to: 'queue@example.com', subject: 'Queued message' } }])
     expect(mailer.getSentEmails()).toHaveLength(0)
 
+    const delivered: string[] = []
+    mailer.setTransport({ send: async message => { delivered.push(message.to) } })
     mailer.setQueue(null)
     await mailer.enqueue({ to: 'direct@example.com', subject: 'Direct message' })
     expect(mailer.getSentEmails()).toHaveLength(1)
+    expect(delivered).toEqual(['direct@example.com'])
+  })
+
+  it('does not report a message as sent when no provider is configured', async () => {
+    const mailer = new MailerService()
+    await expect(mailer.send({ to: 'test@example.com', subject: 'Test' })).rejects.toThrow('Email transport is not configured')
+    expect(mailer.getSentEmails()).toHaveLength(0)
   })
 })

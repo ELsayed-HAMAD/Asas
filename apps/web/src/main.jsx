@@ -9,6 +9,7 @@ import { setFormatDefaults } from './lib/format'
 import { setQueryScope, queryKeys } from './lib/queryKeys'
 import { http } from './lib/api/http'
 import { initSentry } from './lib/sentry'
+import './lib/i18n'
 import './index.css'
 
 initSentry()

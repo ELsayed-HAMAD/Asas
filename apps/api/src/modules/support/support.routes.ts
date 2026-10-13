@@ -83,7 +83,7 @@ export async function supportRoutes(app: FastifyInstance): Promise<void> {
           select: { supportEmail: true, name: true },
         })
         if (tenant?.supportEmail) {
-          void mailer.send({
+          void mailer.enqueue({
             to: tenant.supportEmail,
             subject: `[Support Ticket] ${row.subject}`,
             text: `A new support ticket was created in workspace "${tenant.name}".\n\nTicket ID: ${row.id}\nSubject: ${row.subject}\nChannel: ${row.channel || 'dashboard'}\nDate: ${row.createdAt.toISOString()}`,

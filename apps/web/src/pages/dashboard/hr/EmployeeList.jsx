@@ -35,6 +35,7 @@ const STATUS_LABELS = {
 
 // Stable fallback so effects/memos keyed on `employees` don't re-run every render.
 const EMPTY_EMPLOYEES = []
+const EMPTY_EMPLOYEE_FORM = { name: '', title: '', email: '', departmentId: '', salary: '', salaryBasis: '', salaryEffectiveFrom: '', hiredAt: '', employmentEndDate: '', status: 'ACTIVE', band: '', equityOptions: '' }
 
 // The API's Zod schemas reject empty strings for optional fields (`z.email()`, `min(1)`).
 
@@ -48,9 +49,9 @@ export default function EmployeeDirectory() {
   const [search, setSearch] = useState('')
   const [departmentId, setDepartmentId] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
-  const [createForm, setCreateForm] = useState({ name: '', title: '', email: '', departmentId: '', salary: '', salaryBasis: '', hiredAt: '', status: 'ACTIVE', band: '', equityOptions: '' })
+  const [createForm, setCreateForm] = useState(EMPTY_EMPLOYEE_FORM)
   const [editOpen, setEditOpen] = useState(false)
-  const [editForm, setEditForm] = useState({ name: '', title: '', email: '', location: '', departmentId: '', salary: '', salaryBasis: '', hiredAt: '', status: 'ACTIVE', band: '', equityOptions: '' })
+  const [editForm, setEditForm] = useState({ name: '', title: '', email: '', location: '', departmentId: '', salary: '', salaryBasis: '', salaryEffectiveFrom: '', hiredAt: '', employmentEndDate: '', status: 'ACTIVE', band: '', equityOptions: '' })
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deptModalOpen, setDeptModalOpen] = useState(false)
   const [newDeptName, setNewDeptName] = useState('')
@@ -68,7 +69,8 @@ export default function EmployeeDirectory() {
   }, [searchParams, setSearchParams])
   const { data: activeMemberRole } = useActiveMemberRole()
   const roleName = typeof activeMemberRole === 'string' ? activeMemberRole : activeMemberRole?.role
-  const canDelete = roleName === 'OWNER' || roleName === 'ADMIN'
+  const canEditEmployee = roleName === 'OWNER' || roleName === 'ADMIN'
+  const canDelete = canEditEmployee
   const exportMutation = useMutation({
     mutationFn: async () => {
       let job = await exportsApi.createJob({ kind: 'employees' })
@@ -109,7 +111,9 @@ export default function EmployeeDirectory() {
         departmentId: form.departmentId || null,
         salary: form.salary || null,
         salaryBasis: form.salaryBasis || null,
+        salaryEffectiveFrom: form.salary ? form.salaryEffectiveFrom || null : null,
         hiredAt: form.hiredAt ? new Date(form.hiredAt).toISOString() : null,
+        employmentEndDate: form.employmentEndDate || null,
         status: form.status || 'ACTIVE',
         band: form.band || null,
         equityOptions: form.equityOptions !== '' ? parseInt(form.equityOptions, 10) : null
@@ -117,7 +121,7 @@ export default function EmployeeDirectory() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.hr.employees.all() })
       setCreateOpen(false)
-      setCreateForm({ name: '', title: '', email: '', departmentId: '' })
+      setCreateForm({ ...EMPTY_EMPLOYEE_FORM })
     },
   })
   const editMutation = useMutation({
@@ -130,7 +134,9 @@ export default function EmployeeDirectory() {
         departmentId: form.departmentId || null,
         salary: form.salary || null,
         salaryBasis: form.salaryBasis || null,
+        salaryEffectiveFrom: form.salaryEffectiveFrom || null,
         hiredAt: form.hiredAt ? new Date(form.hiredAt).toISOString() : null,
+        employmentEndDate: form.employmentEndDate || null,
         status: form.status || 'ACTIVE',
         band: form.band || null,
         equityOptions: form.equityOptions !== '' ? parseInt(form.equityOptions, 10) : null
@@ -191,7 +197,7 @@ export default function EmployeeDirectory() {
 
   const employees = data?.items ?? EMPTY_EMPLOYEES
   const allSelected = employees.length > 0 && employees.every(employee => selectedIds.includes(employee.id))
-  const stats = data?.summary ?? { totalHeadcount: 0, onLeaveCount: 0, openRoles: 0, hiredThisMonth: 0 }
+  const stats = data?.summary ?? { totalHeadcount: 0, onLeaveCount: 0, openRoles: 0, hiredThisMonth: 0, hiredPreviousMonthToDate: 0 }
 
   useEffect(() => {
     if (!employees.length) {
@@ -266,7 +272,7 @@ export default function EmployeeDirectory() {
             <div className="flex items-baseline gap-3">
               <p className="text-3xl font-bold text-heading">{stats.totalHeadcount}</p>
               <span className="flex items-center gap-1 text-sm font-semibold text-accent">
-                <TrendingUp size={14} /> {stats.hiredThisMonth > 0 ? `+${stats.hiredThisMonth} this month` : 'No hires this month'}
+                <TrendingUp size={14} /> {`${stats.hiredThisMonth} hired MTD · ${stats.hiredThisMonth - stats.hiredPreviousMonthToDate > 0 ? '+' : ''}${stats.hiredThisMonth - stats.hiredPreviousMonthToDate} vs same period last month`}
               </span>
             </div>
           </div>
@@ -385,9 +391,9 @@ export default function EmployeeDirectory() {
             <>
               <div className="border border-border-default rounded-card-sm p-6 relative">
                 <div className="absolute top-4 right-4 flex gap-2">
-                  <button type="button" onClick={() => { setEditForm({ name: selected.name || '', title: selected.title || '', email: selected.email || '', location: selected.location || '', departmentId: selected.departmentId || '', salary: selected.salary || '', salaryBasis: selected.salaryBasis || '', hiredAt: selected.hiredAt ? selected.hiredAt.split('T')[0] : '', status: selected.status || 'ACTIVE', band: selected.band || '', equityOptions: selected.equityOptions ?? '' }); setEditOpen(true) }} className="p-1.5 border border-border-default rounded-input text-caption hover:text-body-light hover:bg-surface-muted transition-colors" aria-label="Edit profile">
+                  {canEditEmployee && <button type="button" onClick={() => { setEditForm({ name: selected.name || '', title: selected.title || '', email: selected.email || '', location: selected.location || '', departmentId: selected.departmentId || '', salary: selected.salary || '', salaryBasis: selected.salaryBasis || '', salaryEffectiveFrom: selected.salaryEffectiveFrom || '', hiredAt: selected.hiredAt ? selected.hiredAt.split('T')[0] : '', employmentEndDate: selected.employmentEndDate || '', status: selected.status || 'ACTIVE', band: selected.band || '', equityOptions: selected.equityOptions ?? '' }); setEditOpen(true) }} className="p-1.5 border border-border-default rounded-input text-caption hover:text-body-light hover:bg-surface-muted transition-colors" aria-label="Edit profile">
                     <Pencil size={14} />
-                  </button>
+                  </button>}
                   <button type="button" disabled={!canDelete} title={canDelete ? 'Delete employee' : 'Requires the ADMIN role'} onClick={() => setDeleteOpen(true)} className="p-1.5 border border-border-default rounded-input text-danger hover:bg-danger-light transition-colors disabled:opacity-40" aria-label="Delete employee">
                     <Trash2 size={14} />
                   </button>
@@ -404,6 +410,7 @@ export default function EmployeeDirectory() {
                   <p className="text-sm text-muted mt-1">
                     {selected.title} · Hired {selected.hiredAt ? formatDate(selected.hiredAt, { month: 'short', year: 'numeric' }) : '—'}
                   </p>
+                  {selected.employmentEndDate && <p className="text-xs text-muted mt-1">Last eligible payroll day: {formatDate(selected.employmentEndDate)}</p>}
                   <div className="flex gap-3 mt-5 w-full justify-center">
                     <a href={selected.email ? `mailto:${encodeURIComponent(selected.email)}?subject=${encodeURIComponent('Hello ' + selected.name)}` : undefined} aria-disabled={!selected.email} title={selected.email ? 'Open a message draft in your mail app' : 'No email address is available'} className={`flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors ${!selected.email ? 'opacity-60 pointer-events-none' : ''}`}>
                       <Mail size={14} /> Message
@@ -425,6 +432,9 @@ export default function EmployeeDirectory() {
                     <div>
                       <p className="text-[10px] font-bold text-caption uppercase tracking-wider mb-0.5">Salary</p>
                       <p className="text-sm font-bold text-heading">{formatMoney(selected.salary)}</p>
+                      {selected.salaryBasis && <p className="mt-0.5 text-xs text-muted">{selected.salaryBasis === 'ANNUAL' ? 'Annual' : 'Monthly'} basis</p>}
+                      {selected.salaryEffectiveFrom && <p className="mt-0.5 text-xs text-muted">Rate effective {formatDate(selected.salaryEffectiveFrom)}</p>}
+                      {(selected.salaryHistory?.length ?? 0) > 1 && <details className="mt-2 text-xs text-muted"><summary className="cursor-pointer">Salary history ({selected.salaryHistory.length} rates)</summary><ul className="mt-2 space-y-1">{selected.salaryHistory.slice(1).map(rate => <li key={rate.effectiveFrom}>{formatMoney(rate.salary, { currency: rate.currency })} {rate.salaryBasis?.toLowerCase() || 'basis not set'} · {formatDate(rate.effectiveFrom)}</li>)}</ul></details>}
                     </div>
                     <div>
                       <p className="text-[10px] font-bold text-caption uppercase tracking-wider mb-0.5">Equity</p>
@@ -525,9 +535,18 @@ export default function EmployeeDirectory() {
         </div>
       </div>
 
-      <FormDialog open={editOpen} onClose={() => setEditOpen(false)} title="Edit employee" subtitle="Update the employee profile fields." busy={editMutation.isPending} onConfirm={() => editMutation.mutate()} confirmLabel="Save changes">
+      <FormDialog open={editOpen} onClose={() => setEditOpen(false)} title="Edit employee" subtitle="Update profile and payroll compensation details." busy={editMutation.isPending} onConfirm={() => editMutation.mutate()} confirmLabel="Save changes">
         <div className="space-y-4">
           {['name', 'title', 'email', 'location'].map(field => <label key={field} className="block text-sm font-medium text-body"><span className="mb-1 block capitalize">{field}</span><input value={editForm[field]} onChange={event => setEditForm(current => ({ ...current, [field]: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" /></label>)}
+          <div className="grid grid-cols-2 gap-4">
+            <label className="block text-sm font-medium text-body"><span className="mb-1 block">Salary</span><input type="number" min="0" step="0.01" value={editForm.salary} onChange={event => setEditForm(current => ({ ...current, salary: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" /></label>
+            <label className="block text-sm font-medium text-body"><span className="mb-1 block">Salary basis</span><select value={editForm.salaryBasis} onChange={event => setEditForm(current => ({ ...current, salaryBasis: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2"><option value="">None</option><option value="ANNUAL">Annual</option><option value="MONTHLY">Monthly</option></select></label>
+            <label className="block text-sm font-medium text-body"><span className="mb-1 block">Salary effective from</span><input type="date" required={!!editForm.salary} value={editForm.salaryEffectiveFrom} onChange={event => setEditForm(current => ({ ...current, salaryEffectiveFrom: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" /></label>
+            <p className="self-center text-xs text-muted">Set a new date when changing salary or basis. Existing payroll history is preserved.</p>
+            <label className="block text-sm font-medium text-body"><span className="mb-1 block">Employment end date</span><input type="date" min={editForm.hiredAt || undefined} value={editForm.employmentEndDate} onChange={event => setEditForm(current => ({ ...current, employmentEndDate: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" /></label>
+            <p className="self-center text-xs text-muted">Last eligible paid day. Leave blank while employment is ongoing.</p>
+            <p className="col-span-2 -mt-2 text-xs text-muted">If no basis is saved, the payroll run will ask you to confirm one before pricing the run.</p>
+          </div>
         </div>
       </FormDialog>
       <FormDialog open={createOpen} onClose={() => setCreateOpen(false)} title="Add employee" subtitle="Create an employee profile." busy={createMutation.isPending} onConfirm={() => createMutation.mutate()} confirmLabel="Add employee">
@@ -549,8 +568,16 @@ export default function EmployeeDirectory() {
               </select>
             </label>
             <label className="block text-sm font-medium text-body">
+              <span className="mb-1 block">Salary effective from</span>
+              <input type="date" required={!!createForm.salary} value={createForm.salaryEffectiveFrom} onChange={e => setCreateForm(c => ({ ...c, salaryEffectiveFrom: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" />
+            </label>
+            <label className="block text-sm font-medium text-body">
               <span className="mb-1 block">Hire Date</span>
               <input type="date" value={createForm.hiredAt} onChange={e => setCreateForm(c => ({ ...c, hiredAt: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" />
+            </label>
+            <label className="block text-sm font-medium text-body">
+              <span className="mb-1 block">Employment end date</span>
+              <input type="date" min={createForm.hiredAt || undefined} value={createForm.employmentEndDate} onChange={e => setCreateForm(c => ({ ...c, employmentEndDate: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" />
             </label>
             <label className="block text-sm font-medium text-body">
               <span className="mb-1 block">Status</span>

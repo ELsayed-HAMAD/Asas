@@ -14,6 +14,11 @@ export const financeApi = {
   getOverview: (params) => http.get('/finance/overview', { query: params }),
   /** GET /finance/trial-balance â€” posted account balances through an inclusive date. */
   getTrialBalance: (asOf) => http.get('/finance/trial-balance', { query: { asOf } }),
+  listBankStatementImports: () => http.get('/finance/bank-statements'),
+  getBankStatementImport: id => http.get(`/finance/bank-statements/${id}`),
+  importBankStatement: body => http.post('/finance/bank-statements', { body }),
+  matchBankStatementLine: (id, lineId, journalLineId) => http.post(`/finance/bank-statements/${id}/lines/${lineId}/match`, { body: { journalLineId } }),
+  unmatchBankStatementLine: (id, lineId) => http.delete(`/finance/bank-statements/${id}/lines/${lineId}/match`),
   createOpeningBalance: body => http.post('/finance/opening-balances', { body }),
 
   /** GET /finance/payables — { items, pagination, summary } over the whole tenant set. */
@@ -42,6 +47,7 @@ export const financeApi = {
   createReceivable: (body) => http.post('/finance/receivables', { body }),
   createPayable: (body) => http.post('/finance/payables', { body }),
   createExpense: (body) => http.post('/finance/expenses', { body }),
+  createExpenseSelf: (body) => http.post('/finance/expenses/self', { body }),
 
   /** POST /finance/payables/:id/status — approve, schedule, pay, or reject an invoice. */
   updatePayableStatus: (id, status) => http.post(`/finance/payables/${id}/status`, { body: { status } }),

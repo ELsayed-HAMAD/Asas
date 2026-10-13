@@ -27,7 +27,7 @@ function setup(status: string, createdById: string | null = null) {
     journalLine: { createMany: vi.fn(async () => ({ count: 2 })) },
   }
   const prisma = {
-    tenant: { findUnique: vi.fn().mockResolvedValue({ currency: 'USD' }) },
+    tenant: { findUnique: vi.fn().mockResolvedValue({ currency: 'USD', timezone: 'UTC' }) },
     $transaction: vi.fn(async (work: (client: unknown) => unknown) => work(tx)),
   } as unknown as PrismaClient
   return { prisma, tx, delegate }

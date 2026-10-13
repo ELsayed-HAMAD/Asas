@@ -562,12 +562,30 @@ export async function listStockMovements(
   const where: Prisma.StockMovementWhereInput = { tenantId }
   if (query.productId) where.productId = query.productId
   if (query.warehouse) where.product = { warehouse: query.warehouse }
+  if (query.search) {
+    where.OR = [
+      { note: { contains: query.search, mode: 'insensitive' } },
+      { product: { name: { contains: query.search, mode: 'insensitive' } } },
+      { product: { warehouse: { contains: query.search, mode: 'insensitive' } } },
+    ]
+  }
   if (query.type === 'IN') where.delta = { gt: 0 }
   if (query.type === 'OUT') where.delta = { lt: 0 }
 
   const { skip, take } = toPrismaPage(query)
   const movementFilters: Prisma.Sql[] = [Prisma.sql`movement."tenantId" = ${tenantId}`]
   if (query.productId) movementFilters.push(Prisma.sql`movement."productId" = ${query.productId}`)
+  if (query.search) movementFilters.push(Prisma.sql`
+    (
+      movement."note" ILIKE ${`%${query.search}%`}
+      OR EXISTS (
+        SELECT 1 FROM "Product" AS searched_product
+        WHERE searched_product."id" = movement."productId"
+          AND searched_product."tenantId" = movement."tenantId"
+          AND (searched_product."name" ILIKE ${`%${query.search}%`} OR searched_product."warehouse" ILIKE ${`%${query.search}%`})
+      )
+    )
+  `)
   if (query.warehouse) movementFilters.push(Prisma.sql`
     EXISTS (
       SELECT 1 FROM "Product" AS product

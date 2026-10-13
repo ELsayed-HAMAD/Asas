@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Eye, EyeOff, Loader2, MailCheck, ArrowRight, RefreshCw } from 'lucide-react'
 import { authClient, signIn } from '../../lib/authClient'
 import FormDialog from '../../components/common/FormDialog'
 
@@ -17,11 +17,15 @@ function authErrorMessage(error) {
 
 export default function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
 
   const [form, setForm]       = useState({ email: '', password: '' })
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
+  const [unverifiedEmail, setUnverifiedEmail] = useState('')
+  const [resendingVerification, setResendingVerification] = useState(false)
+  const [resendVerificationNotice, setResendVerificationNotice] = useState('')
 
   const [forgotOpen, setForgotOpen] = useState(false)
   const [forgotEmail, setForgotEmail] = useState('')
@@ -59,6 +63,8 @@ export default function Login() {
   const handleSubmit = async e => {
     e.preventDefault()
     setError('')
+    setUnverifiedEmail('')
+    setResendVerificationNotice('')
 
     if (!form.email || !form.password) {
       setError('Please fill in all fields.')
@@ -67,16 +73,56 @@ export default function Login() {
 
     setLoading(true)
     try {
+      const redirectTo = location.state?.from?.pathname || '/dashboard'
+      sessionStorage.setItem('asas.auth.redirectAfterTwoFactor', redirectTo)
       const result = await signIn.email({ email: form.email, password: form.password })
       if (result?.error) {
-        setError(authErrorMessage(result.error))
+        sessionStorage.removeItem('asas.auth.redirectAfterTwoFactor')
+        const msg = authErrorMessage(result.error)
+        const isUnverified =
+          result.error?.code === 'EMAIL_NOT_VERIFIED' ||
+          /email.*not.*verified|not.*verified/i.test(msg) ||
+          /email.*not.*verified|not.*verified/i.test(String(result.error?.message || ''))
+        if (isUnverified) {
+          setUnverifiedEmail(form.email.trim())
+        }
+        setError(msg)
         return
       }
-      navigate('/dashboard')
+      if (result?.data?.twoFactorRedirect) return
+      sessionStorage.removeItem('asas.auth.redirectAfterTwoFactor')
+      navigate(redirectTo, { replace: true })
     } catch (requestError) {
-      setError(authErrorMessage(requestError))
+      sessionStorage.removeItem('asas.auth.redirectAfterTwoFactor')
+      const msg = authErrorMessage(requestError)
+      if (/email.*not.*verified|not.*verified/i.test(msg)) {
+        setUnverifiedEmail(form.email.trim())
+      }
+      setError(msg)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleResendVerification = async () => {
+    const targetEmail = unverifiedEmail || form.email.trim()
+    if (!targetEmail || resendingVerification) return
+    setResendingVerification(true)
+    setResendVerificationNotice('')
+    try {
+      const res = await authClient.sendVerificationEmail({
+        email: targetEmail,
+        callbackURL: `${window.location.origin}/dashboard`,
+      })
+      if (res?.error) {
+        setResendVerificationNotice(res.error?.message || 'Unable to resend confirmation email.')
+      } else {
+        setResendVerificationNotice(`Confirmation email sent to ${targetEmail}. Please check your inbox.`)
+      }
+    } catch (err) {
+      setResendVerificationNotice(err?.message || 'Unable to resend confirmation email.')
+    } finally {
+      setResendingVerification(false)
     }
   }
 
@@ -88,11 +134,63 @@ export default function Login() {
         <p className="text-sm text-muted">Sign in to your Asas workspace</p>
       </div>
 
-      {/* Error */}
+      {/* Error / Unverified Notice */}
       {error && (
-        <div className="mb-5 px-3.5 py-2.5 bg-danger-light border border-danger-border rounded-button text-sm text-danger">
-          {error}
-        </div>
+        unverifiedEmail ? (
+          <div className="mb-5 p-4 bg-danger-light border border-danger-border rounded-button text-sm">
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-danger/10 text-danger flex-shrink-0 mt-0.5">
+                <MailCheck size={18} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-danger text-sm">Email not verified</h3>
+                <p className="text-xs text-danger-text mt-1 leading-relaxed">
+                  Your email address has not been confirmed yet. Please verify your account using the confirmation email we sent you before signing in.
+                </p>
+
+                {resendVerificationNotice && (
+                  <p className="mt-2 text-xs font-medium text-body bg-surface-raised p-2 rounded border border-border-default">
+                    {resendVerificationNotice}
+                  </p>
+                )}
+
+                <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+                  <Link
+                    to={`/verify-email?email=${encodeURIComponent(unverifiedEmail)}`}
+                    state={{ email: unverifiedEmail }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-button bg-primary text-on-primary hover:bg-primary-hover active:scale-[0.98] transition-all shadow-xs"
+                  >
+                    <span>Go to verification page</span>
+                    <ArrowRight size={13} />
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={resendingVerification}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-button bg-surface-raised hover:bg-surface-muted text-body border border-border-default active:scale-[0.98] transition-all disabled:opacity-60 cursor-pointer"
+                  >
+                    {resendingVerification ? (
+                      <>
+                        <Loader2 size={12} className="animate-spin" />
+                        <span>Resending...</span>
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw size={12} />
+                        <span>Resend email</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-5 px-3.5 py-2.5 bg-danger-light border border-danger-border rounded-button text-sm text-danger">
+            {error}
+          </div>
+        )
       )}
 
       {/* Form */}

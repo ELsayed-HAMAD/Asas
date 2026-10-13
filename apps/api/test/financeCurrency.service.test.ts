@@ -15,7 +15,7 @@ function setup(currency: string | null = 'KWD', workspaceCurrency = 'JPY') {
   const create = vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ ...row, ...data }))
   const update = vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ ...row, ...data }))
   const prisma = {
-    tenant: { findUnique: async () => ({ name: 'Workspace', currency: workspaceCurrency }) },
+    tenant: { findUnique: async () => ({ name: 'Workspace', currency: workspaceCurrency, timezone: 'UTC' }) },
     vendor: { findFirst: async () => ({ id: 'vendor_1' }) }, customer: { findFirst: async () => ({ id: 'customer_1' }) },
     payableInvoice: { findFirst: async () => row, findFirstOrThrow: async () => row, create, update },
     receivableInvoice: { findFirst: async () => row, findFirstOrThrow: async () => row, create, update },

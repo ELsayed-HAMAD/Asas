@@ -93,6 +93,10 @@ export const candidateInterviewListSchema = z.array(candidateInterviewSchema)
 /** The presigned upload grant: where to PUT the CV file, and the rules of that upload. */
 export const resumeUploadUrlSchema = z.object({
   uploadUrl: z.string(),
+  uploadTarget: z.enum(['api', 'object']),
+  uploadId: z.uuid(),
+  uploadToken: z.string().min(1),
+  expiresUnix: z.int().positive(),
   method: z.literal('PUT'),
   /** ISO datetime after which the signature stops validating. */
   expiresAt: isoDateTimeSchema,
@@ -104,6 +108,7 @@ export type ResumeUploadUrl = z.infer<typeof resumeUploadUrlSchema>
 export const candidateListQuerySchema = paginationQuerySchema.extend({
   stage: candidateStageSchema.optional(),
   search: boundedText(200, 0).optional(),
+  role: boundedText(120, 0).optional(),
 })
 export type CandidateListQuery = z.infer<typeof candidateListQuerySchema>
 
@@ -125,5 +130,8 @@ export const candidatePipelineSummarySchema = z.object({
 })
 export type CandidatePipelineSummary = z.infer<typeof candidatePipelineSummarySchema>
 
-export const candidateListResponseSchema = paginated(candidateSchema, candidatePipelineSummarySchema)
+export const candidateListResponseSchema = paginated(candidateSchema, candidatePipelineSummarySchema).extend({
+  /** Roles matching the search, independent of the selected role filter. */
+  roleOptions: z.array(z.string()),
+})
 export type CandidateListResponse = z.infer<typeof candidateListResponseSchema>

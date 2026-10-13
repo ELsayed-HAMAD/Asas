@@ -88,6 +88,13 @@ export const payrollLineSchema = z.object({
   baseSalary: decimalStringSchema.nullable(),
   sourceSalary: decimalStringSchema.nullable(),
   salaryBasis: salaryBasisSchema.nullable(),
+  salaryRateSegments: z.array(z.object({
+    salary: decimalStringSchema,
+    salaryBasis: salaryBasisSchema,
+    currency: currencyCodeSchema,
+    effectiveFrom: isoDateSchema,
+    eligibleDays: z.int().nonnegative(),
+  })),
   eligibleDays: z.int().nonnegative().nullable(),
   periodDays: z.int().positive().nullable(),
   missedDaysCount: z.int().nullable(),
@@ -149,6 +156,35 @@ export const payrollRunListQuerySchema = paginationQuerySchema.extend({
 })
 export type PayrollRunListQuery = z.infer<typeof payrollRunListQuerySchema>
 
+export const payrollRoundingReconciliationQuerySchema = z.object({
+  /** Earning year, assigned from PayrollRun.periodStart rather than pay date. */
+  year: z.coerce.number().int().min(2000).max(2100),
+})
+
+export const payrollRoundingReconciliationSchema = z.object({
+  year: z.int().min(2000).max(2100),
+  groups: z.array(z.object({
+    employeeId: idSchema,
+    employeeName: z.string(),
+    currency: currencyCodeSchema,
+    taxRates: z.array(payrollTaxRateSchema),
+    paidLineCount: z.int().positive(),
+    grossTotal: decimalStringSchema,
+    recordedDeductions: decimalStringSchema,
+    aggregateRoundedDeductions: decimalStringSchema,
+    variance: decimalStringSchema,
+    taxLines: z.array(z.object({
+      label: z.string(),
+      recorded: decimalStringSchema,
+      aggregateRounded: decimalStringSchema,
+      variance: decimalStringSchema,
+    })),
+  })),
+  excludedManualOverrideLines: z.int().nonnegative(),
+  excludedUnknownCurrencyLines: z.int().nonnegative(),
+})
+export type PayrollRoundingReconciliation = z.infer<typeof payrollRoundingReconciliationSchema>
+
 export const payrollRunListResponseSchema = paginated(
   payrollRunListItemSchema,
   payrollRunListSummarySchema,
@@ -179,3 +215,24 @@ export const payrollRunSchema = z.object({
   updatedAt: isoDateTimeSchema,
 })
 export type PayrollRun = z.infer<typeof payrollRunSchema>
+
+/** Single payslip summary for employee self-service. */
+export const myPayslipItemSchema = z.object({
+  id: idSchema,
+  payrollRunId: idSchema,
+  runLabel: z.string(),
+  periodStart: isoDateSchema.nullable(),
+  periodEnd: isoDateSchema.nullable(),
+  payDate: isoDateSchema.nullable(),
+  status: payrollRunStatusSchema,
+  currency: currencyCodeSchema.nullable(),
+  baseSalary: decimalStringSchema.nullable(),
+  gross: decimalStringSchema,
+  deductions: decimalStringSchema,
+  net: decimalStringSchema,
+  createdAt: isoDateTimeSchema,
+})
+export type MyPayslipItem = z.infer<typeof myPayslipItemSchema>
+
+export const myPayslipsResponseSchema = z.array(myPayslipItemSchema)
+export type MyPayslipsResponse = z.infer<typeof myPayslipsResponseSchema>
