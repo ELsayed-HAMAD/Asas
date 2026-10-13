@@ -1,5 +1,12 @@
 # Asas
 
+[![CI](https://github.com/ELsayed-HAMAD/asas/actions/workflows/ci.yml/badge.svg)](https://github.com/ELsayed-HAMAD/asas/actions/workflows/ci.yml)
+![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
+![Fastify](https://img.shields.io/badge/Fastify-5-000000?logo=fastify&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
+
 Asas is a multi-tenant business operations platform for HR, payroll, finance, CRM, projects, and inventory. It is a pnpm monorepo with a React web app, a Fastify API, shared contracts, and a domain package.
 
 ## Features
