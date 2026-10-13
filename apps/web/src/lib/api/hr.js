@@ -24,6 +24,7 @@ export const hrApi = {
 
   // Payroll
   listPayrollRuns: (params) => http.get('/hr/payroll/runs', { query: params }),
+  getPayrollRoundingReconciliation: (year) => http.get('/hr/payroll/rounding-reconciliation', { query: { year } }),
   getPayrollRun: (id) => http.get(`/hr/payroll/runs/${id}`),
   createPayrollRun: (body) => http.post('/hr/payroll/runs', { body }),
   approvePayrollRun: (id) => http.post(`/hr/payroll/runs/${id}/approve`),
@@ -31,6 +32,7 @@ export const hrApi = {
   voidPayrollRun: (id, reason) => http.post(`/hr/payroll/runs/${id}/void`, { body: { reason } }),
   patchPayrollLine: (runId, lineId, patch) =>
     http.patch(`/hr/payroll/runs/${runId}/lines/${lineId}`, { body: patch }),
+  listMyPayslips: () => http.get('/hr/payroll/my-payslips'),
 
   // Attendance + leave
   listAttendance: (params) => http.get('/hr/attendance', { query: params }),
@@ -63,11 +65,15 @@ export const hrApi = {
   getResumeUploadUrl: (id) => http.get(`/hr/candidates/${id}/resume-upload-url`),
   uploadResume: async (id, file) => {
     const grant = await http.get(`/hr/candidates/${id}/resume-upload-url`)
-    // grant.uploadUrl is absolute (`/api/v1/hr/candidates/:id/resume?h=..&exp=..`); the h/exp
-    // signature must travel unchanged, but putRaw prefixes /api/v1 itself, so pass the path
-    // RELATIVE to that base and forward the query string as-is.
-    const queryString = grant.uploadUrl.split('?')[1] ?? ''
-    return http.putRaw(`/hr/candidates/${id}/resume`, { body: file, query: queryString })
+    if (grant.uploadTarget === 'api') {
+      const query = new URL(grant.uploadUrl, window.location.origin).search
+      return http.putRaw(`/hr/candidates/${id}/resume`, { body: file, query })
+    }
+
+    await http.putPresigned(grant.uploadUrl, { body: file, headers: { 'content-type': grant.contentType } })
+    return http.post(`/hr/candidates/${id}/resume/complete`, {
+      body: { uploadId: grant.uploadId, expiresUnix: grant.expiresUnix, uploadToken: grant.uploadToken },
+    })
   },
   // Streams the stored PDF (binary; 404 when the candidate has no CV).
   getResume: (id) => http.binary(`/hr/candidates/${id}/resume`),

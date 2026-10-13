@@ -15,6 +15,7 @@ import TopBarActions from '../../../components/TopBarActions'
 import SettingsTabs from './SettingsTabs'
 import ConfirmDialog from '../../../components/common/ConfirmDialog'
 import FormDialog from '../../../components/common/FormDialog'
+import TwoFactorSettings from './TwoFactorSettings'
 import { http } from '../../../lib/api/http'
 import { onboardingApi } from '../../../lib/api/onboarding'
 import { settingsApi } from '../../../lib/api/settings'
@@ -48,6 +49,7 @@ export default function SettingsGeneral() {
     queryKey: queryKeys.settings.billing(),
     queryFn: settingsApi.getBilling,
   })
+  const activeSubscription = billingData?.subscriptions?.find(s => s.status === 'ACTIVE') ?? billingData?.subscriptions?.[0]
 
   const exchangeRateQuery = { page: 1, limit: 20 }
   const { data: exchangeRates } = useQuery({
@@ -197,6 +199,8 @@ export default function SettingsGeneral() {
 
         {/* Left: Settings Content Area */}
         <div className="flex-1 overflow-y-auto p-8 space-y-6">
+
+          <TwoFactorSettings />
 
           {/* Organization Profile Card */}
           <div className="bg-surface-raised border border-border-default rounded-card-sm p-card shadow-card">
@@ -433,19 +437,19 @@ export default function SettingsGeneral() {
               <div className="flex items-center justify-between mb-4">
                 <span className="text-sm font-medium text-body-light">Current Plan</span>
                 <span className="bg-primary text-on-primary px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase">
-                  {billingData?.subscriptions?.[0]?.planName || 'Enterprise Tier'}
+                  {activeSubscription?.planName || 'Standard Tier'}
                 </span>
               </div>
               <div className="flex items-baseline gap-1 mb-1">
                 <span className="text-3xl font-extrabold text-heading tracking-tight">
-                  {billingData?.subscriptions?.[0]?.priceMonthly ? `$${Number(billingData.subscriptions[0].priceMonthly).toLocaleString()}` : '$2,400'}
+                  {activeSubscription?.priceMonthly != null ? `$${Number(activeSubscription.priceMonthly).toLocaleString()}` : '$0'}
                 </span>
                 <span className="text-sm font-medium text-muted">/ month</span>
               </div>
               <p className="text-[11px] font-medium text-muted">
-                {billingData?.subscriptions?.[0]?.renewsOn
-                  ? `Next billing date: ${new Date(billingData.subscriptions[0].renewsOn).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-                  : 'Next billing date: Sept 22'}
+                {activeSubscription?.renewsOn
+                  ? `Next billing date: ${new Date(activeSubscription.renewsOn).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                  : 'Active · Continuous'}
               </p>
             </div>
 
@@ -457,9 +461,9 @@ export default function SettingsGeneral() {
                 <div className="flex justify-between items-end mb-2">
                   <span className="text-sm font-bold text-heading">Active Seats</span>
                   <span className="text-[11px] font-medium text-body-light">
-                    {billingData?.subscriptions?.[0]?.seatsUsed != null
-                      ? `${billingData.subscriptions[0].seatsUsed.toLocaleString()} / ${billingData.subscriptions[0].seatLimit.toLocaleString()}`
-                      : '1,240 / 1,500'}
+                    {activeSubscription?.seatsUsed != null && activeSubscription?.seatLimit != null
+                      ? `${activeSubscription.seatsUsed.toLocaleString()} / ${activeSubscription.seatLimit.toLocaleString()}`
+                      : '—'}
                   </span>
                 </div>
                 <div className="w-full bg-surface-strong rounded-full h-1.5 overflow-hidden">
@@ -468,9 +472,9 @@ export default function SettingsGeneral() {
                     style={{
                       width: `${Math.min(
                         100,
-                        billingData?.subscriptions?.[0]?.seatLimit
-                          ? Math.round(((billingData.subscriptions[0].seatsUsed || 0) / billingData.subscriptions[0].seatLimit) * 100)
-                          : 82.6,
+                        activeSubscription?.seatLimit
+                          ? Math.round(((activeSubscription.seatsUsed || 0) / activeSubscription.seatLimit) * 100)
+                          : 0,
                       )}%`,
                     }}
                   />
@@ -482,20 +486,21 @@ export default function SettingsGeneral() {
                 <div className="flex justify-between items-end mb-2">
                   <span className="text-sm font-bold text-heading">Storage</span>
                   <span className="text-[11px] font-medium text-body-light">
-                    {billingData?.subscriptions?.[0]?.storageUsedGb != null
-                      ? `${billingData.subscriptions[0].storageUsedGb}GB / ${billingData.subscriptions[0].storageLimitGb}GB`
-                      : '450GB / 1TB'}
+                    {activeSubscription?.storageUsedGb != null && activeSubscription?.storageLimitGb != null
+                      ? `${activeSubscription.storageUsedGb < 0.001 ? `${Math.round(activeSubscription.storageUsedGb * 1_000_000)} KB` : activeSubscription.storageUsedGb < 1 ? `${(activeSubscription.storageUsedGb * 1000).toFixed(1)} MB` : `${activeSubscription.storageUsedGb.toFixed(2)} GB`} / ${activeSubscription.storageLimitGb} GB`
+                      : '—'}
                   </span>
                 </div>
                 <div className="w-full bg-surface-strong rounded-full h-1.5 overflow-hidden">
                   <div
+                    hidden={activeSubscription?.storageUsedGb == null}
                     className="bg-primary h-full rounded-full"
                     style={{
                       width: `${Math.min(
                         100,
-                        billingData?.subscriptions?.[0]?.storageLimitGb
-                          ? Math.round(((billingData.subscriptions[0].storageUsedGb || 0) / billingData.subscriptions[0].storageLimitGb) * 100)
-                          : 45,
+                        activeSubscription?.storageLimitGb
+                          ? Math.round(((activeSubscription.storageUsedGb || 0) / activeSubscription.storageLimitGb) * 100)
+                          : 0,
                       )}%`,
                     }}
                   />

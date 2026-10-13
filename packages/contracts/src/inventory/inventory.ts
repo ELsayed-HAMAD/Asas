@@ -203,6 +203,7 @@ export type StockMovement = z.infer<typeof stockMovementSchema>
 
 export const stockMovementListQuerySchema = paginationQuerySchema.extend({
   productId: idSchema.optional(),
+  search: boundedText(200, 1).optional(),
   warehouse: boundedText(200, 0).optional(),
   type: stockMovementTypeSchema.optional(),
 })

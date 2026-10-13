@@ -160,9 +160,9 @@ export async function hrRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request, reply) => {
-      const { tenantId, role } = requireAuthContext(request)
+      const { tenantId, role, userId } = requireAuthContext(request)
       const canReadSalary = hasRequiredRole(role, 'ADMIN')
-      const employee = await employeesService.createEmployee(request.server.prisma, tenantId, request.body, canReadSalary)
+      const employee = await employeesService.createEmployee(request.server.prisma, tenantId, request.body, canReadSalary, userId)
       request.server.ssePublish(tenantId, [moduleKeyPrefix('hr')])
       reply.code(201)
       return { data: employee }
@@ -180,7 +180,7 @@ export async function hrRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async request => {
-      const { tenantId, role } = requireAuthContext(request)
+      const { tenantId, role, userId } = requireAuthContext(request)
       const canReadSalary = hasRequiredRole(role, 'ADMIN')
       const employee = await employeesService.updateEmployee(
         request.server.prisma,
@@ -188,6 +188,7 @@ export async function hrRoutes(app: FastifyInstance): Promise<void> {
         request.params.id,
         request.body,
         canReadSalary,
+        userId,
       )
       request.server.ssePublish(tenantId, [moduleKeyPrefix('hr')])
       return { data: employee }

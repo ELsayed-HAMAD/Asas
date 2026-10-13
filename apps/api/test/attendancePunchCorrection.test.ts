@@ -46,6 +46,10 @@ describe('attendance punch corrections', () => {
     } }))
     expect(tx.timesheet.update).toHaveBeenCalledWith(expect.objectContaining({ data: { totalHours: 17.5, overtimeHours: 1.5, regularHours: 16 } }))
     expect(tx.attendanceException.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ type: 'OVERTIME', alert: true, label: 'Overtime: 1.50 hours' }) }))
+    expect(tx.attendanceException.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ tenantId: 'tenant_1', employeeId: 'employee_1', type: 'MISSING_OUT', alert: true }),
+      data: { alert: false },
+    }))
   })
 
   it('supports overnight corrections and rejects a DST wall time that never occurred', async () => {

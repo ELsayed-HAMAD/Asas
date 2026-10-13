@@ -6,11 +6,29 @@ import {
   journalEntrySchema,
   trialBalanceQuerySchema,
   trialBalanceResponseSchema,
+  payableListQuerySchema,
+  receivableListQuerySchema,
+  receivableInvoiceSchema,
 } from './index.js'
 
 const vendorId = 'clxxxxxxxxxxxxxxxxxxxxxxx'
 
 describe('finance boundary validation', () => {
+  it('accepts bounded Accounts Payable views and rejects unknown filter values', () => {
+    expect(payableListQuerySchema.parse({ page: '2', limit: '25', statusGroup: 'HISTORY', dateRange: 'CURRENT_MONTH' })).toMatchObject({ page: 2, limit: 25, statusGroup: 'HISTORY', dateRange: 'CURRENT_MONTH' })
+    expect(payableListQuerySchema.safeParse({ statusGroup: 'EVERYTHING' }).success).toBe(false)
+    expect(payableListQuerySchema.safeParse({ dateRange: 'LAST_YEAR' }).success).toBe(false)
+  })
+  it('accepts an open receivables page scoped to one customer', () => {
+    expect(receivableListQuerySchema.parse({ page: '2', limit: '10', customerId: vendorId, statusGroup: 'OPEN' })).toMatchObject({ page: 2, limit: 10, customerId: vendorId, statusGroup: 'OPEN' })
+    expect(receivableListQuerySchema.safeParse({ statusGroup: 'UNPAID' }).success).toBe(false)
+  })
+  it('requires a nonnegative server-computed daysPastDue value on receivables', () => {
+    const invoice = { id: vendorId, customerId: vendorId, customer: 'Customer', number: null, amount: { amount: 100, currency: 'USD' }, dueDate: '2026-10-12T00:00:00.000Z', status: 'CURRENT', createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z' }
+    expect(receivableInvoiceSchema.safeParse({ ...invoice, daysPastDue: 0 }).success).toBe(true)
+    expect(receivableInvoiceSchema.safeParse({ ...invoice, daysPastDue: -1 }).success).toBe(false)
+    expect(receivableInvoiceSchema.safeParse(invoice).success).toBe(false)
+  })
   it('requires a bounded nonblank reason for cancellation', () => {
     for (const reason of ['', '   ', 'x'.repeat(2001)]) {
       expect(financeVoidSchema.safeParse({ reason }).success).toBe(false)
@@ -53,6 +71,11 @@ describe('finance boundary validation', () => {
     expect(expenseWriteSchema.safeParse({ ...input, tax: '-0.01' }).success).toBe(false)
     expect(expenseWriteSchema.safeParse({ ...input, tax: '10.02' }).success).toBe(false)
     expect(expenseWriteSchema.safeParse({ ...input, tax: '10.01' }).success).toBe(true)
+  })
+  it('validates self-service expense submission without requiring employeeId', async () => {
+    const { selfExpenseWriteSchema } = await import('./index.js')
+    const selfInput = { name: 'Taxi', date: '2026-10-07', amount: '25.50', category: 'TRAVEL' as const }
+    expect(selfExpenseWriteSchema.safeParse(selfInput).success).toBe(true)
   })
   it('validates mixed-currency journal lines with an explicit base-currency value', () => {
     const payload = {

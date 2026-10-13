@@ -623,12 +623,13 @@ export async function applyEnterpriseSamplePack(
       const lines = (run.lines ?? []).filter(line => employeeIds.has(line.employeeKey))
       if (lines.length === 0) continue
 
+      const targetStatus = asEnum(PAYROLL_STATUSES, run.status, 'PENDING', 'payrollRuns')
       const createdRun = await tx.payrollRun.create({
         data: {
           tenantId,
           label: run.label,
           payDate: parseDate(run.payDate),
-          status: asEnum(PAYROLL_STATUSES, run.status, 'PENDING', 'payrollRuns'),
+          status: 'DRAFT',
           taxRates: SAMPLE_TAX_RATES.map(rate => ({ label: rate.label, rate: String(rate.weight) })),
         },
       })
@@ -668,6 +669,13 @@ export async function applyEnterpriseSamplePack(
               })),
             },
           },
+        })
+      }
+
+      if (targetStatus !== 'DRAFT') {
+        await tx.payrollRun.update({
+          where: { id: createdRun.id },
+          data: { status: targetStatus },
         })
       }
     }

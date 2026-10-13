@@ -50,12 +50,20 @@ out/
 .nuxt/
 .cache/
 .vite/
+.vite-temp/
+.vercel/
+.netlify/
+.wrangler/
 .eslintcache
 .oxlintcache
 .stylelintcache
 .parcel-cache/
 .vuepress/dist/
 .serverless/
+.aws-sam/
+.terraform/
+*.tfstate
+*.tfstate.*
 *.local
 
 # =========================
@@ -87,6 +95,8 @@ obj/
 *.sqlite
 *.sqlite3
 *.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
 uploads/
 storage/
 tmp/
@@ -113,6 +123,7 @@ allure-report/
 !.vscode/extensions.json
 .cursor/
 .idea/
+.history/
 *.suo
 *.ntvs*
 *.njsproj
@@ -139,6 +150,9 @@ $RECYCLE.BIN/
 # AI Tools & Editors
 # =========================
 .claude/
+.agents/
+.codex/
+.opencode/
 .zed/
 .gemini/
 .antigravity/
@@ -152,11 +166,12 @@ $RECYCLE.BIN/
 # =========================
 # Scratch, Maintenance & Local Scripts
 # =========================
+# Local audit/planning notes are intentionally kept out of the public source tree.
+AUDIT.md
 filter.py
 rebase.ps1
 filter-msg.*
 scripts/filter-msg.*
-AUDIT.md
 check_errors.cjs
 lint_output.txt
 scratch/

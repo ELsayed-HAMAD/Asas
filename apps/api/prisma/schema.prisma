@@ -209,6 +209,7 @@ model Tenant {
   name               String
   slug               String           @unique
   supportEmail       String?
+  stripeCustomerId   String?          @unique
   logoUrl            String?
   metadata           String?
   timezone           String           @default("UTC")
@@ -243,6 +244,8 @@ model Tenant {
   exchangeRates        ExchangeRate[]
   journalEntries       JournalEntry[]
   cashFlowSnapshots    CashFlowSnapshot[]
+  bankStatementImports BankStatementImport[]
+  bankStatementLines   BankStatementLine[]
   companies            Company[]
   deals                Deal[]
   dealStageHistory     DealStageHistory[]
@@ -280,6 +283,7 @@ model User {
   name          String
   email         String   @unique
   emailVerified Boolean  @default(false)
+  twoFactorEnabled Boolean @default(false)
   image         String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -290,6 +294,22 @@ model User {
   sentInvitations      Invitation[]   @relation("InvitationInviter")
   auditLogs            AuditLog[]
   exchangeRatesCreated ExchangeRate[]
+  twoFactors            TwoFactor[]
+}
+
+model TwoFactor {
+  id                      String    @id @default(cuid())
+  userId                  String
+  secret                  String
+  backupCodes             String
+  verified                Boolean   @default(true)
+  failedVerificationCount Int       @default(0)
+  lockedUntil             DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([secret])
+  @@index([userId])
 }
 
 model Session {
@@ -461,6 +481,7 @@ model Employee {
   status         EmployeeStatus @default(ACTIVE)
   avatarUrl      String?
   hiredAt        DateTime?
+  employmentEndDate DateTime?   @db.Date
   salary         Decimal?       @db.Decimal(19, 4)
   salaryBasis    SalaryBasis?
   equityOptions  Int?
@@ -476,6 +497,7 @@ model Employee {
   manager          Employee?             @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
   reports          Employee[]            @relation("EmployeeManager")
   member           Member?
+  salaryHistory    EmployeeSalaryHistory[]
   payrollLines     PayrollLine[]
   timesheets       Timesheet[]
   exceptions       AttendanceException[]
@@ -490,6 +512,23 @@ model Employee {
   @@index([tenantId])
   @@index([tenantId, departmentId])
   @@index([tenantId, status])
+}
+
+model EmployeeSalaryHistory {
+  id            String      @id @default(cuid())
+  tenantId      String
+  employeeId    String
+  salary        Decimal     @db.Decimal(19, 4)
+  salaryBasis   SalaryBasis?
+  currency      String
+  effectiveFrom DateTime    @db.Date
+  createdById   String?
+  createdAt     DateTime    @default(now())
+
+  employee Employee @relation(fields: [employeeId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@unique([employeeId, effectiveFrom])
+  @@index([tenantId, employeeId, effectiveFrom])
 }
 
 model PayrollRun {
@@ -539,6 +578,7 @@ model PayrollLine {
   baseSalary       Decimal?     @db.Decimal(19, 4)
   sourceSalary     Decimal?     @db.Decimal(19, 4)
   salaryBasis      SalaryBasis?
+  salaryRateSegments Json?
   eligibleDays     Int?
   periodDays       Int?
   missedDaysCount  Int?
@@ -777,6 +817,7 @@ model Customer {
   id               String           @id @default(cuid())
   tenantId         String
   name             String
+  email            String?
   avatarUrl        String?
   collectionStatus ReceivableStatus @default(CURRENT)
   createdAt        DateTime         @default(now())
@@ -959,9 +1000,51 @@ model JournalLine {
 
   entry   JournalEntry  @relation(fields: [entryId, tenantId], references: [id, tenantId], onDelete: Restrict)
   account LedgerAccount @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  bankStatementMatch BankStatementLine?
 
   @@index([tenantId, accountId])
   @@index([entryId])
+  @@unique([id, tenantId])
+}
+
+model BankStatementImport {
+  id         String   @id @default(cuid())
+  tenantId   String
+  fileName   String
+  contentHash String
+  createdAt  DateTime @default(now())
+
+  tenant Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lines  BankStatementLine[]
+
+  @@unique([tenantId, contentHash])
+  @@unique([id, tenantId])
+  @@index([tenantId, createdAt])
+}
+
+model BankStatementLine {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  importId              String
+  fingerprint           String
+  postedAt               DateTime @db.Date
+  description            String
+  reference              String?
+  currency               String
+  amount                 Decimal  @db.Decimal(19, 4)
+  matchedJournalLineId   String?
+  matchedAt              DateTime?
+  createdAt              DateTime @default(now())
+
+  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  statementImport    BankStatementImport @relation(fields: [importId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  matchedJournalLine JournalLine?       @relation(fields: [matchedJournalLineId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@unique([importId, fingerprint])
+  @@unique([matchedJournalLineId, tenantId])
+  @@index([tenantId, postedAt])
+  @@index([importId, matchedAt])
 }
 
 model LedgerTransaction {
@@ -1419,6 +1502,9 @@ model Subscription {
   priceMonthly   Decimal            @default(0) @db.Decimal(19, 4)
   status         SubscriptionStatus @default(ACTIVE)
   renewsOn       DateTime?
+  stripeSubscriptionId String?          @unique
+  stripePriceId       String?
+  stripeCurrency      String?
   seatsUsed      Int                @default(1)
   seatLimit      Int                @default(10)
   storageUsedGb  Float              @default(0)
@@ -1432,12 +1518,13 @@ model Subscription {
 }
 
 model PaymentMethod {
-  id        String   @id @default(cuid())
-  tenantId  String
-  brand     String
-  last4     String
-  expires   String?
-  createdAt DateTime @default(now())
+  id                    String   @id @default(cuid())
+  tenantId              String
+  stripePaymentMethodId String?  @unique
+  brand                 String
+  last4                 String
+  expires               String?
+  createdAt             DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -1451,11 +1538,19 @@ model BillingInvoice {
   description String
   amount      Decimal  @db.Decimal(19, 4)
   status      String   @default("Paid")
+  stripeInvoiceId String? @unique
+  stripeCurrency  String?
   createdAt   DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
+}
+
+model StripeWebhookEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now())
 }
 
 model Integration {

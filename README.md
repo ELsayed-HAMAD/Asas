@@ -1,178 +1,140 @@
-# Asas Enterprise Platform
+# Asas
 
-![CI](https://github.com/ELsayed-HAMAD/asas/actions/workflows/ci.yml/badge.svg)
-![Status](https://img.shields.io/badge/Status-Active_Development-success?style=flat-square)
-![React](https://img.shields.io/badge/React-19-blue?style=flat-square&logo=react)
-![TailwindCSS v4](https://img.shields.io/badge/TailwindCSS-v4-38B2AC?style=flat-square&logo=tailwind-css)
-![Fastify](https://img.shields.io/badge/Fastify-5-black?style=flat-square&logo=fastify)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Prisma-4169E1?style=flat-square&logo=postgresql)
+Asas is a multi-tenant business operations platform for HR, payroll, finance, CRM, projects, and inventory. It is a pnpm monorepo with a React web app, a Fastify API, shared contracts, and a domain package.
 
-**Asas** is a modern, premium, tenant-aware enterprise operations platform. It brings HR, Finance, CRM, Inventory, and Projects into one unified, visually stunning dashboard.
+## Features
 
-The platform is designed with a strict focus on top-tier professional aesthetics, leveraging a bespoke design system, Tailwind CSS v4, and a highly polished user experience.
+- **HR and payroll:** Employee directory, payroll runs and payslips, attendance punches, overtime thresholds, leave requests and balances, recruitment stages, interviews, and candidate exports.
+- **Finance:** Accounts payable and receivable, expenses and reimbursements, a general ledger and trial balance, opening balances, multi-currency FX support, invoice recognition, settlement reversals, and bank statement reconciliation.
+- **CRM:** Deal pipelines and activity, outcome history, quotas, weighted forecasts, and sales performance reporting.
+- **Projects:** Portfolio and finance spend views, sprint work tracking and burndown, issue comments and checklists, and roadmap planning and export.
+- **Inventory:** Product catalog, suppliers and purchase orders, warehouse stock movements, and stock integrity controls.
+- **Workspace services:** Role-based access, audit logs, exports, email notifications, integrations, subscription billing, two-factor authentication, and English/Arabic UI with RTL support.
 
----
+Some integrations require provider configuration. Email, Stripe, and S3-compatible storage are optional in development; see [API setup](apps/api/README.md) before enabling them in a deployment.
 
-## Key Features
+## Technology
 
-* **Premium UI/UX:** Built on a custom Tailwind v4 `@theme`, featuring tailored spacing, subtle hover states, micro-animations, and a completely custom, scrollbar-free sidebar navigation.
-* **Tenant Isolation:** Fastify API with Better Auth session cookies and strict tenant-level data boundaries via organization membership.
-* **Typed Domain Models:** Full Prisma schema with 72 models across typed modules for HR, Finance, CRM, Inventory, and Projects.
-* **Unified Workspace:** A single-page application (React + Vite) that seamlessly routes between distinct business modules.
-* **Audit Logging:** Full audit trail for sensitive operations with searchable, filterable log views.
-* **PostgreSQL via Prisma:** Runs against a local or hosted PostgreSQL instance; the schema is the single source of truth.
-
-## Core Modules
-
-* **HR & Payroll:** Employee directory, time & attendance tracking (punch clock, leave policies, overtime thresholds), payroll processing with settlement journals, and recruitment pipelines with candidate interviews and export.
-* **Finance:** Accounts payable/receivable, expense tracking with reimbursement journals, trial balance / general ledger, multi-currency FX support, invoice recognition controls, and financial overviews with period filtering.
-* **CRM (Sales):** Deal pipelines with activity tracking, revenue forecasting, outcome history, and sales performance leaderboards.
-* **Projects:** Portfolio overview with finance spend tracking, active sprints with burndown, work tracking, and product roadmaps with export.
-* **Inventory:** Product catalog with stock-level tracking, integrity checks, and warehouse management.
-* **Audit Log:** Searchable audit trail for all sensitive operations across modules.
-
----
-
-## Architecture
-
-This is a **pnpm monorepo** with Turborepo orchestration:
-
-```
-asas/
-├─ apps/
-│  ├─ api/           ← Fastify 5 + Prisma + Better Auth (TypeScript)
-│  └─ web/           ← React 19 + Vite + Tailwind v4 + shadcn/ui (JSX)
-├─ packages/
-│  ├─ contracts/     ← Zod schemas + generated Prisma enums + shared types
-│  └─ domain/        ← Pure calculation layer: Money, payroll periods, aging
-├─ scripts/          ← Repo-level utility scripts
-├─ .github/
-│  └─ workflows/
-│     └─ ci.yml      ← Lint → Typecheck → Test → Build on every push/PR
-├─ pnpm-workspace.yaml
-└─ turbo.json
-```
-
-### Technology Stack
-
-| Layer | Technology |
+| Area | Stack |
 |---|---|
-| Frontend | React 19, Vite 6, Tailwind CSS v4, shadcn/ui (Radix), Recharts 3, TanStack Query, Zustand, Framer Motion |
-| Backend | Fastify 5, Prisma 6, Better Auth (organization plugin, httpOnly cookies) |
-| Database | PostgreSQL 17 (Neon or local Docker) |
-| Domain | TypeScript pure functions: integer-cent Money, payroll periods, AR aging |
-| Contracts | Zod → `fastify-type-provider-zod` → shared `@asas/contracts` |
-| Jobs | pg-boss (Postgres-backed) for PDF / export / email |
-| Real-time | SSE push for cross-tab cache invalidation |
-| Linting | oxlint (web), TypeScript strict mode (API, contracts, domain) |
-| Testing | Vitest (unit / domain / API integration) |
-| CI | GitHub Actions — lint, typecheck, test, build on every push and PR |
+| Web | React 19, Vite, Tailwind CSS 4, TanStack Query, Recharts |
+| API | Fastify 5, TypeScript, Prisma 6, Better Auth |
+| Database | PostgreSQL 17 |
+| Shared packages | Zod contracts and TypeScript domain calculations |
+| Background jobs | pg-boss with PostgreSQL; optional Redis for distributed rate limits and SSE fan-out |
+| Tests | Vitest, Node test runner, and Playwright |
+| CI | GitHub Actions: lint, typecheck, tests, browser tests, dependency audit, and build |
 
-### Key Design Decisions
+## Prerequisites
 
-* **Money is integer cents.** All money columns are `Decimal @db.Decimal(19,4)` in Prisma. The domain layer's `Money` class uses bigint minor units with explicit rounding — no Float arithmetic anywhere.
-* **All calculations are backend.** KPI cards, AR aging, payroll totals, attendance rate — every business number is a SQL aggregate or domain function, never a client-side `.reduce()`.
-* **No fabricated data.** CRM funnel, win rate, forecast — all computed from real `Deal` rows, not hardcoded constants.
-* **RBAC enforced.** A declarative permission map gates every write endpoint; payroll approval and salary visibility are audit-logged.
-* **Multi-currency.** Workspace-level currency settings with FX rates and proper journal accounting for foreign-currency transactions.
+- Node.js 22 or later
+- pnpm 11.9.0 (the repository's pinned package manager)
+- PostgreSQL 17 for API development and migrations
+- Docker Compose is optional for local PostgreSQL and Redis
 
----
+## Local setup
 
-## Quick Start
+Install dependencies from the repository root:
 
-### Prerequisites
-
-- Node.js 22+
-- pnpm 11+
-- PostgreSQL 17+ (local Docker, or a Neon instance)
-
-### Setup
-
-```bash
-# Install dependencies
+```sh
 pnpm install
+```
 
-# Copy environment templates
-cp apps/api/.env.example apps/api/.env   # set DATABASE_URL, AUTH_SECRET
-cp apps/web/.env.example apps/web/.env   # set VITE_API_URL
+Copy the environment templates, then set a local PostgreSQL connection string and a strong `AUTH_SECRET` in `apps/api/.env`. Set `VITE_API_URL` in `apps/web/.env` if the API is not at its default address.
 
-# Generate Prisma client
+PowerShell:
+
+```powershell
+Copy-Item apps/api/.env.example apps/api/.env
+Copy-Item apps/web/.env.example apps/web/.env
+```
+
+macOS/Linux:
+
+```sh
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env
+```
+
+Start PostgreSQL separately or use `docker compose up -d db redis` for local development. The Compose database uses development-only credentials; do not expose it to an untrusted network or reuse those credentials outside local development.
+
+Generate Prisma Client and apply local development migrations:
+
+```sh
 pnpm --filter @asas/api run prisma:generate
-
-# Run migrations (requires a running Postgres)
 pnpm --filter @asas/api run prisma:migrate
+```
 
-# Start the dev servers (API on :4000, web on :5173)
+Start the web app and API:
+
+```sh
 pnpm dev
 ```
 
-### Docker for local Postgres (optional)
+The web app is served at `http://localhost:5173` and the API at `http://127.0.0.1:4000`. API docs are available at `/docs` when enabled; production disables them by default.
 
-```bash
-docker run -d --name asas-db -p 5432:5432 \
-  -e POSTGRES_USER=asas -e POSTGRES_PASSWORD=asas -e POSTGRES_DB=asas \
-  postgres:17-alpine
-```
+### Optional services
 
----
+- **Email:** Configure `RESEND_API_KEY` and a verified `MAIL_FROM` sender. Set `QUEUE_URL` to use pg-boss retries; without it, email sends inline.
+- **Object storage:** Local disk is the development default. Production requires S3-compatible storage; follow the private-bucket, CORS, and migration instructions in [apps/api/README.md](apps/api/README.md).
+- **Stripe:** Billing stays disabled until Stripe keys, webhook secret, and allow-listed recurring monthly Price IDs are configured. Validate in test mode first.
+- **Redis:** Local Compose starts Redis. The API can fall back to in-process behavior when Redis is not configured; multi-instance rate limiting and SSE fan-out require Redis.
 
-## Useful Commands
+Keep real credentials in local environment files or deployment secret stores. Never commit `.env` files, private keys, certificates, database dumps, or provider credentials. Only sanitized `.env.example` templates belong in Git.
+
+## Development commands
 
 | Command | Purpose |
 |---|---|
-| `pnpm dev` | Run API + web in parallel (Turborepo) |
-| `pnpm run build` | Build all packages |
-| `pnpm run typecheck` | Typecheck all workspaces |
-| `pnpm run lint` | Lint all workspaces |
-| `pnpm run test` | Run unit tests (Vitest) |
-| `pnpm --filter @asas/api run prisma:generate` | Generate Prisma client |
-| `pnpm --filter @asas/api run prisma:migrate` | Run Prisma migrations |
-| `pnpm --filter @asas/api run prisma:deploy` | Deploy migrations (production) |
+| `pnpm dev` | Run API and web development servers |
+| `pnpm test` | Run API, contract, domain, and web unit/integration tests |
+| `pnpm test:e2e` | Run Playwright browser tests (installs Chromium as required) |
+| `pnpm lint` | Run workspace lint checks |
+| `pnpm typecheck` | Typecheck the workspaces |
+| `pnpm build` | Build all packages and applications |
+| `pnpm --filter @asas/api run prisma:generate` | Generate Prisma Client |
+| `pnpm --filter @asas/api run prisma:migrate` | Apply local development migrations |
+| `pnpm --filter @asas/api run prisma:deploy` | Apply pending migrations in a deployment environment |
 
----
+Run the standard checks before submitting changes:
 
-## Project Structure
-
-```
-apps/api/
-├─ prisma/             # Schema + migrations
-├─ seeds/              # Onboarding sample data packs
-├─ src/
-│  ├─ config/          # Environment validation
-│  ├─ middlewares/      # Error handling, RBAC, permissions
-│  ├─ modules/         # Route + service modules per domain
-│  │  ├─ auditLog/
-│  │  ├─ crm/
-│  │  ├─ exports/
-│  │  ├─ finance/
-│  │  ├─ hr/
-│  │  ├─ inventory/
-│  │  ├─ onboarding/
-│  │  ├─ projects/
-│  │  ├─ settings/
-│  │  └─ support/
-│  ├─ plugins/         # Fastify plugins (auth, prisma, SSE, sentry)
-│  ├─ services/        # Shared services (audit, export, money, PDF, queue)
-│  └─ utils/           # Error types, date helpers
-└─ test/               # Vitest test files
-
-apps/web/
-├─ public/             # Static assets (favicon, icons)
-├─ src/
-│  ├─ components/      # Shared UI components
-│  ├─ guards/          # Auth route guards
-│  ├─ layouts/         # Dashboard, Auth, Marketing layouts
-│  ├─ lib/             # API clients, formatting, SSE, auth, CSV export
-│  └─ pages/           # Route pages per module
-└─ test/               # Frontend tests
-
-packages/contracts/    # Zod schemas, generated enums, shared types
-packages/domain/       # Pure business logic (Money, payroll, rounding)
+```sh
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:e2e
+pnpm build
 ```
 
----
+Browser E2E tests currently mock the API and verify browser flows; they do not replace staging checks against PostgreSQL or external providers.
+
+## Repository layout
+
+```text
+apps/
+  api/          Fastify API, Prisma schema/migrations, and API tests
+  web/          React application, browser tests, and web tests
+packages/
+  contracts/   Shared Zod request/response schemas and generated enums
+  domain/      Pure business rules for money, payroll, banking, and more
+.github/        CI workflows
+```
+
+## Data and calculation principles
+
+- Business calculations and aggregate KPIs belong in the API/domain layer.
+- Do not invent historical values when the source data is missing; expose the gap clearly.
+- Financial writes and their audit records should remain transactionally consistent.
+- Enforce tenant scope and permissions on the server for every protected operation.
+- Preserve existing user-facing features when extending backend support.
+
+## Deployment notes
+
+Production database changes must be applied with `pnpm --filter @asas/api run prisma:deploy` before starting the API version that depends on them. Review migration contents and back up production data according to your deployment process. Then run the staging acceptance checks documented in [apps/api/README.md](apps/api/README.md) for configured email, billing, and storage providers.
+
+The repository includes API and web Dockerfiles, an Nginx configuration, and a local Compose stack. The Compose stack is for development and is not a production security configuration.
 
 ## Documentation
 
-- API setup and endpoint details: [apps/api/README.md](apps/api/README.md)
-- OpenAPI docs available at `/docs` when the API is running
+- [API configuration, email, billing, reconciliation, and storage](apps/api/README.md)
+- [CI workflow](.github/workflows/ci.yml)

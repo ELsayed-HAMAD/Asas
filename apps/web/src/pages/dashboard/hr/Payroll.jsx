@@ -9,6 +9,7 @@ import {
   Trash2,
   FileText,
   AlertCircle,
+  Calculator,
 } from 'lucide-react'
 import TopBarActions from '../../../components/TopBarActions'
 import FormDialog from '../../../components/common/FormDialog'
@@ -16,13 +17,29 @@ import { hrApi } from '../../../lib/api/hr'
 import { queryKeys } from '../../../lib/queryKeys'
 import { formatMoney, formatDate } from '../../../lib/format'
 import { downloadCsv } from '../../../lib/csv'
-import { useActiveMemberRole } from '../../../lib/authClient'
+import {
+  downloadFile,
+  generateNachaForRun,
+  generateSepaForRun,
+  payrollNachaFilename,
+  payrollPaymentSummaryFilename,
+  payrollPaymentSummaryRows,
+  payrollSepaFilename,
+} from '../../../lib/payrollExport'
+import { clearPayrollRunDraft, payrollRunDraftStorageKey, readPayrollRunDraft, savePayrollRunDraft } from '../../../lib/payrollRunDraft'
+import { useActiveMemberRole, useActiveOrganization, useSession } from '../../../lib/authClient'
+import { useDebouncedValue } from '../../../lib/useDebouncedValue'
+import StatutoryTaxCalculator from './StatutoryTaxCalculator.jsx'
 
 // The old page rendered deductions/taxes as a leading-minus negative; the minus only appears
 // for a positive amount (a zero rendered plain), so mirror that instead of an unconditional '-'.
 function formatNegativeDeduction(value, currency) {
   const options = currency ? { currency } : {}
   return Number(value) > 0 ? `-${formatMoney(value, options)}` : formatMoney(value, options)
+}
+
+function payrollDraftStorage() {
+  try { return window.sessionStorage } catch { return null }
 }
 
 // Shared input style for the New Payroll Run dialog — the page's existing token classes.
@@ -68,13 +85,59 @@ function PayslipButton({ runId, lineId, onSelect, onNotifyError }) {
 
 export default function Payroll() {
   const queryClient = useQueryClient()
+  const { data: activeMemberRole } = useActiveMemberRole()
+  const { data: activeOrganization } = useActiveOrganization()
+  const { data: sessionData } = useSession()
+  const draftStorageKey = payrollRunDraftStorageKey(activeOrganization?.id, sessionData?.user?.id)
+  // Read the role object returned by Better Auth; unresolved roles do not grant write access.
+  const isAdmin = ['OWNER', 'ADMIN'].includes(activeMemberRole?.role)
+  const [roundingReviewOpen, setRoundingReviewOpen] = useState(false)
+  const [roundingYear, setRoundingYear] = useState(String(new Date().getFullYear()))
+  const [statutoryCalculatorOpen, setStatutoryCalculatorOpen] = useState(false)
+
   const [selectedId, setSelectedId] = useState(null)
   const [selectedRunId, setSelectedRunId] = useState('')
+  const [payrollRunPage, setPayrollRunPage] = useState(1)
   const [payrollActionError, setPayrollActionError] = useState(null)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [savedRetryAvailable, setSavedRetryAvailable] = useState(false)
+  const requestRef = useRef(null)
+
+  useEffect(() => {
+    setIsDialogOpen(false)
+    if (!draftStorageKey) {
+      requestRef.current = null
+      setSavedRetryAvailable(false)
+      return
+    }
+    const draft = readPayrollRunDraft(payrollDraftStorage(), draftStorageKey)
+    requestRef.current = draft
+    setSavedRetryAvailable(Boolean(draft))
+  }, [draftStorageKey])
 
   const { data: listData, isLoading: isLoadingList, isError, error } = useQuery({
-    queryKey: queryKeys.hr.payrollRuns.list(),
-    queryFn: () => hrApi.listPayrollRuns(),
+    queryKey: queryKeys.hr.payrollRuns.list({ page: payrollRunPage, limit: 25 }),
+    queryFn: () => hrApi.listPayrollRuns({ page: payrollRunPage, limit: 25 }),
+    enabled: isAdmin,
+  })
+  useEffect(() => {
+    const pages = listData?.pagination?.pages
+    if (pages === undefined) return
+    if (pages === 0 && payrollRunPage !== 1) setPayrollRunPage(1)
+    else if (pages > 0 && payrollRunPage > pages) setPayrollRunPage(pages)
+  }, [listData?.pagination?.pages, payrollRunPage])
+
+  const roundingYearNumber = Number(roundingYear)
+  const { data: roundingReview, isLoading: isLoadingRoundingReview, isError: isRoundingReviewError, error: roundingReviewError } = useQuery({
+    queryKey: ['hr', 'payroll', 'rounding-reconciliation', roundingYear],
+    queryFn: () => hrApi.getPayrollRoundingReconciliation(roundingYearNumber),
+    enabled: isAdmin && roundingReviewOpen && Number.isInteger(roundingYearNumber) && roundingYearNumber >= 2000 && roundingYearNumber <= 2100,
+  })
+
+  const { data: myPayslips = [], isLoading: isLoadingMyPayslips, isError: isMyPayslipsError, error: myPayslipsError } = useQuery({
+    queryKey: ['hr', 'payroll', 'my-payslips'],
+    queryFn: () => hrApi.listMyPayslips(),
+    enabled: !isAdmin,
   })
 
   const runs = listData?.items ?? []
@@ -85,7 +148,7 @@ export default function Payroll() {
   const { data: run, isLoading: isLoadingRun } = useQuery({
     queryKey: queryKeys.hr.payrollRuns.detail(activeRunId),
     queryFn: () => hrApi.getPayrollRun(activeRunId),
-    enabled: !!activeRunId,
+    enabled: isAdmin && !!activeRunId,
   })
 
   const isLoading = isLoadingList || (!!activeRunId && isLoadingRun)
@@ -132,21 +195,35 @@ export default function Payroll() {
     downloadCsv(rows, `${activeRun.label.trim().replace(/[^a-z0-9-_]+/gi, '-') || 'payroll'}-ledger.csv`)
   }
 
-  function downloadAch() {
+  function exportPaymentSummary() {
     if (!activeRun || !run) return
-    const rows = [
-      ['Employee Name', 'Employee ID', 'Pay Date', 'Currency', 'Net Amount', 'Bank Routing', 'Account Number'],
-      ...records.map(line => [
-        line.employee?.name || '',
-        line.employeeId || '',
-        activeRun.payDate || new Date().toISOString().slice(0, 10),
-        run.currency || 'USD',
-        line.net || '0.00',
-        '021000021',
-        `***${(line.employeeId || '0000').slice(-4)}`,
-      ]),
-    ]
-    downloadCsv(rows, `${activeRun.label.trim().replace(/[^a-z0-9-_]+/gi, '-') || 'payroll'}-ach-direct-deposit.csv`)
+    downloadCsv(payrollPaymentSummaryRows(activeRun, records), payrollPaymentSummaryFilename(activeRun.label))
+  }
+
+  function exportNacha() {
+    if (!activeRun || !run || !records.length) return
+    try {
+      setPayrollActionError(null)
+      const nacha = generateNachaForRun(activeRun, records, {
+        name: activeOrganization?.name || 'ASAS WORKSPACE',
+      })
+      downloadFile(nacha.fileContent, payrollNachaFilename(activeRun.label), 'text/plain')
+    } catch (err) {
+      setPayrollActionError(err?.message || 'Failed to generate NACHA ACH file')
+    }
+  }
+
+  function exportSepa() {
+    if (!activeRun || !run || !records.length) return
+    try {
+      setPayrollActionError(null)
+      const sepa = generateSepaForRun(activeRun, records, {
+        name: activeOrganization?.name || 'ASAS WORKSPACE',
+      })
+      downloadFile(sepa.xmlContent, payrollSepaFilename(activeRun.label), 'application/xml')
+    } catch (err) {
+      setPayrollActionError(err?.message || 'Failed to generate SEPA XML file')
+    }
   }
 
   const approveMutation = useMutation({
@@ -209,18 +286,16 @@ export default function Payroll() {
   }
 
   // ── New payroll run (ADMIN write — employee.write) ──────────────────────────────
-  const { data: activeMemberRole } = useActiveMemberRole()
-  // Read the role object returned by Better Auth; unresolved roles do not grant write access.
-  const isAdmin = ['OWNER', 'ADMIN'].includes(activeMemberRole?.role)
-
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [label, setLabel] = useState('')
   const [payDate, setPayDate] = useState('')
   const emptyPeriod = () => ({ salaryBasis: '', payFrequency: 'MONTHLY', periodsPerYear: 12, periodStart: '', periodEnd: '' })
   const [periodForm, setPeriodForm] = useState(emptyPeriod)
-  const requestRef = useRef(null)
   const [taxRates, setTaxRates] = useState([{ label: 'Tax', rate: '10' }])
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState(() => new Set())
+  const [employeeSearch, setEmployeeSearch] = useState('')
+  const debouncedEmployeeSearch = useDebouncedValue(employeeSearch)
+  const [employeePage, setEmployeePage] = useState(1)
+  const employeeLimit = 25
   const [dialogError, setDialogError] = useState(null)
   const [payslipError, setPayslipError] = useState(null)
 
@@ -231,17 +306,23 @@ export default function Payroll() {
     isError: isEmployeeError,
     error: employeeError,
   } = useQuery({
-    queryKey: queryKeys.hr.employees.list({ limit: 100 }),
-    queryFn: () => hrApi.listEmployees({ limit: 100 }),
+    queryKey: queryKeys.hr.employees.list({ page: employeePage, limit: employeeLimit, search: debouncedEmployeeSearch || undefined }),
+    queryFn: () => hrApi.listEmployees({ page: employeePage, limit: employeeLimit, search: debouncedEmployeeSearch || undefined }),
     enabled: isDialogOpen,
   })
   const employees = employeeData?.items ?? []
+  const employeePages = employeeData?.pagination?.pages ?? 0
+
+  useEffect(() => {
+    if (employeePages > 0 && employeePage > employeePages) setEmployeePage(employeePages)
+  }, [employeePages, employeePage])
 
   function resetDialogState() {
     setLabel('')
     setPayDate(new Date().toISOString().slice(0, 10))
     setPeriodForm(emptyPeriod())
     requestRef.current = null
+    setSavedRetryAvailable(false)
     setTaxRates([{ label: 'Tax', rate: '10' }])
     setSelectedEmployeeIds(new Set())
     setDialogError(null)
@@ -249,8 +330,35 @@ export default function Payroll() {
 
   function openNewRunDialog() {
     if (!isAdmin) return
-    resetDialogState()
+    const draft = requestRef.current?.payload
+      ? requestRef.current
+      : readPayrollRunDraft(payrollDraftStorage(), draftStorageKey)
+    if (draft) {
+      requestRef.current = draft
+      setLabel(draft.payload.label)
+      setPayDate(draft.payload.payDate ?? '')
+      setPeriodForm({
+        salaryBasis: draft.payload.salaryBasis,
+        payFrequency: draft.payload.payFrequency,
+        periodsPerYear: draft.payload.periodsPerYear,
+        periodStart: draft.payload.periodStart,
+        periodEnd: draft.payload.periodEnd,
+      })
+      setTaxRates(draft.payload.taxRates.map(rate => ({ ...rate })))
+      setSelectedEmployeeIds(new Set(draft.payload.employeeIds))
+      setDialogError(null)
+      setSavedRetryAvailable(true)
+    } else {
+      resetDialogState()
+    }
     setIsDialogOpen(true)
+  }
+
+  function discardSavedRetry() {
+    clearPayrollRunDraft(payrollDraftStorage(), draftStorageKey)
+    requestRef.current = null
+    setSavedRetryAvailable(false)
+    resetDialogState()
   }
 
   const createRunMutation = useMutation({
@@ -259,6 +367,10 @@ export default function Payroll() {
       // Invalidate the whole hr module so the run list (the newest run becomes the
       // active one) and any open employee tab refresh; SSE covers other tabs.
       queryClient.invalidateQueries({ queryKey: queryKeys.hr.all() })
+      setPayrollRunPage(1)
+      clearPayrollRunDraft(payrollDraftStorage(), draftStorageKey)
+      requestRef.current = null
+      setSavedRetryAvailable(false)
       setIsDialogOpen(false)
     },
     onError: err => setDialogError(err?.message || 'Unable to create the payroll run.'),
@@ -307,7 +419,7 @@ export default function Payroll() {
       setDialogError('Every tax rate needs a label and a rate (a decimal string like 15.5).')
       return
     }
-    const employeeIds = employees.filter(e => selectedEmployeeIds.has(e.id)).map(e => e.id)
+    const employeeIds = [...selectedEmployeeIds].sort()
     if (employeeIds.length === 0) {
       setDialogError('Select at least one employee to pay.')
       return
@@ -322,9 +434,117 @@ export default function Payroll() {
     }
     const payload = { label: trimmedLabel, payDate: payDate || null, ...periodForm, taxRates: rates, employeeIds }
     const signature = JSON.stringify(payload)
-    if (requestRef.current?.signature !== signature) requestRef.current = { signature, requestKey: crypto.randomUUID() }
+    if (requestRef.current?.signature !== signature) requestRef.current = { signature, requestKey: crypto.randomUUID(), payload }
+    else requestRef.current.payload = payload
+    const persisted = savePayrollRunDraft(payrollDraftStorage(), draftStorageKey, payload, requestRef.current.requestKey)
+    setSavedRetryAvailable(persisted)
     setDialogError(null)
     createRunMutation.mutate({ ...payload, requestKey: requestRef.current.requestKey })
+  }
+
+  if (!isAdmin) {
+    if (isLoadingMyPayslips) {
+      return (
+        <div className="flex h-full items-center justify-center bg-surface-raised">
+          <Loader2 className="animate-spin text-muted" size={24} />
+        </div>
+      )
+    }
+
+    if (isMyPayslipsError) {
+      return (
+        <div className="flex h-full items-center justify-center bg-surface-raised text-danger px-6 text-center">
+          {myPayslipsError?.message || 'Failed to load your payslips.'}
+        </div>
+      )
+    }
+
+    const payslipsList = Array.isArray(myPayslips) ? myPayslips : (myPayslips?.data ?? [])
+    const totalPaid = payslipsList
+      .filter(p => p.status === 'PAID')
+      .reduce((sum, p) => sum + Number(p.net || 0), 0)
+    const latestPayDate = payslipsList[0]?.payDate || payslipsList[0]?.periodEnd || null
+    const currency = payslipsList[0]?.currency || 'USD'
+
+    return (
+      <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-[900px]">
+        {/* Header KPI cards */}
+        <div className="border-b border-border-default px-8 py-6 bg-surface-raised">
+          <div className="mb-4">
+            <h1 className="text-xl font-bold text-heading">My Payslips</h1>
+            <p className="text-xs text-muted">View your salary statements and download official PDF payslips.</p>
+          </div>
+          <div className="grid grid-cols-3 gap-6">
+            <div className="border border-border-default rounded-card-sm p-5 bg-surface-raised shadow-card">
+              <p className="text-[11px] font-semibold text-muted tracking-wide mb-2">Total Net Received</p>
+              <p className="text-3xl font-bold text-heading">{formatMoney(totalPaid.toFixed(2), { currency })}</p>
+              <p className="mt-2 text-xs text-muted">Across all paid payroll periods</p>
+            </div>
+            <div className="border border-border-default rounded-card-sm p-5 bg-surface-raised shadow-card">
+              <p className="text-[11px] font-semibold text-muted tracking-wide mb-2">Latest Pay Date</p>
+              <p className="text-3xl font-bold text-heading">{latestPayDate ? formatDate(latestPayDate) : '—'}</p>
+              <p className="mt-2 text-xs text-muted">Most recent statement processed</p>
+            </div>
+            <div className="border border-border-default rounded-card-sm p-5 bg-surface-raised shadow-card">
+              <p className="text-[11px] font-semibold text-muted tracking-wide mb-2">Available Statements</p>
+              <p className="text-3xl font-bold text-heading">{payslipsList.length}</p>
+              <p className="mt-2 text-xs text-muted">Ready for inspection and PDF export</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Payslips Table */}
+        <div className="flex-1 overflow-y-auto px-8 py-6">
+          <div className="border border-border-default rounded-card-sm overflow-hidden bg-surface-raised shadow-card">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-surface-muted border-b border-border-default">
+                <tr>
+                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider">Payroll Period</th>
+                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider">Pay Date</th>
+                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Base Salary</th>
+                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Gross Pay</th>
+                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Deductions</th>
+                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Net Pay</th>
+                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-center">Status</th>
+                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Download</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-subtle">
+                {payslipsList.map(item => (
+                  <tr key={item.id} className="hover:bg-surface-muted transition-colors">
+                    <td className="px-6 py-4 font-semibold text-sm text-heading">{item.runLabel}</td>
+                    <td className="px-6 py-4 text-sm text-body">{item.payDate ? formatDate(item.payDate) : (item.periodEnd ? formatDate(item.periodEnd) : '—')}</td>
+                    <td className="px-6 py-4 text-sm text-heading text-right tabular-nums">{formatMoney(item.baseSalary, { currency: item.currency })}</td>
+                    <td className="px-6 py-4 text-sm text-heading text-right tabular-nums">{formatMoney(item.gross, { currency: item.currency })}</td>
+                    <td className="px-6 py-4 text-sm text-body text-right tabular-nums">-{formatMoney(item.deductions, { currency: item.currency })}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-heading text-right tabular-nums">{formatMoney(item.net, { currency: item.currency })}</td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`px-2.5 py-1 rounded-input text-xs font-semibold uppercase tracking-wider ${
+                        item.status === 'PAID' ? 'bg-accent-light text-accent' :
+                        item.status === 'APPROVED' ? 'bg-[#fff7ed] text-[#c2410c]' :
+                        'bg-surface-muted text-muted'
+                      }`}>
+                        {item.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <PayslipButton runId={item.payrollRunId} lineId={item.id} />
+                    </td>
+                  </tr>
+                ))}
+                {payslipsList.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-12 text-center text-muted text-sm">
+                      No payslips available yet for your account.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -343,11 +563,47 @@ export default function Payroll() {
           <button
             type="button"
             disabled={!run || records.length === 0}
-            onClick={downloadAch}
-            title={run ? 'Download direct deposit ACH payment file' : 'No payroll run loaded'}
+            onClick={exportPaymentSummary}
+            title={run ? 'Export a payroll payment summary CSV' : 'No payroll run loaded'}
             className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60 cursor-pointer"
           >
-            <Download size={16} /> Download ACH
+            <Download size={16} /> Export Payroll CSV
+          </button>
+          {activeRun?.currency === 'EUR' ? (
+            <button
+              type="button"
+              disabled={!run || records.length === 0}
+              onClick={exportSepa}
+              title="Download ISO 20022 SEPA Credit Transfer (.xml) for European banks"
+              className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60 cursor-pointer"
+            >
+              <Download size={16} /> Export SEPA (.xml)
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={!run || records.length === 0}
+              onClick={exportNacha}
+              title="Download standard 94-char fixed-width NACHA Direct Deposit (.ach) file"
+              className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60 cursor-pointer"
+            >
+              <Download size={16} /> Export NACHA (.ach)
+            </button>
+          )}
+          <button
+            type="button"
+            aria-expanded={roundingReviewOpen}
+            onClick={() => setRoundingReviewOpen(open => !open)}
+            className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card"
+          >
+            <Calculator size={15} /> {roundingReviewOpen ? 'Hide rounding review' : 'Year-end rounding review'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatutoryCalculatorOpen(true)}
+            className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card cursor-pointer"
+          >
+            <Calculator size={15} /> Statutory Tax Calculator
           </button>
           {activeRun?.status === 'VOID' ? (
             <span className="rounded-full bg-surface-muted px-3 py-1.5 text-sm font-semibold text-muted">Voided</span>
@@ -425,12 +681,16 @@ export default function Payroll() {
                   ))}
                 </select>
               </label>
-              <label className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm bg-surface-raised shadow-card">
-                Payroll run
-                <select aria-label="Payroll run" value={activeRun?.id || ''} onChange={event => { setSelectedRunId(event.target.value); setSelectedId(null) }} className="max-w-56 bg-transparent text-sm outline-none">
-                  {runs.map(item => <option key={item.id} value={item.id}>{item.label} · {item.status}</option>)}
-                </select>
-              </label>
+              <div className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm bg-surface-raised shadow-card">
+                <label className="flex items-center gap-2">Payroll run
+                  <select aria-label="Payroll run" value={activeRun?.id || ''} onChange={event => { setSelectedRunId(event.target.value); setSelectedId(null) }} className="max-w-56 bg-transparent text-sm outline-none">
+                    {runs.map(item => <option key={item.id} value={item.id}>{item.label} · {item.status}</option>)}
+                  </select>
+                </label>
+                <button type="button" aria-label="Previous payroll run page" disabled={payrollRunPage <= 1} onClick={() => setPayrollRunPage(current => current - 1)} className="rounded border border-border-default px-1.5 py-0.5 disabled:opacity-40">‹</button>
+                <span className="text-[11px] text-muted">{listData?.pagination?.pages ? `${payrollRunPage}/${listData.pagination.pages}` : '0/0'}</span>
+                <button type="button" aria-label="Next payroll run page" disabled={payrollRunPage >= (listData?.pagination?.pages ?? 0)} onClick={() => setPayrollRunPage(current => current + 1)} className="rounded border border-border-default px-1.5 py-0.5 disabled:opacity-40">›</button>
+              </div>
             </div>
             <div className="h-4 w-px bg-border-default" />
             <label className="flex items-center gap-2 text-sm text-body cursor-pointer">
@@ -466,6 +726,48 @@ export default function Payroll() {
           </div>
         </div>
       </div>
+
+      {roundingReviewOpen && (
+        <section aria-label="Year-end rounding review" className="max-h-[40vh] overflow-y-auto border-b border-border-default bg-surface-muted/30 px-6 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-heading">Earning-year rounding review</h2>
+              <p className="mt-1 max-w-3xl text-xs text-muted">Compares summed deductions on paid runs with one currency-precision rounding over gross for each employee, currency, and unchanged saved rate schedule. This is a review of rounding differences, not a statutory tax calculation or an adjustment to payroll.</p>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-body">
+              <span>Period start year</span>
+              <input type="number" min="2000" max="2100" value={roundingYear} onChange={event => setRoundingYear(event.target.value)} className="w-24 rounded-input border border-border-default bg-surface-raised px-2 py-1.5" />
+            </label>
+          </div>
+          {isLoadingRoundingReview && <p className="mt-4 text-sm text-muted">Calculating rounding differences…</p>}
+          {isRoundingReviewError && <p role="alert" className="mt-4 text-sm text-danger">{roundingReviewError?.message || 'Could not load the rounding review.'}</p>}
+          {roundingReview && !isLoadingRoundingReview && !isRoundingReviewError && (() => {
+            const differences = roundingReview.groups.filter(group => [group.variance, ...group.taxLines.map(line => line.variance)].some(value => Number(value) !== 0))
+            return (
+              <>
+                <p className="mt-3 text-xs text-muted">{roundingReview.groups.length} rate groups reviewed · {roundingReview.excludedManualOverrideLines} {roundingReview.excludedManualOverrideLines === 1 ? 'line' : 'lines'} with manual tax overrides excluded · {roundingReview.excludedUnknownCurrencyLines} {roundingReview.excludedUnknownCurrencyLines === 1 ? 'line' : 'lines'} with unknown currency excluded.</p>
+                {differences.length === 0 ? (
+                  <p className="mt-3 text-sm text-body">No rounding-only differences were found for {roundingReview.year} paid earning periods.</p>
+                ) : (
+                  <div className="mt-3 overflow-x-auto rounded-button border border-border-default bg-surface-raised">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-surface-muted text-muted"><tr>
+                        <th className="px-3 py-2">Employee / rate schedule</th><th className="px-3 py-2">Paid lines</th><th className="px-3 py-2">Gross</th><th className="px-3 py-2">Recorded deductions</th><th className="px-3 py-2">Aggregate-rounded</th><th className="px-3 py-2">Variance</th>
+                      </tr></thead>
+                      <tbody className="divide-y divide-border-subtle">{differences.map((group, index) => (
+                        <tr key={`${group.employeeId}-${index}`}>
+                          <td className="px-3 py-2"><p className="font-medium text-heading">{group.employeeName}</p><p className="mt-0.5 text-muted">{group.taxRates.map(rate => `${rate.label} ${rate.rate}%`).join(' · ')} · {group.currency}</p><details className="mt-1"><summary className="cursor-pointer text-muted">Tax-line detail</summary><ul className="mt-1 space-y-1">{group.taxLines.map(line => <li key={line.label}>{line.label}: {formatMoney(line.recorded, { currency: group.currency })} recorded · {formatMoney(line.aggregateRounded, { currency: group.currency })} aggregate · variance {formatMoney(line.variance, { currency: group.currency })}</li>)}</ul></details></td>
+                          <td className="px-3 py-2 text-body">{group.paidLineCount}</td><td className="px-3 py-2 text-body">{formatMoney(group.grossTotal, { currency: group.currency })}</td><td className="px-3 py-2 text-body">{formatMoney(group.recordedDeductions, { currency: group.currency })}</td><td className="px-3 py-2 text-body">{formatMoney(group.aggregateRoundedDeductions, { currency: group.currency })}</td><td className="px-3 py-2 font-semibold text-heading">{formatMoney(group.variance, { currency: group.currency })}</td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )
+          })()}
+        </section>
+      )}
 
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 overflow-y-auto">
@@ -583,10 +885,18 @@ export default function Payroll() {
                   <span className="text-muted">Period base pay</span>
                   <span className="font-medium text-heading">{money(selectedRecord.baseSalary ?? selectedRecord.gross)}</span>
                 </div>
-                {selectedRecord.sourceSalary != null && (
+                {selectedRecord.salaryRateSegments?.length <= 1 && selectedRecord.sourceSalary != null && (
                   <p className="text-xs text-muted">
                     Source salary: {money(selectedRecord.sourceSalary)} {selectedRecord.salaryBasis?.toLowerCase()} · {run?.periodsPerYear} periods/year · {selectedRecord.eligibleDays}/{selectedRecord.periodDays} eligible calendar days. Period base pay may include manual adjustments.
                   </p>
+                )}
+                {selectedRecord.salaryRateSegments?.length > 1 && (
+                  <div className="text-xs text-muted">
+                    <p className="font-medium text-body">Effective salary rates used · {selectedRecord.eligibleDays}/{selectedRecord.periodDays} eligible days</p>
+                    <ul className="mt-1 space-y-1">{selectedRecord.salaryRateSegments.map(segment => (
+                      <li key={segment.effectiveFrom}>{money(segment.salary)} {segment.salaryBasis.toLowerCase()} from {formatDate(segment.effectiveFrom)} · {segment.eligibleDays} eligible days</li>
+                    ))}</ul>
+                  </div>
                 )}
                 <div className="flex justify-between text-sm">
                   <span className="text-muted">Missed days ({selectedRecord.missedDaysCount || 0})</span>
@@ -622,6 +932,10 @@ export default function Payroll() {
         width="max-w-xl"
       >
         <div className="space-y-5">
+          {savedRetryAvailable && <div role="status" className="flex items-start justify-between gap-3 rounded-input border border-accent/30 bg-accent/5 p-3 text-xs text-body">
+            <span>A previous request may have reached the server before its response was lost. Retry unchanged to reuse its request key; changing details creates a new request.</span>
+            <button type="button" onClick={discardSavedRetry} className="shrink-0 font-semibold text-accent hover:underline">Discard saved retry</button>
+          </div>}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="payroll-run-label" className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">
@@ -733,6 +1047,14 @@ export default function Payroll() {
               Employees{' '}
               <span className="normal-case text-caption font-medium">({selectedEmployeeIds.size} selected)</span>
             </p>
+            <input
+              type="search"
+              value={employeeSearch}
+              onChange={event => { setEmployeeSearch(event.target.value); setEmployeePage(1) }}
+              placeholder="Search employees by name, title, email, or employee number"
+              aria-label="Search employees for payroll"
+              className={`${DIALOG_INPUT} mb-2`}
+            />
             <div className="max-h-56 overflow-y-auto border border-border-default rounded-button divide-y divide-border-subtle">
               {isLoadingEmployees ? (
                 <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted">
@@ -760,10 +1082,17 @@ export default function Payroll() {
                 ))
               )}
             </div>
+            {employeeData?.pagination && <div className="mt-2 flex items-center justify-between text-xs text-muted">
+              <span>{employeeData.pagination.total} matching employee(s) - page {employeePage} of {employeePages}</span>
+              <div className="flex items-center gap-2">
+                <button type="button" disabled={employeePage <= 1 || isLoadingEmployees} onClick={() => setEmployeePage(page => page - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
+                <button type="button" disabled={employeePages === 0 || employeePage >= employeePages || isLoadingEmployees} onClick={() => setEmployeePage(page => page + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+              </div>
+            </div>}
           </div>
 
           {dialogError && (
-            <p className="flex items-start gap-1.5 text-sm text-danger">
+            <p role="alert" className="flex items-start gap-1.5 text-sm text-danger">
               <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
               {dialogError}
             </p>
@@ -795,6 +1124,10 @@ export default function Payroll() {
           {adjustLineMutation.isError && <p role="alert" className="text-sm text-danger">{adjustLineMutation.error?.message || 'Unable to recalculate this line.'}</p>}
         </div>
       </FormDialog>
+      <StatutoryTaxCalculator
+        isOpen={statutoryCalculatorOpen}
+        onClose={() => setStatutoryCalculatorOpen(false)}
+      />
     </div>
   )
 }

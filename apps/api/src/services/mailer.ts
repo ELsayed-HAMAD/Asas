@@ -47,8 +47,13 @@ export class MailerService {
     this.queue = queue ?? null
   }
 
-  setTransport(transport: MailerTransport): void {
+  setTransport(transport: MailerTransport | null): void {
     this.transport = transport
+  }
+
+  setDefaultFrom(address: string): void {
+    if (!address.trim()) throw new Error('MAIL_FROM cannot be empty')
+    this.defaultFrom = address
   }
 
   setQueue(queue: BossQueueClient | null): void {
@@ -63,6 +68,11 @@ export class MailerService {
     }
   }
 
+  /** Deliver a message received from the queue without enqueueing it again. */
+  async deliver(options: SendEmailOptions): Promise<SentEmailRecord> {
+    return this.send(options)
+  }
+
   async send(options: SendEmailOptions): Promise<SentEmailRecord> {
     const record: SentEmailRecord = {
       ...options,
@@ -71,9 +81,8 @@ export class MailerService {
       sentAt: new Date(),
     }
 
-    if (this.transport) {
-      await this.transport.send(record)
-    }
+    if (!this.transport) throw new Error('Email transport is not configured')
+    await this.transport.send(record)
 
     this.sentHistory.push(record)
     if (this.sentHistory.length > this.maxHistorySize) {

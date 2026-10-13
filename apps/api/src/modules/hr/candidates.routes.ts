@@ -1,6 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import path from 'node:path'
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
@@ -26,23 +24,23 @@ import { moduleKeyPrefix } from '../../plugins/sse.js'
 import * as candidatesService from './candidates.service.js'
 import { renderCandidateCsv } from './candidateExport.js'
 import { recordAuditLog } from '../../services/auditLog.js'
+import { candidateResumeKey, candidateResumeStagingKey } from '../../services/objectStorage.js'
 
 /**
  * HR candidates — recruitment pipeline reads/writes plus the CV (resume) surface.
  *
- * The CV flow is **server-side storage with a signed upload**, not a third-party presigned
- * URL: the API mints a short-lived HMAC-signed PUT (the `h` and `exp` params, 10-minute
- * window, verified against `authSecret`) scoped to exactly one tenant + candidate, and the
- * browser PUTs the PDF straight to the API. The file lands at
- * `storage/resumes/<tenantId>/<candidateId>.pdf` (gitignored, outside `dist/`),
+ * The CV flow uses tenant-scoped storage and short-lived uploads. Local development keeps the
+ * signed API PUT; S3 mode returns a presigned PUT to a per-upload staging key and requires an
+ * authenticated completion call to validate and promote the object. The file key is scoped to
+ * `resumes/<tenantId>/<candidateId>.pdf`,
  * `Candidate.resumeUrl` records the preview path, and the
  * preview route streams it back as `application/pdf` — which the web app feeds to an in-app
  * `<iframe>` over a same-origin blob URL (native PDF viewer; the 500 kB CI chunk budget rules
  * out bundling pdf.js).
  *
- * The stored filename is the candidate's own id (never client-supplied, and checked against
- * `^[a-z0-9]+$` so it cannot traverse): a candidate has exactly one CV at a time, so a
- * re-upload replaces in place, and two candidates can never share or overwrite a file. Legacy
+ * The stored key is built from session tenant and validated candidate ids, never a client path.
+ * A candidate has exactly one CV at a time, so a re-upload replaces in place, and two
+ * candidates can never share or overwrite a file. Legacy
  * files from the old shared `resume.pdf` layout are deliberately *not* read back — that file
  * may belong to a different candidate — so such a candidate reads as 404 until re-uploaded.
  * Tenant isolation follows the module's rule — `tenantId` only ever comes from the resolved
@@ -51,21 +49,8 @@ import { recordAuditLog } from '../../services/auditLog.js'
 
 /** Upload window: 10 minutes is enough for a human, short enough that a leaked link is stale. */
 const UPLOAD_TTL_SECONDS = 600
-/** A CV is a document, not a video: 5 MB caps the in-flight and on-disk size. */
+/** A CV is a document, not a video: 5 MB caps the in-flight and stored size. */
 const MAX_RESUME_BYTES = 5 * 1024 * 1024
-
-function storageDir(tenantId: string): string {
-  return path.join(process.cwd(), 'storage', 'resumes', tenantId)
-}
-
-/**
- * The one CV file for a candidate. `z.cuid()` alone admits `/` and `.`, so the id is re-checked
- * here before it becomes a path segment.
- */
-function resumeFilePath(tenantId: string, candidateId: string): string {
-  if (!/^[a-z0-9]+$/.test(candidateId)) throw new Error('Refusing to build a resume path from a non-alphanumeric id')
-  return path.join(storageDir(tenantId), `${candidateId}.pdf`)
-}
 
 /** Constant-time comparison of two hex signatures; a length mismatch is simply unequal. */
 function signaturesMatch(provided: string, expected: string): boolean {
@@ -80,8 +65,14 @@ function signaturesMatch(provided: string, expected: string): boolean {
  * signed payload and also travels as `exp` in the URL, so verification at upload time is a
  * pure function of (secret, tenant, candidate, exp) with a window check.
  */
-function signUpload(secret: string, tenantId: string, candidateId: string, expiresUnix: number): string {
-  return createHmac('sha256', secret).update(`${tenantId}:${candidateId}:${expiresUnix}`).digest('hex')
+function signUpload(secret: string, tenantId: string, candidateId: string, expiresUnix: number, uploadId: string): string {
+  return createHmac('sha256', secret).update(`${tenantId}:${candidateId}:${expiresUnix}:${uploadId}`).digest('hex')
+}
+
+function validUploadGrant(secret: string, tenantId: string, candidateId: string, expiresUnix: number, uploadId: string, token: string): boolean {
+  const now = Math.floor(Date.now() / 1000)
+  if (!Number.isSafeInteger(expiresUnix) || expiresUnix < now || expiresUnix - now > UPLOAD_TTL_SECONDS) return false
+  return signaturesMatch(token, signUpload(secret, tenantId, candidateId, expiresUnix, uploadId))
 }
 
 export async function candidateRoutes(app: FastifyInstance): Promise<void> {
@@ -260,6 +251,7 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
     '/candidates/:id/resume-upload-url',
     {
       preHandler: requirePermission('candidate.write'),
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
         params: idParamSchema,
         response: { 200: envelope(resumeUploadUrlSchema), ...errorResponses },
@@ -271,16 +263,79 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
       const candidate = await candidatesService.getCandidate(prisma, tenantId, request.params.id)
 
       const expiresUnix = Math.floor(Date.now() / 1000) + UPLOAD_TTL_SECONDS
-      const h = signUpload(authSecret, tenantId, candidate.id, expiresUnix)
+      const uploadId = randomUUID()
+      const uploadToken = signUpload(authSecret, tenantId, candidate.id, expiresUnix, uploadId)
+      const uploadTarget = request.server.objectStorage.mode === 's3' ? 'object' as const : 'api' as const
+      const uploadUrl = uploadTarget === 'object'
+        ? await request.server.objectStorage.presignPut(candidateResumeStagingKey(tenantId, candidate.id, uploadId), 'application/pdf', UPLOAD_TTL_SECONDS)
+        : `/api/v1/hr/candidates/${candidate.id}/resume?h=${uploadToken}&exp=${expiresUnix}&uploadId=${uploadId}`
       return {
         data: {
-          uploadUrl: `/api/v1/hr/candidates/${candidate.id}/resume?h=${h}&exp=${expiresUnix}`,
+          uploadUrl,
+          uploadTarget,
+          uploadId,
+          uploadToken,
+          expiresUnix,
           method: 'PUT' as const,
           expiresAt: new Date(expiresUnix * 1000).toISOString(),
           contentType: 'application/pdf' as const,
           maxBytes: MAX_RESUME_BYTES,
         },
       }
+    },
+  )
+
+  /** Confirm a direct S3 upload, validate its size/signature, then promote it to the stable CV key. */
+  server.post(
+    '/candidates/:id/resume/complete',
+    {
+      preHandler: requirePermission('candidate.write'),
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      schema: {
+        params: idParamSchema,
+        body: z.object({ uploadId: z.uuid(), expiresUnix: z.int().positive(), uploadToken: z.string().min(1) }),
+        response: { 200: envelope(candidateSchema), 413: errorEnvelopeSchema, ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const { tenantId } = requireAuthContext(request)
+      const { uploadId, expiresUnix, uploadToken } = request.body
+      const candidateId = request.params.id
+      const storage = request.server.objectStorage
+      if (storage.mode !== 's3' || !validUploadGrant(authSecret, tenantId, candidateId, expiresUnix, uploadId, uploadToken)) {
+        reply.code(403)
+        return { error: { message: 'Invalid or expired upload signature' } }
+      }
+
+      const candidate = await candidatesService.getCandidate(request.server.prisma, tenantId, candidateId)
+      const stagedKey = candidateResumeStagingKey(tenantId, candidate.id, uploadId)
+      const metadata = await storage.head(stagedKey)
+      if (!metadata) {
+        reply.code(404)
+        return { error: { message: 'Uploaded resume was not found' } }
+      }
+      if (metadata.size === 0 || metadata.size > MAX_RESUME_BYTES) {
+        await storage.delete(stagedKey)
+        reply.code(metadata.size > MAX_RESUME_BYTES ? 413 : 400)
+        return { error: { message: metadata.size > MAX_RESUME_BYTES ? `Resume exceeds the ${MAX_RESUME_BYTES} byte limit` : 'The resume must be a non-empty PDF' } }
+      }
+      const prefix = await storage.readPrefix(stagedKey, 5)
+      if (!prefix || prefix.toString('latin1') !== '%PDF-') {
+        await storage.delete(stagedKey)
+        reply.code(400)
+        return { error: { message: 'The file is not a PDF' } }
+      }
+
+      await storage.copy(stagedKey, candidateResumeKey(tenantId, candidate.id), 'application/pdf')
+      await storage.delete(stagedKey)
+      const updated = await request.server.prisma.candidate.update({
+        where: { id: candidate.id },
+        data: { resumeUrl: `/api/v1/hr/candidates/${candidate.id}/resume` },
+      })
+      await request.server.prisma.candidateActivity.create({ data: { candidateId: candidate.id, action: 'cv.uploaded' } })
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('hr')])
+      reply.code(200)
+      return { data: candidatesService.mapCandidate(updated) }
     },
   )
 
@@ -300,22 +355,14 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
       schema: {
         params: idParamSchema,
-        querystring: z.object({ h: z.string().min(1), exp: z.string().min(1) }),
+        querystring: z.object({ h: z.string().min(1), exp: z.string().min(1), uploadId: z.uuid() }),
         response: { 200: envelope(candidateSchema), 413: errorEnvelopeSchema, ...errorResponses },
       },
     },
     async (request, reply) => {
       const { tenantId } = requireAuthContext(request)
       const candidateId = request.params.id
-      const exp = Number(request.query.exp)
-      const now = Math.floor(Date.now() / 1000)
-
-      if (!Number.isSafeInteger(exp) || exp < now || exp - now > UPLOAD_TTL_SECONDS) {
-        reply.code(403)
-        return { error: { message: 'Invalid or expired upload signature' } }
-      }
-      const expected = signUpload(authSecret, tenantId, candidateId, exp)
-      if (!signaturesMatch(request.query.h, expected)) {
+      if (request.server.objectStorage.mode !== 'local' || !validUploadGrant(authSecret, tenantId, candidateId, Number(request.query.exp), request.query.uploadId, request.query.h)) {
         reply.code(403)
         return { error: { message: 'Invalid or expired upload signature' } }
       }
@@ -336,8 +383,7 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
 
       const prisma = request.server.prisma
       const candidate = await candidatesService.getCandidate(prisma, tenantId, candidateId)
-      await mkdir(storageDir(tenantId), { recursive: true })
-      await writeFile(resumeFilePath(tenantId, candidate.id), body)
+      await request.server.objectStorage.put(candidateResumeKey(tenantId, candidate.id), body, 'application/pdf')
 
       const updated = await prisma.candidate.update({
         where: { id: candidate.id },
@@ -371,11 +417,8 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
         return { error: { message: 'No resume has been uploaded for this candidate' } }
       }
 
-      const file = resumeFilePath(tenantId, candidate.id)
-      let bytes: Buffer
-      try {
-        bytes = await readFile(file)
-      } catch {
+      const bytes = await request.server.objectStorage.get(candidateResumeKey(tenantId, candidate.id))
+      if (!bytes) {
         reply.code(404)
         return { error: { message: 'Resume file not found' } }
       }

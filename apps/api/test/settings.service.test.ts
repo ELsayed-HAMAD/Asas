@@ -95,6 +95,7 @@ describe('getBillingSettings', () => {
       paymentMethod: { findMany: vi.fn().mockResolvedValue([]) },
       billingInvoice: { findMany: vi.fn().mockResolvedValue([]) },
       member: { count: vi.fn().mockResolvedValue(12) },
+      tenant: { findUnique: vi.fn().mockResolvedValue({ stripeCustomerId: null }) },
     } as unknown as PrismaClient
 
     const { getBillingSettings } = await import('../src/modules/settings/settings.service.js')
@@ -103,6 +104,10 @@ describe('getBillingSettings', () => {
     expect(prisma.member.count).toHaveBeenCalledWith({ where: { tenantId: 'tenant_1' } })
     expect(result.subscriptions[0].seatsUsed).toBe(12)
     expect(result.subscriptions[0].seatLimit).toBe(50)
+    expect(result.stripePortalAvailable).toBe(false)
+    expect(result.subscriptions[0].storageUsedGb).toBeNull()
+    const measured = await getBillingSettings(prisma, 'tenant_1', 0.125)
+    expect(measured.subscriptions[0].storageUsedGb).toBe(0.125)
   })
 })
 

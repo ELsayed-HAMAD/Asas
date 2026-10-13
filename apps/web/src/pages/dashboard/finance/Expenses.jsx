@@ -25,19 +25,27 @@ import { useDebouncedValue } from '../../../lib/useDebouncedValue';
 import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
 import { useSearchParams } from 'react-router-dom';
+import { useActiveMemberRole } from '../../../lib/authClient';
 
 export default function Expenses() {
   const queryClient = useQueryClient();
+  const { data: activeMemberRole } = useActiveMemberRole();
+  const isAdmin = ['OWNER', 'ADMIN'].includes(activeMemberRole?.role);
   const [selectedId, setSelectedId] = useState(null);
   const [searchInput, setSearchInput] = useState('');
   // Debounce the search box so each keystroke doesn't fire a list request and collapse the table.
   const search = useDebouncedValue(searchInput)
   const [departmentId, setDepartmentId] = useState('')
   const [sort, setSort] = useState('desc')
+  const [expensePage, setExpensePage] = useState(1)
   const [receiptZoom, setReceiptZoom] = useState(100)
   const [receiptOpen, setReceiptOpen] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
   const [createOpen, setCreateOpen] = useState(false);
+  const [employeeSearchInput, setEmployeeSearchInput] = useState('')
+  const employeeSearch = useDebouncedValue(employeeSearchInput)
+  const [employeePage, setEmployeePage] = useState(1)
+  const [selectedEmployeeName, setSelectedEmployeeName] = useState('')
   const [createForm, setCreateForm] = useState({
     name: '',
     category: 'OFFICE',
@@ -59,21 +67,36 @@ export default function Expenses() {
   }, [searchParams, setSearchParams]);
 
   const { data: employeesData } = useQuery({
-    queryKey: queryKeys.hr.employees.list({ limit: 100 }),
-    queryFn: () => hrApi.listEmployees({ limit: 100 }),
-    enabled: createOpen,
+    queryKey: queryKeys.hr.employees.list({ page: employeePage, limit: 25, search: employeeSearch || undefined }),
+    queryFn: () => hrApi.listEmployees({ page: employeePage, limit: 25, search: employeeSearch || undefined }),
+    enabled: isAdmin && createOpen,
+    placeholderData: keepPreviousData,
   });
+  useEffect(() => {
+    const pages = employeesData?.pagination?.pages
+    if (pages === undefined) return
+    if (pages === 0 && employeePage !== 1) setEmployeePage(1)
+    else if (pages > 0 && employeePage > pages) setEmployeePage(pages)
+  }, [employeesData?.pagination?.pages, employeePage])
+
+  useEffect(() => { setExpensePage(1) }, [search, departmentId, sort])
 
   const createExpenseMutation = useMutation({
-    mutationFn: () => financeApi.createExpense({
-      name: createForm.name.trim(),
-      category: createForm.category || 'OFFICE',
-      merchant: createForm.merchant.trim() || null,
-      amount: createForm.amount.trim(),
-      tax: createForm.tax.trim() || null,
-      date: createForm.date,
-      employeeId: createForm.employeeId || null,
-    }),
+    mutationFn: () => {
+      const payload = {
+        name: createForm.name.trim(),
+        category: createForm.category || 'OFFICE',
+        merchant: createForm.merchant.trim() || null,
+        amount: createForm.amount.trim(),
+        tax: createForm.tax.trim() || null,
+        date: createForm.date,
+      };
+      if (isAdmin && createForm.employeeId) {
+        payload.employeeId = createForm.employeeId;
+        return financeApi.createExpense(payload);
+      }
+      return financeApi.createExpenseSelf(payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.finance.all() });
       setCreateOpen(false);
@@ -86,6 +109,9 @@ export default function Expenses() {
         date: new Date().toISOString().slice(0, 10),
         employeeId: '',
       });
+      setSelectedEmployeeName('')
+      setEmployeeSearchInput('')
+      setEmployeePage(1)
       setCreateError('');
     },
     onError: (err) => {
@@ -95,10 +121,16 @@ export default function Expenses() {
   const { data: departmentsData } = useQuery({ queryKey: queryKeys.hr.departments.list(), queryFn: hrApi.getDepartments })
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: queryKeys.finance.expenses.list({ limit: 100, search: search || undefined, departmentId: departmentId || undefined, sort }),
-    queryFn: () => financeApi.listExpenses({ limit: 100, search: search || undefined, departmentId: departmentId || undefined, sort }),
+    queryKey: queryKeys.finance.expenses.list({ page: expensePage, limit: 25, search: search || undefined, departmentId: departmentId || undefined, sort }),
+    queryFn: () => financeApi.listExpenses({ page: expensePage, limit: 25, search: search || undefined, departmentId: departmentId || undefined, sort }),
     placeholderData: keepPreviousData,
   });
+  useEffect(() => {
+    const pages = data?.pagination?.pages
+    if (pages === undefined) return
+    if (pages === 0 && expensePage !== 1) setExpensePage(1)
+    else if (pages > 0 && expensePage > pages) setExpensePage(pages)
+  }, [data?.pagination?.pages, expensePage])
   useEffect(() => {
     const rows = data?.items || []
     if (!rows.some(row => row.id === selectedId)) setSelectedId(rows[0]?.id ?? null)
@@ -187,7 +219,7 @@ export default function Expenses() {
           </button>
           <button
             type="button"
-            onClick={() => { setCreateError(''); setCreateOpen(true); }}
+            onClick={() => { setCreateError(''); setEmployeeSearchInput(''); setEmployeePage(1); setCreateOpen(true); }}
             className="flex items-center gap-2 bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card"
           >
             <Plus size={14} /> New Expense
@@ -338,6 +370,14 @@ export default function Expenses() {
               )}
             </tbody>
           </table>
+          {data.pagination && <div className="flex items-center justify-between border-t border-border-default px-6 py-3 text-xs text-muted">
+            <span>Showing {data.pagination.total === 0 ? 0 : (expensePage - 1) * data.pagination.limit + 1}–{Math.min(expensePage * data.pagination.limit, data.pagination.total)} of {data.pagination.total} expenses</span>
+            {data.pagination.pages > 1 && <div className="flex items-center gap-2">
+              <button type="button" aria-label="Previous expense page" disabled={expensePage <= 1 || isLoading} onClick={() => setExpensePage(page => Math.max(1, page - 1))} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
+              <span>Page {expensePage} of {data.pagination.pages}</span>
+              <button type="button" aria-label="Next expense page" disabled={expensePage >= data.pagination.pages || isLoading} onClick={() => setExpensePage(page => Math.min(data.pagination.pages, page + 1))} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+            </div>}
+          </div>}
         </div>
 
         {/* Right: Detail Panel */}
@@ -355,23 +395,36 @@ export default function Expenses() {
                   <p className="text-2xl font-extrabold text-heading tracking-tight mt-0.5">{formatMoney(selectedRecord.amount)}</p>
                 </div>
               </div>
-              <div className="flex flex-col gap-2 w-24">
-                <button disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'PENDING'} onClick={() => statusMutation.mutate('APPROVED')} className="bg-primary text-white w-full py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
-                  Approve
-                </button>
-                <button disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'APPROVED'} onClick={() => statusMutation.mutate('REIMBURSED')} title="Records reimbursement after it has been paid outside Asas." className="bg-primary text-white w-full py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
-                  Mark Reimbursed
-                </button>
-                <button disabled={!selectedRecord || statusMutation.isPending || ['APPROVED', 'REIMBURSED', 'REJECTED', 'VOID'].includes(selectedRecord.status)} onClick={() => statusMutation.mutate('REJECTED')} className="border border-border-default text-body w-full py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60">
-                  Reject
-                </button>
-                <button disabled={!selectedRecord || voidMutation.isPending || selectedRecord.status === 'VOID'} onClick={() => {
-                  const reason = window.prompt('Reason for voiding this expense:')?.trim()
-                  if (reason) voidMutation.mutate(reason)
-                }} className="border border-danger/40 text-danger w-full py-1.5 rounded-input text-sm font-medium hover:bg-danger/5 transition-colors disabled:opacity-60">
-                  {voidMutation.isPending ? 'Voiding…' : 'Void expense'}
-                </button>
-              </div>
+              {isAdmin ? (
+                <div className="flex flex-col gap-2 w-24">
+                  <button disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'PENDING'} onClick={() => statusMutation.mutate('APPROVED')} className="bg-primary text-white w-full py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
+                    Approve
+                  </button>
+                  <button disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'APPROVED'} onClick={() => statusMutation.mutate('REIMBURSED')} title="Records reimbursement after it has been paid outside Asas." className="bg-primary text-white w-full py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
+                    Mark Reimbursed
+                  </button>
+                  <button disabled={!selectedRecord || statusMutation.isPending || ['APPROVED', 'REIMBURSED', 'REJECTED', 'VOID'].includes(selectedRecord.status)} onClick={() => statusMutation.mutate('REJECTED')} className="border border-border-default text-body w-full py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60">
+                    Reject
+                  </button>
+                  <button disabled={!selectedRecord || voidMutation.isPending || selectedRecord.status === 'VOID'} onClick={() => {
+                    const reason = window.prompt('Reason for voiding this expense:')?.trim()
+                    if (reason) voidMutation.mutate(reason)
+                  }} className="border border-danger/40 text-danger w-full py-1.5 rounded-input text-sm font-medium hover:bg-danger/5 transition-colors disabled:opacity-60">
+                    {voidMutation.isPending ? 'Voiding…' : 'Void expense'}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-end gap-1">
+                  <span className={`px-2.5 py-1 rounded-input text-xs font-semibold uppercase tracking-wider ${
+                    selectedRecord.status === 'APPROVED' ? 'bg-accent-light text-accent' :
+                    selectedRecord.status === 'REIMBURSED' ? 'bg-accent text-white' :
+                    selectedRecord.status === 'REJECTED' || selectedRecord.status === 'VOID' ? 'bg-danger-light text-danger' :
+                    'bg-[#fff7ed] text-[#c2410c]'
+                  }`}>
+                    {selectedRecord.status}
+                  </span>
+                </div>
+              )}
             </div>
             {statusMutation.isError && <p role="alert" className="text-sm text-danger">{statusMutation.error?.message || 'Unable to update the expense status.'}</p>}
             {voidMutation.isError && <p role="alert" className="text-sm text-danger">{voidMutation.error?.message || 'Unable to void the expense.'}</p>}
@@ -579,21 +632,47 @@ export default function Expenses() {
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-heading mb-1.5">Employee (Optional)</label>
-              <select
-                value={createForm.employeeId}
-                onChange={(e) => setCreateForm((f) => ({ ...f, employeeId: e.target.value }))}
-                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-              >
-                <option value="">Select employee...</option>
-                {(employeesData?.items ?? []).map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {isAdmin && (
+              <div>
+                <label className="block text-xs font-bold text-heading mb-1.5">Employee (Optional)</label>
+                <input
+                  type="search"
+                  aria-label="Search employees"
+                  placeholder="Search by name, title, or email"
+                  value={employeeSearchInput}
+                  onChange={event => { setEmployeeSearchInput(event.target.value); setEmployeePage(1) }}
+                  className="mb-2 w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+                <select
+                  aria-label="Expense employee"
+                  value={createForm.employeeId}
+                  onChange={(e) => {
+                    const employee = (employeesData?.items ?? []).find(item => item.id === e.target.value)
+                    setCreateForm(current => ({ ...current, employeeId: e.target.value }))
+                    setSelectedEmployeeName(employee?.name ?? '')
+                  }}
+                  className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="">Select employee...</option>
+                  {createForm.employeeId && !(employeesData?.items ?? []).some(employee => employee.id === createForm.employeeId) && (
+                    <option value={createForm.employeeId}>{selectedEmployeeName || 'Selected employee'}</option>
+                  )}
+                  {(employeesData?.items ?? []).map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name}
+                    </option>
+                  ))}
+                </select>
+                {employeesData?.pagination && <div className="mt-2 flex items-center justify-between text-[11px] text-muted">
+                  <span>Showing {employeesData.pagination.total === 0 ? 0 : (employeePage - 1) * employeesData.pagination.limit + 1}–{Math.min(employeePage * employeesData.pagination.limit, employeesData.pagination.total)} of {employeesData.pagination.total}</span>
+                  <div className="flex items-center gap-2">
+                    <button type="button" disabled={employeePage <= 1} onClick={() => setEmployeePage(current => current - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
+                    <span>Page {employeesData.pagination.pages === 0 ? 0 : employeePage} of {employeesData.pagination.pages}</span>
+                    <button type="button" disabled={employeePage >= employeesData.pagination.pages} onClick={() => setEmployeePage(current => current + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+                  </div>
+                </div>}
+              </div>
+            )}
           </div>
         </div>
       </FormDialog>

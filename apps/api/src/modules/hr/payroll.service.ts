@@ -8,9 +8,11 @@ import type {
   PayrollRunListQuery,
   PayrollRunListItem,
   PayrollRunListSummary,
+  MyPayslipItem,
+  PayrollRoundingReconciliation,
 } from '@asas/contracts'
 import { buildPaginationMeta, toPrismaPage } from '@asas/contracts'
-import { computePeriodBaseSalary, validatePayrollPeriod, computePayrollLine, sumPayrollTaxRates, Money, type PayrollLineInputs, type PayrollLineResult, type TaxRate } from '@asas/domain'
+import { computePeriodSalarySchedule, validatePayrollPeriod, computePayrollLine, computeTaxLines, sumPayrollTaxRates, Money, type PayrollLineInputs, type PayrollLineResult, type SalaryRate, type TaxRate } from '@asas/domain'
 import { AppError } from '../../utils/errors.js'
 import { monthToDateComparisonPeriods, tenantToday } from '../../utils/dates.js'
 import type { PayslipDoc } from '../../services/pdf.js'
@@ -25,6 +27,7 @@ type LineWithIncludes = {
   baseSalary: Prisma.Decimal | null
   sourceSalary?: Prisma.Decimal | null
   salaryBasis?: 'ANNUAL' | 'MONTHLY' | null
+  salaryRateSegments?: Prisma.JsonValue | null
   eligibleDays?: number | null
   periodDays?: number | null
   missedDaysCount: number | null
@@ -65,6 +68,123 @@ function assertValidTaxRates(rates: readonly TaxRate[]): void {
 }
 
 /**
+ * Compare the sum of rounded paycheck deductions with one rounding over paid earning-year gross.
+ * Groups never combine currencies or runs with different stored rate schedules. This is a
+ * rounding review only; manual overrides and unknown legacy currencies are excluded.
+ */
+export async function getPayrollRoundingReconciliation(
+  prisma: PayrollClient,
+  tenantId: string,
+  year: number,
+): Promise<PayrollRoundingReconciliation> {
+  const start = new Date(`${year}-01-01T00:00:00.000Z`)
+  const end = new Date(`${year + 1}-01-01T00:00:00.000Z`)
+  const lines = await prisma.payrollLine.findMany({
+    where: {
+      tenantId,
+      payrollRun: { tenantId, status: 'PAID', periodStart: { gte: start, lt: end } },
+    },
+    select: {
+      employeeId: true,
+      gross: true,
+      employee: { select: { name: true } },
+      taxLines: { select: { label: true, amount: true, override: true } },
+      payrollRun: { select: { currency: true, taxRates: true } },
+    },
+  })
+
+  type Group = {
+    employeeId: string
+    employeeName: string
+    currency: string
+    rates: TaxRate[]
+    rateKey: string
+    paidLineCount: number
+    gross: Money
+    recorded: Map<string, Money>
+  }
+  const groups = new Map<string, Group>()
+  let excludedManualOverrideLines = 0
+  let excludedUnknownCurrencyLines = 0
+
+  for (const line of lines) {
+    if (line.taxLines.some(tax => tax.override)) {
+      excludedManualOverrideLines++
+      continue
+    }
+    const currency = line.payrollRun.currency
+    if (!currency) {
+      excludedUnknownCurrencyLines++
+      continue
+    }
+    let rates: TaxRate[]
+    try {
+      rates = readTaxRates(line.payrollRun.taxRates)
+      assertValidTaxRates(rates)
+    } catch {
+      throw new AppError(409, 'A paid payroll run has invalid stored tax rates and cannot be reconciled')
+    }
+    const rateKey = JSON.stringify(rates.map(rate => ({ label: rate.label, weight: String(rate.weight) })))
+    const key = JSON.stringify([line.employeeId, currency, rateKey])
+    let group = groups.get(key)
+    if (!group) {
+      group = {
+        employeeId: line.employeeId,
+        employeeName: line.employee.name,
+        currency,
+        rates,
+        rateKey,
+        paidLineCount: 0,
+        gross: Money.zero(currency),
+        recorded: new Map(),
+      }
+      groups.set(key, group)
+    }
+    group.paidLineCount++
+    group.gross = group.gross.add(Money.fromDecimal(line.gross.toString(), currency, 'HALF_UP'))
+    for (const tax of line.taxLines) {
+      const amount = Money.fromDecimal(tax.amount.toString(), currency, 'HALF_UP')
+      group.recorded.set(tax.label, (group.recorded.get(tax.label) ?? Money.zero(currency)).add(amount))
+    }
+  }
+
+  const result = [...groups.values()].map(group => {
+    const roundedByLabel = new Map<string, Money>()
+    for (const tax of computeTaxLines(group.gross, group.rates)) {
+      roundedByLabel.set(tax.label, (roundedByLabel.get(tax.label) ?? Money.zero(group.currency)).add(tax.amount))
+    }
+    const labels = [...new Set([...group.rates.map(rate => rate.label), ...group.recorded.keys()])]
+    const taxLines = labels.map(label => {
+      const recorded = group.recorded.get(label) ?? Money.zero(group.currency)
+      const aggregateRounded = roundedByLabel.get(label) ?? Money.zero(group.currency)
+      return { label, recorded: recorded.toDecimalString(), aggregateRounded: aggregateRounded.toDecimalString(), variance: recorded.subtract(aggregateRounded).toDecimalString() }
+    })
+    const recordedDeductions = Money.sum([...group.recorded.values()], group.currency)
+    const aggregateRoundedDeductions = Money.sum([...roundedByLabel.values()], group.currency)
+    return {
+      employeeId: group.employeeId,
+      employeeName: group.employeeName,
+      currency: group.currency,
+      taxRates: group.rates.map(rate => ({ label: rate.label, rate: String(rate.weight) })),
+      paidLineCount: group.paidLineCount,
+      grossTotal: group.gross.toDecimalString(),
+      recordedDeductions: recordedDeductions.toDecimalString(),
+      aggregateRoundedDeductions: aggregateRoundedDeductions.toDecimalString(),
+      variance: recordedDeductions.subtract(aggregateRoundedDeductions).toDecimalString(),
+      taxLines,
+      rateKey: group.rateKey,
+    }
+  }).sort((left, right) => left.employeeName.localeCompare(right.employeeName) || left.rateKey.localeCompare(right.rateKey))
+
+  return {
+    year,
+    groups: result.map(({ rateKey: _rateKey, ...group }) => group),
+    excludedManualOverrideLines,
+    excludedUnknownCurrencyLines,
+  }
+}
+
+/**
  * `computePayrollLine` plus the invariants a stored line must satisfy: neither gross nor net
  * may be negative (e.g. missed days larger than base + bonus). Any domain `RangeError` is
  * re-thrown as a 400 so a bad input never becomes an unhandled 500.
@@ -90,6 +210,7 @@ function mapLine(line: LineWithIncludes): PayrollLine {
     baseSalary: line.baseSalary?.toString() ?? null,
     sourceSalary: line.sourceSalary?.toString() ?? null,
     salaryBasis: line.salaryBasis ?? null,
+    salaryRateSegments: readSalaryRateSegments(line.salaryRateSegments),
     eligibleDays: line.eligibleDays ?? null,
     periodDays: line.periodDays ?? null,
     missedDaysCount: line.missedDaysCount,
@@ -106,6 +227,21 @@ function mapLine(line: LineWithIncludes): PayrollLine {
     deductions: line.deductions.toString(),
     net: line.net.toString(),
   }
+}
+
+function readSalaryRateSegments(raw: Prisma.JsonValue | null | undefined): PayrollLine['salaryRateSegments'] {
+  if (!Array.isArray(raw)) return []
+  return raw.map(value => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new AppError(500, 'Payroll line has malformed salary rate segments')
+    const segment = value as Record<string, Prisma.JsonValue>
+    return {
+      salary: String(segment.salary),
+      salaryBasis: segment.salaryBasis as 'ANNUAL' | 'MONTHLY',
+      currency: String(segment.currency),
+      effectiveFrom: String(segment.effectiveFrom),
+      eligibleDays: Number(segment.eligibleDays),
+    }
+  })
 }
 
 /**
@@ -210,7 +346,7 @@ export async function createPayrollRun(
   }
   const employees = await prisma.employee.findMany({
     where: { id: { in: employeeIds }, tenantId, status: { not: 'ARCHIVED' } },
-    select: { id: true, name: true, salary: true, salaryBasis: true, hiredAt: true, currency: true },
+    select: { id: true, name: true, salary: true, salaryBasis: true, hiredAt: true, employmentEndDate: true, currency: true },
   })
 
   // Reject any id the tenant does not own — tenant isolation for the run's inputs.
@@ -226,6 +362,17 @@ export async function createPayrollRun(
       400,
       `Cannot price a line without a base salary; set one first for: ${missingSalary.join(', ')}`,
     )
+  }
+
+  const salaryHistory = await prisma.employeeSalaryHistory.findMany({
+    where: { tenantId, employeeId: { in: employeeIds }, effectiveFrom: { lte: new Date(input.periodEnd) } },
+    orderBy: [{ employeeId: 'asc' }, { effectiveFrom: 'asc' }],
+  })
+  const ratesByEmployee = new Map<string, typeof salaryHistory>()
+  for (const rate of salaryHistory) {
+    const existing = ratesByEmployee.get(rate.employeeId) ?? []
+    existing.push(rate)
+    ratesByEmployee.set(rate.employeeId, existing)
   }
 
   const rates: TaxRate[] = input.taxRates.map(rate => ({ label: rate.label, weight: rate.rate }))
@@ -252,35 +399,57 @@ export async function createPayrollRun(
     },
   })
 
+  const lineWrites: Prisma.PayrollLineCreateManyInput[] = []
+  const taxLineWritesByEmployee = new Map<string, ReturnType<typeof priceLine>['taxLines']>()
   for (const employee of employees) {
-    const salaryBasis = employee.salaryBasis ?? input.salaryBasis
-    let periodPay: ReturnType<typeof computePeriodBaseSalary>
+    const savedRates = ratesByEmployee.get(employee.id) ?? []
+    const salaryRates: SalaryRate[] = savedRates.map(rate => ({
+      salary: Money.fromDecimal(rate.salary.toString(), rate.currency as typeof currency, 'HALF_UP'),
+      salaryBasis: rate.salaryBasis,
+      effectiveFrom: rate.effectiveFrom.toISOString().slice(0, 10),
+    }))
+    let periodPay: ReturnType<typeof computePeriodSalarySchedule>
     try {
-      periodPay = computePeriodBaseSalary(Money.fromDecimal(String(employee.salary), currency, 'HALF_UP'), salaryBasis, input, employee.hiredAt?.toISOString().slice(0, 10))
+      periodPay = computePeriodSalarySchedule(salaryRates, input.salaryBasis, input, employee.hiredAt?.toISOString().slice(0, 10), employee.employmentEndDate?.toISOString().slice(0, 10))
     } catch (error) {
       throw new AppError(400, error instanceof Error ? error.message : 'Cannot calculate period salary')
     }
-    const { baseSalary, eligibleDays, periodDays } = periodPay
+    const { baseSalary, eligibleDays, periodDays, salarySegments } = periodPay
+    if (baseSalary.currency !== currency) throw new AppError(409, 'Salary currency does not match workspace base currency; an explicit FX conversion is required before payroll can be priced')
     const result = priceLine({ baseSalary }, rates)
-    await prisma.payrollLine.create({
-      data: {
-        tenantId,
-        payrollRunId: run.id,
-        employeeId: employee.id,
-        baseSalary: baseSalary.toDecimalString(),
-        sourceSalary: employee.salary, salaryBasis, eligibleDays, periodDays,
-        gross: result.gross.toDecimalString(),
-        deductions: result.deductions.toDecimalString(),
-        net: result.net.toDecimalString(),
-        taxLines: {
-          create: result.taxLines.map(taxLine => ({
-            label: taxLine.label,
-            amount: taxLine.amount.toDecimalString(),
-          })),
-        },
-      },
+    const finalRate = salarySegments.at(-1)
+    lineWrites.push({
+      tenantId,
+      payrollRunId: run.id,
+      employeeId: employee.id,
+      baseSalary: baseSalary.toDecimalString(),
+      sourceSalary: salarySegments.length <= 1 ? employee.salary : finalRate?.salary.toDecimalString() ?? employee.salary,
+      salaryBasis: finalRate?.salaryBasis ?? employee.salaryBasis ?? input.salaryBasis,
+      salaryRateSegments: salarySegments.map(segment => ({
+        salary: segment.salary.toDecimalString(), salaryBasis: segment.salaryBasis,
+        currency: segment.salary.currency, effectiveFrom: segment.effectiveFrom, eligibleDays: segment.eligibleDays,
+      })) as Prisma.InputJsonValue,
+      eligibleDays, periodDays,
+      gross: result.gross.toDecimalString(),
+      deductions: result.deductions.toDecimalString(),
+      net: result.net.toDecimalString(),
     })
+    taxLineWritesByEmployee.set(employee.id, result.taxLines)
   }
+
+  // Batch the potentially 1,000 payroll lines and their tax splits. Keep all writes in the
+  // caller's existing transaction; any failure still rolls back the run as a whole.
+  const createdLines = await prisma.payrollLine.createManyAndReturn({
+    data: lineWrites,
+    select: { id: true, employeeId: true },
+  })
+  await prisma.payrollTaxLine.createMany({
+    data: createdLines.flatMap(line => (taxLineWritesByEmployee.get(line.employeeId) ?? []).map(taxLine => ({
+      payrollLineId: line.id,
+      label: taxLine.label,
+      amount: taxLine.amount.toDecimalString(),
+    }))),
+  })
   return { ...await getPayrollRun(prisma, tenantId, run.id), creationReplayed: false }
 }
 
@@ -594,4 +763,52 @@ export async function adjustPayrollLine(
   })
 
   return getPayrollRun(prisma, tenantId, run.id)
+}
+
+/**
+ * Retrieve all payslips belonging to a specific employee in this tenant.
+ * Self-service endpoint: each employee may only see their own payslips.
+ */
+export async function listMyPayslips(
+  prisma: PayrollClient,
+  tenantId: string,
+  employeeId: string,
+): Promise<MyPayslipItem[]> {
+  const lines = await prisma.payrollLine.findMany({
+    where: { tenantId, employeeId },
+    include: {
+      payrollRun: {
+        select: {
+          id: true,
+          label: true,
+          periodStart: true,
+          periodEnd: true,
+          payDate: true,
+          status: true,
+          currency: true,
+        },
+      },
+    },
+    orderBy: {
+      payrollRun: {
+        periodStart: 'desc',
+      },
+    },
+  })
+
+  return lines.map(line => ({
+    id: line.id,
+    payrollRunId: line.payrollRun.id,
+    runLabel: line.payrollRun.label,
+    periodStart: line.payrollRun.periodStart?.toISOString().slice(0, 10) ?? null,
+    periodEnd: line.payrollRun.periodEnd?.toISOString().slice(0, 10) ?? null,
+    payDate: line.payrollRun.payDate?.toISOString().slice(0, 10) ?? null,
+    status: line.payrollRun.status,
+    currency: line.payrollRun.currency,
+    baseSalary: line.baseSalary?.toString() ?? null,
+    gross: line.gross.toString(),
+    deductions: line.deductions.toString(),
+    net: line.net.toString(),
+    createdAt: line.createdAt.toISOString(),
+  }))
 }

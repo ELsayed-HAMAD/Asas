@@ -2,8 +2,9 @@ import type { PrismaClient } from '@prisma/client'
 import { APIError } from 'better-auth/api'
 import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
-import { createAccessControl, organization } from 'better-auth/plugins'
+import { createAccessControl, organization, twoFactor } from 'better-auth/plugins'
 import type { AsasEnv } from './config/env.js'
+import { emailVerificationHtml, invitationHtml, passwordResetHtml } from './services/authEmailTemplates.js'
 import { mailer } from './services/mailer.js'
 
 /**
@@ -49,6 +50,7 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
   const member = ac.newRole({})
 
   return betterAuth({
+    appName: 'Asas',
     secret: env.authSecret || undefined,
     // The process binds 127.0.0.1 by default; the browser must use that same host.
     // `localhost` on Windows often resolves to ::1 and never reaches this listener.
@@ -57,24 +59,83 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
     database: prismaAdapter(prisma, { provider: 'postgresql' }),
     emailAndPassword: {
       enabled: true,
+      requireEmailVerification: true,
       sendResetPassword: async (data: { user: { email: string; name?: string | null }; url: string }) => {
-        await mailer.send({
-          to: data.user.email,
-          subject: 'Reset your Asas password',
-          text: `Reset your password by visiting: ${data.url}`,
-          html: `<p>Hello ${data.user.name || 'there'},</p><p>You requested a password reset. Click below to choose a new password:</p><p><a href="${data.url}">Reset Password</a></p>`,
-        })
-      },
-      sendEmailVerification: async (data: { user: { email: string; name?: string | null }; url: string }) => {
-        await mailer.send({
-          to: data.user.email,
-          subject: 'Verify your Asas email address',
-          text: `Verify your email by visiting: ${data.url}`,
-          html: `<p>Hello ${data.user.name || 'there'},</p><p>Click below to verify your email address:</p><p><a href="${data.url}">Verify Email</a></p>`,
-        })
+        try {
+          await mailer.enqueue({
+            to: data.user.email,
+            subject: 'Reset your Asas password',
+            text: `Reset your password by visiting: ${data.url}`,
+            html: passwordResetHtml(data.user.name, data.url),
+          })
+          console.log(`[Auth] Password reset email sent for ${data.user.email}`)
+        } catch (mailError) {
+          console.error(`[Auth] Failed to send password reset email for ${data.user.email}:`, mailError)
+          throw mailError
+        }
       },
     },
+    emailVerification: {
+      sendOnSignUp: true,
+      autoSignInAfterVerification: true,
+      sendVerificationEmail: async (data: { user: { email: string; name?: string | null }; url: string }) => {
+        const frontendBase = (env.frontendOrigin.split(',')[0] ?? 'http://localhost:5173').trim()
+        let verificationUrl = data.url
+        try {
+          const parsed = new URL(verificationUrl)
+          if (!parsed.searchParams.get('callbackURL')) {
+            parsed.searchParams.set('callbackURL', `${frontendBase}/onboarding`)
+            verificationUrl = parsed.toString()
+          }
+        } catch {
+          // ignore parsing error
+        }
+
+        try {
+          await mailer.enqueue({
+            to: data.user.email,
+            subject: 'Verify your Asas email address',
+            text: `Verify your email by visiting: ${verificationUrl}`,
+            html: emailVerificationHtml(data.user.name, verificationUrl),
+          })
+          console.log(`[Auth] Verification email sent for ${data.user.email}`)
+        } catch (mailError) {
+          console.error(`[Auth] Failed to send verification email for ${data.user.email}:`, mailError)
+          throw mailError
+        }
+      },
+    },
+    socialProviders: {
+      ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+        ? {
+            google: {
+              clientId: process.env.GOOGLE_CLIENT_ID,
+              clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+            },
+          }
+        : {}),
+      ...(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET
+        ? {
+            microsoft: {
+              clientId: process.env.MICROSOFT_CLIENT_ID,
+              clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
+            },
+          }
+        : {}),
+      ...(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET
+        ? {
+            github: {
+              clientId: process.env.GITHUB_CLIENT_ID,
+              clientSecret: process.env.GITHUB_CLIENT_SECRET,
+            },
+          }
+        : {}),
+    },
     plugins: [
+      twoFactor({
+        issuer: 'Asas',
+        schema: { twoFactor: { modelName: 'TwoFactor' } },
+      }),
       organization({
         creatorRole: 'OWNER',
         ac,
@@ -83,11 +144,11 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
           const frontendBase = (env.frontendOrigin.split(',')[0] ?? 'http://localhost:5173').trim()
           const inviteUrl = `${frontendBase}/register?invitationId=${data.id}`
           const orgName = data.organization?.name || 'Workspace'
-          await mailer.send({
+          await mailer.enqueue({
             to: data.email,
             subject: `Invitation to join ${orgName} on Asas`,
             text: `You have been invited to join ${orgName} on Asas as ${data.role}. Accept your invitation: ${inviteUrl}`,
-            html: `<p>You have been invited to join <strong>${orgName}</strong> as ${data.role}.</p><p><a href="${inviteUrl}">Accept Invitation</a></p>`,
+            html: invitationHtml(orgName, data.role, inviteUrl),
           })
         },
         schema: {

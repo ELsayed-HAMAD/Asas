@@ -7,3 +7,4 @@
  */
 export * from './money/index.js'
 export * from './payroll/index.js'
+export * from './banking/index.js'

@@ -88,12 +88,13 @@ describe('recruitment pipeline service', () => {
         findMany: vi.fn()
           .mockResolvedValueOnce([pageCandidate])
           .mockResolvedValueOnce([
-            { id: 'candidate_hired', stage: 'HIRED' },
-            { id: 'candidate_hired_2', stage: 'HIRED' },
-            { id: 'candidate_offer', stage: 'OFFER_SENT' },
-            { id: 'candidate_active', stage: 'SCREENING' },
-            { id: 'candidate_rejected', stage: 'REJECTED' },
-          ]),
+            { id: 'candidate_hired', stage: 'HIRED', role: 'Engineer' },
+            { id: 'candidate_hired_2', stage: 'HIRED', role: 'Designer' },
+            { id: 'candidate_offer', stage: 'OFFER_SENT', role: 'Engineer' },
+            { id: 'candidate_active', stage: 'SCREENING', role: 'Engineer' },
+            { id: 'candidate_rejected', stage: 'REJECTED', role: 'Designer' },
+          ])
+          .mockResolvedValueOnce([{ role: 'Designer' }, { role: 'Engineer' }]),
         count: vi.fn().mockResolvedValue(5),
       },
       candidateActivity: {
@@ -112,6 +113,9 @@ describe('recruitment pipeline service', () => {
     const result = await listCandidates(prisma, 'tenant_1', { page: 1, limit: 1 })
     expect(result.items).toHaveLength(1)
     expect(result.pagination.total).toBe(5)
+    expect(result.roleOptions).toEqual(['Designer', 'Engineer'])
+    expect(prisma.candidate.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({ skip: 0, take: 1 }))
+    expect(prisma.candidate.findMany).toHaveBeenNthCalledWith(3, expect.objectContaining({ distinct: ['role'], orderBy: { role: 'asc' } }))
     expect(result.summary).toEqual({
       stageCounts: { APPLIED: 0, SCREENING: 1, TECH_INTERVIEW: 0, FINAL_INTERVIEW: 0, OFFER_SENT: 1, HIRED: 2, REJECTED: 1 },
       activeCandidates: 2,
@@ -129,6 +133,27 @@ describe('recruitment pipeline service', () => {
       offersDecidedPreviousPeriod: 1,
     })
     expect(prisma.candidateActivity.findMany).toHaveBeenCalledTimes(2)
+  })
+
+  it('applies the selected role to candidate rows and summary queries while preserving role choices', async () => {
+    const prisma = {
+      tenant: { findUnique: vi.fn().mockResolvedValue({ timezone: 'UTC' }) },
+      candidate: {
+        findMany: vi.fn()
+          .mockResolvedValueOnce([{ ...baseCandidate, activities: [] }])
+          .mockResolvedValueOnce([{ id: baseCandidate.id, stage: 'SCREENING' }])
+          .mockResolvedValueOnce([{ role: 'Designer' }, { role: 'Engineer' }]),
+        count: vi.fn().mockResolvedValue(1),
+      },
+      candidateActivity: { findMany: vi.fn().mockResolvedValue([]) },
+    } as unknown as PrismaClient
+
+    const result = await listCandidates(prisma, 'tenant_1', { page: 1, limit: 25, role: 'Engineer' })
+
+    expect(result.roleOptions).toEqual(['Designer', 'Engineer'])
+    expect(prisma.candidate.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({ where: expect.objectContaining({ tenantId: 'tenant_1', role: 'Engineer' }) }))
+    expect(prisma.candidate.count).toHaveBeenCalledWith({ where: expect.objectContaining({ tenantId: 'tenant_1', role: 'Engineer' }) })
+    expect(prisma.candidate.findMany).toHaveBeenNthCalledWith(3, expect.objectContaining({ where: { tenantId: 'tenant_1' }, distinct: ['role'] }))
   })
 
   it('schedules a future interview for a tenant candidate and records its activity', async () => {

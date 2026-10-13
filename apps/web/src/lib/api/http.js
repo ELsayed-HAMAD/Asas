@@ -83,6 +83,18 @@ export const http = {
     return payload?.data
   },
 
+  /** PUT directly to a short-lived object-store URL without forwarding app session cookies. */
+  async putPresigned(url, { body, headers } = {}) {
+    const response = await fetch(url, {
+      method: 'PUT',
+      credentials: 'omit',
+      redirect: 'error',
+      headers,
+      body,
+    })
+    if (!response.ok) throw new ApiError(response.status, 'Object upload failed')
+  },
+
   /**
    * Fetch a binary document (a payslip/invoice PDF, an export workbook) as a Blob. These
    * endpoints stream raw bytes with a `content-disposition`, so they are *not* the JSON

@@ -26,6 +26,8 @@ import type {
   ExchangeRateListQuery,
   ExchangeRateListResponse,
   ExchangeRateWriteInput,
+  GdprAnonymizeRequest,
+  GdprAnonymizeResponse,
 } from '@asas/contracts'
 import { buildPaginationMeta, toPrismaPage } from '@asas/contracts'
 import { AppError } from '../../utils/errors.js'
@@ -402,24 +404,28 @@ export async function testIntegration(
 
 // ── Billing and backups ────────────────────────────────────────────────────
 
-export async function getBillingSettings(prisma: PrismaClient, tenantId: string): Promise<BillingSettings> {
-  const [subscriptions, paymentMethods, invoices, memberCount] = await Promise.all([
+export async function getBillingSettings(prisma: PrismaClient, tenantId: string, measuredStorageUsedGb: number | null = null): Promise<BillingSettings> {
+  const [subscriptions, paymentMethods, invoices, memberCount, tenant] = await Promise.all([
     prisma.subscription.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } }),
     prisma.paymentMethod.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } }),
     prisma.billingInvoice.findMany({ where: { tenantId }, orderBy: { date: 'desc' } }),
     prisma.member.count({ where: { tenantId } }),
+    prisma.tenant.findUnique({ where: { id: tenantId }, select: { stripeCustomerId: true } }),
   ])
 
   return {
+    stripePortalAvailable: Boolean(tenant?.stripeCustomerId),
     subscriptions: subscriptions.map(row => ({
       id: row.id,
       planName: row.planName,
       priceMonthly: row.priceMonthly.toString(),
+      currency: row.stripeCurrency ?? 'USD',
+      priceId: row.stripePriceId,
       status: row.status,
       renewsOn: row.renewsOn?.toISOString() ?? null,
       seatsUsed: memberCount > 0 ? memberCount : row.seatsUsed,
       seatLimit: row.seatLimit,
-      storageUsedGb: row.storageUsedGb,
+      storageUsedGb: measuredStorageUsedGb,
       storageLimitGb: row.storageLimitGb,
     })),
     paymentMethods: paymentMethods.map(row => ({
@@ -434,6 +440,7 @@ export async function getBillingSettings(prisma: PrismaClient, tenantId: string)
       description: row.description,
       amount: row.amount.toString(),
       status: row.status,
+      currency: row.stripeCurrency,
     })),
   }
 }
@@ -502,5 +509,74 @@ export async function deleteWorkspace(
 async function assertTenantExists(prisma: PrismaClient, tenantId: string): Promise<void> {
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } })
   if (!tenant) throw new AppError(404, 'Workspace not found')
+}
+
+export async function anonymizeEntity(
+  prisma: PrismaClient | Prisma.TransactionClient,
+  tenantId: string,
+  input: GdprAnonymizeRequest,
+): Promise<GdprAnonymizeResponse> {
+  const { targetType, targetId } = input
+
+  if (targetType === 'EMPLOYEE') {
+    const employee = await prisma.employee.findUnique({
+      where: { id: targetId },
+    })
+    if (!employee || employee.tenantId !== tenantId) {
+      throw new AppError(404, 'Employee not found in this workspace')
+    }
+
+    const shortId = targetId.slice(-6)
+    await prisma.employee.update({
+      where: { id: targetId },
+      data: {
+        name: `Anonymized Employee ${shortId}`,
+        email: `anonymized_${shortId}@redacted.local`,
+        avatarUrl: null,
+        location: null,
+        band: null,
+        employeeNumber: null,
+        status: 'ARCHIVED',
+      },
+    })
+
+    return {
+      success: true,
+      targetType: 'EMPLOYEE',
+      targetId,
+      anonymizedAt: new Date().toISOString(),
+      recordsScrubbed: 1,
+    }
+  }
+
+  if (targetType === 'USER') {
+    const member = await prisma.member.findFirst({
+      where: { userId: targetId, tenantId },
+      include: { user: true },
+    })
+    if (!member || !member.user) {
+      throw new AppError(404, 'User is not a member of this workspace')
+    }
+
+    const shortId = targetId.slice(-6)
+    await prisma.user.update({
+      where: { id: targetId },
+      data: {
+        name: `Anonymized User ${shortId}`,
+        email: `anonymized_${shortId}@redacted.local`,
+        image: null,
+      },
+    })
+
+    return {
+      success: true,
+      targetType: 'USER',
+      targetId,
+      anonymizedAt: new Date().toISOString(),
+      recordsScrubbed: 1,
+    }
+  }
+
+  throw new AppError(400, 'Unsupported target type')
 }
 

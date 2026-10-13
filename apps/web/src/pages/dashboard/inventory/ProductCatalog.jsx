@@ -31,11 +31,13 @@ export default function Inventory() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [manualDeselect, setManualDeselect] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [movementPage, setMovementPage] = useState(1);
   const [searchInput, setSearchInput] = useState('');
   // Debounce the top-bar search into the list query's `search` param (shared helper).
   const search = useDebouncedValue(searchInput);
   const [stockFilter, setStockFilter] = useState('');
   const [showArchived, setShowArchived] = useState(false);
+  const [productPage, setProductPage] = useState(1);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [purchaseOrderOpen, setPurchaseOrderOpen] = useState(false);
   const [purchaseQuantity, setPurchaseQuantity] = useState('1');
@@ -43,28 +45,43 @@ export default function Inventory() {
   const [createdOrder, setCreatedOrder] = useState(null);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: queryKeys.inventory.products.list({ search: search || undefined, status: stockFilter || undefined, archived: showArchived, limit: 100 }),
-    queryFn: () => inventoryApi.listProducts({ search: search || undefined, status: stockFilter || undefined, archived: showArchived, limit: 100 }),
+    queryKey: queryKeys.inventory.products.list({ page: productPage, search: search || undefined, status: stockFilter || undefined, archived: showArchived, limit: 25 }),
+    queryFn: () => inventoryApi.listProducts({ page: productPage, search: search || undefined, status: stockFilter || undefined, archived: showArchived, limit: 25 }),
     placeholderData: keepPreviousData,
   });
+  useEffect(() => setProductPage(1), [search, stockFilter, showArchived]);
+  useEffect(() => {
+    const pages = data?.pagination?.pages;
+    if (pages === undefined) return;
+    if (pages === 0 && productPage !== 1) setProductPage(1);
+    else if (pages > 0 && productPage > pages) setProductPage(pages);
+  }, [data?.pagination?.pages, productPage]);
 
   const products = data?.items ?? [];
 
   // Auto-select the first product once the list lands (and the user hasn't dismissed it).
   useEffect(() => {
-    if (!manualDeselect && selectedId == null && products.length > 0) {
+    if (products.length > 0 && (!manualDeselect && selectedId == null || selectedId && !products.some(product => product.id === selectedId))) {
       setSelectedId(products[0].id);
+      setManualDeselect(false);
     }
   }, [products, selectedId, manualDeselect]);
 
   const selectedProduct = products.find(p => p.id === selectedId);
 
   // History tab — real stock movements for the selected product (lazy, only while visible).
-  const { data: movementData, isLoading: isMovementsLoading } = useQuery({
-    queryKey: queryKeys.inventory.movements.list({ productId: selectedId, limit: 100 }),
-    queryFn: () => inventoryApi.listStockMovements({ productId: selectedId, limit: 100 }),
+  useEffect(() => setMovementPage(1), [selectedId]);
+  const { data: movementData, isLoading: isMovementsLoading, isError: isMovementsError, error: movementsError, refetch: refetchMovements } = useQuery({
+    queryKey: queryKeys.inventory.movements.list({ productId: selectedId, page: movementPage, limit: 25 }),
+    queryFn: () => inventoryApi.listStockMovements({ productId: selectedId, page: movementPage, limit: 25 }),
     enabled: activeTab === 'history' && !!selectedProduct,
   });
+  useEffect(() => {
+    const pages = movementData?.pagination?.pages;
+    if (pages === undefined) return;
+    if (pages === 0 && movementPage !== 1) setMovementPage(1);
+    else if (pages > 0 && movementPage > pages) setMovementPage(pages);
+  }, [movementData?.pagination?.pages, movementPage]);
   const movements = movementData?.items ?? [];
   const movementSummary = movementData?.summary;
   const { data: suppliersData, isLoading: isSuppliersLoading, isError: isSuppliersError } = useQuery({
@@ -484,6 +501,14 @@ export default function Inventory() {
               </tbody>
             </table>
           </div>
+          {data?.pagination && <div className="flex items-center justify-between border-t border-border-default px-2 py-3 text-xs text-muted">
+            <span>Showing {data.pagination.total === 0 ? 0 : (productPage - 1) * data.pagination.limit + 1}–{Math.min(productPage * data.pagination.limit, data.pagination.total)} of {data.pagination.total} products</span>
+            <div className="flex items-center gap-2">
+              <button type="button" disabled={productPage <= 1} onClick={() => setProductPage(current => current - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
+              <span>Page {data.pagination.pages === 0 ? 0 : productPage} of {data.pagination.pages}</span>
+              <button type="button" disabled={productPage >= data.pagination.pages} onClick={() => setProductPage(current => current + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+            </div>
+          </div>}
         </div>
 
         {/* Right: Detail Panel */}
@@ -771,6 +796,11 @@ export default function Inventory() {
                     <div className="flex h-full items-center justify-center">
                       <Loader2 className="animate-spin text-muted" size={20} />
                     </div>
+                  ) : isMovementsError ? (
+                    <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-danger">
+                      <p role="alert">{movementsError?.message || 'Unable to load stock movement history.'}</p>
+                      <button type="button" onClick={() => refetchMovements()} className="rounded border border-border-default px-3 py-1.5 text-body hover:bg-surface-muted">Retry</button>
+                    </div>
                   ) : movements.length === 0 ? (
                     <div className="flex h-full items-center justify-center text-sm text-muted">
                       No stock movements recorded.
@@ -815,6 +845,14 @@ export default function Inventory() {
                           })}
                         </tbody>
                       </table>
+                      <div className="flex items-center justify-between border-t border-border-default px-4 py-2 text-xs text-muted">
+                        <span>Showing {(movementPage - 1) * (movementData?.pagination?.limit ?? 25) + 1}–{Math.min(movementPage * (movementData?.pagination?.limit ?? 25), movementData?.pagination?.total ?? 0)} of {movementData?.pagination?.total ?? 0} movements</span>
+                        <div className="flex items-center gap-2">
+                          <button type="button" aria-label="Previous movement page" disabled={movementPage <= 1} onClick={() => setMovementPage(current => current - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
+                          <span>Page {movementPage} of {movementData?.pagination?.pages ?? 0}</span>
+                          <button type="button" aria-label="Next movement page" disabled={movementPage >= (movementData?.pagination?.pages ?? 0)} onClick={() => setMovementPage(current => current + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

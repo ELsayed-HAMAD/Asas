@@ -20,7 +20,7 @@ const scenarios = [
 ] as const
 
 /** Staged transaction stub verifies composition/rollback; it does not simulate Postgres locks. */
-async function setup(options: { failAudit?: boolean; failRead?: boolean; status?: string; archived?: boolean; role?: string; missingTenant?: boolean; salary?: string; salaryBasis?: 'ANNUAL' | 'MONTHLY'; hiredAt?: Date; currency?: string; runCurrency?: string; salaryCurrency?: string; existingPeriod?: { start: Date; end: Date } } = {}) {
+async function setup(options: { failAudit?: boolean; failRead?: boolean; status?: string; archived?: boolean; role?: string; missingTenant?: boolean; salary?: string; salaryBasis?: 'ANNUAL' | 'MONTHLY'; hiredAt?: Date; employmentEndDate?: Date; salaryHistory?: { salary: string; salaryBasis: 'ANNUAL' | 'MONTHLY' | null; currency: string; effectiveFrom: Date }[]; currency?: string; runCurrency?: string; salaryCurrency?: string; existingPeriod?: { start: Date; end: Date } } = {}) {
   const app = Fastify()
   app.setValidatorCompiler(validatorCompiler)
   app.setSerializerCompiler(serializerCompiler)
@@ -45,8 +45,12 @@ async function setup(options: { failAudit?: boolean; failRead?: boolean; status?
         expect(where.tenantId).toBe('tenant_1')
         expect(where.status.not).toBe('ARCHIVED')
         events.push('readEmployee')
-                return options.archived ? [] : [{ id: employeeId, name: 'Ada', salary: new Prisma.Decimal(options.salary ?? '5'), salaryBasis: options.salaryBasis ?? null, hiredAt: options.hiredAt ?? null, currency: options.salaryCurrency ?? null }]
+                return options.archived ? [] : [{ id: employeeId, name: 'Ada', salary: new Prisma.Decimal(options.salary ?? '5'), salaryBasis: options.salaryBasis ?? null, hiredAt: options.hiredAt ?? null, employmentEndDate: options.employmentEndDate ?? null, currency: options.salaryCurrency ?? null }]
       } },
+      employeeSalaryHistory: { findMany: async () => (options.salaryHistory ?? [{
+        employeeId, salary: new Prisma.Decimal(options.salary ?? '5'), salaryBasis: options.salaryBasis ?? null,
+        currency: options.salaryCurrency ?? options.currency ?? 'USD', effectiveFrom: new Date('2020-01-01T00:00:00.000Z'),
+      }]).map(rate => ({ ...rate, employeeId })) },
       $queryRaw: vi.fn(async (_strings: TemplateStringsArray, ...values: unknown[]) => {
         events.push('lock')
         locks.push({ sql: _strings.join('?'), values })
@@ -70,9 +74,11 @@ async function setup(options: { failAudit?: boolean; failRead?: boolean; status?
           const period = options.existingPeriod
           return period && period.start <= where.payrollRun.periodStart.lte && period.end >= where.payrollRun.periodEnd.gte ? 1 : 0
         },
-        create: async ({ data }: { data: Record<string, unknown> & { taxLines: { create: Array<{ label: string; amount: string }> } } }) => {
+        createManyAndReturn: async ({ data }: { data: Array<Record<string, unknown> & { employeeId: string }> }) => {
           write()
-          staged.line = { ...staged.line, ...data, taxLines: data.taxLines.create.map(line => ({ ...line, id: lineId, amount: new Prisma.Decimal(line.amount), override: false })) } as typeof staged.line
+          const line = data[0]
+          staged.line = { ...staged.line, ...line } as typeof staged.line
+          return [{ id: lineId, employeeId: line.employeeId }]
         },
         findFirst: async () => { events.push('readLine'); return staged.line },
         findMany: async () => { if (options.failRead) throw new Error('Read failed'); return [staged.line] },
@@ -87,8 +93,8 @@ async function setup(options: { failAudit?: boolean; failRead?: boolean; status?
       journalLine: { createMany: async ({ data }: { data: Record<string, unknown>[] }) => { staged.journalLines.push(...data); return { count: data.length } } },
       payrollTaxLine: {
         deleteMany: async () => { write(); staged.line.taxLines = [] },
-        createMany: async ({ data }: { data: Array<{ label: string; amount: string }> }) => {
-          write(); staged.line.taxLines = data.map(line => ({ id: lineId, label: line.label, amount: new Prisma.Decimal(line.amount), override: false }))
+        createMany: async ({ data }: { data: Array<{ payrollLineId: string; label: string; amount: string }> }) => {
+          write(); staged.line.taxLines = data.map(line => ({ id: line.payrollLineId, label: line.label, amount: new Prisma.Decimal(line.amount), override: false }))
         },
       },
       auditLog: { create: async ({ data }: { data: Record<string, unknown> }) => {
@@ -160,17 +166,39 @@ describe('payroll earning policy and retry safety', () => {
     { salary: '120000', salaryBasis: 'ANNUAL' as const, fallback: 'ANNUAL', expected: '10000.00', eligibleDays: 31 },
     { salary: '10000', salaryBasis: 'MONTHLY' as const, fallback: 'ANNUAL', expected: '10000.00', eligibleDays: 31 },
     { salary: '120000', salaryBasis: 'ANNUAL' as const, fallback: 'MONTHLY', hiredAt: new Date('2026-10-16T00:00:00Z'), expected: '5161.29', eligibleDays: 16 },
-  ])('snapshots and prices salary $salary / $salaryBasis as $expected', async policy => {
+    { salary: '120000', salaryBasis: 'ANNUAL' as const, fallback: 'MONTHLY', employmentEndDate: new Date('2026-10-16T00:00:00Z'), expected: '5161.29', eligibleDays: 16 },
+    { salary: '120000', salaryBasis: 'ANNUAL' as const, fallback: 'MONTHLY', salaryHistory: [
+      { salary: '120000', salaryBasis: 'ANNUAL', currency: 'USD', effectiveFrom: new Date('2026-10-01T00:00:00Z') },
+      { salary: '240000', salaryBasis: 'ANNUAL', currency: 'USD', effectiveFrom: new Date('2026-10-16T00:00:00Z') },
+    ], expected: '15161.29', expectedSourceSalary: '240000.00', eligibleDays: 31 },
+  ])('snapshots and prices salary $salary / $salaryBasis as $expected for $eligibleDays eligible days', async policy => {
     const fixture = await setup(policy)
     try {
       const response = await fixture.app.inject({ method: 'POST', url: '/payroll/runs', payload: { ...createBody, salaryBasis: policy.fallback } })
       expect(response.statusCode, response.body).toBe(201)
       expect(response.json().data).toMatchObject({ periodStart: '2026-10-01', periodEnd: '2026-10-31', payFrequency: 'MONTHLY', periodsPerYear: 12, prorationMethod: 'CALENDAR_DAYS', currency: 'USD' })
-      expect(response.json().data.lines[0]).toMatchObject({ sourceSalary: policy.salary, salaryBasis: policy.salaryBasis, baseSalary: policy.expected, eligibleDays: policy.eligibleDays, periodDays: 31 })
+      expect(response.json().data.lines[0]).toMatchObject({ sourceSalary: 'expectedSourceSalary' in policy ? policy.expectedSourceSalary : policy.salary, salaryBasis: policy.salaryBasis, baseSalary: policy.expected, eligibleDays: policy.eligibleDays, periodDays: 31 })
       expect(fixture.events.indexOf('lock')).toBeLessThan(fixture.events.indexOf('readEmployee'))
       expect(fixture.locks[0].sql).toContain('ORDER BY "id" FOR UPDATE')
       expect(fixture.locks[0].values).toContain('tenant_1')
       expect(fixture.overlaps[0]).toMatchObject({ tenantId: 'tenant_1', employeeId: { in: [employeeId] }, payrollRun: { tenantId: 'tenant_1', status: { in: ['DRAFT', 'PENDING', 'APPROVED', 'PAID'] } } })
+    } finally { await fixture.app.close() }
+  })
+  it('prices and snapshots salary changes within the earning period', async () => {
+    const fixture = await setup({ salary: '240000', salaryBasis: 'ANNUAL', salaryHistory: [
+      { salary: '120000', salaryBasis: 'ANNUAL', currency: 'USD', effectiveFrom: new Date('2026-10-01T00:00:00Z') },
+      { salary: '240000', salaryBasis: 'ANNUAL', currency: 'USD', effectiveFrom: new Date('2026-10-16T00:00:00Z') },
+    ] })
+    try {
+      const response = await fixture.app.inject({ method: 'POST', url: '/payroll/runs', payload: createBody })
+      expect(response.statusCode, response.body).toBe(201)
+      expect(response.json().data.lines[0]).toMatchObject({
+        baseSalary: '15161.29', eligibleDays: 31,
+        salaryRateSegments: [
+          { salary: '120000.00', salaryBasis: 'ANNUAL', currency: 'USD', effectiveFrom: '2026-10-01', eligibleDays: 15 },
+          { salary: '240000.00', salaryBasis: 'ANNUAL', currency: 'USD', effectiveFrom: '2026-10-16', eligibleDays: 16 },
+        ],
+      })
     } finally { await fixture.app.close() }
   })
   it('replays an identical request without duplicate writes, audit or SSE', async () => {

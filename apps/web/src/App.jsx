@@ -18,6 +18,8 @@ const Privacy = lazy(() => import('./pages/marketing/Privacy'))
 // ── Auth ───────────────────────────────────────────────────
 import Login    from './pages/auth/Login'
 import Register from './pages/auth/Register'
+import TwoFactorVerify from './pages/auth/TwoFactorVerify'
+import VerifyEmail from './pages/auth/VerifyEmail'
 import Onboarding from './pages/auth/Onboarding'
 
 const DashboardPlaceholder = lazy(() => import('./pages/dashboard/DashboardPlaceholder'))
@@ -31,6 +33,7 @@ const AccountsPayable = lazy(() => import('./pages/dashboard/finance/AccountsPay
 const AccountsReceivable = lazy(() => import('./pages/dashboard/finance/AccountsReceivable'))
 const Expenses = lazy(() => import('./pages/dashboard/finance/Expenses'))
 const TrialBalance = lazy(() => import('./pages/dashboard/finance/TrialBalance'))
+const BankReconciliation = lazy(() => import('./pages/dashboard/finance/BankReconciliation'))
 const CRMOverview = lazy(() => import('./pages/dashboard/crm/CRMOverview'))
 const DealsPipeline = lazy(() => import('./pages/dashboard/crm/DealsPipeline'))
 const SalesPerformance = lazy(() => import('./pages/dashboard/crm/SalesPerformance'))
@@ -64,7 +67,7 @@ function NotFound() {
 const DASHBOARD_PATHS = [
   '/dashboard',
   '/dashboard/hr/employees', '/dashboard/hr/payroll', '/dashboard/hr/time-attendance', '/dashboard/hr/recruitment',
-  '/dashboard/finance', '/dashboard/finance/accounts-payable', '/dashboard/finance/accounts-receivable', '/dashboard/finance/expenses', '/dashboard/finance/trial-balance',
+  '/dashboard/finance', '/dashboard/finance/accounts-payable', '/dashboard/finance/accounts-receivable', '/dashboard/finance/expenses', '/dashboard/finance/trial-balance', '/dashboard/finance/reconciliation',
   '/dashboard/crm', '/dashboard/crm/deals', '/dashboard/crm/sales-performance', '/dashboard/crm/revenue-forecast',
   '/dashboard/inventory', '/dashboard/inventory/movements',
   '/dashboard/projects', '/dashboard/projects/sprints', '/dashboard/projects/roadmap',
@@ -84,6 +87,7 @@ const REAL_PAGES = {
   '/dashboard/finance/accounts-receivable': AccountsReceivable,
   '/dashboard/finance/expenses': Expenses,
   '/dashboard/finance/trial-balance': TrialBalance,
+  '/dashboard/finance/reconciliation': BankReconciliation,
   '/dashboard/crm': CRMOverview,
   '/dashboard/crm/deals': DealsPipeline,
   '/dashboard/crm/sales-performance': SalesPerformance,
@@ -114,12 +118,14 @@ export default function App() {
         <Route path="/privacy" element={<Privacy />} />
       </Route>
 
-      {/* ── Auth (only for guests — redirect to dashboard if already logged in) ── */}
-      <Route element={<GuestGuard />}>
-        <Route element={<Suspense fallback={<div className="flex h-screen items-center justify-center text-muted">Loading…</div>}><AuthLayout /></Suspense>}>
+      {/* ── Auth ── */}
+      <Route element={<Suspense fallback={<div className="flex h-screen items-center justify-center text-muted">Loading…</div>}><AuthLayout /></Suspense>}>
+        <Route element={<GuestGuard />}>
           <Route path="/login"    element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          <Route path="/two-factor" element={<TwoFactorVerify />} />
         </Route>
+        <Route path="/register" element={<Register />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
       </Route>
 
       {/* ── Onboarding (protected) ── */}

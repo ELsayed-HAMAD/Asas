@@ -130,7 +130,7 @@ describe('attendance exception resolution route', () => {
         before: { clockIn: '09:00', clockOut: '17:00', totalHours: 8 },
         after: expect.objectContaining({ clockOutTime: '18:30', totalHours: 9.5 }),
       })
-      expect(events).toEqual(['write', 'audit', 'commit', 'sse'])
+      expect(events).toEqual(['write', 'write', 'audit', 'commit', 'sse'])
       expect(publish).toHaveBeenCalledTimes(1)
     } finally { await app.close() }
   })

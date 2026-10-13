@@ -11,13 +11,17 @@ import {
   payrollRunCreateSchema,
   payrollRunListQuerySchema,
   payrollRunListResponseSchema,
+  payrollRoundingReconciliationQuerySchema,
+  payrollRoundingReconciliationSchema,
   payrollRunSchema,
+  myPayslipsResponseSchema,
 } from '@asas/contracts'
 import { hasRequiredRole, requireAuthContext, requireRole } from '../../middlewares/rbac.js'
 import { PERMISSIONS, requirePermission } from '../../middlewares/permissions.js'
 import { moduleKeyPrefix } from '../../plugins/sse.js'
 import { recordAuditLog } from '../../services/auditLog.js'
 import { renderPayslipPdf } from '../../services/pdf.js'
+import { AppError } from '../../utils/errors.js'
 import * as payrollService from './payroll.service.js'
 
 /**
@@ -36,6 +40,22 @@ import * as payrollService from './payroll.service.js'
  */
 export async function payrollRoutes(app: FastifyInstance): Promise<void> {
   const server = app.withTypeProvider<ZodTypeProvider>()
+
+  server.get(
+    '/payroll/rounding-reconciliation',
+    {
+      preHandler: requirePermission('payroll.read'),
+      schema: {
+        querystring: payrollRoundingReconciliationQuerySchema,
+        response: { 200: envelope(payrollRoundingReconciliationSchema), ...errorResponses },
+      },
+    },
+    async request => {
+      const { tenantId } = requireAuthContext(request)
+      const result = await payrollService.getPayrollRoundingReconciliation(request.server.prisma, tenantId, request.query.year)
+      return { data: result }
+    },
+  )
 
   server.get(
     '/payroll/runs',
@@ -233,6 +253,27 @@ export async function payrollRoutes(app: FastifyInstance): Promise<void> {
         .header('content-disposition', `inline; filename="payslip-${lineId}.pdf"`)
         .header('content-length', buffer.length)
       return reply.send(buffer)
+    },
+  )
+
+  /**
+   * Employee self-service: list all payslips belonging to the caller's linked employee record.
+   */
+  server.get(
+    '/payroll/my-payslips',
+    {
+      preHandler: requirePermission('payroll.read.self'),
+      schema: {
+        response: { 200: envelope(myPayslipsResponseSchema), ...errorResponses },
+      },
+    },
+    async request => {
+      const { tenantId, employeeId } = requireAuthContext(request)
+      if (!employeeId) {
+        throw new AppError(409, 'Link this account to an employee record to view payslips')
+      }
+      const data = await payrollService.listMyPayslips(request.server.prisma, tenantId, employeeId)
+      return { data }
     },
   )
 }

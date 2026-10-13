@@ -34,8 +34,15 @@ import { betterAuthPlugin } from './plugins/betterAuth.js'
 import { correlationPlugin } from './plugins/correlation.js'
 import { prismaPlugin } from './plugins/prisma.js'
 import { sentryPlugin } from './plugins/sentry.js'
-import { publish, ssePlugin } from './plugins/sse.js'
+import { initSseRedis, publish, ssePlugin } from './plugins/sse.js'
+import { createRedisClient } from './lib/redis.js'
 import { exportQueuePlugin } from './services/queue.js'
+import { mailerQueuePlugin } from './services/mailerQueue.js'
+import { mailer } from './services/mailer.js'
+import { ResendTransport } from './services/resendTransport.js'
+import { createObjectStorage, type ObjectStorage } from './services/objectStorage.js'
+import { createStripeBillingProvider, type StripeBillingProvider } from './services/stripeBilling.js'
+import { stripeBillingRoutes } from './modules/billing/stripe.routes.js'
 
 /**
  * The Fastify logger configuration shared by every build.
@@ -120,6 +127,18 @@ export function resolveRequestId(header: string | string[] | undefined): string 
 
 const healthResponseSchema = z.object({ data: z.object({ status: z.literal('ok') }) })
 
+const readyResponseSchema = z.object({
+  data: z.object({
+    status: z.enum(['ok', 'unhealthy']),
+    database: z.enum(['connected', 'disconnected', 'disabled']),
+    emailDelivery: z.enum(['configured', 'disabled']),
+    objectStorage: z.enum(['local', 's3']),
+    uptime: z.number().nonnegative(),
+    timestamp: z.string(),
+    error: z.string().optional(),
+  }),
+})
+
 /**
  * `authSecret` is decorated (when a `PrismaClient` is supplied) so the routes that mint or
  * verify signed grants — the CV upload's HMAC signature in `candidates.routes.ts` — read the
@@ -154,6 +173,10 @@ export interface BuildAppOptions {
   prisma?: PrismaClient
   /** Override the better-auth instance (e.g. with a stub `handler`/`api`) instead of building one from `prisma`+`environment`. */
   auth?: Auth
+  /** Inject an object store in tests or custom deployments. Defaults from environment settings. */
+  objectStorage?: ObjectStorage
+  /** Override Stripe API calls in route tests. Defaults to null when billing is unconfigured. */
+  stripeBilling?: StripeBillingProvider | null
 }
 
 /**
@@ -186,6 +209,23 @@ export async function buildApp(
     genReqId: req => resolveRequestId(req.headers['x-request-id']),
   }).withTypeProvider<ZodTypeProvider>()
 
+  const objectStorage = options.objectStorage ?? createObjectStorage({
+    driver: environment.objectStorageDriver,
+    bucket: environment.objectStorageBucket,
+    region: environment.objectStorageRegion,
+    endpoint: environment.objectStorageEndpoint,
+    accessKeyId: environment.objectStorageAccessKeyId,
+    secretAccessKey: environment.objectStorageSecretAccessKey,
+  })
+  app.decorate('objectStorage', objectStorage)
+  app.decorate('environment', environment)
+  app.decorate('stripeBilling', options.stripeBilling !== undefined
+    ? options.stripeBilling
+    : environment.stripeSecretKey
+      ? createStripeBillingProvider(environment.stripeSecretKey, environment.stripePriceIds)
+      : null)
+  app.addHook('onClose', () => objectStorage.close())
+
   app.setErrorHandler(errorHandler)
   app.setValidatorCompiler(validatorCompiler)
   app.setSerializerCompiler(serializerCompiler)
@@ -204,6 +244,12 @@ export async function buildApp(
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 
+  mailer.setDefaultFrom(environment.mailFrom || 'noreply@asas.app')
+  mailer.setTransport(environment.resendApiKey ? new ResendTransport(environment.resendApiKey) : null)
+  if (environment.isProduction && !environment.resendApiKey) {
+    app.log.warn('Email delivery is disabled: configure RESEND_API_KEY and MAIL_FROM')
+  }
+
   await app.register(cors, {
     origin: environment.frontendOrigin.split(',').map(value => value.trim()),
     credentials: true,
@@ -213,7 +259,23 @@ export async function buildApp(
   // fixed-window limiter inside the better-auth catch-all (`plugins/betterAuth.ts`), because
   // `@fastify/rate-limit` cannot scope rules to a wildcard sub-path — everything else rides
   // this global ceiling.
-  await app.register(rateLimit, { max: 300, timeWindow: '1 minute' })
+  const rateLimitOptions: Record<string, unknown> = { max: 300, timeWindow: '1 minute' }
+  if (environment.redisUrl) {
+    try {
+      const redisClient = createRedisClient(environment.redisUrl, 'rate-limit')
+      rateLimitOptions.redis = redisClient
+      app.addHook('onClose', async () => {
+        try {
+          await redisClient.quit()
+        } catch {
+          redisClient.disconnect()
+        }
+      })
+    } catch {
+      // In-memory fallback
+    }
+  }
+  await app.register(rateLimit, rateLimitOptions)
 
   await app.register(swagger, {
     openapi: {
@@ -255,6 +317,9 @@ export async function buildApp(
     // Decorate `ssePublish` on the *root* so every module route (a child of root) can call
     // `request.server.ssePublish(tenantId, keys)` after a write mutation. The SSE route itself
     // is registered with a prefix so it ends up at `/api/v1/events`.
+    if (environment.redisUrl) {
+      initSseRedis(environment.redisUrl)
+    }
     app.decorate('ssePublish', publish)
     await app.register(ssePlugin, { prefix: '/api/v1' })
     // The export queue. `QUEUE_URL` set → pg-boss worker; empty (default) → inline, so a job
@@ -269,8 +334,17 @@ export async function buildApp(
       store: {
         create: data => app.prisma.exportJob.create({ data }),
         updateMany: args => app.prisma.exportJob.updateMany(args),
+        getTenantId: async jobId => (await app.prisma.exportJob.findUnique({ where: { id: jobId }, select: { tenantId: true } }))?.tenantId ?? null,
       },
+      storage: objectStorage,
     })
+    if (environment.resendApiKey) {
+      await mailerQueuePlugin(app, { queueUrl: environment.queueUrl || undefined })
+    } else {
+      // Do not queue email that cannot possibly be delivered; enqueue then appears successful
+      // while a worker retries it forever without a configured provider.
+      mailer.setQueue(null)
+    }
     // Register the concrete "render a kind into bytes" handlers before any job can dispatch.
     registerExportHandlers(app.exportQueue, app.prisma)
     await app.register(hrRoutes, { prefix: '/api/v1/hr' })
@@ -282,6 +356,7 @@ export async function buildApp(
     await app.register(projectsRoutes, { prefix: '/api/v1/projects' })
     await app.register(inventoryRoutes, { prefix: '/api/v1/inventory' })
     await app.register(settingsRoutes, { prefix: '/api/v1/settings' })
+    await app.register(stripeBillingRoutes, { prefix: '/api/v1/billing' })
     await app.register(supportRoutes, { prefix: '/api/v1/support' })
     await app.register(onboardingRoutes, { prefix: '/api/v1/onboarding' })
     await app.register(exportRoutes, { prefix: '/api/v1/exports' })
@@ -295,6 +370,61 @@ export async function buildApp(
       schema: { response: { 200: healthResponseSchema } },
     },
     async () => ({ data: { status: 'ok' as const } }),
+  )
+
+  app.get(
+    '/ready',
+    {
+      config: { rateLimit: false },
+      schema: {
+        response: {
+          200: readyResponseSchema,
+          503: readyResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const now = new Date().toISOString()
+      const uptime = process.uptime()
+      if (options.prisma) {
+        try {
+          await options.prisma.$queryRaw`SELECT 1`
+          return {
+            data: {
+              status: 'ok' as const,
+              database: 'connected' as const,
+              emailDelivery: environment.resendApiKey ? 'configured' as const : 'disabled' as const,
+              objectStorage: objectStorage.mode,
+              uptime,
+              timestamp: now,
+            },
+          }
+        } catch (err) {
+          reply.code(503)
+          return {
+            data: {
+              status: 'unhealthy' as const,
+              database: 'disconnected' as const,
+              emailDelivery: environment.resendApiKey ? 'configured' as const : 'disabled' as const,
+              objectStorage: objectStorage.mode,
+              uptime,
+              timestamp: now,
+              error: err instanceof Error ? err.message : 'Database ping failed',
+            },
+          }
+        }
+      }
+      return {
+        data: {
+          status: 'ok' as const,
+          database: 'disabled' as const,
+          emailDelivery: environment.resendApiKey ? 'configured' as const : 'disabled' as const,
+          objectStorage: objectStorage.mode,
+          uptime,
+          timestamp: now,
+        },
+      }
+    },
   )
 
   return app

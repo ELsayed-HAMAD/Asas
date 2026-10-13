@@ -4,10 +4,12 @@ import {
   LayoutDashboard, Users, CreditCard, Briefcase,
   Package, FolderKanban, Settings, HelpCircle,
   ChevronDown, ChevronRight, Plus, LogOut, Menu,
-  Check, User, Moon, Download, X, Search, Bell
+  Check, User, Moon, Download, X, Search, Bell, Globe, Mail
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
+import { changeLanguage } from '../lib/i18n'
 import {
   authClient, useSession, useActiveOrganization, useActiveMemberRole,
   useListOrganizations, signOut
@@ -20,60 +22,67 @@ const NAV = [
   {
     id: 'dashboard',
     label: 'Dashboard',
+    i18nKey: 'nav.dashboard',
     icon: LayoutDashboard,
     path: '/dashboard',
   },
   {
     id: 'hr',
     label: 'HR',
+    i18nKey: 'nav.hr',
     icon: Users,
     children: [
-      { label: 'Employee Directory', path: '/dashboard/hr/employees' },
-      { label: 'Payroll',            path: '/dashboard/hr/payroll' },
-      { label: 'Time & Attendance',  path: '/dashboard/hr/time-attendance' },
-      { label: 'Recruitment',        path: '/dashboard/hr/recruitment' },
+      { label: 'Employee Directory', i18nKey: 'nav.employees', path: '/dashboard/hr/employees' },
+      { label: 'Payroll',            i18nKey: 'nav.payroll', path: '/dashboard/hr/payroll' },
+      { label: 'Time & Attendance',  i18nKey: 'nav.timeAttendance', path: '/dashboard/hr/time-attendance' },
+      { label: 'Recruitment',        i18nKey: 'nav.recruitment', path: '/dashboard/hr/recruitment' },
     ],
   },
   {
     id: 'finance',
     label: 'Finance',
+    i18nKey: 'nav.finance',
     icon: CreditCard,
     children: [
-      { label: 'Overview',              path: '/dashboard/finance' },
-      { label: 'Accounts Payable',      path: '/dashboard/finance/accounts-payable' },
-      { label: 'Accounts Receivable',   path: '/dashboard/finance/accounts-receivable' },
-      { label: 'Expenses',              path: '/dashboard/finance/expenses' },
-      { label: 'Trial Balance',         path: '/dashboard/finance/trial-balance' },
+      { label: 'Overview',              i18nKey: 'finance.overview', path: '/dashboard/finance' },
+      { label: 'Accounts Payable',      i18nKey: 'nav.accountsPayable', path: '/dashboard/finance/accounts-payable' },
+      { label: 'Accounts Receivable',   i18nKey: 'nav.accountsReceivable', path: '/dashboard/finance/accounts-receivable' },
+      { label: 'Expenses',              i18nKey: 'nav.expenses', path: '/dashboard/finance/expenses' },
+      { label: 'Bank Reconciliation',   i18nKey: 'finance.reconciliation', path: '/dashboard/finance/reconciliation' },
+      { label: 'Trial Balance',         i18nKey: 'nav.trialBalance', path: '/dashboard/finance/trial-balance' },
     ],
   },
   {
     id: 'crm',
     label: 'CRM',
+    i18nKey: 'nav.crm',
     icon: Briefcase,
     children: [
-      { label: 'Overview',          path: '/dashboard/crm' },
-      { label: 'Deals Pipeline',    path: '/dashboard/crm/deals' },
-      { label: 'Sales Performance', path: '/dashboard/crm/sales-performance' },
-      { label: 'Revenue Forecast',  path: '/dashboard/crm/revenue-forecast' },
+      { label: 'Overview',          i18nKey: 'crm.overview', path: '/dashboard/crm' },
+      { label: 'Deals Pipeline',    i18nKey: 'nav.deals', path: '/dashboard/crm/deals' },
+      { label: 'Sales Performance', i18nKey: 'nav.salesPerformance', path: '/dashboard/crm/sales-performance' },
+      { label: 'Revenue Forecast',  i18nKey: 'nav.revenueForecast', path: '/dashboard/crm/revenue-forecast' },
     ],
   },
   {
     id: 'inventory',
     label: 'Inventory',
+    i18nKey: 'nav.inventory',
     icon: Package,
     children: [
-      { label: 'Product Catalog', path: '/dashboard/inventory' },
-      { label: 'Stock Movements', path: '/dashboard/inventory/movements' },
+      { label: 'Product Catalog', i18nKey: 'nav.productCatalog', path: '/dashboard/inventory' },
+      { label: 'Stock Movements', i18nKey: 'nav.stockMovements', path: '/dashboard/inventory/movements' },
     ],
   },
   {
     id: 'projects',
     label: 'Projects',
+    i18nKey: 'nav.projects',
     icon: FolderKanban,
     children: [
-      { label: 'Portfolio',      path: '/dashboard/projects' },
-      { label: 'Active Sprints', path: '/dashboard/projects/sprints' },
-      { label: 'Roadmap',        path: '/dashboard/projects/roadmap' },
+      { label: 'Portfolio',      i18nKey: 'nav.portfolio', path: '/dashboard/projects' },
+      { label: 'Active Sprints', i18nKey: 'nav.activeSprints', path: '/dashboard/projects/sprints' },
+      { label: 'Roadmap',        i18nKey: 'nav.roadmap', path: '/dashboard/projects/roadmap' },
     ],
   },
 ]
@@ -82,18 +91,21 @@ const BOTTOM_NAV = [
   {
     id: 'settings',
     label: 'Settings',
+    i18nKey: 'nav.settings',
     icon: Settings,
     path: '/dashboard/settings',
   },
   {
     id: 'support',
     label: 'Support',
+    i18nKey: 'nav.support',
     icon: HelpCircle,
     path: '/dashboard/support',
   },
   {
     id: 'exports',
     label: 'Exports',
+    i18nKey: 'nav.dataExport',
     icon: Download,
     path: '/dashboard/exports',
   },
@@ -131,6 +143,37 @@ const BREADCRUMB_LABELS = {
   support:               'Support',
 }
 
+const BREADCRUMB_I18N = {
+  dashboard:             'nav.dashboard',
+  hr:                    'nav.hr',
+  employees:             'nav.employees',
+  payroll:               'nav.payroll',
+  'time-attendance':     'nav.timeAttendance',
+  recruitment:           'nav.recruitment',
+  finance:               'nav.finance',
+  'accounts-payable':    'nav.accountsPayable',
+  'accounts-receivable': 'nav.accountsReceivable',
+  expenses:              'nav.expenses',
+  'trial-balance':       'nav.trialBalance',
+  crm:                   'nav.crm',
+  deals:                 'nav.deals',
+  'sales-performance':   'nav.salesPerformance',
+  'revenue-forecast':    'nav.revenueForecast',
+  inventory:             'nav.inventory',
+  movements:             'nav.stockMovements',
+  projects:              'nav.projects',
+  sprints:               'nav.activeSprints',
+  roadmap:               'nav.roadmap',
+  settings:              'nav.settings',
+  members:               'nav.members',
+  billing:               'nav.billing',
+  integrations:          'nav.integrations',
+  notifications:         'nav.notifications',
+  'data-export':         'nav.dataExport',
+  exports:               'nav.dataExport',
+  support:               'nav.support',
+}
+
 // ── Helpers ────────────────────────────────────────────────
 function isChildActive(path, pathname) {
   if (pathname === path) return true
@@ -149,10 +192,11 @@ function isParentActive(item, pathname) {
 }
 
 // ── NavItem component ──────────────────────────────────────
-function NavItem({ item, pathname, openSections, toggleSection, onNavigate }) {
+function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t }) {
   const hasChildren = Boolean(item.children)
   const isOpen      = openSections[item.id]
   const parentActive = isParentActive(item, pathname)
+  const itemLabel   = item.i18nKey && t ? t(item.i18nKey, item.label) : item.label
 
   if (hasChildren) {
     return (
@@ -167,7 +211,7 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate }) {
         >
           <div className="flex items-center gap-2.5">
             <item.icon size={16} />
-            {item.label}
+            {itemLabel}
           </div>
           <ChevronDown
             size={13}
@@ -176,9 +220,10 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate }) {
         </button>
 
         {isOpen && (
-          <div className="ml-4 mt-0.5 border-l border-border-subtle pl-3 space-y-0.5">
+          <div className="ms-4 mt-0.5 border-s border-border-subtle ps-3 space-y-0.5">
             {item.children.map(child => {
               const isActive = isChildActive(child.path, pathname)
+              const childLabel = child.i18nKey && t ? t(child.i18nKey, child.label) : child.label
               return (
               <Link
                 key={child.path}
@@ -192,10 +237,10 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate }) {
               >
                 {isActive && (
                   <div
-                    className="absolute left-0 top-[6px] bottom-[6px] w-[3px] bg-primary rounded-r-full"
+                    className="absolute start-0 top-[6px] bottom-[6px] w-[3px] bg-primary rounded-e-full"
                   />
                 )}
-                {child.label}
+                {childLabel}
               </Link>
             )})}
           </div>
@@ -217,17 +262,18 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate }) {
     >
       {isActive && (
         <div
-          className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-primary rounded-r-full"
+          className="absolute start-0 top-1.5 bottom-1.5 w-[3px] bg-primary rounded-e-full"
         />
       )}
       <item.icon size={16} />
-      {item.label}
+      {itemLabel}
     </Link>
   )
 }
 
 // ── Sidebar Content Component ────────────────────────────────
 function SidebarContent({ navProps, navigate }) {
+  const { t, i18n } = useTranslation()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const menuRef = useRef(null)
   const [switchingOrgId, setSwitchingOrgId] = useState(null)
@@ -425,7 +471,7 @@ function SidebarContent({ navProps, navigate }) {
             <p className="text-sm font-semibold text-heading leading-tight">Asas</p>
             {activeOrganization?.onboardingStatus === 'SAMPLE_LOADED' && (
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/20">
-                Sample
+                {t('common.sampleData', 'Sample')}
               </span>
             )}
           </div>
@@ -441,21 +487,21 @@ function SidebarContent({ navProps, navigate }) {
           className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary text-sm font-medium px-3 py-2 rounded-button hover:bg-primary-hover active:scale-[0.98] transition-all cursor-pointer"
         >
           <Plus size={14} />
-          New Entry
+          {t('common.newEntry', 'New Entry')}
         </button>
       </div>
 
       {/* Main navigation */}
       <nav className="flex-1 px-2 space-y-0.5 overflow-y-auto no-scrollbar">
         {NAV.map(item => (
-          <NavItem key={item.id} item={item} {...navProps} />
+          <NavItem key={item.id} item={item} {...navProps} t={t} />
         ))}
       </nav>
 
       {/* Bottom navigation */}
       <div className="px-2 py-2 border-t border-border-subtle space-y-0.5 flex-shrink-0">
         {BOTTOM_NAV.map(item => (
-          <NavItem key={item.id} item={item} {...navProps} />
+          <NavItem key={item.id} item={item} {...navProps} t={t} />
         ))}
       </div>
 
@@ -538,10 +584,10 @@ function SidebarContent({ navProps, navigate }) {
                     setCreateWorkspaceError('')
                     setCreateWorkspaceOpen(true)
                   }}
-                  className="w-full px-3 py-2 flex items-center gap-3 text-sm font-semibold text-accent hover:bg-surface-muted rounded-input cursor-pointer transition-colors mt-1 text-left"
+                  className="w-full px-3 py-2 flex items-center gap-3 text-sm font-semibold text-accent hover:bg-surface-muted rounded-input cursor-pointer transition-colors mt-1 text-left rtl:text-right"
                 >
                   <Plus size={16} />
-                  Create New Workspace
+                  {t('common.createWorkspace', 'Create New Workspace')}
                 </button>
               </div>
 
@@ -559,26 +605,37 @@ function SidebarContent({ navProps, navigate }) {
                     setProfileSuccess('')
                     setProfileOpen(true)
                   }}
-                  className="flex items-center gap-3 text-left px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
+                  className="flex items-center gap-3 text-left rtl:text-right px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
                 >
                   <User size={16} className="text-caption" />
-                  Profile & Preferences
+                  {t('common.profilePreferences', 'Profile & Preferences')}
                 </button>
                 <button
                   type="button"
                   onClick={toggleTheme}
-                  className="flex items-center gap-3 text-left px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
+                  className="flex items-center gap-3 text-left rtl:text-right px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
                 >
                   <Moon size={16} className="text-caption" />
-                  Toggle Theme
+                  {t('common.toggleTheme', 'Toggle Theme')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserMenuOpen(false)
+                    changeLanguage(i18n.language === 'ar' ? 'en' : 'ar')
+                  }}
+                  className="flex items-center gap-3 text-left rtl:text-right px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
+                >
+                  <Globe size={16} className="text-caption" />
+                  <span>{i18n.language === 'ar' ? 'English' : 'العربية'}</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleInstallApp}
-                  className="flex items-center gap-3 text-left px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
+                  className="flex items-center gap-3 text-left rtl:text-right px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
                 >
                   <Download size={16} className="text-caption" />
-                  Download Desktop App
+                  {t('common.downloadApp', 'Download Desktop App')}
                 </button>
               </div>
 
@@ -586,10 +643,10 @@ function SidebarContent({ navProps, navigate }) {
               <div className="border-t border-border-subtle p-2">
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-3 text-left px-3 py-2 text-danger hover:bg-danger-light hover:text-danger-hover rounded-input text-sm font-bold transition-colors"
+                  className="w-full flex items-center gap-3 text-left rtl:text-right px-3 py-2 text-danger hover:bg-danger-light hover:text-danger-hover rounded-input text-sm font-bold transition-colors"
                 >
                   <LogOut size={16} />
-                  Log Out
+                  {t('common.logout', 'Log Out')}
                 </button>
               </div>
             </motion.div>
@@ -859,10 +916,12 @@ function SidebarContent({ navProps, navigate }) {
 
 // ── Main Layout ────────────────────────────────────────────
 export default function DashboardLayout() {
+  const { t, i18n } = useTranslation()
   const location  = useLocation()
   const navigate  = useNavigate()
   const pathname  = location.pathname
 
+  const { data: session } = useSession()
   const { data: activeOrganization } = useActiveOrganization()
 
   const [openSections, setOpenSections]         = useState({})
@@ -908,11 +967,12 @@ export default function DashboardLayout() {
   const toggleSection = id =>
     setOpenSections(prev => ({ ...prev, [id]: !prev[id] }))
 
-  // Build breadcrumbs from pathname
-  const breadcrumbs = pathname
-    .split('/')
-    .filter(Boolean)
-    .map(seg => BREADCRUMB_LABELS[seg] || (seg.charAt(0).toUpperCase() + seg.slice(1)));
+  // Build breadcrumbs from pathname with translation support
+  const segments = pathname.split('/').filter(Boolean)
+  const breadcrumbs = segments.map(seg => {
+    const i18nKey = BREADCRUMB_I18N[seg]
+    return i18nKey ? t(i18nKey, { defaultValue: BREADCRUMB_LABELS[seg] || seg }) : (BREADCRUMB_LABELS[seg] || (seg.charAt(0).toUpperCase() + seg.slice(1)))
+  })
 
   const navProps = { pathname, openSections, toggleSection, onNavigate: () => setMobileSidebarOpen(false) }
 
@@ -920,7 +980,7 @@ export default function DashboardLayout() {
     <div className="flex h-screen bg-surface overflow-hidden">
 
       {/* ── Desktop sidebar ── */}
-      <aside className="hidden md:flex w-55 min-w-55 bg-surface-raised border-r border-border-subtle flex-col relative z-30">
+      <aside className="hidden md:flex w-55 min-w-55 bg-surface-raised border-e border-border-subtle flex-col relative z-30">
         <SidebarContent navProps={navProps} navigate={navigate} />
       </aside>
 
@@ -933,7 +993,7 @@ export default function DashboardLayout() {
             onClick={() => setMobileSidebarOpen(false)}
           />
           {/* Drawer */}
-          <aside className="relative z-10 w-55 bg-surface-raised border-r border-border-subtle flex flex-col">
+          <aside className="relative z-10 w-55 bg-surface-raised border-e border-border-subtle flex flex-col">
             <SidebarContent navProps={navProps} navigate={navigate} />
           </aside>
         </div>
@@ -962,7 +1022,7 @@ export default function DashboardLayout() {
                 return (
                   <span key={i} className="flex items-center gap-1 min-w-0">
                     {i > 0 && (
-                      <ChevronRight size={13} className="text-faint flex-shrink-0" />
+                      <ChevronRight size={13} className="text-faint flex-shrink-0 rtl:rotate-180" />
                     )}
                     {isLast ? (
                       <span className="truncate font-semibold text-heading" aria-current="page">
@@ -991,10 +1051,19 @@ export default function DashboardLayout() {
               title="Global search (⌘K or Ctrl+K)"
             >
               <Search size={14} className="text-caption" />
-              <span className="hidden md:inline text-body-light">Search or jump to...</span>
+              <span className="hidden md:inline text-body-light">{t('common.searchJump', 'Search or jump to...')}</span>
               <kbd className="px-1.5 py-0.5 text-[10px] bg-surface-raised border border-border-default rounded text-caption font-mono font-semibold">
                 ⌘K
               </kbd>
+            </button>
+            <button
+              type="button"
+              onClick={() => changeLanguage(i18n.language === 'ar' ? 'en' : 'ar')}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-muted hover:text-heading hover:bg-surface-muted border border-border-default rounded-input transition-colors cursor-pointer"
+              title={i18n.language === 'ar' ? 'Switch to English' : 'التحويل إلى العربية'}
+            >
+              <Globe size={14} className="text-caption" />
+              <span className="hidden sm:inline font-medium">{i18n.language === 'ar' ? 'English' : 'العربية'}</span>
             </button>
             <button
               type="button"
@@ -1011,6 +1080,19 @@ export default function DashboardLayout() {
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto">
+          {session?.user && !session.user.emailVerified && (
+            <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-2 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200">
+              <div className="flex items-center gap-2">
+                <Mail size={14} className="text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                <span>
+                  Please confirm your email address (<strong>{session.user.email}</strong>) to complete verification.
+                </span>
+              </div>
+              <Link to="/verify-email" state={{ email: session.user.email }} className="font-medium underline hover:text-amber-800 dark:hover:text-amber-100 ml-4 flex-shrink-0">
+                View instructions →
+              </Link>
+            </div>
+          )}
           <Outlet />
         </main>
 

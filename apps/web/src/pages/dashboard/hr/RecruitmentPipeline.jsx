@@ -307,6 +307,7 @@ export default function RecruitmentPipeline() {
   const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState(null)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [stageOpen, setStageOpen] = useState(false)
   const [nextStage, setNextStage] = useState('SCREENING')
   const [scheduleOpen, setScheduleOpen] = useState(false)
@@ -368,20 +369,38 @@ export default function RecruitmentPipeline() {
     })
   }
 
+  const candidateQuery = {
+    page,
+    limit: 25,
+    search: search || undefined,
+    role: roleFilter === 'ALL' ? undefined : roleFilter,
+  }
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: queryKeys.hr.candidates.list({ search: search || undefined }),
-    queryFn: () => hrApi.listCandidates({ limit: 100, search: search || undefined }),
+    queryKey: queryKeys.hr.candidates.list(candidateQuery),
+    queryFn: () => hrApi.listCandidates(candidateQuery),
   })
 
   const candidates = data?.items || []
-  const availableRoles = Array.from(new Set(candidates.map(c => c.role).filter(Boolean))).sort()
-  const visibleCandidates = roleFilter === 'ALL' ? candidates : candidates.filter(c => c.role === roleFilter)
-  const selectedCandidate = candidates.find(c => c.id === selectedId)
+  const availableRoles = data?.roleOptions || []
+  const visibleCandidates = candidates
+  const selectedCandidateOnPage = candidates.find(c => c.id === selectedId)
+  const { data: selectedCandidateDetail } = useQuery({
+    queryKey: queryKeys.hr.candidates.detail(selectedId ? `${selectedId}:record` : 'none'),
+    queryFn: () => hrApi.getCandidate(selectedId),
+    enabled: !!selectedId && !selectedCandidateOnPage,
+  })
+  const selectedCandidate = selectedCandidateOnPage ?? selectedCandidateDetail
   const { data: interviews = [] } = useQuery({
     queryKey: queryKeys.hr.candidates.detail(selectedId ? `${selectedId}:interviews` : 'none'),
     queryFn: () => hrApi.listCandidateInterviews(selectedId),
     enabled: !!selectedId,
   })
+  useEffect(() => {
+    const pagination = data?.pagination
+    if (!pagination) return
+    if (pagination.pages === 0 && page !== 1) setPage(1)
+    else if (pagination.pages > 0 && page > pagination.pages) setPage(pagination.pages)
+  }, [data?.pagination, page])
   const moveStageMutation = useMutation({
     mutationFn: () => hrApi.updateCandidateStage(selectedId, nextStage),
     onSuccess: () => {
@@ -549,7 +568,7 @@ export default function RecruitmentPipeline() {
               <input
                 type="text"
                 value={search}
-                onChange={event => setSearch(event.target.value)}
+                onChange={event => { setSearch(event.target.value); setPage(1) }}
                 placeholder="Search candidates..."
                 className="pl-9 pr-4 py-1.5 text-sm border border-border-default rounded-button bg-surface-raised w-64 focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
               />
@@ -559,7 +578,7 @@ export default function RecruitmentPipeline() {
               <select
                 aria-label="Filter by candidate role"
                 value={roleFilter}
-                onChange={event => setRoleFilter(event.target.value)}
+                onChange={event => { setRoleFilter(event.target.value); setPage(1) }}
                 className="appearance-none bg-surface-raised border border-border-default text-body text-sm pl-8 pr-7 py-1.5 rounded-button hover:bg-surface-muted transition-colors cursor-pointer outline-none"
               >
                 <option value="ALL">Role: All</option>
@@ -636,6 +655,14 @@ export default function RecruitmentPipeline() {
             </table>
           </QueryState>
         </div>
+        {data?.pagination && <div className="flex items-center justify-between px-8 py-3 border-t border-border-default text-xs text-muted">
+          <span>Showing {data.pagination.total === 0 ? 0 : (page - 1) * data.pagination.limit + 1}–{Math.min(page * data.pagination.limit, data.pagination.total)} of {data.pagination.total} candidates</span>
+          <div className="flex items-center gap-2">
+            <button type="button" disabled={page <= 1} onClick={() => setPage(current => current - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
+            <span>Page {data.pagination.pages === 0 ? 0 : page} of {data.pagination.pages}</span>
+            <button type="button" disabled={page >= data.pagination.pages} onClick={() => setPage(current => current + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+          </div>
+        </div>}
       </div>
 
       {/* ── Right Side: Inspector Panel ── */}

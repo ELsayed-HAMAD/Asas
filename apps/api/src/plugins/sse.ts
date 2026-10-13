@@ -1,5 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { requireRole } from '../middlewares/rbac.js'
+import { createRedisClient } from '../lib/redis.js'
+import type { Redis } from 'ioredis'
 
 /**
  * The string form of a module's query-key *prefix*, e.g. `moduleKeyPrefix('finance')` →
@@ -27,6 +29,9 @@ export function moduleKeyPrefix(moduleName: string): string {
  * web client (`apps/web/src/lib/sse.js`) then calls `queryClient.invalidateQueries` for each —
  * the UI self-heals after any mutation in any tab without polling.
  *
+ * In a multi-replica setup, when `REDIS_URL` is set, invalidations fan out across all replicas
+ * via Redis Pub/Sub so tabs connected to any replica are kept up to date.
+ *
  * Event frame (SSE):
  *
  * ```
@@ -49,10 +54,76 @@ interface Subscriber {
 /** In-memory subscriber registry, keyed by tenant. */
 const subscribers = new Map<string, Set<Subscriber>>()
 
+const SSE_REDIS_CHANNEL = 'asas:sse:invalidation'
+const localInstanceId = Math.random().toString(36).slice(2)
+
+let redisPublisher: Redis | null = null
+let redisSubscriber: Redis | null = null
+
+export function initSseRedis(redisUrl?: string): void {
+  if (!redisUrl) return
+  try {
+    redisPublisher = createRedisClient(redisUrl, 'sse-pub')
+    redisSubscriber = createRedisClient(redisUrl, 'sse-sub')
+
+    redisPublisher.connect().catch(() => {})
+    redisSubscriber.connect().then(() => {
+      redisSubscriber?.subscribe(SSE_REDIS_CHANNEL).catch(() => {})
+      redisSubscriber?.on('message', (channel, message) => {
+        if (channel !== SSE_REDIS_CHANNEL) return
+        try {
+          const parsed = JSON.parse(message) as { originInstanceId?: string; tenantId: string; keys: string[] }
+          // Skip if this instance was the origin of the broadcast (already handled locally)
+          if (parsed.originInstanceId === localInstanceId) return
+          if (parsed.tenantId && Array.isArray(parsed.keys)) {
+            deliverToLocalSubscribers(parsed.tenantId, parsed.keys)
+          }
+        } catch {
+          // Ignore malformed redis message
+        }
+      })
+    }).catch(() => {})
+  } catch {
+    // Memory fallback
+  }
+}
+
+export async function closeSseRedis(): Promise<void> {
+  if (redisSubscriber) {
+    try {
+      await redisSubscriber.quit()
+    } catch {
+      redisSubscriber.disconnect()
+    }
+    redisSubscriber = null
+  }
+  if (redisPublisher) {
+    try {
+      await redisPublisher.quit()
+    } catch {
+      redisPublisher.disconnect()
+    }
+    redisPublisher = null
+  }
+}
+
 declare module 'fastify' {
   interface FastifyInstance {
     /** The tenant's event stream is live only behind auth, so this always resolves. */
     ssePublish: (tenantId: string, keys: readonly string[]) => void
+  }
+}
+
+function deliverToLocalSubscribers(tenantId: string, keys: readonly string[]): void {
+  const set = subscribers.get(tenantId)
+  if (!set) return
+  const payload = JSON.stringify({ type: 'invalidate' as const, keys: [...keys] })
+  for (const subscriber of set) {
+    try {
+      subscriber.send('invalidate', payload)
+    } catch {
+      // A slow/dead socket's write errors are the close handler's problem, not the writer's.
+    }
   }
 }
 
@@ -63,14 +134,18 @@ declare module 'fastify' {
  * commits; `publish` never throws, so a dead socket can never break a request handler.
  */
 export function publish(tenantId: string, keys: readonly string[]): void {
-  const set = subscribers.get(tenantId)
-  if (!set) return
-  const payload = JSON.stringify({ type: 'invalidate' as const, keys: [...keys] })
-  for (const subscriber of set) {
+  // Always deliver immediately to local clients
+  deliverToLocalSubscribers(tenantId, keys)
+
+  // Fan out across other replicas via Redis Pub/Sub if available
+  if (redisPublisher && redisPublisher.status === 'ready') {
     try {
-      subscriber.send('invalidate', payload)
+      redisPublisher.publish(
+        SSE_REDIS_CHANNEL,
+        JSON.stringify({ originInstanceId: localInstanceId, tenantId, keys: [...keys] }),
+      ).catch(() => {})
     } catch {
-      // A slow/dead socket's write errors are the close handler's problem, not the writer's.
+      // Redis publish failed - local delivery already succeeded
     }
   }
 }
@@ -108,6 +183,9 @@ export async function ssePlugin(app: FastifyInstance): Promise<void> {
   // Hijacked streams must end before Fastify waits for connections during shutdown.
   app.addHook('preClose', async () => {
     for (const close of closeStreams) close()
+  })
+  app.addHook('onClose', async () => {
+    await closeSseRedis()
   })
   app.get(
     '/events',

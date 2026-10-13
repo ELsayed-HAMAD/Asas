@@ -3,11 +3,13 @@ import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod
 import type { PrismaClient } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
 import type { Auth } from '../src/auth.js'
+import type { ObjectStorage } from '../src/services/objectStorage.js'
+import { LocalObjectStorage } from '../src/services/objectStorage.js'
 import { candidateRoutes } from '../src/modules/hr/candidates.routes.js'
 
 const candidateId = 'clxxxxxxxxxxxxxxxxxxxxxxx'
 
-async function setup(role: 'ADMIN' | 'MEMBER' = 'ADMIN') {
+async function setup(role: 'ADMIN' | 'MEMBER' = 'ADMIN', objectStorage: ObjectStorage = new LocalObjectStorage(`candidate-route-test-${process.pid}`)) {
   const events: string[] = []
   const startsAt = new Date(Date.now() + 86_400_000)
   const interview = {
@@ -56,10 +58,15 @@ async function setup(role: 'ADMIN' | 'MEMBER' = 'ADMIN') {
       events.push('commit')
       return value
     }),
-    candidate: { findMany: vi.fn().mockResolvedValue([{
+    candidate: {
+      findFirst: vi.fn().mockResolvedValue(candidateRecord),
+      update: vi.fn().mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({ ...candidateRecord, ...data })),
+      findMany: vi.fn().mockResolvedValue([{
       name: 'Ada Candidate', email: '=formula', role: 'Engineer', stage: 'SCREENING',
       appliedAt: new Date('2026-10-01T00:00:00Z'), location: null, source: 'LinkedIn',
-    }]) },
+      }]),
+    },
+    candidateActivity: { create: vi.fn().mockResolvedValue({}) },
     auditLog: { create: vi.fn(async () => { events.push('audit') }) },
   }
   const app = Fastify()
@@ -67,6 +74,7 @@ async function setup(role: 'ADMIN' | 'MEMBER' = 'ADMIN') {
   app.setSerializerCompiler(serializerCompiler)
   app.decorate('auth', { api: { getSession: async () => ({ session: { activeOrganizationId: 'tenant_1' }, user: { id: 'user_1' } }) } } as unknown as Auth)
   app.decorate('authSecret', 'test-secret')
+  app.decorate('objectStorage', objectStorage)
   app.decorate('prisma', prisma as unknown as PrismaClient)
   app.decorate('ssePublish', vi.fn(() => { events.push('sse') }))
   await app.register(candidateRoutes, { prefix: '/hr' })
@@ -137,6 +145,66 @@ describe('candidate scheduling and export routes', () => {
     } finally {
       await app.close()
     }
+  })
+
+  it('uses a short-lived object-store PUT and validates the staged PDF before promotion', async () => {
+    const objectStorage = {
+      mode: 's3' as const,
+      presignPut: vi.fn(async () => 'https://objects.example.test/signed-put'),
+      head: vi.fn(async () => ({ size: 12 })),
+      readPrefix: vi.fn(async () => Buffer.from('%PDF-')),
+      copy: vi.fn(async () => undefined),
+      delete: vi.fn(async () => undefined),
+      put: vi.fn(async () => undefined),
+      get: vi.fn(async () => null),
+      presignGet: vi.fn(async () => 'https://objects.example.test/signed-get'),
+    } as unknown as ObjectStorage
+    const { app, prisma, events } = await setup('ADMIN', objectStorage)
+    try {
+      const grantResponse = await app.inject(`/hr/candidates/${candidateId}/resume-upload-url`)
+      expect(grantResponse.statusCode).toBe(200)
+      const grant = grantResponse.json().data
+      expect(grant).toMatchObject({ uploadUrl: 'https://objects.example.test/signed-put', uploadTarget: 'object', method: 'PUT', maxBytes: 5 * 1024 * 1024 })
+      expect(objectStorage.presignPut).toHaveBeenCalledWith(`staging/resumes/tenant_1/${candidateId}/${grant.uploadId}.pdf`, 'application/pdf', 600)
+
+      const completion = await app.inject({
+        method: 'POST',
+        url: `/hr/candidates/${candidateId}/resume/complete`,
+        payload: { uploadId: grant.uploadId, expiresUnix: grant.expiresUnix, uploadToken: grant.uploadToken },
+      })
+      expect(completion.statusCode).toBe(200)
+      expect(completion.json().data.resumeUrl).toBe(`/api/v1/hr/candidates/${candidateId}/resume`)
+      expect(objectStorage.copy).toHaveBeenCalledWith(`staging/resumes/tenant_1/${candidateId}/${grant.uploadId}.pdf`, `resumes/tenant_1/${candidateId}.pdf`, 'application/pdf')
+      expect(objectStorage.delete).toHaveBeenCalledOnce()
+      expect(prisma.candidateActivity.create).toHaveBeenCalledWith({ data: { candidateId, action: 'cv.uploaded' } })
+      expect(events).toEqual(['sse'])
+    } finally { await app.close() }
+  })
+
+  it('rejects oversized staged resumes and deletes the temporary object', async () => {
+    const objectStorage = {
+      mode: 's3' as const,
+      presignPut: vi.fn(async () => 'https://objects.example.test/signed-put'),
+      head: vi.fn(async () => ({ size: 5 * 1024 * 1024 + 1 })),
+      readPrefix: vi.fn(async () => Buffer.from('%PDF-')),
+      copy: vi.fn(async () => undefined),
+      delete: vi.fn(async () => undefined),
+      put: vi.fn(async () => undefined),
+      get: vi.fn(async () => null),
+      presignGet: vi.fn(async () => 'https://objects.example.test/signed-get'),
+    } as unknown as ObjectStorage
+    const { app } = await setup('ADMIN', objectStorage)
+    try {
+      const grant = (await app.inject(`/hr/candidates/${candidateId}/resume-upload-url`)).json().data
+      const response = await app.inject({
+        method: 'POST',
+        url: `/hr/candidates/${candidateId}/resume/complete`,
+        payload: { uploadId: grant.uploadId, expiresUnix: grant.expiresUnix, uploadToken: grant.uploadToken },
+      })
+      expect(response.statusCode).toBe(413)
+      expect(objectStorage.delete).toHaveBeenCalledOnce()
+      expect(objectStorage.copy).not.toHaveBeenCalled()
+    } finally { await app.close() }
   })
 
   it('rejects candidate updates from MEMBER role without permissions', async () => {

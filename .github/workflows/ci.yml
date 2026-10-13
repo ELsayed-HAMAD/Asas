@@ -47,6 +47,15 @@ jobs:
       - name: Test
         run: pnpm run test
 
+      - name: Install Playwright browser
+        run: pnpm --filter @asas/web exec playwright install --with-deps chromium
+
+      - name: Browser concurrency tests
+        run: pnpm run test:e2e
+
+      - name: Dependency security audit
+        run: pnpm audit --audit-level critical
+
       - name: Build
         run: pnpm run build
 

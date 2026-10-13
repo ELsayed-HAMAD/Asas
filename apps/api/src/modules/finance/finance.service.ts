@@ -337,6 +337,8 @@ export async function listPayables(
 
   const where: Prisma.PayableInvoiceWhereInput = { tenantId }
   if (query.status) where.status = query.status
+  if (query.statusGroup === 'OPEN') where.status = { in: ['PENDING', 'APPROVED', 'SCHEDULED'] }
+  if (query.statusGroup === 'HISTORY') where.status = { in: ['PAID', 'REJECTED', 'VOID'] }
   if (query.vendorId) where.vendorId = query.vendorId
   if (query.search) {
     where.OR = [
@@ -347,6 +349,11 @@ export async function listPayables(
 
   const { skip, take } = toPrismaPage(query)
   const now = tenantToday(timezone)
+  if (query.dateRange === 'CURRENT_MONTH') {
+    const startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10)
+    const endDateExclusive = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString().slice(0, 10)
+    where.date = { gte: startDate, lt: endDateExclusive }
+  }
   const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
   const periods = monthToDateComparisonPeriods(now)
   const [items, total, statusMap, pastDue, dueIn7Days, paidThisMonth] = await Promise.all([
@@ -624,9 +631,8 @@ export async function voidPayable(prisma: FinanceClient, tenantId: string, id: s
 // ── Customers ───────────────────────────────────────────────────────────────────
 
 export async function listCustomers(prisma: FinanceClient, tenantId: string): Promise<Customer[]> {
-  const currency = await getTenantCurrency(prisma, tenantId)
-  const today = new Date()
-  today.setUTCHours(0, 0, 0, 0)
+  const [currency, timezone] = await Promise.all([getTenantCurrency(prisma, tenantId), getTenantTimezone(prisma, tenantId)])
+  const today = tenantToday(timezone)
   const [rows, balanceByCustomer, oldestDueByCustomer] = await Promise.all([
     prisma.customer.findMany({ where: { tenantId }, orderBy: { name: 'asc' } }),
     openReceivableBalanceByCustomer(prisma, tenantId),
@@ -639,7 +645,8 @@ export async function listCustomers(prisma: FinanceClient, tenantId: string): Pr
   const oldestDue = new Map(oldestDueByCustomer.map(row => [row.customerId, row._min.dueDate]))
   return rows.map(row => {
     const date = oldestDue.get(row.id)
-    const oldestOverdueDays = date ? Math.max(1, Math.ceil((today.getTime() - new Date(date).setUTCHours(0, 0, 0, 0)) / 86_400_000)) : 0
+    const dueDate = date ? new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())) : null
+    const oldestOverdueDays = dueDate ? Math.max(0, Math.floor((today.getTime() - dueDate.getTime()) / 86_400_000)) : 0
     return mapCustomer(row, balanceByCustomer.get(row.id) ?? new Prisma.Decimal(0), currency, oldestOverdueDays)
   })
 }
@@ -654,7 +661,7 @@ export async function createCustomer(
   if (existing) throw new AppError(409, 'A customer with this name already exists')
 
   const customer = await prisma.customer.create({
-    data: { tenantId, name: input.name, avatarUrl: input.avatarUrl ?? null },
+    data: { tenantId, name: input.name, email: input.email ?? null, avatarUrl: input.avatarUrl ?? null },
   })
   return mapCustomer(customer, new Prisma.Decimal(0), currency, 0)
 }
@@ -680,6 +687,7 @@ export async function updateCustomer(
     where: { id },
     data: {
       ...(input.name !== undefined && { name: input.name }),
+      ...(input.email !== undefined && { email: input.email ?? null }),
       ...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl ?? null }),
       ...(input.collectionStatus !== undefined && { collectionStatus: input.collectionStatus }),
     },
@@ -742,11 +750,11 @@ export async function sendBatchRemindersInTransaction(
   tenantId: string,
   author: string,
   customerIds: string[],
-): Promise<{ remindedCount: number; customerIds: string[] }> {
+): Promise<{ remindedCount: number; customerIds: string[]; notifications: Array<{ customerId: string; to: string; customerName: string; invoices: Array<{ number: string | null; amount: string; currency: string; dueDate: string | null }> }> }> {
   const uniqueIds = Array.from(new Set(customerIds))
   const customers = await tx.customer.findMany({
     where: { id: { in: uniqueIds }, tenantId },
-    select: { id: true, name: true },
+    select: { id: true, name: true, email: true },
   })
 
   const invoices = await tx.receivableInvoice.findMany({
@@ -755,12 +763,14 @@ export async function sendBatchRemindersInTransaction(
       tenantId,
       status: { in: ['CURRENT', 'OVERDUE', 'IN_COLLECTIONS'] },
     },
-    select: { customerId: true },
+    select: { customerId: true, number: true, amount: true, currency: true, dueDate: true },
   })
 
   const invoiceCountByCustomer = new Map<string, number>()
+  const invoicesByCustomer = new Map<string, typeof invoices>()
   for (const inv of invoices) {
     invoiceCountByCustomer.set(inv.customerId, (invoiceCountByCustomer.get(inv.customerId) ?? 0) + 1)
+    invoicesByCustomer.set(inv.customerId, [...(invoicesByCustomer.get(inv.customerId) ?? []), inv])
   }
 
   for (const customer of customers) {
@@ -769,7 +779,7 @@ export async function sendBatchRemindersInTransaction(
       data: {
         tenantId,
         customerId: customer.id,
-        title: 'Payment Reminder Sent',
+        title: 'Payment Reminder Requested',
         author,
         body: `Automated payment reminder issued for ${count} outstanding invoice${count === 1 ? '' : 's'}.`,
       },
@@ -779,6 +789,14 @@ export async function sendBatchRemindersInTransaction(
   return {
     remindedCount: customers.length,
     customerIds: customers.map(c => c.id),
+    notifications: customers.flatMap(customer => customer.email && (invoicesByCustomer.get(customer.id)?.length ?? 0) > 0
+      ? [{ customerId: customer.id, to: customer.email, customerName: customer.name, invoices: (invoicesByCustomer.get(customer.id) ?? []).map(inv => ({
+          number: inv.number,
+          amount: inv.amount.toString(),
+          currency: inv.currency ?? 'USD',
+          dueDate: inv.dueDate?.toISOString() ?? null,
+        })) }]
+      : []),
   }
 }
 
@@ -791,6 +809,7 @@ function mapCustomer(
   return {
     id: customer.id,
     name: customer.name,
+    email: customer.email,
     avatarUrl: customer.avatarUrl,
     collectionStatus: customer.collectionStatus,
     openBalance: moneyWire(openBalance, currency),
@@ -853,6 +872,9 @@ function buildReceivableSummary(
     previousTotal: { amount: number; currency: string } | null
   },
 ): ReceivableSummary {
+  const currentBucket = aging.find(bucket => bucket.bucket === 'current')
+  const overdueBuckets = aging.filter(bucket => bucket.bucket !== 'current')
+  const overdueTotal = Money.sum(overdueBuckets.map(bucket => Money.fromWire(bucket.total)), currency)
   return {
     openBalance: receivableOpenBalance(statusMap, currency),
     collectedThisMonthTotal: collectionPeriod.currentTotal,
@@ -862,10 +884,10 @@ function buildReceivableSummary(
       previousTotal: collectionPeriod.previousTotal,
     },
     agingBuckets: aging,
-    currentCount: statusMap.get('CURRENT')?.count ?? 0,
-    currentTotal: moneyWire(statusMap.get('CURRENT')?.total ?? new Prisma.Decimal(0), currency),
-    overdueCount: statusMap.get('OVERDUE')?.count ?? 0,
-    overdueTotal: moneyWire(statusMap.get('OVERDUE')?.total ?? new Prisma.Decimal(0), currency),
+    currentCount: currentBucket?.count ?? 0,
+    currentTotal: currentBucket?.total ?? moneyWire(new Prisma.Decimal(0), currency),
+    overdueCount: overdueBuckets.reduce((sum, bucket) => sum + bucket.count, 0),
+    overdueTotal: overdueTotal.toWire(),
     inCollectionsCount: statusMap.get('IN_COLLECTIONS')?.count ?? 0,
     inCollectionsTotal: moneyWire(statusMap.get('IN_COLLECTIONS')?.total ?? new Prisma.Decimal(0), currency),
     paidCount: statusMap.get('PAID')?.count ?? 0,
@@ -903,13 +925,22 @@ export async function listReceivables(
   const periods = monthToDateComparisonPeriods(today)
 
   const where: Prisma.ReceivableInvoiceWhereInput = { tenantId }
-  if (query.status) where.status = query.status
+  const andConditions: Prisma.ReceivableInvoiceWhereInput[] = []
+  if (query.status === 'OVERDUE') {
+    andConditions.push({ OR: [
+      { status: 'OVERDUE' },
+      { status: 'CURRENT', dueDate: { lt: today } },
+    ] })
+  } else if (query.status === 'CURRENT') {
+    andConditions.push({ status: 'CURRENT', OR: [{ dueDate: null }, { dueDate: { gte: today } }] })
+  } else if (query.status) {
+    where.status = query.status
+  }
+  if (query.statusGroup === 'OPEN') where.status = { in: ['CURRENT', 'OVERDUE', 'IN_COLLECTIONS'] }
+  if (query.statusGroup === 'HISTORY') where.status = { in: ['PAID', 'VOID'] }
   if (query.customerId) where.customerId = query.customerId
   if (query.overdueOnly === true) {
-    where.AND = [
-      ...(where.AND ? (Array.isArray(where.AND) ? where.AND : [where.AND]) : []),
-      { status: { in: ['CURRENT', 'OVERDUE', 'IN_COLLECTIONS'] }, dueDate: { lt: today } },
-    ]
+    andConditions.push({ status: { in: ['CURRENT', 'OVERDUE', 'IN_COLLECTIONS'] }, dueDate: { lt: today } })
   }
   if (query.search) {
     where.OR = [
@@ -917,6 +948,7 @@ export async function listReceivables(
       { customer: { name: { contains: query.search, mode: 'insensitive' } } },
     ]
   }
+  if (andConditions.length) where.AND = andConditions
 
   const { skip, take } = toPrismaPage(query)
   const [items, total, statusMap, aging, collectedThisMonth] = await Promise.all([
@@ -938,7 +970,7 @@ export async function listReceivables(
   ])
 
   return {
-    items: items.map(item => mapReceivable(item, currency)),
+    items: items.map(item => mapReceivable(item, currency, today)),
     pagination: buildPaginationMeta(query, total),
     summary: buildReceivableSummary(statusMap, currency, aging, {
       currentTotal: collectedThisMonth.currentTotal,
@@ -951,7 +983,12 @@ export async function listReceivables(
 
 type PrismaReceivableWithIncludes = Prisma.ReceivableInvoiceGetPayload<{ include: { customer: true } }>
 
-function mapReceivable(invoice: PrismaReceivableWithIncludes, currency: string): ReceivableInvoice {
+function mapReceivable(invoice: PrismaReceivableWithIncludes, currency: string, today: Date): ReceivableInvoice {
+  const dueDate = invoice.dueDate ? new Date(Date.UTC(invoice.dueDate.getUTCFullYear(), invoice.dueDate.getUTCMonth(), invoice.dueDate.getUTCDate())) : null
+  const status = invoice.status === 'CURRENT' && dueDate && dueDate < today ? 'OVERDUE' : invoice.status
+  const daysPastDue = dueDate && !['PAID', 'VOID'].includes(invoice.status)
+    ? Math.max(0, Math.floor((today.getTime() - dueDate.getTime()) / 86_400_000))
+    : 0
   return {
     id: invoice.id,
     customerId: invoice.customerId,
@@ -959,7 +996,8 @@ function mapReceivable(invoice: PrismaReceivableWithIncludes, currency: string):
     number: invoice.number,
     amount: moneyWire(invoice.amount, invoice.currency ?? currency),
     dueDate: invoice.dueDate?.toISOString() ?? null,
-    status: invoice.status,
+    daysPastDue,
+    status,
     createdAt: invoice.createdAt.toISOString(),
     updatedAt: invoice.updatedAt.toISOString(),
   }
@@ -970,13 +1008,13 @@ export async function getReceivable(
   tenantId: string,
   id: string,
 ): Promise<ReceivableInvoice> {
-  const currency = await getTenantCurrency(prisma, tenantId)
+  const [currency, timezone] = await Promise.all([getTenantCurrency(prisma, tenantId), getTenantTimezone(prisma, tenantId)])
   const invoice = await prisma.receivableInvoice.findFirst({
     where: { id, tenantId },
     include: { customer: true },
   })
   if (!invoice) throw new AppError(404, 'Invoice not found')
-  return mapReceivable(invoice, currency)
+  return mapReceivable(invoice, currency, tenantToday(timezone))
 }
 
 /** Throws unless `customerId` names a customer in this tenant. */
@@ -996,7 +1034,7 @@ export async function createReceivable(
   input: ReceivableWriteInput,
   actorId: string | null = null,
 ): Promise<ReceivableInvoice> {
-  const currency = await getTenantCurrency(prisma, tenantId)
+  const [currency, timezone] = await Promise.all([getTenantCurrency(prisma, tenantId), getTenantTimezone(prisma, tenantId)])
   const create = async (tx: Prisma.TransactionClient) => {
     await assertCustomerInTenant(tx, tenantId, input.customerId)
     const invoice = await tx.receivableInvoice.create({
@@ -1016,7 +1054,7 @@ export async function createReceivable(
       currency: invoice.currency ?? currency, workspaceCurrency: currency, postedAt: invoice.createdAt, actorId,
       description: `Receivable recognized: ${invoice.customer.name}${invoice.number ? ` · ${invoice.number}` : ''}`,
     })
-    return mapReceivable(invoice, currency)
+    return mapReceivable(invoice, currency, tenantToday(timezone))
   }
   return '$transaction' in prisma ? prisma.$transaction(create, { isolationLevel: 'Serializable' }) : create(prisma)
 }
@@ -1028,7 +1066,7 @@ export async function updateReceivable(
   input: ReceivableUpdateInput,
   actorId: string | null = null,
 ): Promise<ReceivableInvoice> {
-  const workspaceCurrency = await getTenantCurrency(prisma, tenantId)
+  const [workspaceCurrency, timezone] = await Promise.all([getTenantCurrency(prisma, tenantId), getTenantTimezone(prisma, tenantId)])
   return withDocumentLock(prisma, 'ReceivableInvoice', tenantId, id, async tx => {
     const existing = await tx.receivableInvoice.findFirstOrThrow({ where: { id, tenantId } })
     const currency = existing.currency ?? workspaceCurrency
@@ -1048,7 +1086,7 @@ export async function updateReceivable(
       currency: invoice.currency ?? currency, workspaceCurrency, postedAt: new Date(), actorId,
       description: `Receivable re-recognized: ${invoice.customer.name}${invoice.number ? ` · ${invoice.number}` : ''}`,
     })
-    return mapReceivable(invoice, currency)
+    return mapReceivable(invoice, currency, tenantToday(timezone))
   })
 }
 
@@ -1060,7 +1098,7 @@ export async function updateReceivableStatus(
   status: ReceivableStatus,
   userId: string | null = null,
 ): Promise<ReceivableInvoice> {
-  const currency = await getTenantCurrency(prisma, tenantId)
+  const [currency, timezone] = await Promise.all([getTenantCurrency(prisma, tenantId), getTenantTimezone(prisma, tenantId)])
   return withDocumentLock(prisma, 'ReceivableInvoice', tenantId, id, async tx => {
     const existing = await tx.receivableInvoice.findFirstOrThrow({ where: { id, tenantId } })
     assertTransition(RECEIVABLE_TRANSITIONS, existing.status, status)
@@ -1081,7 +1119,7 @@ export async function updateReceivableStatus(
         actorId: userId, description: `Collection from ${invoice.customer.name}${invoice.number ? ` · ${invoice.number}` : ''}`,
       })
     }
-    return mapReceivable(invoice, currency)
+    return mapReceivable(invoice, currency, tenantToday(timezone))
   })
 }
 
@@ -1095,7 +1133,7 @@ export async function deleteReceivable(prisma: FinanceClient, tenantId: string, 
 }
 
 export async function voidReceivable(prisma: FinanceClient, tenantId: string, id: string, reason = 'Voided', actorId: string | null = null): Promise<ReceivableInvoice> {
-  const currency = await getTenantCurrency(prisma, tenantId)
+  const [currency, timezone] = await Promise.all([getTenantCurrency(prisma, tenantId), getTenantTimezone(prisma, tenantId)])
   return withDocumentLock(prisma, 'ReceivableInvoice', tenantId, id, async tx => {
     const existing = await tx.receivableInvoice.findFirstOrThrow({ where: { id, tenantId } })
     if (existing.status === 'VOID') throw new AppError(409, 'This invoice is already void')
@@ -1106,7 +1144,7 @@ export async function voidReceivable(prisma: FinanceClient, tenantId: string, id
       data: { status: 'VOID' },
       include: { customer: true },
     })
-    return mapReceivable(invoice, currency)
+    return mapReceivable(invoice, currency, tenantToday(timezone))
   })
 }
 

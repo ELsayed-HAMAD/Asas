@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { candidateListResponseSchema } from './candidate.js'
+import { candidateListQuerySchema, candidateListResponseSchema } from './candidate.js'
 
 const candidate = {
   id: 'candid1234567890123456789',
@@ -30,10 +30,16 @@ const candidate = {
 }
 
 describe('candidate pipeline contract', () => {
+  it('accepts bounded role filters alongside pagination', () => {
+    expect(candidateListQuerySchema.parse({ page: '2', limit: '25', role: 'Engineer' })).toMatchObject({ page: 2, limit: 25, role: 'Engineer' })
+    expect(candidateListQuerySchema.safeParse({ role: 'x'.repeat(121) }).success).toBe(false)
+  })
+
   it('requires stage timing and real activity on candidate rows', () => {
     const result = candidateListResponseSchema.safeParse({
       items: [candidate],
       pagination: { page: 1, limit: 25, total: 1, pages: 1 },
+      roleOptions: ['Engineer'],
       summary: {
         stageCounts: { APPLIED: 0, SCREENING: 0, TECH_INTERVIEW: 0, FINAL_INTERVIEW: 0, OFFER_SENT: 0, HIRED: 1, REJECTED: 0 },
         activeCandidates: 0,
@@ -58,6 +64,7 @@ describe('candidate pipeline contract', () => {
     const result = candidateListResponseSchema.safeParse({
       items: [candidate],
       pagination: { page: 1, limit: 25, total: 1, pages: 1 },
+      roleOptions: ['Engineer'],
       summary: {
         stageCounts: { APPLIED: 0, SCREENING: 0, TECH_INTERVIEW: 0, FINAL_INTERVIEW: 0, OFFER_SENT: 0, HIRED: 1, REJECTED: 0 },
         activeCandidates: 0,

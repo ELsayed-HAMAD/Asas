@@ -9,6 +9,7 @@ import { supportRoutes } from '../src/modules/support/support.routes.js'
 const { mockMailer } = vi.hoisted(() => ({
   mockMailer: {
     send: vi.fn().mockResolvedValue({ id: 'mail_1', sentAt: new Date() }),
+    enqueue: vi.fn().mockResolvedValue(undefined),
   },
 }))
 vi.mock('../src/services/mailer.js', () => ({
@@ -140,7 +141,7 @@ describe('Support Routes', () => {
         }),
       }),
     )
-    expect(mockMailer.send).toHaveBeenCalledWith(
+    expect(mockMailer.enqueue).toHaveBeenCalledWith(
       expect.objectContaining({
         to: 'help@acme.com',
         subject: expect.stringContaining('Bug in expenses report'),

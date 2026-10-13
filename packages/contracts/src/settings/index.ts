@@ -244,11 +244,13 @@ export const subscriptionSchema = z.object({
   id: idSchema,
   planName: shortTextSchema,
   priceMonthly: z.string(),
+  currency: z.string().length(3),
+  priceId: z.string().nullable(),
   status: z.string(),
   renewsOn: isoDateTimeSchema.nullable(),
   seatsUsed: z.int().min(0),
   seatLimit: z.int().min(0),
-  storageUsedGb: z.number().min(0),
+  storageUsedGb: z.number().min(0).nullable(),
   storageLimitGb: z.number().min(0),
 })
 
@@ -265,15 +267,32 @@ export const billingInvoiceSchema = z.object({
   description: shortTextSchema,
   amount: z.string(),
   status: shortTextSchema,
+  currency: z.string().length(3).nullable(),
 })
 
 export const billingSettingsSchema = z.object({
+  stripePortalAvailable: z.boolean(),
   subscriptions: z.array(subscriptionSchema),
   paymentMethods: z.array(paymentMethodSchema),
   invoices: z.array(billingInvoiceSchema),
 })
 
 export type BillingSettings = z.infer<typeof billingSettingsSchema>
+
+export const billingPlanSchema = z.object({
+  priceId: z.string().min(1),
+  name: shortTextSchema,
+  amount: z.string().regex(/^\d+(?:\.\d+)?$/),
+  currency: z.string().length(3),
+  interval: z.literal('month'),
+  seatLimit: z.int().min(1),
+  storageLimitGb: z.number().positive(),
+})
+export const billingPlansResponseSchema = z.object({ enabled: z.boolean(), items: z.array(billingPlanSchema) })
+export const billingCheckoutRequestSchema = z.object({
+  priceId: z.string().regex(/^price_[A-Za-z0-9]+$/),
+})
+export const billingSessionResponseSchema = z.object({ url: z.string().url() })
 
 export const backupScheduleSchema = z.object({
   id: idSchema,
@@ -309,3 +328,43 @@ export const workspaceDeleteResponseSchema = z.object({
   success: z.boolean(),
 })
 export type WorkspaceDeleteResponse = z.infer<typeof workspaceDeleteResponseSchema>
+
+// ── Compliance / GDPR ────────────────────────────────────────────────────────
+
+export const gdprAnonymizeRequestSchema = z.object({
+  targetType: z.enum(['EMPLOYEE', 'USER']),
+  targetId: idSchema,
+  reason: boundedText(500),
+})
+
+export const gdprAnonymizeResponseSchema = z.object({
+  success: z.boolean(),
+  targetType: z.enum(['EMPLOYEE', 'USER']),
+  targetId: idSchema,
+  anonymizedAt: isoDateTimeSchema,
+  recordsScrubbed: z.number().int().min(0),
+})
+
+export type GdprAnonymizeRequest = z.infer<typeof gdprAnonymizeRequestSchema>
+export type GdprAnonymizeResponse = z.infer<typeof gdprAnonymizeResponseSchema>
+
+export const dataRetentionCleanupRequestSchema = z.object({
+  retentionDays: z.number().int().min(1).max(3650).default(30),
+  categories: z
+    .array(z.enum(['EXPIRED_TOKENS', 'OLD_SESSIONS', 'EXPIRED_EXPORTS', 'TRANSIENT_LOGS']))
+    .default(['EXPIRED_TOKENS', 'OLD_SESSIONS', 'EXPIRED_EXPORTS']),
+})
+
+export const dataRetentionCleanupResponseSchema = z.object({
+  success: z.boolean(),
+  executedAt: isoDateTimeSchema,
+  purgedCounts: z.object({
+    expiredTokens: z.number().int().min(0),
+    expiredSessions: z.number().int().min(0),
+    expiredExports: z.number().int().min(0),
+    transientLogs: z.number().int().min(0),
+  }),
+})
+
+export type DataRetentionCleanupRequest = z.infer<typeof dataRetentionCleanupRequestSchema>
+export type DataRetentionCleanupResponse = z.infer<typeof dataRetentionCleanupResponseSchema>

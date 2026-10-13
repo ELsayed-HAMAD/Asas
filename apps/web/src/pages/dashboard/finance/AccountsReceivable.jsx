@@ -21,21 +21,36 @@ export default function AccountsReceivable() {
   const [activityBody, setActivityBody] = useState('')
   const [activityType, setActivityType] = useState('Note')
   const [search, setSearch] = useState('')
+  const [invoicePage, setInvoicePage] = useState(1)
   const [ageFilter, setAgeFilter] = useState('all')
   const [oldestFirst, setOldestFirst] = useState(true)
   const [paymentTargetId, setPaymentTargetId] = useState(null)
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState('');
+  const [newCustomerEmail, setNewCustomerEmail] = useState('');
   const [editingCustomerId, setEditingCustomerId] = useState(null);
   const [editingCustomerName, setEditingCustomerName] = useState('');
+  const [editingCustomerEmail, setEditingCustomerEmail] = useState('');
   const [customerError, setCustomerError] = useState('');
   const [deletingCustomer, setDeletingCustomer] = useState(null);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: queryKeys.finance.receivables.list({ limit: 100 }),
-    queryFn: () => financeApi.listReceivables({ limit: 100 }),
+    queryKey: queryKeys.finance.receivables.list({ limit: 1 }),
+    queryFn: () => financeApi.listReceivables({ limit: 1 }),
   });
+  React.useEffect(() => setInvoicePage(1), [selectedId])
+  const { data: selectedInvoicesData, isLoading: isInvoicesLoading } = useQuery({
+    queryKey: queryKeys.finance.receivables.list({ customerId: selectedId, statusGroup: 'OPEN', page: invoicePage, limit: 10 }),
+    queryFn: () => financeApi.listReceivables({ customerId: selectedId, statusGroup: 'OPEN', page: invoicePage, limit: 10 }),
+    enabled: Boolean(selectedId),
+  })
+  React.useEffect(() => {
+    const pages = selectedInvoicesData?.pagination?.pages
+    if (pages === undefined) return
+    if (pages === 0 && invoicePage !== 1) setInvoicePage(1)
+    else if (pages > 0 && invoicePage > pages) setInvoicePage(pages)
+  }, [selectedInvoicesData?.pagination?.pages, invoicePage])
 
   const { data: customersData } = useQuery({
     queryKey: [...queryKeys.finance.all(), 'customers'],
@@ -72,10 +87,11 @@ export default function AccountsReceivable() {
     onError: (err) => setCustomerError(err?.message || 'Could not update customer.'),
   });
   const createCustomerMutation = useMutation({
-    mutationFn: (name) => financeApi.createCustomer({ name }),
+    mutationFn: (customer) => financeApi.createCustomer(customer),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.finance.all() });
       setNewCustomerName('');
+      setNewCustomerEmail('');
       setCustomerError('');
     },
     onError: (err) => setCustomerError(err?.message || 'Could not create customer.'),
@@ -97,7 +113,6 @@ export default function AccountsReceivable() {
     },
   });
 
-  const items = data?.items || [];
   const customers = customersData?.items || [];
   const summary = data?.summary || {};
   const displayItems = React.useMemo(() => customers
@@ -154,10 +169,8 @@ export default function AccountsReceivable() {
   const priorCollections = summary.collectedThisMonthComparison?.previousTotal;
 
   // Outstanding invoices for the selected customer (from the flat invoice list).
-  const selectedInvoices = selectedRecord
-    ? items.filter(r => r.customerId === selectedRecord.id && ['CURRENT', 'OVERDUE', 'IN_COLLECTIONS'].includes(r.status))
-    : [];
-  const paymentTarget = items.find(invoice => invoice.id === paymentTargetId)
+  const selectedInvoices = selectedInvoicesData?.items ?? []
+  const paymentTarget = selectedInvoices.find(invoice => invoice.id === paymentTargetId)
 
   const toggleSelection = (id) => {
     setSelectedIds(current => {
@@ -387,17 +400,13 @@ export default function AccountsReceivable() {
             <div className="bg-surface-raised border border-border-default rounded-card-sm shadow-card overflow-hidden flex flex-col">
               <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle bg-surface-raised">
                 <h3 className="text-xs font-bold text-heading">Outstanding Invoices</h3>
-                <span className="text-[11px] font-semibold text-muted">{selectedInvoices.length} Items</span>
+                <span className="text-[11px] font-semibold text-muted">{selectedInvoicesData?.pagination?.total ?? 0} Items</span>
               </div>
               <div className="divide-y divide-border-subtle">
 
-                {selectedInvoices.map(inv => {
-                  let daysOverdue = 0;
-                  if (inv.dueDate) {
-                    const today = new Date(); today.setHours(0, 0, 0, 0); const due = new Date(inv.dueDate); due.setHours(0, 0, 0, 0);
-                    daysOverdue = Math.max(0, Math.floor((today.getTime() - due.getTime()) / 86400000));
-                  }
+                {isInvoicesLoading && <div className="p-5 flex justify-center text-muted"><Loader2 size={18} className="animate-spin" /></div>}
 
+                {selectedInvoices.map(inv => {
                   return (
                     <div key={inv.id} className="flex items-center justify-between p-5 hover:bg-surface-muted transition-colors">
                       <div className="flex items-center gap-4">
@@ -407,8 +416,8 @@ export default function AccountsReceivable() {
                         <div>
                           <p className="text-sm font-bold text-heading">{inv.number || 'No Number'}</p>
                           <p className="text-[11px] font-medium text-muted mt-0.5">
-                            {daysOverdue > 0 ? (
-                              <span className="text-danger font-bold">Overdue ({daysOverdue}d)</span>
+                            {inv.daysPastDue > 0 ? (
+                              <span className="text-danger font-bold">Overdue ({inv.daysPastDue}d)</span>
                             ) : (
                               <span className="text-success font-bold">Current</span>
                             )}
@@ -428,9 +437,17 @@ export default function AccountsReceivable() {
 
                 {selectedInvoices.length === 0 && (
                   <div className="p-5 text-center text-muted text-sm">
-                    No outstanding invoices.
+                    {isInvoicesLoading ? 'Loading invoices…' : 'No outstanding invoices.'}
                   </div>
                 )}
+              </div>
+              <div className="flex items-center justify-between border-t border-border-subtle px-4 py-2 text-xs text-muted">
+                <span>Showing {selectedInvoicesData?.pagination?.total ? (invoicePage - 1) * 10 + 1 : 0}–{Math.min(invoicePage * 10, selectedInvoicesData?.pagination?.total ?? 0)} of {selectedInvoicesData?.pagination?.total ?? 0}</span>
+                <div className="flex items-center gap-2">
+                  <button type="button" disabled={invoicePage <= 1} onClick={() => setInvoicePage(current => current - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
+                  <span>Page {selectedInvoicesData?.pagination?.pages ? invoicePage : 0} of {selectedInvoicesData?.pagination?.pages ?? 0}</span>
+                  <button type="button" disabled={invoicePage >= (selectedInvoicesData?.pagination?.pages ?? 0)} onClick={() => setInvoicePage(current => current + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+                </div>
               </div>
             </div>
 
@@ -537,15 +554,22 @@ export default function AccountsReceivable() {
               onSubmit={(e) => {
                 e.preventDefault();
                 const trimmed = newCustomerName.trim();
-                if (trimmed) createCustomerMutation.mutate(trimmed);
+                if (trimmed) createCustomerMutation.mutate({ name: trimmed, email: newCustomerEmail.trim() || null });
               }}
-              className="mt-4 flex gap-2"
+              className="mt-4 flex flex-col gap-2"
             >
               <input
                 type="text"
                 placeholder="New customer name..."
                 value={newCustomerName}
                 onChange={(e) => setNewCustomerName(e.target.value)}
+                className="flex-1 rounded-input border border-border-default px-3 py-2 text-sm bg-surface-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+              <input
+                type="email"
+                placeholder="Customer email (optional)"
+                value={newCustomerEmail}
+                onChange={(e) => setNewCustomerEmail(e.target.value)}
                 className="flex-1 rounded-input border border-border-default px-3 py-2 text-sm bg-surface-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
               />
               <button
@@ -568,9 +592,9 @@ export default function AccountsReceivable() {
                         onSubmit={(e) => {
                           e.preventDefault();
                           const trimmed = editingCustomerName.trim();
-                          if (trimmed) updateCustomerMutation.mutate({ id: cust.id, name: trimmed });
+                          if (trimmed) updateCustomerMutation.mutate({ id: cust.id, name: trimmed, email: editingCustomerEmail.trim() || null });
                         }}
-                        className="flex flex-1 items-center gap-2"
+                        className="flex flex-1 flex-col items-stretch gap-2"
                       >
                         <input
                           type="text"
@@ -579,14 +603,14 @@ export default function AccountsReceivable() {
                           className="flex-1 rounded-input border border-border-default px-2.5 py-1 text-sm bg-surface-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
                           autoFocus
                         />
-                        <button
-                          type="submit"
-                          disabled={!editingCustomerName.trim() || updateCustomerMutation.isPending}
-                          className="p-1.5 text-success-text hover:bg-success-light rounded-input transition-colors disabled:opacity-50"
-                          title="Save"
-                        >
-                          <Check size={16} />
-                        </button>
+                        <input
+                          type="email"
+                          placeholder="Customer email (optional)"
+                          value={editingCustomerEmail}
+                          onChange={(e) => setEditingCustomerEmail(e.target.value)}
+                          className="flex-1 rounded-input border border-border-default px-2.5 py-1 text-sm bg-surface-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                        />
+                        <div className="flex items-center justify-end gap-2">
                         <button
                           type="button"
                           onClick={() => setEditingCustomerId(null)}
@@ -595,6 +619,15 @@ export default function AccountsReceivable() {
                         >
                           <X size={16} />
                         </button>
+                        <button
+                          type="submit"
+                          disabled={!editingCustomerName.trim() || updateCustomerMutation.isPending}
+                          className="p-1.5 text-success-text hover:bg-success-light rounded-input transition-colors disabled:opacity-50"
+                          title="Save"
+                        >
+                          <Check size={16} />
+                        </button>
+                        </div>
                       </form>
                     ) : (
                       <>
@@ -605,6 +638,7 @@ export default function AccountsReceivable() {
                             onClick={() => {
                               setEditingCustomerId(cust.id);
                               setEditingCustomerName(cust.name);
+                              setEditingCustomerEmail(cust.email ?? '');
                               setCustomerError('');
                             }}
                             className="p-1.5 text-muted hover:text-body hover:bg-surface-muted rounded-input transition-colors"

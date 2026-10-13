@@ -22,12 +22,18 @@ import {
   exchangeRateSchema,
   exchangeRateWriteSchema,
   workspaceDeleteResponseSchema,
+  gdprAnonymizeRequestSchema,
+  gdprAnonymizeResponseSchema,
+  dataRetentionCleanupRequestSchema,
+  dataRetentionCleanupResponseSchema,
 } from '@asas/contracts'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { requireAuthContext, requireRole } from '../../middlewares/rbac.js'
 import { requirePermission } from '../../middlewares/permissions.js'
 import { recordAuditLog } from '../../services/auditLog.js'
+import { getTenantStorageBytes } from '../../services/objectStorage.js'
+import { executeDataRetentionCleanup } from '../../services/dataRetention.js'
 import { moduleKeyPrefix } from '../../plugins/sse.js'
 import * as settingsController from './settings.controller.js'
 
@@ -132,7 +138,13 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     schema: { response: { 200: envelope(billingSettingsSchema), ...errorResponses } },
   }, async request => {
     const { tenantId } = requireAuthContext(request)
-    return { data: await settingsController.getBilling(request.server.prisma, tenantId) }
+    let storageUsedGb: number | null = null
+    try {
+      storageUsedGb = await getTenantStorageBytes(request.server.objectStorage, tenantId) / 1_000_000_000
+    } catch (error) {
+      request.log.warn({ tenantId, err: error }, 'Could not measure workspace object storage usage')
+    }
+    return { data: await settingsController.getBilling(request.server.prisma, tenantId, storageUsedGb) }
   })
 
   server.get('/backups', {
@@ -312,6 +324,67 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         targetType: 'Integration',
         targetId: request.params.id,
         metadata: { statusCode: result.log.statusCode, event: result.log.event },
+      })
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('settings')])
+      return { data: result }
+    },
+  )
+
+  server.post(
+    '/compliance/anonymize',
+    {
+      preHandler: requirePermission('compliance.gdpr.anonymize'),
+      schema: {
+        body: gdprAnonymizeRequestSchema,
+        response: {
+          200: envelope(gdprAnonymizeResponseSchema),
+          ...errorResponses,
+        },
+      },
+    },
+    async request => {
+      const { tenantId, userId } = requireAuthContext(request)
+      const result = await request.server.prisma.$transaction(async tx => {
+        const anonymized = await settingsController.anonymizeEntity(tx, tenantId, request.body)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'compliance.gdpr.anonymize',
+          targetType: request.body.targetType,
+          targetId: request.body.targetId,
+          metadata: { reason: request.body.reason },
+        })
+        return anonymized
+      })
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('hr'), moduleKeyPrefix('settings')])
+      return { data: result }
+    },
+  )
+
+  server.post(
+    '/compliance/cleanup',
+    {
+      preHandler: requirePermission('compliance.dataRetention.cleanup'),
+      schema: {
+        body: dataRetentionCleanupRequestSchema,
+        response: {
+          200: envelope(dataRetentionCleanupResponseSchema),
+          ...errorResponses,
+        },
+      },
+    },
+    async request => {
+      const { tenantId, userId } = requireAuthContext(request)
+      const result = await executeDataRetentionCleanup(request.server.prisma, tenantId, request.body)
+      await recordAuditLog(request.server.prisma, {
+        tenantId,
+        actorId: userId,
+        action: 'compliance.dataRetention.cleanup',
+        targetType: 'DataRetention',
+        metadata: {
+          retentionDays: request.body.retentionDays,
+          purgedCounts: result.purgedCounts,
+        },
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('settings')])
       return { data: result }

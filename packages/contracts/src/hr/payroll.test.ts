@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { payrollRunCreateSchema, payrollTaxRateSchema } from './payroll.js'
+import { payrollRunCreateSchema, payrollTaxRateSchema, payrollRoundingReconciliationQuerySchema, payrollRoundingReconciliationSchema } from './payroll.js'
 
 const employeeId = 'clxxxxxxxxxxxxxxxxxxxxxxx'
 const input = { periodStart: '2026-10-01', periodEnd: '2026-10-31', payFrequency: 'MONTHLY', salaryBasis: 'ANNUAL', requestKey: 'cc35b4e1-07ec-4656-a3d3-8b4e71c67251', label: 'Payroll', employeeIds: [employeeId], taxRates: [{ label: 'Tax', rate: '10' }] }
@@ -43,5 +43,46 @@ describe('payroll rate validation', () => {
   })
   it('bounds the tax split size', () => {
     expect(payrollRunCreateSchema.safeParse({ ...input, taxRates: Array.from({ length: 101 }, () => ({ label: 'Tax', rate: '0' })) }).success).toBe(false)
+  })
+})
+
+describe('payroll rounding reconciliation contract', () => {
+  it('accepts an earning-year query and rejects out-of-range years', () => {
+    expect(payrollRoundingReconciliationQuerySchema.safeParse({ year: '2026' }).success).toBe(true)
+    expect(payrollRoundingReconciliationQuerySchema.safeParse({ year: '1999' }).success).toBe(false)
+  })
+
+  it('keeps annual rounding comparisons currency-specific and decimal-string based', () => {
+    expect(payrollRoundingReconciliationSchema.safeParse({
+      year: 2026, excludedManualOverrideLines: 0, excludedUnknownCurrencyLines: 0,
+      groups: [{
+        employeeId, employeeName: 'Ada', currency: 'USD', taxRates: [{ label: 'Tax', rate: '0.9' }],
+        paidLineCount: 2, grossTotal: '10.00', recordedDeductions: '0.10', aggregateRoundedDeductions: '0.09', variance: '0.01',
+        taxLines: [{ label: 'Tax', recorded: '0.10', aggregateRounded: '0.09', variance: '0.01' }],
+      }],
+    }).success).toBe(true)
+  })
+})
+
+describe('self-service my payslips contract', () => {
+  it('validates a valid payslip item and list response', async () => {
+    const { myPayslipItemSchema, myPayslipsResponseSchema } = await import('./payroll.js')
+    const item = {
+      id: 'cly0000000000000000000001',
+      payrollRunId: 'cly0000000000000000000002',
+      runLabel: 'October 2026',
+      periodStart: '2026-10-01',
+      periodEnd: '2026-10-31',
+      payDate: '2026-11-01',
+      status: 'APPROVED',
+      currency: 'USD',
+      baseSalary: '5000.00',
+      gross: '5000.00',
+      deductions: '500.00',
+      net: '4500.00',
+      createdAt: '2026-10-15T12:00:00.000Z',
+    }
+    expect(myPayslipItemSchema.parse(item)).toEqual(item)
+    expect(myPayslipsResponseSchema.parse([item])).toHaveLength(1)
   })
 })

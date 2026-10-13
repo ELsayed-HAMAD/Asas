@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -34,6 +34,13 @@ export default function StockMovements() {
   const debouncedSearch = useDebouncedValue(searchInput)
   const [warehouseFilter, setWarehouseFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
+  const [productSearchInput, setProductSearchInput] = useState('')
+  const productSearch = useDebouncedValue(productSearchInput)
+  const [productPage, setProductPage] = useState(1)
+  const [selectedProduct, setSelectedProduct] = useState(null)
+
+  useEffect(() => { setPage(1) }, [debouncedSearch])
+  useEffect(() => { setProductPage(1) }, [productSearch])
 
   // Record movement dialog state
   const [movementDialogOpen, setMovementDialogOpen] = useState(false)
@@ -50,6 +57,7 @@ export default function StockMovements() {
     queryKey: queryKeys.inventory.movements.list({
       page,
       limit: 25,
+      search: debouncedSearch || undefined,
       warehouse: warehouseFilter || undefined,
       type: typeFilter || undefined,
     }),
@@ -57,6 +65,7 @@ export default function StockMovements() {
       inventoryApi.listStockMovements({
         page,
         limit: 25,
+        search: debouncedSearch || undefined,
         warehouse: warehouseFilter || undefined,
         type: typeFilter || undefined,
       }),
@@ -71,8 +80,8 @@ export default function StockMovements() {
 
   // Query: Products for Record Movement dropdown
   const { data: productsData } = useQuery({
-    queryKey: queryKeys.inventory.products.list({ limit: 100, archived: false }),
-    queryFn: () => inventoryApi.listProducts({ limit: 100, archived: false }),
+    queryKey: queryKeys.inventory.products.list({ page: productPage, limit: 25, search: productSearch || undefined, archived: false }),
+    queryFn: () => inventoryApi.listProducts({ page: productPage, limit: 25, search: productSearch || undefined, archived: false }),
     enabled: movementDialogOpen,
   })
 
@@ -81,18 +90,12 @@ export default function StockMovements() {
   const pagination = data?.pagination ?? { page: 1, limit: 25, total: 0, totalPages: 1 }
   const warehouses = (Array.isArray(warehousesData) ? warehousesData : warehousesData?.items) ?? []
   const products = (Array.isArray(productsData) ? productsData : productsData?.items) ?? []
+  const productOptions = selectedProduct && !products.some((product) => product.id === selectedProduct.id)
+    ? [selectedProduct, ...products]
+    : products
+  const productPagination = productsData?.pagination
 
-  // Filter items client-side by debounced product name search if typed
-  const movements = useMemo(() => {
-    if (!debouncedSearch) return rawItems
-    const term = debouncedSearch.toLowerCase()
-    return rawItems.filter(
-      (m) =>
-        m.productName?.toLowerCase().includes(term) ||
-        m.warehouse?.toLowerCase().includes(term) ||
-        m.note?.toLowerCase().includes(term)
-    )
-  }, [rawItems, debouncedSearch])
+  const movements = rawItems
 
   // Mutation: Record Stock Movement
   const recordMovementMutation = useMutation({
@@ -122,6 +125,9 @@ export default function StockMovements() {
 
   function openMovementDialog() {
     setMovementForm({ productId: '', kind: 'receive', quantity: '1', note: '' })
+    setSelectedProduct(null)
+    setProductSearchInput('')
+    setProductPage(1)
     setMovementError('')
     setMovementDialogOpen(true)
   }
@@ -451,19 +457,38 @@ export default function StockMovements() {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-heading mb-1.5">Product</label>
+            <input
+              type="search"
+              value={productSearchInput}
+              onChange={(event) => setProductSearchInput(event.target.value)}
+              placeholder="Search products by name or SKU..."
+              aria-label="Search products"
+              className="mb-2 w-full border border-border-default rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary"
+            />
             <select
               value={movementForm.productId}
-              onChange={(e) => setMovementForm((f) => ({ ...f, productId: e.target.value }))}
+              onChange={(e) => {
+                const product = productOptions.find((item) => item.id === e.target.value) ?? null
+                setSelectedProduct(product)
+                setMovementForm((f) => ({ ...f, productId: e.target.value }))
+              }}
               required
               className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             >
               <option value="">Select a product...</option>
-              {products.map((product) => (
+              {productOptions.map((product) => (
                 <option key={product.id} value={product.id}>
                   {product.name} ({product.sku}) — {product.stock} on hand
                 </option>
               ))}
             </select>
+            {productPagination && productPagination.pages > 1 && <div className="mt-2 flex items-center justify-between text-xs text-muted">
+              <span>{productPagination.total.toLocaleString()} matching products · page {productPage} of {productPagination.pages}</span>
+              <div className="flex gap-2">
+                <button type="button" aria-label="Previous product page" disabled={productPage <= 1} onClick={() => setProductPage((current) => Math.max(1, current - 1))} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
+                <button type="button" aria-label="Next product page" disabled={productPage >= productPagination.pages} onClick={() => setProductPage((current) => Math.min(productPagination.pages, current + 1))} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+              </div>
+            </div>}
           </div>
 
           <div>

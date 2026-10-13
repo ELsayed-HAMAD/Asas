@@ -42,12 +42,34 @@ describe('PERMISSIONS map', () => {
     expect(PERMISSIONS['employee.salary.read']).toBe('ADMIN')
   })
 
+  it('enforces separation of duties permissions for finance and HR approvals', () => {
+    expect(PERMISSIONS['finance.invoice.approve']).toBe('ADMIN')
+    expect(PERMISSIONS['finance.invoice.pay']).toBe('ADMIN')
+    expect(PERMISSIONS['finance.invoice.void']).toBe('ADMIN')
+    expect(PERMISSIONS['finance.expense.approve']).toBe('ADMIN')
+    expect(PERMISSIONS['finance.expense.reimburse']).toBe('ADMIN')
+    expect(PERMISSIONS['finance.expense.void']).toBe('ADMIN')
+    expect(PERMISSIONS['attendance.read.all']).toBe('ADMIN')
+  })
+
+  it('allows MEMBER for self-service capabilities', () => {
+    expect(PERMISSIONS['finance.expense.self']).toBe('MEMBER')
+    expect(PERMISSIONS['attendance.read.self']).toBe('MEMBER')
+    expect(PERMISSIONS['payroll.read.self']).toBe('MEMBER')
+  })
+
   it('reserves organization deletion for OWNER', () => {
     expect(PERMISSIONS['organization.delete']).toBe('OWNER')
   })
 
   it('marks the attributable actions for the audit log', () => {
     expect(AUDITED_PERMISSIONS.has('payroll.approve')).toBe(true)
+    expect(AUDITED_PERMISSIONS.has('finance.invoice.approve')).toBe(true)
+    expect(AUDITED_PERMISSIONS.has('finance.invoice.pay')).toBe(true)
+    expect(AUDITED_PERMISSIONS.has('finance.invoice.void')).toBe(true)
+    expect(AUDITED_PERMISSIONS.has('finance.expense.approve')).toBe(true)
+    expect(AUDITED_PERMISSIONS.has('finance.expense.reimburse')).toBe(true)
+    expect(AUDITED_PERMISSIONS.has('finance.expense.void')).toBe(true)
     expect(AUDITED_PERMISSIONS.has('employee.write')).toBe(false)
   })
 })

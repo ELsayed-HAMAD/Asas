@@ -5,17 +5,22 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Auth } from '../src/auth.js'
 import { financeRoutes } from '../src/modules/finance/finance.routes.js'
 import { errorHandler } from '../src/middlewares/errorHandler.js'
+import { mailer } from '../src/services/mailer.js'
+
+vi.mock('../src/services/mailer.js', () => ({
+  mailer: { enqueue: vi.fn().mockResolvedValue(undefined) },
+}))
 
 const customerId1 = 'clxxxxxxxxxxxxxxxxxxxxxxx'
 const customerId2 = 'clyyyyyyyyyyyyyyyyyyyyyyy'
 
-async function setup(role: 'ADMIN' | 'MEMBER' = 'ADMIN') {
+async function setup(role: 'ADMIN' | 'MEMBER' = 'ADMIN', includeEmail = false) {
   const events: string[] = []
   const tx = {
     customer: {
       findMany: vi.fn().mockResolvedValue([
-        { id: customerId1, tenantId: 'tenant_1', name: 'Acme Corp', invoices: [{ id: 'inv1' }] },
-        { id: customerId2, tenantId: 'tenant_1', name: 'Globex Inc', invoices: [{ id: 'inv2' }, { id: 'inv3' }] },
+        { id: customerId1, tenantId: 'tenant_1', name: 'Acme Corp', email: includeEmail ? 'ar@acme.test' : null, invoices: [{ id: 'inv1' }] },
+        { id: customerId2, tenantId: 'tenant_1', name: 'Globex Inc', email: null, invoices: [{ id: 'inv2' }, { id: 'inv3' }] },
       ]),
     },
     collectionActivity: {
@@ -26,9 +31,9 @@ async function setup(role: 'ADMIN' | 'MEMBER' = 'ADMIN') {
     },
     receivableInvoice: {
       findMany: vi.fn().mockResolvedValue([
-        { customerId: customerId1 },
-        { customerId: customerId2 },
-        { customerId: customerId2 },
+        { customerId: customerId1, number: 'AR-1', amount: { toString: () => '125.00' }, currency: 'USD', dueDate: new Date('2026-09-01T00:00:00.000Z') },
+        { customerId: customerId2, number: 'AR-2', amount: { toString: () => '50.00' }, currency: 'USD', dueDate: null },
+        { customerId: customerId2, number: 'AR-3', amount: { toString: () => '75.00' }, currency: 'USD', dueDate: null },
       ]),
     },
     auditLog: {
@@ -115,6 +120,23 @@ describe('receivables batch remind route', () => {
 
       expect(response.statusCode).toBe(403)
       expect(tx.collectionActivity.create).not.toHaveBeenCalled()
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('queues invoice details to customers with email after the transaction commits', async () => {
+    vi.mocked(mailer.enqueue).mockClear()
+    const { app, events } = await setup('ADMIN', true)
+    try {
+      const response = await app.inject({ method: 'POST', url: '/receivables/batch-remind', payload: { customerIds: [customerId1] } })
+      expect(response.statusCode).toBe(200)
+      expect(mailer.enqueue).toHaveBeenCalledWith(expect.objectContaining({
+        to: 'ar@acme.test',
+        subject: 'Payment reminder',
+        text: expect.stringContaining('AR-1: 125.00 USD'),
+      }))
+      expect(events.indexOf('commit')).toBeLessThan(events.indexOf('sse'))
     } finally {
       await app.close()
     }
