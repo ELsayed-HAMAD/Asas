@@ -8,7 +8,7 @@ import React from 'react';
 export default function GroupedList({
   title,
   count,
-  dotColor = 'bg-gray-400',
+  dotColor = 'bg-caption',
   isEmpty = false,
   emptyMessage = 'No items in this group.',
   children,
