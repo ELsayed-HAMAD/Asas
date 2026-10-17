@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { MailCheck, ExternalLink, Loader2, CheckCircle2, ArrowRight, RefreshCw, AlertCircle } from 'lucide-react'
 import { authClient, useSession, signOut } from '../../lib/authClient'
+import { Button } from '../../components/ui/button'
+import { Badge } from '../../components/ui/badge'
+import { Alert, AlertDescription } from '../../components/ui/alert'
 
 function getMailProvider(email = '') {
   const domain = (email.split('@')[1] || '').toLowerCase()
@@ -98,8 +101,10 @@ export default function VerifyEmail() {
 
       {/* Email pill */}
       {email ? (
-        <div className="mb-6 inline-flex items-center justify-center gap-2 self-center px-3.5 py-1.5 rounded-button bg-surface-muted border border-border-default text-sm font-medium text-heading">
-          <span>{email}</span>
+        <div className="mb-6 self-center">
+          <Badge variant="outline" className="px-3.5 py-1 text-sm font-medium text-heading">
+            {email}
+          </Badge>
         </div>
       ) : (
         <p className="text-xs text-muted mb-6">
@@ -109,65 +114,73 @@ export default function VerifyEmail() {
 
       {/* Status Notifications */}
       {resendMessage && (
-        <div className="mb-5 flex items-center justify-center gap-2 p-3 bg-success-light border border-success-border rounded-button text-xs font-medium text-success text-left">
-          <CheckCircle2 size={16} className="flex-shrink-0" />
-          <span>{resendMessage}</span>
-        </div>
+        <Alert variant="success" className="mb-5 text-left">
+          <CheckCircle2 size={16} />
+          <AlertDescription>{resendMessage}</AlertDescription>
+        </Alert>
       )}
 
       {resendError && (
-        <div className="mb-5 flex items-center justify-center gap-2 p-3 bg-danger-light border border-danger-border rounded-button text-xs font-medium text-danger text-left">
-          <AlertCircle size={16} className="flex-shrink-0" />
-          <span>{resendError}</span>
-        </div>
+        <Alert variant="destructive" className="mb-5 text-left">
+          <AlertCircle size={16} />
+          <AlertDescription>{resendError}</AlertDescription>
+        </Alert>
       )}
 
       {isAlreadyVerified && (
-        <div className="mb-5 flex items-center justify-center gap-2 p-3 bg-primary/10 border border-primary/20 rounded-button text-xs font-medium text-primary">
+        <Alert variant="info" className="mb-5 text-left">
           <CheckCircle2 size={16} />
-          <span>Your email is already verified!</span>
-        </div>
+          <AlertDescription>Your email is already verified!</AlertDescription>
+        </Alert>
       )}
 
       {/* Actions */}
       <div className="space-y-3 mb-6">
         {provider.url ? (
-          <a
-            href={provider.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full bg-primary text-on-primary text-sm font-medium py-2.5 rounded-button hover:bg-primary-hover focus:outline-none focus:ring-4 focus:ring-surface-strong transition-all flex items-center justify-center gap-2"
-          >
-            <span>Open {provider.name}</span>
-            <ExternalLink size={15} />
-          </a>
+          <Button asChild className="w-full h-10 font-medium">
+            <a
+              href={provider.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2"
+            >
+              <span>Open {provider.name}</span>
+              <ExternalLink size={15} />
+            </a>
+          </Button>
         ) : (
-          <a
-            href={`mailto:${email}`}
-            className="w-full bg-primary text-on-primary text-sm font-medium py-2.5 rounded-button hover:bg-primary-hover focus:outline-none focus:ring-4 focus:ring-surface-strong transition-all flex items-center justify-center gap-2"
-          >
-            <span>Open Email Inbox</span>
-            <ExternalLink size={15} />
-          </a>
+          <Button asChild className="w-full h-10 font-medium">
+            <a
+              href={`mailto:${email}`}
+              className="flex items-center justify-center gap-2"
+            >
+              <span>Open Email Inbox</span>
+              <ExternalLink size={15} />
+            </a>
+          </Button>
         )}
 
         {session?.user ? (
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => navigate('/onboarding')}
-            className="w-full bg-surface-raised border border-border-default text-body text-sm font-medium py-2.5 rounded-button hover:bg-surface-muted focus:outline-none focus:ring-4 focus:ring-surface-active transition-all flex items-center justify-center gap-2"
+            className="w-full h-10 font-medium"
           >
             <span>Continue to Onboarding</span>
             <ArrowRight size={15} />
-          </button>
+          </Button>
         ) : (
-          <Link
-            to="/login"
-            className="w-full bg-surface-raised border border-border-default text-body text-sm font-medium py-2.5 rounded-button hover:bg-surface-muted focus:outline-none focus:ring-4 focus:ring-surface-active transition-all flex items-center justify-center gap-2"
+          <Button
+            asChild
+            variant="outline"
+            className="w-full h-10 font-medium"
           >
-            <span>Already confirmed? Go to Login</span>
-            <ArrowRight size={15} />
-          </Link>
+            <Link to="/login" className="flex items-center justify-center gap-2">
+              <span>Already confirmed? Go to Login</span>
+              <ArrowRight size={15} />
+            </Link>
+          </Button>
         )}
       </div>
 

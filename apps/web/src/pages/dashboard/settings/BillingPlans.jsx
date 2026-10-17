@@ -7,6 +7,9 @@ import SettingsTabs from './SettingsTabs'
 import { settingsApi } from '../../../lib/api/settings'
 import { queryKeys } from '../../../lib/queryKeys'
 import QueryState from '../../../components/common/QueryState'
+import { Button } from '../../../components/ui/button'
+import { Badge } from '../../../components/ui/badge'
+import { Alert, AlertDescription } from '../../../components/ui/alert'
 
 function money(amount, currency) {
   const numericAmount = Number(amount)
@@ -50,16 +53,17 @@ export default function SettingsBilling() {
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
           {plansQuery.data?.enabled && billingQuery.data?.stripePortalAvailable && (
-            <button
+            <Button
+              variant="outline"
               type="button"
               onClick={() => portal.mutate()}
               disabled={portal.isPending}
-              className="inline-flex items-center gap-2 rounded-input border border-border-default bg-surface-raised px-4 py-2 text-sm font-semibold text-heading hover:bg-surface-muted disabled:cursor-wait disabled:opacity-60"
+              className="gap-2 text-heading"
             >
               {portal.isPending ? <Loader2 size={15} className="animate-spin" /> : <CreditCard size={15} />}
               Manage billing
               <ArrowUpRight size={14} />
-            </button>
+            </Button>
           )}
         </div>
       </TopBarActions>
@@ -74,8 +78,16 @@ export default function SettingsBilling() {
             <p className="mt-2 max-w-2xl text-sm leading-6 text-body-light">Manage the plan attached to this workspace. Payments are handled on Stripe’s hosted checkout and billing portal.</p>
           </header>
 
-          {notice && <div role="status" className="rounded-card-sm border border-border-default bg-surface-raised px-4 py-3 text-sm text-heading">{notice}</div>}
-          {error && <div role="alert" className="rounded-card-sm border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">{error}</div>}
+          {notice && (
+            <Alert>
+              <AlertDescription>{notice}</AlertDescription>
+            </Alert>
+          )}
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
           <section aria-labelledby="current-plan-title" className="rounded-card border border-border-default bg-surface-raised p-5 shadow-card md:p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -113,14 +125,14 @@ export default function SettingsBilling() {
                         <p className="mt-3 text-3xl font-bold tracking-tight text-heading">{money(plan.amount, plan.currency)}<span className="text-sm font-medium text-body-light"> / month</span></p>
                         <p className="mt-2 text-xs text-body-light">Billed monthly. Taxes, if applicable, are calculated by Stripe Checkout.</p>
                         <p className="mt-2 text-xs font-medium text-body-light">Up to {plan.seatLimit} seats · {plan.storageLimitGb} GB storage</p>
-                        <button
+                        <Button
                           type="button"
                           onClick={() => checkout.mutate(plan.priceId)}
                           disabled={checkout.isPending || portal.isPending || subscription?.status === 'ACTIVE'}
-                          className="mt-6 inline-flex min-h-10 items-center justify-center gap-2 rounded-input bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-card hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+                          className="mt-6 w-full"
                         >
                           {checkout.isPending ? <><Loader2 size={15} className="animate-spin" /> Opening secure checkout…</> : subscription?.status === 'ACTIVE' ? (subscription.priceId === plan.priceId ? 'Current plan' : 'Manage current plan first') : 'Choose plan'}
-                        </button>
+                        </Button>
                       </article>
                     ))}</div>}
           </section>
@@ -128,7 +140,7 @@ export default function SettingsBilling() {
           <section aria-labelledby="payment-methods-title" className="rounded-card border border-border-default bg-surface-raised p-5 shadow-card md:p-6">
             <div className="mb-4 flex items-center gap-2"><CreditCard size={18} className="text-accent" /><h2 id="payment-methods-title" className="text-lg font-bold text-heading">Payment methods</h2></div>
             {billingQuery.data?.paymentMethods?.length
-              ? <div className="divide-y divide-border-default">{billingQuery.data.paymentMethods.map(method => <div key={method.id} className="flex items-center justify-between gap-3 py-3 text-sm"><div><p className="font-medium capitalize text-heading">{method.brand} ending in {method.last4}</p><p className="mt-1 text-xs text-muted">{method.expires ? `Expires ${method.expires}` : 'Expiration not provided'}</p></div><span className="rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium text-body-light">Saved on Stripe</span></div>)}</div>
+              ? <div className="divide-y divide-border-default">{billingQuery.data.paymentMethods.map(method => <div key={method.id} className="flex items-center justify-between gap-3 py-3 text-sm"><div><p className="font-medium capitalize text-heading">{method.brand} ending in {method.last4}</p><p className="mt-1 text-xs text-muted">{method.expires ? `Expires ${method.expires}` : 'Expiration not provided'}</p></div><Badge variant="outline">Saved on Stripe</Badge></div>)}</div>
               : <p className="text-sm text-body-light">Saved cards will appear here after Stripe confirms them. Add or update a card through Manage billing.</p>}
           </section>
 

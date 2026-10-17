@@ -8,26 +8,23 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import TopBarActions from '../../../components/TopBarActions';
 import SettingsTabs from './SettingsTabs';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Switch } from '../../../components/ui/switch';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../components/ui/card';
 import { settingsApi } from '../../../lib/api/settings';
 import { queryKeys } from '../../../lib/queryKeys';
 
 /**
- * Reusable toggle (verbatim from the legacy page). `onClick` — when provided — toggles the
- * underlying channel; when omitted the toggle is a visual no-op (used for the marketing-style
- * "security override" switch that has no backend equivalent).
+ * Reusable toggle wrapping shadcn/Radix Switch.
  */
 const Toggle = ({ on, color = 'green', onClick }) => {
-  let bgClass = 'bg-surface-strong';
-  if (on) {
-    bgClass = color === 'red' ? 'bg-danger' : 'bg-success';
-  }
-  const translateClass = on ? 'translate-x-5' : 'translate-x-0';
-  const borderClass = !on ? 'border border-border-strong' : '';
-
   return (
-    <div onClick={onClick} className={`w-10 h-5 rounded-full relative flex items-center px-0.5 cursor-pointer transition-colors shadow-panel ${bgClass}`}>
-      <div className={`w-4 h-4 bg-on-primary rounded-full shadow-card transition-transform ${translateClass} ${borderClass}`}></div>
-    </div>
+    <Switch
+      checked={Boolean(on)}
+      onCheckedChange={onClick}
+      color={color}
+    />
   );
 };
 
@@ -123,26 +120,26 @@ export default function SettingsNotifications() {
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
-            <input
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption z-10 pointer-events-none" />
+            <Input
               type="text"
               value={search}
               onChange={event => setSearch(event.target.value)}
               placeholder="Search..."
-              className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className="pl-9 pr-4 py-1.5 h-8 text-sm w-64 bg-surface-muted"
             />
           </div>
 
           <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-strong shrink-0"></div>
 
-          <button
+          <Button
             type="button"
             disabled={updateMutation.isPending}
             onClick={savePreferences}
-            className="bg-primary text-on-primary px-5 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card whitespace-nowrap disabled:opacity-60"
+            className="h-8 whitespace-nowrap"
           >
             {updateMutation.isPending ? 'Saving...' : updateMutation.isError ? 'Retry Save' : 'Save Preferences'}
-          </button>
+          </Button>
         </div>
       </TopBarActions>
 
@@ -155,11 +152,14 @@ export default function SettingsNotifications() {
         <div className="flex-1 overflow-y-auto p-4 sm:p-8 max-w-4xl space-y-6">
 
           {/* Delivery Schedule Card */}
-          <div className="bg-surface-raised border border-border-default rounded-card-sm p-card shadow-card">
-            <h2 className="text-lg font-bold text-heading mb-1">Delivery Schedule</h2>
-            <p className="text-sm text-muted mb-6">Configure when you receive non-critical alerts.</p>
+          {/* Delivery Schedule Card */}
+          <Card className="rounded-card-sm border-border-default shadow-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-bold text-heading">Delivery Schedule</CardTitle>
+              <CardDescription className="text-sm text-muted">Configure when you receive non-critical alerts.</CardDescription>
+            </CardHeader>
 
-            <div className="space-y-4">
+            <CardContent className="space-y-4 pt-0">
               {/* Quiet Hours */}
               <div className="bg-surface-muted border border-border-default rounded-button p-5 flex items-start gap-4">
                 <Clock size={20} className="text-body shrink-0 mt-0.5" />
@@ -167,18 +167,18 @@ export default function SettingsNotifications() {
                   <h3 className="text-sm font-bold text-heading mb-1">Quiet Hours</h3>
                   <div className="flex items-center gap-3 text-sm text-body-light">
                     Pause all non-critical alerts between
-                    <input
+                    <Input
                       type="time"
                       value={quietHours.start}
                       onChange={setQuietHour('start')}
-                      className="bg-surface-raised border border-border-strong px-3 py-1.5 rounded-input text-heading font-medium shadow-card focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                      className="w-28 bg-surface-raised font-medium"
                     />
                     and
-                    <input
+                    <Input
                       type="time"
                       value={quietHours.end}
                       onChange={setQuietHour('end')}
-                      className="bg-surface-raised border border-border-strong px-3 py-1.5 rounded-input text-heading font-medium shadow-card focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                      className="w-28 bg-surface-raised font-medium"
                     />
                   </div>
                 </div>
@@ -192,46 +192,50 @@ export default function SettingsNotifications() {
                 </div>
                 <Toggle on={criticalOverride} color="green" onClick={() => setCriticalOverride(prev => !prev)} />
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Event Triggers & Channels Card */}
-          <div className="bg-surface-raised border border-border-default rounded-card-sm p-card shadow-card">
-            <h2 className="text-lg font-bold text-heading mb-1">Event Triggers & Channels</h2>
-            <p className="text-sm text-muted mb-6">Route specific events to preferred platforms.</p>
+          <Card className="rounded-card-sm border-border-default shadow-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-bold text-heading">Event Triggers & Channels</CardTitle>
+              <CardDescription className="text-sm text-muted">Route specific events to preferred platforms.</CardDescription>
+            </CardHeader>
 
-            <div className="w-full">
-              {/* Table Header */}
-              <div className="grid grid-cols-12 py-3 border-b border-border-default">
-                <div className="col-span-6 text-[10px] font-bold text-muted uppercase tracking-widest">Event Type</div>
-                <div className="col-span-2 text-[10px] font-bold text-muted uppercase tracking-widest text-center">In-App</div>
-                <div className="col-span-2 text-[10px] font-bold text-muted uppercase tracking-widest text-center">Email</div>
-                <div className="col-span-2 text-[10px] font-bold text-muted uppercase tracking-widest text-center">Slack</div>
-              </div>
+            <CardContent className="pt-0">
+              <div className="w-full">
+                {/* Table Header */}
+                <div className="grid grid-cols-12 py-3 border-b border-border-default">
+                  <div className="col-span-6 text-[10px] font-bold text-muted uppercase tracking-widest">Event Type</div>
+                  <div className="col-span-2 text-[10px] font-bold text-muted uppercase tracking-widest text-center">In-App</div>
+                  <div className="col-span-2 text-[10px] font-bold text-muted uppercase tracking-widest text-center">Email</div>
+                  <div className="col-span-2 text-[10px] font-bold text-muted uppercase tracking-widest text-center">Slack</div>
+                </div>
 
-              {/* Table Body */}
-              <div className="divide-y divide-border-subtle">
-                {visibleEventRows.map((row) => {
-                  const prefs = modules[row.module]?.[row.eventType] ?? DEFAULT_PREFERENCES;
-                  return (
-                    <div
-                      key={`${row.module}.${row.eventType}`}
-                      onMouseEnter={() => setPreviewEvent(row.preview)}
-                      className="grid grid-cols-12 items-center py-5 cursor-pointer hover:bg-surface-active px-4 -mx-4 transition-colors rounded-lg"
-                    >
-                      <div className="col-span-6">
-                        <span className={`block text-[10px] font-medium mb-0.5 ${row.danger ? 'text-danger' : 'text-muted'}`}>{row.group}</span>
-                        <span className="block text-sm font-semibold text-heading">{row.name}</span>
+                {/* Table Body */}
+                <div className="divide-y divide-border-subtle">
+                  {visibleEventRows.map((row) => {
+                    const prefs = modules[row.module]?.[row.eventType] ?? DEFAULT_PREFERENCES;
+                    return (
+                      <div
+                        key={`${row.module}.${row.eventType}`}
+                        onMouseEnter={() => setPreviewEvent(row.preview)}
+                        className="grid grid-cols-12 items-center py-5 cursor-pointer hover:bg-surface-active px-4 -mx-4 transition-colors rounded-lg"
+                      >
+                        <div className="col-span-6">
+                          <span className={`block text-[10px] font-medium mb-0.5 ${row.danger ? 'text-danger' : 'text-muted'}`}>{row.group}</span>
+                          <span className="block text-sm font-semibold text-heading">{row.name}</span>
+                        </div>
+                        <div className="col-span-2 flex justify-center"><Toggle on={prefs.inApp} color="green" onClick={toggleChannel(row.module, row.eventType, 'inApp')} /></div>
+                        <div className="col-span-2 flex justify-center"><Toggle on={prefs.email} color="green" onClick={toggleChannel(row.module, row.eventType, 'email')} /></div>
+                        <div className="col-span-2 flex justify-center"><Toggle on={prefs.slack} color="green" onClick={toggleChannel(row.module, row.eventType, 'slack')} /></div>
                       </div>
-                      <div className="col-span-2 flex justify-center"><Toggle on={prefs.inApp} color="green" onClick={toggleChannel(row.module, row.eventType, 'inApp')} /></div>
-                      <div className="col-span-2 flex justify-center"><Toggle on={prefs.email} color="green" onClick={toggleChannel(row.module, row.eventType, 'email')} /></div>
-                      <div className="col-span-2 flex justify-center"><Toggle on={prefs.slack} color="green" onClick={toggleChannel(row.module, row.eventType, 'slack')} /></div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
         </div>
 
@@ -266,9 +270,9 @@ export default function SettingsNotifications() {
                     {preview.desc}
                   </p>
 
-                  <button disabled title="Notification actions are not connected yet" className="w-full bg-primary text-on-primary text-xs font-semibold py-2.5 rounded-input hover:bg-primary-hover transition-colors disabled:opacity-60">
+                  <Button disabled size="sm" title="Notification actions are not connected yet" className="w-full text-xs">
                     {preview.btn}
-                  </button>
+                  </Button>
                 </div>
 
               </div>

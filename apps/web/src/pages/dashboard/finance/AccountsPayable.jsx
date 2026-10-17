@@ -13,7 +13,6 @@ import {
   Trash2,
   X,
   Check,
-  AlertTriangle,
   Maximize2,
   ExternalLink
 } from 'lucide-react';
@@ -27,6 +26,19 @@ import { useDebouncedValue } from '../../../lib/useDebouncedValue';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import { downloadCsv } from '../../../lib/csv';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '../../../components/ui/table';
+import { Textarea } from '../../../components/ui/textarea';
+import { Badge } from '../../../components/ui/badge';
+import { Alert, AlertDescription } from '../../../components/ui/alert';
 
 const metricFontSize = (money) => {
   const label = formatMoney(money)
@@ -265,62 +277,71 @@ export default function AccountsPayable() {
         {/* Left group */}
         <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
-            <input
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
+            <Input
               type="text"
               placeholder="Search invoices..."
               value={searchInput}
               onChange={event => setSearchInput(event.target.value)}
-              className="pl-9 pr-4 py-2 text-xs border border-border-default rounded-input bg-surface-raised w-72 max-w-full focus:outline-none focus:border-border-strong focus:ring-2 focus:ring-border-subtle transition-all shadow-card"
+              className="pl-9 pr-4 text-xs bg-surface-raised w-72 max-w-full shadow-card h-9"
             />
           </div>
           <select
             aria-label="Payables view"
             value={statusGroup}
             onChange={event => setStatusGroup(event.target.value)}
-            className="border border-border-default text-body text-xs px-3 py-2 rounded-input bg-surface-raised hover:bg-surface-muted transition-colors cursor-pointer outline-none shadow-card"
+            className="border border-border-default text-body text-xs px-3 py-2 rounded-input bg-surface-raised hover:bg-surface-muted transition-colors cursor-pointer outline-none shadow-card h-9"
           >
             <option value="OPEN">Open bills</option>
             <option value="HISTORY">History</option>
           </select>
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => setDateFilter(current => current === 'ALL' ? 'MONTH' : 'ALL')}
-            className="flex items-center gap-1.5 border border-border-default text-body text-xs px-3 py-2 rounded-input font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card cursor-pointer"
+            className="gap-1.5 bg-surface-raised shadow-card font-medium h-9"
           >
             <Calendar size={13} className="text-muted" />
             {dateFilter === 'ALL' ? 'All Dates' : 'This Month'}
-          </button>
+          </Button>
         </div>
 
         {/* Right group */}
         <div className="flex items-center gap-2 shrink-0 ml-auto">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             disabled={!scheduled.length || batchPayment.isPending}
             onClick={() => setBatchConfirmOpen(true)}
-            className="border border-border-default text-body text-xs px-3 py-2 rounded-input font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60 cursor-pointer"
+            className="bg-surface-raised shadow-card font-medium h-9"
           >
             Batch Payment {scheduled.length > 0 ? `(${scheduled.length})` : ''}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => { setVendorError(''); setVendorModalOpen(true); }}
-            className="flex items-center gap-1.5 border border-border-default text-body text-xs px-3 py-2 rounded-input font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card cursor-pointer"
+            className="gap-1.5 bg-surface-raised shadow-card font-medium h-9"
             title="Manage vendors"
           >
             <Users size={13} className="text-muted" />
             Vendors
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            size="sm"
             onClick={() => { setProjectSearchInput(''); setProjectPage(1); setSelectedProject(null); setBillOpen(true) }}
-            className="flex items-center gap-1.5 bg-primary text-white text-xs px-3.5 py-2 rounded-input font-semibold hover:bg-primary-hover transition-colors shadow-card cursor-pointer"
+            className="gap-1.5 shadow-card font-semibold h-9"
           >
             <Plus size={14} /> New Bill
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={() => {
               const rows = [
                 ['Vendor', 'Invoice Number', 'Date', 'Due Date', 'Amount', 'Currency', 'Status'],
@@ -337,10 +358,10 @@ export default function AccountsPayable() {
               downloadCsv(rows, 'accounts-payable.csv')
             }}
             title="Export Accounts Payable CSV"
-            className="p-2 border border-border-default rounded-input text-muted hover:text-body hover:bg-surface-muted transition-colors bg-surface-raised shadow-card cursor-pointer"
+            className="bg-surface-raised shadow-card h-9 w-9 text-muted hover:text-body"
           >
             <MoreVertical size={14} />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -408,26 +429,26 @@ export default function AccountsPayable() {
                       </div>
                     </div>
                     <div className={`${scheduled.length > 0 ? 'max-h-[250px]' : 'max-h-[500px]'} overflow-y-auto overflow-x-auto`}>
-                      <table className="w-full min-w-[500px] text-left border-collapse">
-                        <thead className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
-                          <tr>
-                            <th className="px-4 py-2.5 text-left bg-surface-muted">Vendor</th>
-                            <th className="px-4 py-2.5 text-left bg-surface-muted whitespace-nowrap">Due Date</th>
-                            <th className="px-5 py-2.5 text-right bg-surface-muted whitespace-nowrap">Amount</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border-subtle">
+                      <Table className="w-full min-w-[500px] text-left border-collapse">
+                        <TableHeader className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
+                          <TableRow className="border-b border-border-default hover:bg-transparent">
+                            <TableHead className="px-4 py-2.5 text-left bg-surface-muted">Vendor</TableHead>
+                            <TableHead className="px-4 py-2.5 text-left bg-surface-muted whitespace-nowrap">Due Date</TableHead>
+                            <TableHead className="px-5 py-2.5 text-right bg-surface-muted whitespace-nowrap">Amount</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody className="divide-y divide-border-subtle">
                           {needsApproval.map(item => {
                             const isSelected = selectedId === item.id;
                             return (
-                              <tr
+                              <TableRow
                                 key={item.id}
                                 onClick={() => setSelectedId(item.id)}
                                 className={`cursor-pointer transition-colors h-12 ${
                                   isSelected ? 'bg-accent-light/50' : 'bg-surface-raised hover:bg-surface-muted/60'
                                 }`}
                               >
-                                <td className="px-4 py-2.5">
+                                <TableCell className="px-4 py-2.5">
                                   <div className="flex items-center gap-3">
                                     {item.vendorId && getVendorAvatar(item.vendorId) ? (
                                       <img src={getVendorAvatar(item.vendorId)} alt="Avatar" className="w-7 h-7 rounded border border-border-default bg-surface-strong object-cover shrink-0" />
@@ -441,18 +462,18 @@ export default function AccountsPayable() {
                                       {item.invoiceNumber && <span className="text-[11px] text-muted truncate block">#{item.invoiceNumber}</span>}
                                     </div>
                                   </div>
-                                </td>
-                                <td className="px-4 py-2.5 text-sm text-body font-medium whitespace-nowrap">
+                                </TableCell>
+                                <TableCell className="px-4 py-2.5 text-sm text-body font-medium whitespace-nowrap">
                                   {new Date(item.dueDate || item.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' })}
-                                </td>
-                                <td className="px-5 py-2.5 text-right text-sm font-bold text-heading tabular-nums whitespace-nowrap" title={formatMoney(item.amount)}>
+                                </TableCell>
+                                <TableCell className="px-5 py-2.5 text-right text-sm font-bold text-heading tabular-nums whitespace-nowrap" title={formatMoney(item.amount)}>
                                   {formatCompactTableMoney(item.amount)}
-                                </td>
-                              </tr>
+                                </TableCell>
+                              </TableRow>
                             );
                           })}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     </div>
                   </div>
                 )}
@@ -467,26 +488,26 @@ export default function AccountsPayable() {
                       </div>
                     </div>
                     <div className={`${needsApproval.length > 0 ? 'max-h-[250px]' : 'max-h-[500px]'} overflow-y-auto overflow-x-auto`}>
-                      <table className="w-full min-w-[500px] text-left border-collapse">
-                        <thead className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
-                          <tr>
-                            <th className="px-4 py-2.5 text-left bg-surface-muted">Vendor</th>
-                            <th className="px-4 py-2.5 text-left bg-surface-muted whitespace-nowrap">Due Date</th>
-                            <th className="px-5 py-2.5 text-right bg-surface-muted whitespace-nowrap">Amount</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border-subtle">
+                      <Table className="w-full min-w-[500px] text-left border-collapse">
+                        <TableHeader className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
+                          <TableRow className="border-b border-border-default hover:bg-transparent">
+                            <TableHead className="px-4 py-2.5 text-left bg-surface-muted">Vendor</TableHead>
+                            <TableHead className="px-4 py-2.5 text-left bg-surface-muted whitespace-nowrap">Due Date</TableHead>
+                            <TableHead className="px-5 py-2.5 text-right bg-surface-muted whitespace-nowrap">Amount</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody className="divide-y divide-border-subtle">
                           {scheduled.map(item => {
                             const isSelected = selectedId === item.id;
                             return (
-                              <tr
+                              <TableRow
                                 key={item.id}
                                 onClick={() => setSelectedId(item.id)}
                                 className={`cursor-pointer transition-colors h-12 ${
                                   isSelected ? 'bg-accent-light/50' : 'bg-surface-raised hover:bg-surface-muted/60'
                                 }`}
                               >
-                                <td className="px-4 py-2.5">
+                                <TableCell className="px-4 py-2.5">
                                   <div className="flex items-center gap-3">
                                     {item.vendorId && getVendorAvatar(item.vendorId) ? (
                                       <img src={getVendorAvatar(item.vendorId)} alt="Avatar" className="w-7 h-7 rounded border border-border-default bg-surface-raised object-cover shrink-0" />
@@ -500,18 +521,18 @@ export default function AccountsPayable() {
                                       {item.invoiceNumber && <span className="text-[11px] text-muted truncate block">#{item.invoiceNumber}</span>}
                                     </div>
                                   </div>
-                                </td>
-                                <td className="px-4 py-2.5 text-sm text-body font-medium whitespace-nowrap">
+                                </TableCell>
+                                <TableCell className="px-4 py-2.5 text-sm text-body font-medium whitespace-nowrap">
                                   {new Date(item.dueDate || item.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' })}
-                                </td>
-                                <td className="px-5 py-2.5 text-right text-sm font-bold text-heading tabular-nums whitespace-nowrap" title={formatMoney(item.amount)}>
+                                </TableCell>
+                                <TableCell className="px-5 py-2.5 text-right text-sm font-bold text-heading tabular-nums whitespace-nowrap" title={formatMoney(item.amount)}>
                                   {formatCompactTableMoney(item.amount)}
-                                </td>
-                              </tr>
+                                </TableCell>
+                              </TableRow>
                             );
                           })}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     </div>
                   </div>
                 )}
@@ -527,51 +548,51 @@ export default function AccountsPayable() {
                 </div>
               </div>
               <div className="max-h-[500px] overflow-y-auto overflow-x-auto">
-                <table className="w-full min-w-[500px] text-left border-collapse">
-                  <thead className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
-                    <tr>
-                      <th className="px-4 py-2.5 text-left bg-surface-muted">Status</th>
-                      <th className="px-4 py-2.5 text-left bg-surface-muted">Vendor</th>
-                      <th className="px-4 py-2.5 text-left bg-surface-muted whitespace-nowrap">Due Date</th>
-                      <th className="px-5 py-2.5 text-right bg-surface-muted whitespace-nowrap">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-subtle">
+                <Table className="w-full min-w-[500px] text-left border-collapse">
+                  <TableHeader className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
+                    <TableRow className="border-b border-border-default hover:bg-transparent">
+                      <TableHead className="px-4 py-2.5 text-left bg-surface-muted">Status</TableHead>
+                      <TableHead className="px-4 py-2.5 text-left bg-surface-muted">Vendor</TableHead>
+                      <TableHead className="px-4 py-2.5 text-left bg-surface-muted whitespace-nowrap">Due Date</TableHead>
+                      <TableHead className="px-5 py-2.5 text-right bg-surface-muted whitespace-nowrap">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="divide-y divide-border-subtle">
                     {historyItems.length > 0 ? (
                       historyItems.map(item => (
-                        <tr
+                        <TableRow
                           key={item.id}
                           onClick={() => setSelectedId(item.id)}
                           className={`cursor-pointer transition-colors h-12 ${
                             selectedId === item.id ? 'bg-accent-light/50' : 'bg-surface-raised hover:bg-surface-muted/60'
                           }`}
                         >
-                          <td className="px-4 py-2.5 text-left">
+                          <TableCell className="px-4 py-2.5 text-left">
                             <span className="text-xs font-semibold text-muted">{item.status}</span>
-                          </td>
-                          <td className="px-4 py-2.5">
+                          </TableCell>
+                          <TableCell className="px-4 py-2.5">
                             <div className="min-w-0">
                               <span className="text-sm font-semibold text-heading truncate block">{item.vendor}</span>
                               <span className="text-[11px] text-muted truncate block">#{item.invoiceNumber || 'N/A'}</span>
                             </div>
-                          </td>
-                          <td className="px-4 py-2.5 text-sm text-body font-medium whitespace-nowrap">
+                          </TableCell>
+                          <TableCell className="px-4 py-2.5 text-sm text-body font-medium whitespace-nowrap">
                             {new Date(item.dueDate || item.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' })}
-                          </td>
-                          <td className="px-5 py-2.5 text-right text-sm font-bold text-heading tabular-nums whitespace-nowrap" title={formatMoney(item.amount)}>
+                          </TableCell>
+                          <TableCell className="px-5 py-2.5 text-right text-sm font-bold text-heading tabular-nums whitespace-nowrap" title={formatMoney(item.amount)}>
                             {formatCompactTableMoney(item.amount)}
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ))
                     ) : (
-                      <tr>
-                        <td colSpan={4} className="px-6 py-12 text-center text-muted text-sm">
+                      <TableRow>
+                        <TableCell colSpan={4} className="px-6 py-12 text-center text-muted text-sm">
                           No historical invoices found.
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     )}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             </div>
           )}
@@ -596,15 +617,18 @@ export default function AccountsPayable() {
                     <p className="text-xs text-muted mt-0.5 truncate">Invoice #{selectedRecord.invoiceNumber || 'N/A'}</p>
                   </div>
                 </div>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 ${
-                  selectedRecord.status === 'PAID'
-                    ? 'bg-success-light text-success-text'
-                    : selectedRecord.status === 'REJECTED'
-                    ? 'bg-danger-light text-danger'
-                    : 'bg-warning-light text-warning'
-                }`}>
+                <Badge
+                  variant="outline"
+                  className={`text-xs font-semibold whitespace-nowrap shrink-0 border-0 ${
+                    selectedRecord.status === 'PAID'
+                      ? 'bg-success-light text-success-text'
+                      : selectedRecord.status === 'REJECTED'
+                      ? 'bg-danger-light text-danger'
+                      : 'bg-warning-light text-warning'
+                  }`}
+                >
                   {selectedRecord.status}
-                </span>
+                </Badge>
               </div>
 
               {/* Total Amount Due */}
@@ -615,30 +639,35 @@ export default function AccountsPayable() {
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2 pt-1">
-                <button
+                <Button
                   type="button"
+                  size="sm"
                   disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'PENDING'}
                   onClick={() => statusMutation.mutate('APPROVED')}
-                  className="flex-1 whitespace-nowrap px-3 py-2 rounded-input text-xs font-semibold bg-primary text-white hover:bg-primary-hover transition-colors disabled:opacity-50 cursor-pointer text-center"
+                  className="flex-1 whitespace-nowrap text-xs font-semibold"
                 >
                   Approve
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => { setChangeRequestReason(''); requestChanges.reset(); setChangeRequestSaved(false); setChangeRequestOpen(true) }}
                   disabled={!selectedRecord || requestChanges.isPending || !['APPROVED', 'SCHEDULED'].includes(selectedRecord.status)}
-                  className="shrink-0 whitespace-nowrap px-3 py-2 rounded-input text-xs font-medium border border-border-default text-body hover:bg-surface-muted transition-colors disabled:opacity-50 cursor-pointer text-center"
+                  className="shrink-0 whitespace-nowrap text-xs font-medium"
                 >
                   Request Changes
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   disabled={!selectedRecord || statusMutation.isPending || !['PENDING', 'APPROVED'].includes(selectedRecord.status)}
                   onClick={() => statusMutation.mutate('REJECTED')}
-                  className="flex-1 whitespace-nowrap px-3 py-2 rounded-input text-xs font-medium border border-border-default text-danger hover:bg-danger-light transition-colors disabled:opacity-50 cursor-pointer text-center"
+                  className="flex-1 whitespace-nowrap text-xs font-medium text-danger border-border-default hover:bg-danger-light"
                 >
                   Reject
-                </button>
+                </Button>
               </div>
               {statusMutation.isError && <p role="alert" className="text-xs text-danger">{statusMutation.error?.message || 'Could not update the invoice status.'}</p>}
               {changeRequestSaved && <p role="status" className="text-xs text-success-text">Change request recorded in the invoice audit history.</p>}
@@ -669,31 +698,37 @@ export default function AccountsPayable() {
                     <span className="text-xs font-semibold truncate">invoice_{selectedRecord.invoiceNumber || 'document'}.pdf</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-muted shrink-0">
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="sm"
                       onClick={() => setInvoicePreviewOpen(true)}
                       title="Full preview"
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-input text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/15 transition-colors cursor-pointer"
+                      className="gap-1 h-7 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/15"
                     >
                       <Maximize2 size={13} />
                       <span>Full preview</span>
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon"
                       onClick={handleOpenInNewTab}
                       title="Open in new window"
-                      className="hover:text-heading transition-colors cursor-pointer p-1 text-muted hover:bg-surface-raised rounded"
+                      className="h-7 w-7 text-muted hover:text-heading"
                     >
                       <ExternalLink size={14} />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon"
                       onClick={handleDownloadPdf}
                       title="Download PDF"
-                      className="hover:text-heading transition-colors cursor-pointer p-1 text-muted hover:bg-surface-raised rounded"
+                      className="h-7 w-7 text-muted hover:text-heading"
                     >
                       <Download size={14} />
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -741,7 +776,42 @@ export default function AccountsPayable() {
         </div>
       </div>
       <FormDialog open={billOpen} onClose={() => { setBillOpen(false); setSelectedProject(null); createBill.reset() }} title="New bill" subtitle="Add a vendor invoice to accounts payable." busy={createBill.isPending} error={createBill.isError ? createBill.error?.message || 'Could not create the bill.' : undefined} onConfirm={() => createBill.mutate()} confirmLabel="Create bill">
-        <div className="space-y-4"><label className="block text-sm font-medium text-body">Vendor<select required value={billForm.vendorId} onChange={event => setBillForm(current => ({ ...current, vendorId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="">Select a vendor</option>{(vendorsData?.items ?? []).map(vendor => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}</select></label><label className="block text-sm font-medium text-body">Project<input type="search" aria-label="Search projects" value={projectSearchInput} onChange={event => setProjectSearchInput(event.target.value)} placeholder="Search projects..." className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /><select aria-label="Project" value={billForm.projectId} onChange={event => { const project = projectOptions.find(item => item.id === event.target.value) ?? null; setSelectedProject(project); setBillForm(current => ({ ...current, projectId: event.target.value })) }} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="">Unassigned</option>{projectOptions.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select>{projectsData?.pagination?.pages > 1 && <div className="mt-2 flex items-center justify-between text-xs text-muted"><span>{projectsData.pagination.total.toLocaleString()} projects · page {projectPage} of {projectsData.pagination.pages}</span><div className="flex gap-2"><button type="button" aria-label="Previous project page" disabled={projectPage <= 1} onClick={() => setProjectPage(current => Math.max(1, current - 1))} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button><button type="button" aria-label="Next project page" disabled={projectPage >= projectsData.pagination.pages} onClick={() => setProjectPage(current => Math.min(projectsData.pagination.pages, current + 1))} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button></div></div>}</label><label className="block text-sm font-medium text-body">Invoice number<input value={billForm.invoiceNumber} onChange={event => setBillForm(current => ({ ...current, invoiceNumber: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Invoice date<input type="date" required value={billForm.date} onChange={event => setBillForm(current => ({ ...current, date: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Due date<input type="date" required value={billForm.dueDate} onChange={event => setBillForm(current => ({ ...current, dueDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Amount<input required type="number" min="0" step="0.01" value={billForm.amount} onChange={event => setBillForm(current => ({ ...current, amount: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div>
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-body">Vendor
+            <select required value={billForm.vendorId} onChange={event => setBillForm(current => ({ ...current, vendorId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2 bg-surface-raised text-body text-xs focus:outline-none">
+              <option value="">Select a vendor</option>
+              {(vendorsData?.items ?? []).map(vendor => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}
+            </select>
+          </label>
+          <label className="block text-sm font-medium text-body">Project
+            <Input type="search" aria-label="Search projects" value={projectSearchInput} onChange={event => setProjectSearchInput(event.target.value)} placeholder="Search projects..." className="mt-1 text-xs" />
+            <select aria-label="Project" value={billForm.projectId} onChange={event => { const project = projectOptions.find(item => item.id === event.target.value) ?? null; setSelectedProject(project); setBillForm(current => ({ ...current, projectId: event.target.value })) }} className="mt-1 w-full rounded-input border border-border-default px-3 py-2 bg-surface-raised text-body text-xs focus:outline-none">
+              <option value="">Unassigned</option>
+              {projectOptions.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
+            </select>
+            {projectsData?.pagination?.pages > 1 && (
+              <div className="mt-2 flex items-center justify-between text-xs text-muted">
+                <span>{projectsData.pagination.total.toLocaleString()} projects · page {projectPage} of {projectsData.pagination.pages}</span>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" size="sm" aria-label="Previous project page" disabled={projectPage <= 1} onClick={() => setProjectPage(current => Math.max(1, current - 1))} className="h-7 px-2 text-xs">Previous</Button>
+                  <Button type="button" variant="outline" size="sm" aria-label="Next project page" disabled={projectPage >= projectsData.pagination.pages} onClick={() => setProjectPage(current => Math.min(projectsData.pagination.pages, current + 1))} className="h-7 px-2 text-xs">Next</Button>
+                </div>
+              </div>
+            )}
+          </label>
+          <label className="block text-sm font-medium text-body">Invoice number
+            <Input value={billForm.invoiceNumber} onChange={event => setBillForm(current => ({ ...current, invoiceNumber: event.target.value }))} className="mt-1 text-xs" />
+          </label>
+          <label className="block text-sm font-medium text-body">Invoice date
+            <Input type="date" required value={billForm.date} onChange={event => setBillForm(current => ({ ...current, date: event.target.value }))} className="mt-1 text-xs" />
+          </label>
+          <label className="block text-sm font-medium text-body">Due date
+            <Input type="date" required value={billForm.dueDate} onChange={event => setBillForm(current => ({ ...current, dueDate: event.target.value }))} className="mt-1 text-xs" />
+          </label>
+          <label className="block text-sm font-medium text-body">Amount
+            <Input required type="number" min="0" step="0.01" value={billForm.amount} onChange={event => setBillForm(current => ({ ...current, amount: event.target.value }))} className="mt-1 text-xs" />
+          </label>
+        </div>
       </FormDialog>
       <FormDialog
         open={changeRequestOpen}
@@ -757,7 +827,7 @@ export default function AccountsPayable() {
         confirmLabel="Record request"
       >
         <label className="block text-sm font-medium text-body">Reason
-          <textarea required maxLength={2000} rows={4} value={changeRequestReason} onChange={event => setChangeRequestReason(event.target.value)} className="mt-1 w-full resize-y rounded-input border border-border-default px-3 py-2" placeholder="Describe the correction needed" />
+          <Textarea required maxLength={2000} rows={4} value={changeRequestReason} onChange={event => setChangeRequestReason(event.target.value)} className="mt-1 resize-y" placeholder="Describe the correction needed" />
         </label>
       </FormDialog>
       <ConfirmDialog
@@ -785,15 +855,18 @@ export default function AccountsPayable() {
                     <h2 className="text-sm font-bold text-heading truncate">
                       Invoice #{selectedRecord.invoiceNumber || selectedRecord.id}
                     </h2>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap ${
-                      selectedRecord.status === 'PAID'
-                        ? 'bg-success-light text-success-text'
-                        : selectedRecord.status === 'REJECTED'
-                        ? 'bg-danger-light text-danger'
-                        : 'bg-warning-light text-warning'
-                    }`}>
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] font-semibold whitespace-nowrap border-0 ${
+                        selectedRecord.status === 'PAID'
+                          ? 'bg-success-light text-success-text'
+                          : selectedRecord.status === 'REJECTED'
+                          ? 'bg-danger-light text-danger'
+                          : 'bg-warning-light text-warning'
+                      }`}
+                    >
                       {selectedRecord.status}
-                    </span>
+                    </Badge>
                   </div>
                   <p className="text-xs text-muted truncate mt-0.5">
                     {selectedRecord.vendor} · Total: {formatMoney(selectedRecord.amount)} · Due {new Date(selectedRecord.dueDate || selectedRecord.date).toLocaleDateString()}
@@ -803,34 +876,40 @@ export default function AccountsPayable() {
 
               {/* Controls */}
               <div className="flex items-center gap-2 shrink-0">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={handleOpenInNewTab}
                   title="Open in new window"
-                  className="flex items-center gap-1.5 px-3 py-1.5 border border-border-default rounded-input text-xs font-medium text-body bg-surface-raised hover:bg-surface-muted transition-colors cursor-pointer"
+                  className="gap-1.5 h-8 text-xs font-medium"
                 >
                   <ExternalLink size={13} />
                   <span className="hidden sm:inline">Open in new tab</span>
-                </button>
+                </Button>
 
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={handleDownloadPdf}
                   title="Download PDF"
-                  className="flex items-center gap-1.5 px-3 py-1.5 border border-border-default rounded-input text-xs font-medium text-body bg-surface-raised hover:bg-surface-muted transition-colors cursor-pointer"
+                  className="gap-1.5 h-8 text-xs font-medium"
                 >
                   <Download size={13} />
                   <span className="hidden sm:inline">Download</span>
-                </button>
+                </Button>
 
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setInvoicePreviewOpen(false)}
                   title="Close preview"
-                  className="p-1.5 text-muted hover:text-body rounded-input hover:bg-surface-muted transition-colors cursor-pointer"
+                  className="h-8 w-8 text-muted hover:text-body"
                 >
                   <X size={18} />
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -862,21 +941,22 @@ export default function AccountsPayable() {
           <div className="w-full max-w-md rounded-panel bg-surface-raised p-6 shadow-modal border border-border-default">
             <div className="flex items-center justify-between pb-3 border-b border-border-default">
               <h2 className="text-base font-semibold text-heading">Manage Vendors</h2>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => { setVendorModalOpen(false); setEditingVendorId(null); setVendorError(''); }}
-                className="text-muted hover:text-body transition-colors"
+                className="h-8 w-8 text-muted hover:text-body"
                 title="Close"
               >
                 <X size={18} />
-              </button>
+              </Button>
             </div>
 
             {vendorError && (
-              <div className="mt-3 flex items-center gap-2 rounded-input bg-danger-light p-2.5 text-xs text-danger">
-                <AlertTriangle size={14} />
-                <span>{vendorError}</span>
-              </div>
+              <Alert variant="destructive" className="mt-3 py-2.5 px-3">
+                <AlertDescription className="text-xs">{vendorError}</AlertDescription>
+              </Alert>
             )}
 
             <form
@@ -887,20 +967,21 @@ export default function AccountsPayable() {
               }}
               className="mt-4 flex gap-2"
             >
-              <input
+              <Input
                 type="text"
                 placeholder="New vendor name..."
                 value={newVendorName}
                 onChange={(e) => setNewVendorName(e.target.value)}
-                className="flex-1 rounded-input border border-border-default px-3 py-2 text-sm bg-surface-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                className="flex-1 text-sm bg-surface-muted/50"
               />
-              <button
+              <Button
                 type="submit"
+                size="sm"
                 disabled={!newVendorName.trim() || createVendorMutation.isPending}
-                className="flex items-center gap-1.5 bg-primary text-white px-4 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors disabled:opacity-50"
+                className="gap-1.5"
               >
                 <Plus size={16} /> Add
-              </button>
+              </Button>
             </form>
 
             <div className="mt-4 max-h-64 overflow-y-auto divide-y divide-border-default border border-border-default rounded-input">
@@ -918,57 +999,65 @@ export default function AccountsPayable() {
                         }}
                         className="flex flex-1 items-center gap-2"
                       >
-                        <input
+                        <Input
                           type="text"
                           value={editingVendorName}
                           onChange={(e) => setEditingVendorName(e.target.value)}
-                          className="flex-1 rounded-input border border-border-default px-2.5 py-1 text-sm bg-surface-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                          className="flex-1 text-sm bg-surface-muted/50 h-8"
                           autoFocus
                         />
-                        <button
+                        <Button
                           type="submit"
+                          size="icon"
+                          variant="ghost"
                           disabled={!editingVendorName.trim() || updateVendorMutation.isPending}
-                          className="p-1.5 text-success-text hover:bg-success-light rounded-input transition-colors disabled:opacity-50"
+                          className="h-7 w-7 text-success-text hover:bg-success-light"
                           title="Save"
                         >
                           <Check size={16} />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          size="icon"
+                          variant="ghost"
                           onClick={() => setEditingVendorId(null)}
-                          className="p-1.5 text-muted hover:bg-surface-muted rounded-input transition-colors"
+                          className="h-7 w-7 text-muted hover:bg-surface-muted"
                           title="Cancel"
                         >
                           <X size={16} />
-                        </button>
+                        </Button>
                       </form>
                     ) : (
                       <>
                         <span className="text-sm font-medium text-body">{vendor.name}</span>
                         <div className="flex items-center gap-1">
-                          <button
+                          <Button
                             type="button"
+                            size="icon"
+                            variant="ghost"
                             onClick={() => {
                               setEditingVendorId(vendor.id);
                               setEditingVendorName(vendor.name);
                               setVendorError('');
                             }}
-                            className="p-1.5 text-muted hover:text-body hover:bg-surface-muted rounded-input transition-colors"
+                            className="h-7 w-7 text-muted hover:text-body"
                             title="Rename"
                           >
                             <Pencil size={14} />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
+                            size="icon"
+                            variant="ghost"
                             onClick={() => {
                               setVendorError('');
                               setDeletingVendor(vendor);
                             }}
-                            className="p-1.5 text-muted hover:text-danger hover:bg-danger-light rounded-input transition-colors"
+                            className="h-7 w-7 text-muted hover:text-danger hover:bg-danger-light"
                             title="Delete"
                           >
                             <Trash2 size={14} />
-                          </button>
+                          </Button>
                         </div>
                       </>
                     )}
@@ -978,13 +1067,14 @@ export default function AccountsPayable() {
             </div>
 
             <div className="mt-6 flex justify-end">
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => { setVendorModalOpen(false); setEditingVendorId(null); setVendorError(''); }}
-                className="px-4 py-2 border border-border-default rounded-input text-sm font-medium text-body hover:bg-surface-muted transition-colors"
               >
                 Close
-              </button>
+              </Button>
             </div>
           </div>
         </div>

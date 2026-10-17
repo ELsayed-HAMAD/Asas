@@ -27,6 +27,9 @@ import GroupedList from '../../../components/common/GroupedList';
 import SidePanelSection from '../../../components/common/SidePanelSection';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Badge } from '../../../components/ui/badge';
 
 export default function ActiveSprints() {
   const queryClient = useQueryClient();
@@ -216,9 +219,9 @@ export default function ActiveSprints() {
         <div className="flex items-center gap-3 shrink-0">
           <div className="w-14 min-w-[56px] flex items-center justify-center">
             {issue.tag ? (
-              <span className="inline-flex items-center justify-center min-w-[44px] bg-surface-active/60 text-body px-2 py-0.5 rounded-full text-[11px] font-medium capitalize tracking-normal text-center">
+              <Badge variant="outline" className="min-w-[44px] bg-surface-active/60 text-body px-2 py-0.5 rounded-full text-[11px] font-medium capitalize tracking-normal justify-center border-transparent">
                 {issue.tag}
-              </span>
+              </Badge>
             ) : null}
           </div>
 
@@ -292,9 +295,9 @@ export default function ActiveSprints() {
                   <span>{activeSprint.name}</span>
                 )}
                 {activeSprint.status === 'ACTIVE' && (
-                  <span className="bg-success-light text-success-text text-[11px] font-medium px-2 py-0.5 rounded-full inline-flex items-center">
+                  <Badge variant="outline" className="bg-success-light text-success-text text-[11px] font-medium px-2 py-0.5 rounded-full border-success-border">
                     ACTIVE
-                  </span>
+                  </Badge>
                 )}
               </div>
             }
@@ -327,14 +330,14 @@ export default function ActiveSprints() {
               </>
             }
             actions={
-              <button
+              <Button
                 type="button"
                 onClick={() => setCompleteConfirmOpen(true)}
                 disabled={!activeSprint || activeSprint.status !== 'ACTIVE' || completeSprint.isPending}
-                className="h-10 px-4 rounded-[10px] bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 shrink-0 cursor-pointer shadow-sm flex items-center justify-center whitespace-nowrap"
+                className="h-10 px-4 rounded-[10px] font-semibold shadow-sm whitespace-nowrap"
               >
                 {completeSprint.isPending ? 'Completing...' : 'Complete Sprint'}
-              </button>
+              </Button>
             }
             className="bg-surface mb-4"
           />
@@ -403,36 +406,38 @@ export default function ActiveSprints() {
                   <>
                     <div className="relative flex-1 min-w-[160px] max-w-[260px]">
                       <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-                      <input
+                      <Input
                         type="text"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Search issues..."
                         aria-label="Search issues"
                         title="Search issues"
-                        className="pl-9 pr-4 h-10 text-sm border-0 rounded-[10px] bg-surface-raised text-heading placeholder:text-caption focus:outline-none focus:ring-2 focus:ring-accent shadow-[0_1px_2px_rgba(16,24,40,0.04)] w-full"
+                        className="pl-9 pr-4 h-10 text-sm border-0 rounded-[10px] bg-surface-raised text-heading placeholder:text-caption shadow-[0_1px_2px_rgba(16,24,40,0.04)] w-full"
                       />
                     </div>
 
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
                       onClick={() => setGroupBy(prev => prev === 'status' ? 'priority' : 'status')}
-                      className="flex items-center gap-1.5 border-0 bg-surface-raised text-body px-3.5 h-10 rounded-[10px] text-xs font-medium hover:bg-surface-muted transition-colors cursor-pointer shrink-0 shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+                      className="flex items-center gap-1.5 border-0 bg-surface-raised text-body px-3.5 h-10 rounded-[10px] text-xs font-medium hover:bg-surface-muted transition-colors shrink-0 shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
                       aria-label={`Group by ${groupBy === 'status' ? 'Status' : 'Priority'}`}
                     >
                       Group: {groupBy === 'status' ? 'Status' : 'Priority'} <ChevronDown size={13} className="text-caption" />
-                    </button>
+                    </Button>
                   </>
                 }
                 right={
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
                     onClick={() => setIssueOpen(true)}
                     disabled={!activeSprint || activeSprint.status !== 'ACTIVE'}
-                    className="h-10 px-4 rounded-[10px] border-0 bg-surface-raised text-body text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60 shrink-0 cursor-pointer shadow-[0_1px_2px_rgba(16,24,40,0.04)] flex items-center justify-center whitespace-nowrap"
+                    className="h-10 px-4 rounded-[10px] border-0 bg-surface-raised text-body text-sm font-medium hover:bg-surface-muted transition-colors shrink-0 shadow-[0_1px_2px_rgba(16,24,40,0.04)] whitespace-nowrap"
                   >
                     New Issue
-                  </button>
+                  </Button>
                 }
               />
 
@@ -533,7 +538,7 @@ export default function ActiveSprints() {
                         </span>
                         <div className="flex items-center gap-1.5 text-caption">
                           <button disabled className="p-1 hover:text-body transition-colors disabled:opacity-60 cursor-not-allowed" aria-label="More options"><MoreHorizontal size={17} /></button>
-                          <button onClick={() => setSelectedId(null)} className="p-1 hover:text-body transition-colors cursor-pointer" aria-label="Close detail panel"><X size={17} /></button>
+                          <Button variant="ghost" size="icon" onClick={() => setSelectedId(null)} className="h-7 w-7 text-caption hover:text-body" aria-label="Close detail panel"><X size={17} /></Button>
                         </div>
                       </div>
 
@@ -581,9 +586,9 @@ export default function ActiveSprints() {
                           );
                         })()}
                         {selectedIssue.priority === 'HIGH' || selectedIssue.priority === 'URGENT' ? (
-                          <span className="inline-flex items-center gap-1 bg-danger-light text-danger-text px-2.5 py-1 rounded-full text-xs font-medium">
+                          <Badge variant="outline" className="gap-1 bg-danger-light text-danger-text px-2.5 py-1 rounded-full text-xs font-medium border-danger-border">
                             <ChevronsUp size={14} strokeWidth={2.5} /> High Priority
-                          </span>
+                          </Badge>
                         ) : null}
                       </div>
                     </div>
@@ -632,20 +637,20 @@ export default function ActiveSprints() {
                           }}
                           className="pt-2 flex items-center gap-2"
                         >
-                          <input
+                          <Input
                             type="text"
                             value={newChecklistText}
                             onChange={(e) => setNewChecklistText(e.target.value)}
                             placeholder="Add item..."
-                            className="flex-1 bg-surface-muted/50 border-0 rounded-[10px] px-3.5 h-10 text-xs text-body focus:outline-none focus:ring-2 focus:ring-accent"
+                            className="flex-1 bg-surface-muted/50 border-0 rounded-[10px] px-3.5 h-10 text-xs text-body"
                           />
-                          <button
+                          <Button
                             type="submit"
                             disabled={!newChecklistText.trim() || createChecklistMutation.isPending}
-                            className="px-4 h-10 bg-accent text-white rounded-[10px] text-xs font-medium hover:bg-accent-hover disabled:opacity-50 cursor-pointer shrink-0 transition-colors"
+                            className="px-4 h-10 bg-accent text-white rounded-[10px] text-xs font-medium hover:bg-accent-hover shrink-0"
                           >
                             Add
-                          </button>
+                          </Button>
                         </form>
                       </div>
                     </SidePanelSection>
@@ -686,7 +691,7 @@ export default function ActiveSprints() {
                     className="p-4 bg-surface-raised border-t border-border-subtle/50 shrink-0"
                   >
                     <div className="relative">
-                      <input
+                      <Input
                         type="text"
                         value={commentText}
                         onChange={(e) => setCommentText(e.target.value)}
@@ -699,7 +704,7 @@ export default function ActiveSprints() {
                           }
                         }}
                         placeholder="Write a comment..."
-                        className="w-full bg-surface-muted/50 border-0 rounded-[10px] pl-3.5 pr-10 h-10 text-xs text-body focus:outline-none focus:ring-2 focus:ring-accent placeholder:text-caption"
+                        className="w-full bg-surface-muted/50 border-0 rounded-[10px] pl-3.5 pr-10 h-10 text-xs text-body placeholder:text-caption"
                       />
                       <button
                         type="submit"
@@ -728,8 +733,14 @@ export default function ActiveSprints() {
       )}
       <FormDialog open={issueOpen} onClose={() => setIssueOpen(false)} title="New issue" subtitle={activeSprint?.name} busy={createIssue.isPending} onConfirm={() => createIssue.mutate()} confirmLabel="Create issue">
         <div className="space-y-4">
-          <label className="block text-sm font-medium text-body">Issue title<input required value={issueTitle} onChange={event => setIssueTitle(event.target.value)} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
-          <label className="block text-sm font-medium text-body">Story points<input type="number" min="0" max="1000" step="1" value={issueStoryPoints} onChange={event => setIssueStoryPoints(event.target.value)} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
+          <label className="block text-sm font-medium text-body">
+            Issue title
+            <Input required value={issueTitle} onChange={event => setIssueTitle(event.target.value)} className="mt-1 w-full" />
+          </label>
+          <label className="block text-sm font-medium text-body">
+            Story points
+            <Input type="number" min="0" max="1000" step="1" value={issueStoryPoints} onChange={event => setIssueStoryPoints(event.target.value)} className="mt-1 w-full" />
+          </label>
         </div>
       </FormDialog>
       <ConfirmDialog

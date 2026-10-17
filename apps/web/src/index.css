@@ -127,6 +127,49 @@
   --height-table-row: 3.25rem;        /* 52px */
   --height-control: 2.25rem;          /* 36px */
   --width-detail-panel: clamp(340px, 26vw, 400px);
+
+  /* ── SHADCN / RADIX COMPONENT TOKENS ────────────────────────── */
+  --color-background: var(--color-surface);
+  --color-foreground: var(--color-heading);
+  --color-card: var(--color-surface-raised);
+  --color-card-foreground: var(--color-heading);
+  --color-popover: var(--color-surface-raised);
+  --color-popover-foreground: var(--color-heading);
+  --color-primary-foreground: var(--color-on-primary);
+  --color-secondary: var(--color-surface-muted);
+  --color-secondary-foreground: var(--color-body);
+  --color-muted-foreground: var(--color-muted);
+  --color-accent-foreground: var(--color-accent);
+  --color-destructive: var(--color-danger);
+  --color-destructive-foreground: var(--color-on-primary);
+  --color-border: var(--color-border-default);
+  --color-input: var(--color-border-default);
+  --color-ring: var(--color-accent);
+
+  --radius-lg: var(--radius-card);
+  --radius-md: var(--radius-button);
+  --radius-sm: var(--radius-input);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+}
+
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
 }
 
 /* ── GLOBAL BODY STYLES ───────────────────────────────────────── */

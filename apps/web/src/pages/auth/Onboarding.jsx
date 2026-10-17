@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { Navigate, Link } from 'react-router-dom'
-import { Database, FileUp, Loader2, Sparkles, SquarePen, Mail } from 'lucide-react'
+import { Navigate } from 'react-router-dom'
+import { Database, FileUp, Loader2, Sparkles, SquarePen } from 'lucide-react'
 import { http } from '../../lib/api/http'
-
 import { useActiveOrganization, useSession, authClient } from '../../lib/authClient'
+import { Button } from '../../components/ui/button'
+import { Textarea } from '../../components/ui/textarea'
+import { Alert, AlertDescription } from '../../components/ui/alert'
 
 // The three start paths — the legacy UX, kept verbatim. The API endpoints are the
 // preserved 3-path onboarding flow under `/api/v1/onboarding` (see the API's
@@ -122,9 +124,9 @@ export default function Onboarding() {
         </div>
 
         {error && (
-          <div className="mb-4 px-3.5 py-2.5 bg-danger-light border border-danger-border rounded-button text-sm text-danger">
-            {error}
-          </div>
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
 
         <div className="space-y-3 mb-6">
@@ -136,7 +138,7 @@ export default function Onboarding() {
                 key={choice.id}
                 type="button"
                 onClick={() => setSelected(choice.id)}
-                className={`w-full text-left flex gap-4 p-4 rounded-button border transition-colors ${
+                className={`w-full text-left flex gap-4 p-4 rounded-button border transition-colors cursor-pointer ${
                   active
                     ? 'border-accent bg-surface-active'
                     : 'border-border-default hover:bg-surface-muted'
@@ -159,12 +161,12 @@ export default function Onboarding() {
             <label className="block text-sm font-medium text-body mb-1.5" htmlFor="import-json">
               Employees JSON
             </label>
-            <textarea
+            <Textarea
               id="import-json"
               value={importJson}
               onChange={event => setImportJson(event.target.value)}
               rows={10}
-              className="w-full px-3 py-2.5 text-xs font-mono border border-border-default rounded-button focus:outline-none focus:ring-4 focus:ring-surface-active bg-surface-muted"
+              className="font-mono text-xs"
             />
           </div>
         )}
@@ -180,11 +182,11 @@ export default function Onboarding() {
           </div>
         )}
 
-        <button
+        <Button
           type="button"
           disabled={isLoading}
           onClick={finish}
-          className="w-full bg-primary text-on-primary text-sm font-medium py-2.5 rounded-button hover:bg-primary-hover disabled:opacity-70 flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full h-10 text-sm font-medium flex items-center justify-center gap-2 cursor-pointer"
         >
           {isLoading ? (
             <>
@@ -194,7 +196,7 @@ export default function Onboarding() {
           ) : (
             'Continue to dashboard'
           )}
-        </button>
+        </Button>
       </div>
     </div>
   )

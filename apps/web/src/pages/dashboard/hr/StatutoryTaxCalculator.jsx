@@ -6,6 +6,9 @@ import {
   Money,
 } from '@asas/domain'
 import { Calculator, X } from 'lucide-react'
+import { Button } from '../../../components/ui/button'
+import { Input } from '../../../components/ui/input'
+import { Alert, AlertDescription } from '../../../components/ui/alert'
 import { formatMoney } from '../../../lib/format'
 
 export default function StatutoryTaxCalculator({ isOpen, onClose }) {
@@ -71,58 +74,60 @@ export default function StatutoryTaxCalculator({ isOpen, onClose }) {
               Statutory Tax & Deduction Calculator
             </h2>
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded p-1 text-muted hover:bg-surface-muted hover:text-heading cursor-pointer"
+            className="h-7 w-7 text-muted hover:text-heading"
           >
             <X size={18} />
-          </button>
+          </Button>
         </div>
 
         {/* Region selector */}
         <div className="mt-4 flex gap-2 border-b border-border-subtle pb-4">
-          <button
+          <Button
+            variant={region === 'US' ? 'default' : 'secondary'}
+            size="sm"
             type="button"
             onClick={() => setRegion('US')}
-            className={`flex-1 rounded-input py-2 text-xs font-semibold cursor-pointer transition-colors ${
-              region === 'US' ? 'bg-primary text-on-primary' : 'bg-surface-muted text-body hover:bg-surface-strong'
-            }`}
+            className="flex-1 text-xs"
           >
             🇺🇸 United States (W-4 / FICA)
-          </button>
-          <button
+          </Button>
+          <Button
+            variant={region === 'UK' ? 'default' : 'secondary'}
+            size="sm"
             type="button"
             onClick={() => setRegion('UK')}
-            className={`flex-1 rounded-input py-2 text-xs font-semibold cursor-pointer transition-colors ${
-              region === 'UK' ? 'bg-primary text-on-primary' : 'bg-surface-muted text-body hover:bg-surface-strong'
-            }`}
+            className="flex-1 text-xs"
           >
             🇬🇧 United Kingdom (PAYE / NIC)
-          </button>
-          <button
+          </Button>
+          <Button
+            variant={region === 'SA' ? 'default' : 'secondary'}
+            size="sm"
             type="button"
             onClick={() => setRegion('SA')}
-            className={`flex-1 rounded-input py-2 text-xs font-semibold cursor-pointer transition-colors ${
-              region === 'SA' ? 'bg-primary text-on-primary' : 'bg-surface-muted text-body hover:bg-surface-strong'
-            }`}
+            className="flex-1 text-xs"
           >
             🇸🇦 Saudi Arabia (GOSI)
-          </button>
+          </Button>
         </div>
 
         {/* Inputs */}
         <div className="mt-4 grid grid-cols-2 gap-4 text-xs">
           <div>
             <label htmlFor="statutory-amount" className="block font-medium text-body mb-1">Gross Salary ({currency})</label>
-            <input
+            <Input
               id="statutory-amount"
               type="text"
               value={amount}
               onChange={e => setAmount(e.target.value)}
-              className="w-full rounded-input border border-border-default bg-surface-muted px-3 py-2 text-sm text-heading outline-none focus:ring-1 focus:ring-accent"
               placeholder="5000.00"
+              className="bg-surface-muted"
             />
           </div>
 
@@ -160,13 +165,13 @@ export default function StatutoryTaxCalculator({ isOpen, onClose }) {
               </div>
               <div>
                 <label htmlFor="statutory-prior-ytd" className="block font-medium text-body mb-1">Prior YTD Gross (USD)</label>
-                <input
+                <Input
                   id="statutory-prior-ytd"
                   type="text"
                   value={priorYtd}
                   onChange={e => setPriorYtd(e.target.value)}
                   placeholder="Optional (e.g. 150000.00)"
-                  className="w-full rounded-input border border-border-default bg-surface-muted px-3 py-2 text-sm text-heading outline-none focus:ring-1 focus:ring-accent"
+                  className="bg-surface-muted"
                 />
               </div>
             </>
@@ -175,13 +180,13 @@ export default function StatutoryTaxCalculator({ isOpen, onClose }) {
           {region === 'UK' && (
             <div>
               <label htmlFor="statutory-tax-code" className="block font-medium text-body mb-1">HMRC Tax Code</label>
-              <input
+              <Input
                 id="statutory-tax-code"
                 type="text"
                 value={taxCode}
                 onChange={e => setTaxCode(e.target.value)}
                 placeholder="1257L"
-                className="w-full rounded-input border border-border-default bg-surface-muted px-3 py-2 text-sm text-heading outline-none focus:ring-1 focus:ring-accent"
+                className="bg-surface-muted"
               />
             </div>
           )}
@@ -204,9 +209,9 @@ export default function StatutoryTaxCalculator({ isOpen, onClose }) {
 
         {/* Results */}
         {calculationError ? (
-          <p role="alert" className="mt-4 rounded-input border border-danger-border bg-danger-light p-3 text-xs text-danger">
-            {calculationError}
-          </p>
+          <Alert variant="destructive" className="mt-4">
+            <AlertDescription className="text-xs">{calculationError}</AlertDescription>
+          </Alert>
         ) : result ? (
           <div className="mt-4 space-y-3 rounded-card-sm border border-border-default bg-surface-muted/40 p-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted">Statutory Deductions Breakdown</h3>
@@ -263,13 +268,14 @@ export default function StatutoryTaxCalculator({ isOpen, onClose }) {
         ) : null}
 
         <div className="mt-5 flex justify-end">
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
             onClick={onClose}
-            className="rounded-input border border-border-default bg-surface-raised px-4 py-2 text-xs font-semibold text-heading hover:bg-surface-muted cursor-pointer"
           >
             Done
-          </button>
+          </Button>
         </div>
       </div>
     </div>

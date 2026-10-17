@@ -23,6 +23,18 @@ import { formatCompactMoney } from '../../../lib/crmMoney';
 import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Textarea } from '../../../components/ui/textarea';
+import { Badge } from '../../../components/ui/badge';
+import { Progress } from '../../../components/ui/progress';
+import { Alert, AlertDescription } from '../../../components/ui/alert';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '../../../components/ui/dropdown-menu';
 
 const STAGE_ORDER = ['LEADS', 'PROPOSAL', 'NEGOTIATION', 'CLOSED_WON', 'CLOSED_LOST'];
 
@@ -165,9 +177,9 @@ function ListDealRow({ deal, selected, onSelect, disabled }) {
         </div>
       </div>
       <div className="flex items-center min-w-0">
-        <span className={`h-[22px] min-h-[22px] px-2.5 inline-flex items-center justify-center text-xs font-bold rounded-full border whitespace-nowrap ${getStageBadgeColors(deal.stage)}`}>
+        <Badge variant="outline" className={`h-[22px] min-h-[22px] px-2.5 text-xs font-bold rounded-full whitespace-nowrap ${getStageBadgeColors(deal.stage)}`}>
           {STAGE_LABELS[deal.stage] || deal.stage}
-        </span>
+        </Badge>
       </div>
       <div className="text-end">
         <span className="text-sm font-extrabold text-heading tabular-nums whitespace-nowrap">
@@ -195,8 +207,6 @@ function DetailPanel({
   showCloseButton = false,
   onClose,
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-
   if (!deal) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted">
@@ -228,38 +238,41 @@ function DetailPanel({
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => setMenuOpen(prev => !prev)}
-                className="text-caption hover:text-body transition-colors p-1.5 rounded hover:bg-surface-muted cursor-pointer"
-                title="Deal options"
-              >
-                <MoreHorizontal size={18} />
-              </button>
-              {menuOpen && (
-                <div className="absolute inset-inline-end-0 mt-1 w-36 rounded-input bg-surface-raised border border-border-default shadow-modal py-1 z-30">
-                  <button
-                    type="button"
-                    onClick={() => { setMenuOpen(false); onDelete(); }}
-                    disabled={!canWrite}
-                    className="w-full text-start px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger-light flex items-center gap-2 disabled:opacity-50 cursor-pointer"
-                  >
-                    <Trash2 size={14} /> Delete Deal
-                  </button>
-                </div>
-              )}
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-caption hover:text-body"
+                  title="Deal options"
+                >
+                  <MoreHorizontal size={18} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  disabled={!canWrite}
+                  onClick={onDelete}
+                  className="text-danger focus:text-danger focus:bg-danger-light"
+                >
+                  <Trash2 className="mr-2 h-3.5 w-3.5" />
+                  Delete Deal
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {showCloseButton && onClose && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={onClose}
                 aria-label="Close"
-                className="text-caption hover:text-body transition-colors p-1.5 rounded hover:bg-surface-muted cursor-pointer"
+                className="h-8 w-8 text-caption hover:text-body"
               >
                 <X size={18} />
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -274,33 +287,39 @@ function DetailPanel({
 
       {/* Actions: Log Email / Log Call / Edit in a 3-column grid, 8px gap, 36px high, equal width, nowrap, existing icons */}
       <div className="grid grid-cols-3 gap-2">
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => onOpenActivity('EMAIL')}
           disabled={!canWrite}
           title={!canWrite ? 'Requires the ADMIN role' : 'Record an email activity'}
-          className="flex items-center justify-center gap-1.5 border border-border-default text-body min-h-[36px] h-9 px-2 rounded-input text-sm font-semibold hover:bg-surface-muted transition-colors disabled:opacity-60 whitespace-nowrap cursor-pointer"
+          className="h-9 px-2 text-sm font-semibold whitespace-nowrap"
         >
-          <Mail size={16} className="text-muted shrink-0" /> Log Email
-        </button>
-        <button
+          <Mail size={16} className="text-muted mr-1.5 shrink-0" /> Log Email
+        </Button>
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => onOpenActivity('CALL')}
           disabled={!canWrite}
           title={!canWrite ? 'Requires the ADMIN role' : 'Record a call activity'}
-          className="flex items-center justify-center gap-1.5 border border-border-default text-body min-h-[36px] h-9 px-2 rounded-input text-sm font-semibold hover:bg-surface-muted transition-colors disabled:opacity-60 whitespace-nowrap cursor-pointer"
+          className="h-9 px-2 text-sm font-semibold whitespace-nowrap"
         >
-          <Phone size={16} className="text-muted shrink-0" /> Log Call
-        </button>
-        <button
+          <Phone size={16} className="text-muted mr-1.5 shrink-0" /> Log Call
+        </Button>
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={onEdit}
           disabled={!canWrite}
           title={!canWrite ? 'Requires the ADMIN role' : 'Edit deal'}
-          className="flex items-center justify-center gap-1.5 border border-border-default text-body min-h-[36px] h-9 px-2 rounded-input text-sm font-semibold hover:bg-surface-muted transition-colors disabled:opacity-60 whitespace-nowrap cursor-pointer"
+          className="h-9 px-2 text-sm font-semibold whitespace-nowrap"
         >
-          <Pencil size={16} className="text-muted shrink-0" /> Edit
-        </button>
+          <Pencil size={16} className="text-muted mr-1.5 shrink-0" /> Edit
+        </Button>
       </div>
 
       {/* Stage row: label "STAGE" (11px uppercase muted) left, select (36px) right, 12px gap */}
@@ -341,12 +360,11 @@ function DetailPanel({
               {deal.closeDate ? `Closing ${formatDate(deal.closeDate, { month: 'short', day: 'numeric' })}` : 'No close date'}
             </span>
           </div>
-          <div className="w-full bg-surface-strong rounded-full h-[6px] overflow-hidden mt-2">
-            <div
-              className="bg-accent h-full rounded-full transition-all"
-              style={{ width: `${Math.min(100, Math.max(0, deal.winProbability))}%` }}
-            />
-          </div>
+          <Progress
+            value={Math.min(100, Math.max(0, deal.winProbability))}
+            className="h-1.5 mt-2 bg-surface-strong"
+            indicatorClassName="bg-accent"
+          />
         </div>
       )}
 
@@ -386,23 +404,27 @@ function DetailPanel({
             ))}
             {(activityData.pagination?.pages ?? 0) > 1 && (
               <div className="flex items-center justify-between pt-2 text-xs text-muted">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   disabled={activityPage <= 1}
                   onClick={() => onActivityPageChange(page => page - 1)}
-                  className="rounded border border-border-default px-2 py-0.5 min-h-[26px] disabled:opacity-40 hover:bg-surface-muted transition-colors cursor-pointer"
+                  className="h-6 px-2 text-xs"
                 >
                   Newer
-                </button>
+                </Button>
                 <span>Page {activityPage} of {activityData.pagination.pages}</span>
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   disabled={activityPage >= activityData.pagination.pages}
                   onClick={() => onActivityPageChange(page => page + 1)}
-                  className="rounded border border-border-default px-2 py-0.5 min-h-[26px] disabled:opacity-40 hover:bg-surface-muted transition-colors cursor-pointer"
+                  className="h-6 px-2 text-xs"
                 >
                   Older
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -717,25 +739,25 @@ export default function DealsPipeline() {
           {/* Table Search (~240px, 36px high, matching search style) */}
           <div className="relative">
             <Search size={14} className="absolute inset-inline-start-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-            <input
+            <Input
               type="text"
               value={search}
               onChange={event => { setSearch(event.target.value); setPageByStage(Object.fromEntries(STAGE_ORDER.map(stage => [stage, 1]))); }}
               placeholder="Search..."
-              className="w-[240px] h-9 ps-9 pe-3 text-sm bg-surface-muted border border-border-default rounded-input text-heading placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className="w-[240px] h-9 ps-9 pe-3 text-sm bg-surface-muted"
             />
           </div>
 
           {/* New Deal button (36px high) */}
-          <button
+          <Button
             type="button"
             disabled={!canWrite}
             onClick={openNewDealDialog}
             title={!canWrite ? 'Requires the ADMIN role' : undefined}
-            className="h-9 px-4 bg-primary text-white text-sm font-semibold rounded-input hover:bg-primary-hover transition-colors disabled:opacity-60 flex items-center justify-center cursor-pointer whitespace-nowrap"
+            className="h-9 px-4 text-sm font-semibold"
           >
             New Deal
-          </button>
+          </Button>
         </div>
       </TopBarActions>
 
@@ -819,23 +841,27 @@ export default function DealsPipeline() {
               <div className="flex items-center justify-between border-t border-border-subtle bg-surface-raised min-h-[36px] h-9 px-5 text-xs text-muted shrink-0">
                 <span>Showing {activeFirst}–{activeLast} of {activeTotal}</span>
                 <div className="flex items-center gap-2">
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     disabled={activePage <= 1}
                     onClick={() => changeStagePage(activeGroup.stage, activePage - 1)}
-                    className="rounded border border-border-default px-2 py-0.5 min-h-[26px] disabled:opacity-40 hover:bg-surface-muted transition-colors cursor-pointer"
+                    className="h-6 px-2 text-xs"
                   >
                     Previous
-                  </button>
+                  </Button>
                   <span>Page {activePage} of {activePages}</span>
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     disabled={activePage >= activePages}
                     onClick={() => changeStagePage(activeGroup.stage, activePage + 1)}
-                    className="rounded border border-border-default px-2 py-0.5 min-h-[26px] disabled:opacity-40 hover:bg-surface-muted transition-colors cursor-pointer"
+                    className="h-6 px-2 text-xs"
                   >
                     Next
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -879,7 +905,7 @@ export default function DealsPipeline() {
         <div className="space-y-4">
           <div>
             <label htmlFor="new-deal-name" className="block mb-1.5 text-[10px] font-bold text-muted uppercase tracking-wider">Deal name</label>
-            <input
+            <Input
               id="new-deal-name"
               type="text"
               value={dealForm.name}
@@ -888,14 +914,14 @@ export default function DealsPipeline() {
                 if (formError) setFormError(null);
               }}
               placeholder="e.g. Acme Corp renewal"
-              className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className="bg-surface-muted"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="new-deal-value" className="block mb-1.5 text-[10px] font-bold text-muted uppercase tracking-wider">Value</label>
-              <input
+              <Input
                 id="new-deal-value"
                 type="number"
                 min="0"
@@ -903,7 +929,7 @@ export default function DealsPipeline() {
                 value={dealForm.value}
                 onChange={(event) => setDealForm((f) => ({ ...f, value: event.target.value }))}
                 placeholder="12500"
-                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                className="bg-surface-muted"
               />
             </div>
             <div>
@@ -912,7 +938,7 @@ export default function DealsPipeline() {
                 id="new-deal-stage"
                 value={dealForm.stage}
                 onChange={(event) => setDealForm((f) => ({ ...f, stage: event.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                className="w-full h-9 px-3 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
               >
                 {CREATE_STAGES.map((stage) => (
                   <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>
@@ -924,17 +950,17 @@ export default function DealsPipeline() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="new-deal-close-date" className="block mb-1.5 text-[10px] font-bold text-muted uppercase tracking-wider">Close date</label>
-              <input
+              <Input
                 id="new-deal-close-date"
                 type="date"
                 value={dealForm.closeDate}
                 onChange={(event) => setDealForm((f) => ({ ...f, closeDate: event.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                className="bg-surface-muted"
               />
             </div>
             <div>
               <label htmlFor="new-deal-win-probability" className="block mb-1.5 text-[10px] font-bold text-muted uppercase tracking-wider">Win probability</label>
-              <input
+              <Input
                 id="new-deal-win-probability"
                 type="number"
                 min="0"
@@ -943,7 +969,7 @@ export default function DealsPipeline() {
                 value={dealForm.winProbability}
                 onChange={(event) => setDealForm((f) => ({ ...f, winProbability: event.target.value }))}
                 placeholder="0-100"
-                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                className="bg-surface-muted"
               />
             </div>
           </div>
@@ -953,7 +979,7 @@ export default function DealsPipeline() {
               id="new-deal-forecast-bucket"
               value={dealForm.forecastBucket}
               onChange={(event) => setDealForm((f) => ({ ...f, forecastBucket: event.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className="w-full h-9 px-3 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             >
               <option value="PIPELINE">Pipeline</option>
               <option value="COMMIT">Commit</option>
@@ -962,11 +988,89 @@ export default function DealsPipeline() {
           </div>
         </div>
 
-        {dialogError && <p className="mt-4 text-sm font-medium text-danger">{dialogError}</p>}
+        {dialogError && (
+          <Alert variant="destructive" className="mt-4">
+            <AlertDescription>{dialogError}</AlertDescription>
+          </Alert>
+        )}
       </FormDialog>
 
-      <FormDialog open={editDealOpen} onClose={() => setEditDealOpen(false)} title="Edit deal" subtitle={selectedDeal?.name} busy={editMutation.isPending} onConfirm={() => editMutation.mutate()} confirmLabel="Save deal">
-        <div className="space-y-4"><label className="block text-sm font-medium text-body">Deal name<input required value={editForm.name} onChange={event => setEditForm(current => ({ ...current, name: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Value<input type="number" min="0" step="0.01" value={editForm.value} onChange={event => setEditForm(current => ({ ...current, value: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Stage<select value={editForm.stage} onChange={event => setEditForm(current => ({ ...current, stage: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2">{STAGE_ORDER.map(stage => <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>)}</select></label><label className="block text-sm font-medium text-body">Close date<input type="date" value={editForm.closeDate} onChange={event => setEditForm(current => ({ ...current, closeDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Win probability (%)<input type="number" min="0" max="100" value={editForm.winProbability} onChange={event => setEditForm(current => ({ ...current, winProbability: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Forecast category<select value={editForm.forecastBucket || ''} onChange={event => setEditForm(current => ({ ...current, forecastBucket: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="PIPELINE">Pipeline</option><option value="COMMIT">Commit</option><option value="BEST_CASE">Best case</option>{editForm.forecastBucket && !['PIPELINE', 'COMMIT', 'BEST_CASE'].includes(editForm.forecastBucket.toUpperCase()) && <option value={editForm.forecastBucket}>Legacy: {editForm.forecastBucket}</option>}</select></label></div>
+      <FormDialog
+        open={editDealOpen}
+        onClose={() => setEditDealOpen(false)}
+        title="Edit deal"
+        subtitle={selectedDeal?.name}
+        busy={editMutation.isPending}
+        onConfirm={() => editMutation.mutate()}
+        confirmLabel="Save deal"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Deal name</label>
+            <Input
+              required
+              value={editForm.name}
+              onChange={event => setEditForm(current => ({ ...current, name: event.target.value }))}
+              className="bg-surface-muted"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Value</label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={editForm.value}
+              onChange={event => setEditForm(current => ({ ...current, value: event.target.value }))}
+              className="bg-surface-muted"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Stage</label>
+            <select
+              value={editForm.stage}
+              onChange={event => setEditForm(current => ({ ...current, stage: event.target.value }))}
+              className="w-full h-9 px-3 py-1.5 rounded-input border border-border-default bg-surface-muted text-sm text-body"
+            >
+              {STAGE_ORDER.map(stage => <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Close date</label>
+            <Input
+              type="date"
+              value={editForm.closeDate}
+              onChange={event => setEditForm(current => ({ ...current, closeDate: event.target.value }))}
+              className="bg-surface-muted"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Win probability (%)</label>
+            <Input
+              type="number"
+              min="0"
+              max="100"
+              value={editForm.winProbability}
+              onChange={event => setEditForm(current => ({ ...current, winProbability: event.target.value }))}
+              className="bg-surface-muted"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Forecast category</label>
+            <select
+              value={editForm.forecastBucket || ''}
+              onChange={event => setEditForm(current => ({ ...current, forecastBucket: event.target.value }))}
+              className="w-full h-9 px-3 py-1.5 rounded-input border border-border-default bg-surface-muted text-sm text-body"
+            >
+              <option value="PIPELINE">Pipeline</option>
+              <option value="COMMIT">Commit</option>
+              <option value="BEST_CASE">Best case</option>
+              {editForm.forecastBucket && !['PIPELINE', 'COMMIT', 'BEST_CASE'].includes(editForm.forecastBucket.toUpperCase()) && (
+                <option value={editForm.forecastBucket}>Legacy: {editForm.forecastBucket}</option>
+              )}
+            </select>
+          </div>
+        </div>
       </FormDialog>
       <FormDialog
         open={Boolean(activityDialogType)}
@@ -978,13 +1082,33 @@ export default function DealsPipeline() {
         confirmLabel={activityDialogType === 'EMAIL' ? 'Save email activity' : 'Save call activity'}
       >
         <div className="space-y-4">
-          <label className="block text-sm font-medium text-body">Summary
-            <input value={activityTitle} onChange={event => setActivityTitle(event.target.value)} maxLength={160} required className="mt-1 w-full rounded-input border border-border-default px-3 py-2" />
-          </label>
-          <label className="block text-sm font-medium text-body">Details
-            <textarea value={activityBody} onChange={event => setActivityBody(event.target.value)} maxLength={5000} rows={4} className="mt-1 w-full resize-y rounded-input border border-border-default px-3 py-2" />
-          </label>
-          {activityMutation.isError && <p role="alert" className="text-sm text-danger">{activityMutation.error?.message || 'Could not save activity.'}</p>}
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Summary</label>
+            <Input
+              value={activityTitle}
+              onChange={event => setActivityTitle(event.target.value)}
+              maxLength={160}
+              required
+              className="bg-surface-muted"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Details</label>
+            <Textarea
+              value={activityBody}
+              onChange={event => setActivityBody(event.target.value)}
+              maxLength={5000}
+              rows={4}
+              className="resize-y bg-surface-muted"
+            />
+          </div>
+          {activityMutation.isError && (
+            <Alert variant="destructive">
+              <AlertDescription>
+                {activityMutation.error?.message || 'Could not save activity.'}
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
       </FormDialog>
       <ConfirmDialog

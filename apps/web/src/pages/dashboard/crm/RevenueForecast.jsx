@@ -29,6 +29,11 @@ import { useActiveMemberRole } from '../../../lib/authClient';
 import { getMemberRoleName } from '../../../lib/memberRole';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Badge } from '../../../components/ui/badge';
+import { Progress } from '../../../components/ui/progress';
+import { Alert, AlertDescription } from '../../../components/ui/alert';
 
 const toMajor = (money) => (money == null ? 0 : moneyToMajor(money));
 
@@ -175,12 +180,12 @@ export default function RevenueForecast() {
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
+            <Input
               type="text"
               value={search}
               onChange={event => setSearch(event.target.value)}
               placeholder="Search reps..."
-              className="pl-9 pr-12 py-1.5 text-sm border border-gray-200 rounded-md bg-white w-56 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="ps-9 pe-4 h-9 text-xs w-56 bg-white border-gray-200"
             />
           </div>
 
@@ -188,31 +193,53 @@ export default function RevenueForecast() {
 
           <label className="relative flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium bg-white">
             <span className="sr-only">Forecast calendar year</span>
-            <select value={selectedYear} onChange={event => setSelectedYear(event.target.value)} className="appearance-none bg-transparent pr-5 outline-none">
+            <select value={selectedYear} onChange={event => setSelectedYear(event.target.value)} className="appearance-none bg-transparent pr-5 outline-none cursor-pointer">
               {availableYears.map(year => <option key={year} value={year}>Year {year}</option>)}
             </select>
             <ChevronDown size={14} className="pointer-events-none absolute right-2 text-gray-400" />
           </label>
 
-          <button onClick={exportCsv} aria-label="Download forecast CSV" title="Download forecast CSV" className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={exportCsv}
+            aria-label="Download forecast CSV"
+            title="Download forecast CSV"
+            className="h-8 w-8 text-gray-500 hover:text-gray-900"
+          >
             <Download size={18} />
-          </button>
-          {canManageQuotas && <button type="button" onClick={openQuotaManager} className="flex items-center gap-2 border border-gray-200 bg-white px-3 py-1.5 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-            <Target size={14} /> Manage Quotas
-          </button>}
+          </Button>
+          {canManageQuotas && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={openQuotaManager}
+              className="h-9 px-3 text-sm font-medium bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+            >
+              <Target size={14} className="mr-1.5" /> Manage Quotas
+            </Button>
+          )}
 
-          <button onClick={shareForecast} className="flex items-center gap-2 bg-black text-white px-4 py-1.5 rounded-md text-sm font-semibold hover:bg-gray-800 transition-colors shadow-sm">
-            <Share2 size={14} />
+          <Button
+            onClick={shareForecast}
+            className="h-9 px-4 text-sm font-semibold shadow-sm"
+          >
+            <Share2 size={14} className="mr-1.5" />
             Share Forecast
-          </button>
+          </Button>
         </div>
       </TopBarActions>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
 
-        {summary.excludedQuotaCount > 0 && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-900">
-          {summary.excludedQuotaCount} quota row(s) with a nonannual period or unknown/foreign currency are excluded from annual base-currency totals.
-        </div>}
+        {summary.excludedQuotaCount > 0 && (
+          <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+            <AlertDescription className="text-xs font-medium">
+              {summary.excludedQuotaCount} quota row(s) with a nonannual period or unknown/foreign currency are excluded from annual base-currency totals.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* ── KPIs Grid ── */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
@@ -225,9 +252,11 @@ export default function RevenueForecast() {
             </div>
             <div className="mt-auto pt-2">
               <p className="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">{closedWon == null ? '—' : formatCurrency(wonMajor)}</p>
-              <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1.5 overflow-hidden">
-                <div className="bg-[#10b981] h-full rounded-full" style={{ width: `${wonPctToQuota == null ? 0 : Math.min(100, wonPctToQuota)}%` }}></div>
-              </div>
+              <Progress
+                value={wonPctToQuota == null ? 0 : Math.min(100, wonPctToQuota)}
+                className="w-full bg-gray-200 h-1.5 mb-1.5"
+                indicatorClassName="bg-[#10b981]"
+              />
               <div className="flex justify-between items-center text-[10px] text-gray-500 font-medium">
                 <span>{wonPctToQuota == null ? 'No quota set' : `${Math.round(wonPctToQuota)}% to Quota`}</span>
                 <span>{quotaMajor === 0 ? 'No goal' : `${formatCurrency(quotaMajor)} Goal`}</span>
@@ -243,10 +272,10 @@ export default function RevenueForecast() {
             </div>
             <div className="mt-auto pt-2">
               <p className="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">{committedTotal === 0 ? '—' : formatCurrency(committedTotal)}</p>
-              <span className="inline-flex items-center gap-1.5 bg-[#eff6ff] text-[#1d4ed8] px-2.5 py-1 rounded text-[10px] font-bold">
-                <div className="w-1.5 h-1.5 bg-[#3b82f6] rounded-full"></div>
+              <Badge className="bg-[#eff6ff] text-[#1d4ed8] border-transparent font-bold text-[10px] px-2.5 py-1">
+                <div className="w-1.5 h-1.5 bg-[#3b82f6] rounded-full mr-1.5 shrink-0" />
                 High Confidence · {summary.dealCommitCount} {summary.dealCommitCount === 1 ? 'deal' : 'deals'}
-              </span>
+              </Badge>
             </div>
           </div>
 
@@ -258,10 +287,10 @@ export default function RevenueForecast() {
             </div>
             <div className="mt-auto pt-2">
               <p className="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">{bestCaseTotal === 0 ? '—' : formatCurrency(bestCaseTotal)}</p>
-              <span className="inline-flex items-center gap-1.5 bg-[#fefce8] text-[#a16207] px-2.5 py-1 rounded text-[10px] font-bold">
-                <div className="w-1.5 h-1.5 bg-[#eab308] rounded-full"></div>
+              <Badge className="bg-[#fefce8] text-[#a16207] border-transparent font-bold text-[10px] px-2.5 py-1">
+                <div className="w-1.5 h-1.5 bg-[#eab308] rounded-full mr-1.5 shrink-0" />
                 Medium Confidence · {summary.dealBestCaseCount} {summary.dealBestCaseCount === 1 ? 'deal' : 'deals'}
-              </span>
+              </Badge>
             </div>
           </div>
 
@@ -335,9 +364,14 @@ export default function RevenueForecast() {
           <div className="col-span-1 xl:col-span-8 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col overflow-x-auto">
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
               <h2 className="text-lg font-bold text-gray-900">Forecast by Rep</h2>
-              <button onClick={() => setShowAllReps(value => !value)} className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAllReps(value => !value)}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-800 h-7 px-2"
+              >
                 {showAllReps ? 'Show Top 5' : `View All (${visibleReps.length})`}
-              </button>
+              </Button>
             </div>
             <table className="w-full min-w-[650px] text-left border-collapse">
               <thead className="bg-white">
@@ -376,9 +410,11 @@ export default function RevenueForecast() {
                         <td className="px-6 py-4 text-right text-sm text-gray-600 font-medium tabular-nums" title={formatExactCurrency(toMajor(rep.bestCase))}>{formatCurrency(toMajor(rep.bestCase))}</td>
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-end gap-2">
-                            <div className="w-12 bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                              <div className={`h-full rounded-full ${repQuotaPct >= 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${repQuotaPct == null ? 0 : Math.min(100, repQuotaPct)}%` }}></div>
-                            </div>
+                            <Progress
+                              value={repQuotaPct == null ? 0 : Math.min(100, repQuotaPct)}
+                              className="w-12 bg-gray-200 h-1.5"
+                              indicatorClassName={repQuotaPct >= 100 ? 'bg-emerald-500' : 'bg-blue-500'}
+                            />
                             <span className="text-xs font-semibold text-gray-600 w-8 text-right">{repQuotaPct == null ? '—' : `${Math.round(repQuotaPct)}%`}</span>
                           </div>
                         </td>
@@ -394,12 +430,12 @@ export default function RevenueForecast() {
           <div className="col-span-1 xl:col-span-4 flex flex-col gap-4">
 
             {expectedShortfall > 0 && (
-              <div className="bg-[#fef9c3] border border-[#fde047] rounded-xl p-4 flex items-center gap-3 shadow-sm">
-                <AlertTriangle size={20} className="text-[#a16207]" />
-                <p className="text-sm font-bold text-[#854d0e]">
+              <Alert className="border-[#fde047] bg-[#fef9c3] text-[#854d0e] flex items-center gap-3 shadow-sm">
+                <AlertTriangle className="h-5 w-5 text-[#a16207] shrink-0" />
+                <AlertDescription className="text-sm font-bold">
                   Pipeline is below quota by {formatCurrency(expectedShortfall)}.
-                </p>
-              </div>
+                </AlertDescription>
+              </Alert>
             )}
 
             {/* Expected Shortfall Card — real: quota − closed-won */}
@@ -437,20 +473,29 @@ export default function RevenueForecast() {
             <p className="text-xs font-semibold uppercase text-gray-500">Existing quotas</p>
             {quotas.length === 0 ? <p className="text-sm text-gray-500">No quotas recorded for this year.</p> : quotas.map(quota => <div key={quota.id} className="flex items-center justify-between gap-3 text-sm">
               <button type="button" onClick={() => selectQuota(quota.id)} className="min-w-0 flex-1 truncate text-left text-blue-700 hover:underline">{quota.repName} · {quota.period} · {quota.quota ? formatCompactMoney(toMajor(quota.quota), quota.quota.currency) : 'Currency unknown'}</button>
-              <button type="button" onClick={() => setQuotaToDelete(quota)} aria-label={`Delete quota for ${quota.repName}`} className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-red-600"><Trash2 size={14} /></button>
+              <Button type="button" variant="ghost" size="icon" onClick={() => setQuotaToDelete(quota)} aria-label={`Delete quota for ${quota.repName}`} className="h-6 w-6 text-gray-500 hover:bg-gray-100 hover:text-red-600"><Trash2 size={14} /></Button>
             </div>)}
           </div>
-          <label className="block text-sm font-medium text-gray-700">Sales representative
-            <input value={quotaForm.repName} onChange={event => setQuotaForm(value => ({ ...value, repName: event.target.value }))} maxLength={160} required className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-          </label>
-          <label className="block text-sm font-medium text-gray-700">Period
-            <input value={quotaForm.period} onChange={event => setQuotaForm(value => ({ ...value, period: event.target.value }))} placeholder="2026, 2026-Q1, or 2026-01" required className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-          </label>
-          <label className="block text-sm font-medium text-gray-700">Quota amount ({data.baseCurrency})
-            <input type="number" min="0" step="0.01" value={quotaForm.quota} onChange={event => setQuotaForm(value => ({ ...value, quota: event.target.value }))} required className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-          </label>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sales representative</label>
+            <Input value={quotaForm.repName} onChange={event => setQuotaForm(value => ({ ...value, repName: event.target.value }))} maxLength={160} required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Period</label>
+            <Input value={quotaForm.period} onChange={event => setQuotaForm(value => ({ ...value, period: event.target.value }))} placeholder="2026, 2026-Q1, or 2026-01" required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Quota amount ({data.baseCurrency})</label>
+            <Input type="number" min="0" step="0.01" value={quotaForm.quota} onChange={event => setQuotaForm(value => ({ ...value, quota: event.target.value }))} required />
+          </div>
           <p className="text-xs text-gray-500">Annual periods contribute to the annual quota total. Quarter and month quotas remain available for their matching period. Legacy quotas with unknown or different currency are excluded until edited and saved in the workspace base currency.</p>
-          {saveQuota.isError && <p role="alert" className="text-sm text-red-600">{saveQuota.error?.message || 'Could not save quota.'}</p>}
+          {saveQuota.isError && (
+            <Alert variant="destructive">
+              <AlertDescription>
+                {saveQuota.error?.message || 'Could not save quota.'}
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
       </FormDialog>}
       {canManageQuotas && <ConfirmDialog

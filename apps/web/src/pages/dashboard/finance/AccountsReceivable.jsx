@@ -3,13 +3,17 @@ import {
   Search, Send, ChevronDown,
   FileText, Paperclip, Phone,
   CircleDot, Circle, Loader2,
-  Users, Plus, Pencil, Trash2, X, Check, AlertTriangle
+  Users, Plus, Pencil, Trash2, X, Check
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../../../lib/api/finance';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatDate, formatMoney, formatCompactTableMoney } from '../../../lib/format';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Badge } from '../../../components/ui/badge';
+import { Alert, AlertDescription } from '../../../components/ui/alert';
 
 // The old page rendered receivable money with no forced decimals (e.g. $320,000) — keep that.
 const money = (v) => formatMoney(v, { minimumFractionDigits: 0 });
@@ -224,20 +228,20 @@ export default function AccountsReceivable() {
         {/* Left group */}
         <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
-            <input
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
+            <Input
               type="text"
               value={search}
               onChange={event => { setSearch(event.target.value); setCustomerPage(1); }}
               placeholder="Search customers..."
-              className="pl-9 pr-4 py-2 text-xs border border-border-default rounded-input bg-surface-raised w-72 max-w-full focus:outline-none focus:border-border-strong focus:ring-2 focus:ring-border-subtle transition-all shadow-card"
+              className="pl-9 pr-4 text-xs bg-surface-raised w-72 max-w-full shadow-card h-9"
             />
           </div>
           <select
             aria-label="Filter customers by aging status"
             value={ageFilter}
             onChange={e => { setAgeFilter(e.target.value); setCustomerPage(1); }}
-            className="border border-border-default text-body text-xs px-3 py-2 rounded-input bg-surface-raised hover:bg-surface-muted transition-colors cursor-pointer outline-none shadow-card"
+            className="border border-border-default text-body text-xs px-3 py-2 rounded-input bg-surface-raised hover:bg-surface-muted transition-colors cursor-pointer outline-none shadow-card h-9"
           >
             <option value="all">All</option>
             <option value="overdue">Overdue</option>
@@ -247,7 +251,7 @@ export default function AccountsReceivable() {
             aria-label="Sort customers"
             value={oldestFirst ? 'oldest' : 'newest'}
             onChange={e => { setOldestFirst(e.target.value === 'oldest'); setCustomerPage(1); }}
-            className="border border-border-default text-body text-xs px-3 py-2 rounded-input bg-surface-raised hover:bg-surface-muted transition-colors cursor-pointer outline-none shadow-card"
+            className="border border-border-default text-body text-xs px-3 py-2 rounded-input bg-surface-raised hover:bg-surface-muted transition-colors cursor-pointer outline-none shadow-card h-9"
           >
             <option value="oldest">Sort: Oldest First</option>
             <option value="newest">Sort: Newest First</option>
@@ -256,24 +260,28 @@ export default function AccountsReceivable() {
 
         {/* Right group */}
         <div className="flex items-center gap-2.5 shrink-0 ml-auto">
-          <button 
+          <Button 
             type="button"
+            variant="outline"
+            size="sm"
             disabled={selectedIds.size === 0 || batchRemindMutation.isPending}
             onClick={handleBatchRemind}
-            className="flex items-center gap-1.5 border border-border-default text-body text-xs px-3 py-2 rounded-input font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60 cursor-pointer"
+            className="gap-1.5 bg-surface-raised shadow-card font-medium h-9"
           >
             {batchRemindMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
             <span>Send Batch Reminders ({selectedIds.size})</span>
-          </button>
-          <button 
+          </Button>
+          <Button 
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => { setCustomerError(''); setCustomerModalOpen(true); }}
-            className="flex items-center gap-1.5 border border-border-default text-body text-xs px-3 py-2 rounded-input font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card cursor-pointer"
+            className="gap-1.5 bg-surface-raised shadow-card font-medium h-9"
             title="Manage customers"
           >
             <Users size={13} className="text-muted" />
             <span>Customers</span>
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -408,11 +416,14 @@ export default function AccountsReceivable() {
                       </div>
                     </td>
                     <td className="px-4 py-2.5 text-center whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
-                        isSeverelyOverdue ? 'bg-danger-light text-danger' : 'text-body-light'
-                      }`}>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs font-semibold border-0 ${
+                          isSeverelyOverdue ? 'bg-danger-light text-danger' : 'text-body-light'
+                        }`}
+                      >
                         {account.oldest} {account.oldest === 1 ? 'Day' : 'Days'}
-                      </span>
+                      </Badge>
                     </td>
                     <td className="px-4 py-2.5 text-right text-sm font-semibold text-heading tabular-nums whitespace-nowrap" title={money(account.openBalance)}>
                       {compactMoney(account.openBalance)}
@@ -438,25 +449,29 @@ export default function AccountsReceivable() {
             Showing {totalCustomers > 0 ? (customerPage - 1) * CUSTOMER_PAGE_SIZE + 1 : 0}–{Math.min(customerPage * CUSTOMER_PAGE_SIZE, totalCustomers)} of {totalCustomers}
           </span>
           <div className="flex items-center gap-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               aria-label="Back"
               disabled={customerPage <= 1}
               onClick={() => setCustomerPage(p => Math.max(1, p - 1))}
-              className="rounded border border-border-default px-2.5 py-1 text-xs font-medium text-body hover:bg-surface-muted transition-colors disabled:opacity-40 cursor-pointer"
+              className="h-7 px-2.5 text-xs font-medium"
             >
               Previous
-            </button>
+            </Button>
             <span className="text-xs">Page {customerPages > 0 ? customerPage : 0} of {customerPages}</span>
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               aria-label="Forward"
               disabled={customerPage >= customerPages}
               onClick={() => setCustomerPage(p => Math.min(customerPages, p + 1))}
-              className="rounded border border-border-default px-2.5 py-1 text-xs font-medium text-body hover:bg-surface-muted transition-colors disabled:opacity-40 cursor-pointer"
+              className="h-7 px-2.5 text-xs font-medium"
             >
               Next
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -514,22 +529,25 @@ export default function AccountsReceivable() {
             {/* Action Button */}
             <div className="pt-1">
               {selectedRecord.openBalance?.amount === 0 ? (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   disabled
-                  className="w-full whitespace-nowrap px-3 py-2 rounded-input text-xs font-semibold bg-surface-muted text-body-light border border-border-default transition-colors disabled:opacity-60 text-center"
+                  className="w-full whitespace-nowrap text-xs font-semibold bg-surface-muted text-body-light"
                 >
                   View History
-                </button>
+                </Button>
               ) : (
-                <button
+                <Button
                   type="button"
+                  size="sm"
                   disabled={!selectedInvoices[0] || paymentMutation.isPending}
                   onClick={() => setPaymentTargetId(selectedInvoices[0].id)}
-                  className="w-full whitespace-nowrap px-3 py-2 rounded-input text-xs font-semibold bg-primary text-white hover:bg-primary-hover transition-colors disabled:opacity-50 cursor-pointer text-center shadow-card"
+                  className="w-full whitespace-nowrap text-xs font-semibold shadow-card"
                 >
                   Log Payment
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -563,9 +581,16 @@ export default function AccountsReceivable() {
                   </div>
                   <div className="flex items-center gap-3 shrink-0 ml-2">
                     <span className="text-xs font-bold text-heading tabular-nums" title={money(inv.amount)}>{compactMoney(inv.amount)}</span>
-                    <button disabled={paymentMutation.isPending || inv.status === 'PAID'} onClick={() => setPaymentTargetId(inv.id)} className="flex items-center gap-1 border border-border-strong rounded px-2 py-1 text-xs font-semibold text-body hover:bg-surface-muted transition-colors bg-surface-raised disabled:opacity-60 cursor-pointer">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={paymentMutation.isPending || inv.status === 'PAID'}
+                      onClick={() => setPaymentTargetId(inv.id)}
+                      className="gap-1 h-7 px-2 text-xs font-semibold"
+                    >
                       Action <ChevronDown size={12} className="text-caption" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -579,9 +604,9 @@ export default function AccountsReceivable() {
             <div className="flex items-center justify-between border-t border-border-subtle px-4 py-2 text-xs text-muted">
               <span>Showing {selectedInvoicesData?.pagination?.total ? (invoicePage - 1) * 10 + 1 : 0}–{Math.min(invoicePage * 10, selectedInvoicesData?.pagination?.total ?? 0)} of {selectedInvoicesData?.pagination?.total ?? 0}</span>
               <div className="flex items-center gap-2">
-                <button type="button" disabled={invoicePage <= 1} onClick={() => setInvoicePage(current => current - 1)} className="rounded border border-border-default px-2 py-0.5 text-xs font-medium hover:bg-surface-muted transition-colors disabled:opacity-40 cursor-pointer">Previous</button>
+                <Button type="button" variant="outline" size="sm" disabled={invoicePage <= 1} onClick={() => setInvoicePage(current => current - 1)} className="h-6 px-2 text-xs font-medium">Previous</Button>
                 <span>Page {selectedInvoicesData?.pagination?.pages ? invoicePage : 0} of {selectedInvoicesData?.pagination?.pages ?? 0}</span>
-                <button type="button" disabled={invoicePage >= (selectedInvoicesData?.pagination?.pages ?? 0)} onClick={() => setInvoicePage(current => current + 1)} className="rounded border border-border-default px-2 py-0.5 text-xs font-medium hover:bg-surface-muted transition-colors disabled:opacity-40 cursor-pointer">Next</button>
+                <Button type="button" variant="outline" size="sm" disabled={invoicePage >= (selectedInvoicesData?.pagination?.pages ?? 0)} onClick={() => setInvoicePage(current => current + 1)} className="h-6 px-2 text-xs font-medium">Next</Button>
               </div>
             </div>
           </div>
@@ -607,12 +632,22 @@ export default function AccountsReceivable() {
                     <button type="button" disabled title="Attachments are not supported for collection activity notes" aria-label="Attach file (not supported)" className="hover:text-body-light transition-colors disabled:opacity-60 cursor-not-allowed"><Paperclip size={14} /></button>
                     <button type="button" aria-label={activityType === 'Call' ? 'Log a call' : 'Add a note'} onClick={() => setActivityType(current => current === 'Note' ? 'Call' : 'Note')} className={`transition-colors cursor-pointer ${activityType === 'Call' ? 'text-accent' : 'hover:text-body-light'}`}><Phone size={14} /></button>
                   </div>
-                  <button disabled={!activityBody.trim() || activityMutation.isPending} onClick={() => activityMutation.mutate()} className="bg-primary text-white text-xs font-semibold px-3 py-1 rounded hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={!activityBody.trim() || activityMutation.isPending}
+                    onClick={() => activityMutation.mutate()}
+                    className="h-7 px-3 text-xs font-semibold"
+                  >
                     {activityMutation.isPending ? 'Posting...' : 'Post'}
-                  </button>
+                  </Button>
                 </div>
               </div>
-              {activityMutation.isError && <p role="alert" className="mb-3 text-xs text-danger">{activityMutation.error?.message || 'Could not post activity.'}</p>}
+              {activityMutation.isError && (
+                <Alert variant="destructive" className="mb-3 py-2 px-3">
+                  <AlertDescription className="text-xs">{activityMutation.error?.message || 'Could not post activity.'}</AlertDescription>
+                </Alert>
+              )}
 
               {/* Timeline */}
               <div className="relative pl-3 space-y-4">
@@ -674,21 +709,22 @@ export default function AccountsReceivable() {
           <div className="w-full max-w-md rounded-panel bg-surface-raised p-6 shadow-modal border border-border-default">
             <div className="flex items-center justify-between pb-3 border-b border-border-default">
               <h2 className="text-base font-semibold text-heading">Manage Customers</h2>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => { setCustomerModalOpen(false); setEditingCustomerId(null); setCustomerError(''); }}
-                className="text-muted hover:text-body transition-colors"
+                className="h-8 w-8 text-muted hover:text-body"
                 title="Close"
               >
                 <X size={18} />
-              </button>
+              </Button>
             </div>
 
             {customerError && (
-              <div className="mt-3 flex items-center gap-2 rounded-input bg-danger-light p-2.5 text-xs text-danger">
-                <AlertTriangle size={14} />
-                <span>{customerError}</span>
-              </div>
+              <Alert variant="destructive" className="mt-3 py-2.5 px-3">
+                <AlertDescription className="text-xs">{customerError}</AlertDescription>
+              </Alert>
             )}
 
             <form
@@ -699,27 +735,28 @@ export default function AccountsReceivable() {
               }}
               className="mt-4 flex flex-col gap-2"
             >
-              <input
+              <Input
                 type="text"
                 placeholder="New customer name..."
                 value={newCustomerName}
                 onChange={(e) => setNewCustomerName(e.target.value)}
-                className="flex-1 rounded-input border border-border-default px-3 py-2 text-sm bg-surface-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                className="text-sm bg-surface-muted/50"
               />
-              <input
+              <Input
                 type="email"
                 placeholder="Customer email (optional)"
                 value={newCustomerEmail}
                 onChange={(e) => setNewCustomerEmail(e.target.value)}
-                className="flex-1 rounded-input border border-border-default px-3 py-2 text-sm bg-surface-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                className="text-sm bg-surface-muted/50"
               />
-              <button
+              <Button
                 type="submit"
+                size="sm"
                 disabled={!newCustomerName.trim() || createCustomerMutation.isPending}
-                className="flex items-center gap-1.5 bg-primary text-white px-4 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors disabled:opacity-50"
+                className="gap-1.5"
               >
                 <Plus size={16} /> Add
-              </button>
+              </Button>
             </form>
 
             <div className="mt-4 max-h-64 overflow-y-auto divide-y divide-border-default border border-border-default rounded-input">
@@ -737,67 +774,75 @@ export default function AccountsReceivable() {
                         }}
                         className="flex flex-1 flex-col items-stretch gap-2"
                       >
-                        <input
+                        <Input
                           type="text"
                           value={editingCustomerName}
                           onChange={(e) => setEditingCustomerName(e.target.value)}
-                          className="flex-1 rounded-input border border-border-default px-2.5 py-1 text-sm bg-surface-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                          className="text-sm bg-surface-muted/50 h-8"
                           autoFocus
                         />
-                        <input
+                        <Input
                           type="email"
                           placeholder="Customer email (optional)"
                           value={editingCustomerEmail}
                           onChange={(e) => setEditingCustomerEmail(e.target.value)}
-                          className="flex-1 rounded-input border border-border-default px-2.5 py-1 text-sm bg-surface-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                          className="text-sm bg-surface-muted/50 h-8"
                         />
                         <div className="flex items-center justify-end gap-2">
-                        <button
+                        <Button
                           type="button"
+                          size="icon"
+                          variant="ghost"
                           onClick={() => setEditingCustomerId(null)}
-                          className="p-1.5 text-muted hover:bg-surface-muted rounded-input transition-colors"
+                          className="h-7 w-7 text-muted hover:bg-surface-muted"
                           title="Cancel"
                         >
                           <X size={16} />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="submit"
+                          size="icon"
+                          variant="ghost"
                           disabled={!editingCustomerName.trim() || updateCustomerMutation.isPending}
-                          className="p-1.5 text-success-text hover:bg-success-light rounded-input transition-colors disabled:opacity-50"
+                          className="h-7 w-7 text-success-text hover:bg-success-light"
                           title="Save"
                         >
                           <Check size={16} />
-                        </button>
+                        </Button>
                         </div>
                       </form>
                     ) : (
                       <>
                         <span className="text-sm font-medium text-body">{cust.name}</span>
                         <div className="flex items-center gap-1">
-                          <button
+                          <Button
                             type="button"
+                            size="icon"
+                            variant="ghost"
                             onClick={() => {
                               setEditingCustomerId(cust.id);
                               setEditingCustomerName(cust.name);
                               setEditingCustomerEmail(cust.email ?? '');
                               setCustomerError('');
                             }}
-                            className="p-1.5 text-muted hover:text-body hover:bg-surface-muted rounded-input transition-colors"
+                            className="h-7 w-7 text-muted hover:text-body"
                             title="Rename"
                           >
                             <Pencil size={14} />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
+                            size="icon"
+                            variant="ghost"
                             onClick={() => {
                               setCustomerError('');
                               setDeletingCustomer(cust);
                             }}
-                            className="p-1.5 text-muted hover:text-danger hover:bg-danger-light rounded-input transition-colors"
+                            className="h-7 w-7 text-muted hover:text-danger hover:bg-danger-light"
                             title="Delete"
                           >
                             <Trash2 size={14} />
-                          </button>
+                          </Button>
                         </div>
                       </>
                     )}
@@ -807,13 +852,14 @@ export default function AccountsReceivable() {
             </div>
 
             <div className="mt-6 flex justify-end">
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => { setCustomerModalOpen(false); setEditingCustomerId(null); setCustomerError(''); }}
-                className="px-4 py-2 border border-border-default rounded-input text-sm font-medium text-body hover:bg-surface-muted transition-colors"
               >
                 Close
-              </button>
+              </Button>
             </div>
           </div>
         </div>

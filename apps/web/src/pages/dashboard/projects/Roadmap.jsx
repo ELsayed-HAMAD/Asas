@@ -18,6 +18,9 @@ import { downloadRoadmapCsv } from '../../../lib/roadmapExport';
 import PageHeader from '../../../components/common/PageHeader';
 import PageToolbar from '../../../components/common/PageToolbar';
 import FormDialog from '../../../components/common/FormDialog';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Badge } from '../../../components/ui/badge';
 
 export default function Roadmap() {
   const queryClient = useQueryClient()
@@ -122,30 +125,32 @@ export default function Roadmap() {
         }
         actions={
           <div className="flex items-center gap-3 shrink-0 flex-nowrap">
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={() => setPhaseOpen(true)}
-              className="h-10 px-3.5 rounded-[10px] border-0 bg-surface-raised text-body text-sm font-medium hover:bg-surface-muted transition-colors cursor-pointer shadow-[0_1px_2px_rgba(16,24,40,0.04)] flex items-center justify-center whitespace-nowrap"
+              className="h-10 px-3.5 rounded-[10px] border-0 bg-surface-raised text-body text-sm font-medium hover:bg-surface-muted transition-colors shadow-[0_1px_2px_rgba(16,24,40,0.04)] whitespace-nowrap"
             >
               New Phase
-            </button>
+            </Button>
 
-            <button
+            <Button
               type="button"
+              variant="outline"
               disabled={!phases.length}
               onClick={() => { setTaskForm({ title: '', phaseId: phases[0]?.id || '' }); setTaskOpen(true); }}
-              className="h-10 px-3.5 rounded-[10px] border-0 bg-surface-raised text-body text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60 cursor-pointer shadow-[0_1px_2px_rgba(16,24,40,0.04)] flex items-center justify-center whitespace-nowrap"
+              className="h-10 px-3.5 rounded-[10px] border-0 bg-surface-raised text-body text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60 shadow-[0_1px_2px_rgba(16,24,40,0.04)] whitespace-nowrap"
             >
               New Task
-            </button>
+            </Button>
 
-            <button
+            <Button
               type="button"
               onClick={() => downloadRoadmapCsv(phases)}
-              className="h-10 px-4 rounded-[10px] bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 shrink-0 cursor-pointer shadow-sm flex items-center justify-center whitespace-nowrap"
+              className="h-10 px-4 rounded-[10px] font-semibold shadow-sm shrink-0 whitespace-nowrap"
             >
               Export
-            </button>
+            </Button>
           </div>
         }
         className="bg-surface mb-2 px-6"
@@ -164,19 +169,20 @@ export default function Roadmap() {
               <>
                 <div className="relative flex-1 min-w-[160px] max-w-[280px]">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-                  <input
+                  <Input
                     type="text"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Search..."
                     aria-label="Search roadmap"
                     title="Search roadmap"
-                    className="pl-9 pr-4 h-10 text-sm border-0 rounded-[10px] bg-surface-raised text-heading placeholder:text-caption focus:outline-none focus:ring-2 focus:ring-accent shadow-[0_1px_2px_rgba(16,24,40,0.04)] w-full"
+                    className="pl-9 pr-4 h-10 text-sm border-0 rounded-[10px] bg-surface-raised text-heading placeholder:text-caption shadow-[0_1px_2px_rgba(16,24,40,0.04)] w-full"
                   />
                 </div>
 
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   disabled
                   className="flex items-center gap-1.5 h-10 px-3.5 border-0 bg-surface-raised text-body rounded-[10px] text-xs font-medium shadow-[0_1px_2px_rgba(16,24,40,0.04)] disabled:opacity-60 cursor-not-allowed shrink-0"
                   title="Timeline: H2 2026"
@@ -184,7 +190,7 @@ export default function Roadmap() {
                 >
                   <span>Timeline: H2 2026</span>
                   <ChevronDown size={13} className="text-caption" />
-                </button>
+                </Button>
               </>
             }
           />
@@ -205,9 +211,9 @@ export default function Roadmap() {
                     <h3 className="text-base font-medium text-heading tracking-normal">
                       {phase.title}
                     </h3>
-                    <span className="text-[11px] font-medium text-muted bg-surface-muted px-2.5 py-0.5 rounded-full tabular-nums">
+                    <Badge variant="outline" className="text-[11px] font-medium text-muted bg-surface-muted px-2.5 py-0.5 rounded-full tabular-nums border-border-default">
                       {phase.tasks?.length || 0} Tasks
-                    </span>
+                    </Badge>
                   </div>
                   <button
                     type="button"
@@ -253,9 +259,9 @@ export default function Roadmap() {
                             {task.title}
                           </span>
 
-                          <span className="inline-flex items-center bg-surface-active/60 px-2 py-0.5 rounded-full text-[11px] font-medium text-body capitalize tracking-normal shrink-0">
+                          <Badge variant="outline" className="bg-surface-active/60 px-2 py-0.5 rounded-full text-[11px] font-medium text-body capitalize tracking-normal shrink-0 border-transparent">
                             {task.statusLabel ? task.statusLabel.toLowerCase() : 'scheduled'}
-                          </span>
+                          </Badge>
                         </div>
 
                         {/* Right: Fixed columns on ONE line */}
@@ -298,14 +304,16 @@ export default function Roadmap() {
             {/* Inspector Header */}
             <div className="flex items-center justify-between p-5 pb-3">
               <span className="text-xs font-medium text-muted">Inspector</span>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => setInspectorOpen(false)}
-                className="text-caption hover:text-body transition-colors cursor-pointer p-1"
+                className="h-7 w-7 text-caption hover:text-body"
                 aria-label="Close inspector"
               >
                 <X size={16} />
-              </button>
+              </Button>
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-5 space-y-4 scrollbar-soft">
@@ -317,9 +325,9 @@ export default function Roadmap() {
                       {selectedTask.title}
                     </h2>
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="inline-flex items-center bg-surface-active/60 px-2 py-0.5 rounded-full text-xs font-medium text-body capitalize">
+                      <Badge variant="outline" className="bg-surface-active/60 px-2 py-0.5 rounded-full text-xs font-medium text-body capitalize border-transparent">
                         {selectedTask.statusLabel ? selectedTask.statusLabel.toLowerCase() : 'scheduled'}
-                      </span>
+                      </Badge>
                       {selectedTask.taskCode && (
                         <span className="text-xs font-medium text-caption tabular-nums">
                           {selectedTask.taskCode}
@@ -363,14 +371,16 @@ export default function Roadmap() {
                   <div className="border-t border-border-subtle/50 pt-4">
                     <div className="flex items-center justify-between mb-2.5">
                       <h3 className="text-xs font-medium text-heading">Assigned Execution Team</h3>
-                      <button
+                      <Button
                         type="button"
+                        variant="link"
+                        size="sm"
                         disabled={!selectedTask.assignees || selectedTask.assignees.length === 0}
                         onClick={() => setTeamOpen(true)}
-                        className="text-xs font-medium text-accent hover:underline disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                        className="h-auto p-0 text-xs font-medium text-accent hover:underline disabled:opacity-50"
                       >
                         View All
-                      </button>
+                      </Button>
                     </div>
 
                     <div className="flex items-center justify-between bg-surface-muted/40 p-3 rounded-[10px]">
@@ -406,35 +416,69 @@ export default function Roadmap() {
             {/* Inspector Footer (Pinned with hairline above, 40px buttons, rounded-[10px]) */}
             {selectedTask && (
               <div className="p-4 border-t border-border-subtle/50 bg-surface-raised shrink-0 space-y-2">
-                <button
+                <Button
                   type="button"
                   onClick={() => { setTimelineTaskId(selectedTask.id); setTimelineForm({ startDate: selectedTask.startDate?.slice(0, 10) || '', endDate: selectedTask.endDate?.slice(0, 10) || '', progressPct: selectedTask.progressPct || 0 }); setTimelineOpen(true); }}
-                  className="w-full h-10 flex items-center justify-center gap-2 bg-primary text-white rounded-[10px] text-sm font-semibold hover:bg-primary-hover transition-colors shadow-sm cursor-pointer"
+                  className="w-full h-10 gap-2 font-semibold shadow-sm"
                 >
                   <Edit2 size={14} />
                   Edit Timeline
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="outline"
                   disabled={deleteTask.isPending}
                   onClick={() => {
                     if (window.confirm(`Delete task "${selectedTask.title}"?`)) {
                       deleteTask.mutate(selectedTask.id);
                     }
                   }}
-                  className="w-full h-10 flex items-center justify-center gap-2 border-0 text-danger bg-danger-light/20 hover:bg-danger-light/30 rounded-[10px] text-xs font-medium transition-colors cursor-pointer disabled:opacity-60"
+                  className="w-full h-10 gap-2 border-0 text-danger bg-danger-light/20 hover:bg-danger-light/30 rounded-[10px] text-xs font-medium"
                 >
                   <Trash2 size={13} />
                   Delete Task
-                </button>
+                </Button>
               </div>
             )}
           </div>
         )}
       </div>
-      <FormDialog open={phaseOpen} onClose={() => setPhaseOpen(false)} title="New roadmap phase" busy={createPhase.isPending} onConfirm={() => createPhase.mutate()} confirmLabel="Create phase"><label className="block text-sm font-medium text-body">Phase name<input required value={phaseTitle} onChange={event => setPhaseTitle(event.target.value)} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></FormDialog>
-      <FormDialog open={taskOpen} onClose={() => setTaskOpen(false)} title="New roadmap task" busy={createTask.isPending} onConfirm={() => createTask.mutate()} confirmLabel="Create task"><div className="space-y-4"><label className="block text-sm font-medium text-body">Task name<input required value={taskForm.title} onChange={event => setTaskForm(current => ({ ...current, title: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Phase<select value={taskForm.phaseId || phases[0]?.id || ''} onChange={event => setTaskForm(current => ({ ...current, phaseId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2">{phases.map(phase => <option key={phase.id} value={phase.id}>{phase.title}</option>)}</select></label></div></FormDialog>
-      <FormDialog open={timelineOpen} onClose={() => setTimelineOpen(false)} title="Edit task timeline" subtitle={selectedTask?.title} busy={updateTimeline.isPending} onConfirm={() => updateTimeline.mutate()} confirmLabel="Save timeline"><div className="space-y-4"><label className="block text-sm font-medium text-body">Start date<input type="date" value={timelineForm.startDate} onChange={event => setTimelineForm(current => ({ ...current, startDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">End date<input type="date" value={timelineForm.endDate} onChange={event => setTimelineForm(current => ({ ...current, endDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Progress (%)<input type="number" min="0" max="100" value={timelineForm.progressPct} onChange={event => setTimelineForm(current => ({ ...current, progressPct: Number(event.target.value) }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div></FormDialog>
+      <FormDialog open={phaseOpen} onClose={() => setPhaseOpen(false)} title="New roadmap phase" busy={createPhase.isPending} onConfirm={() => createPhase.mutate()} confirmLabel="Create phase">
+        <label className="block text-sm font-medium text-body">
+          Phase name
+          <Input required value={phaseTitle} onChange={event => setPhaseTitle(event.target.value)} className="mt-1 w-full" />
+        </label>
+      </FormDialog>
+      <FormDialog open={taskOpen} onClose={() => setTaskOpen(false)} title="New roadmap task" busy={createTask.isPending} onConfirm={() => createTask.mutate()} confirmLabel="Create task">
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-body">
+            Task name
+            <Input required value={taskForm.title} onChange={event => setTaskForm(current => ({ ...current, title: event.target.value }))} className="mt-1 w-full" />
+          </label>
+          <label className="block text-sm font-medium text-body">
+            Phase
+            <select value={taskForm.phaseId || phases[0]?.id || ''} onChange={event => setTaskForm(current => ({ ...current, phaseId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2 bg-surface">
+              {phases.map(phase => <option key={phase.id} value={phase.id}>{phase.title}</option>)}
+            </select>
+          </label>
+        </div>
+      </FormDialog>
+      <FormDialog open={timelineOpen} onClose={() => setTimelineOpen(false)} title="Edit task timeline" subtitle={selectedTask?.title} busy={updateTimeline.isPending} onConfirm={() => updateTimeline.mutate()} confirmLabel="Save timeline">
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-body">
+            Start date
+            <Input type="date" value={timelineForm.startDate} onChange={event => setTimelineForm(current => ({ ...current, startDate: event.target.value }))} className="mt-1 w-full" />
+          </label>
+          <label className="block text-sm font-medium text-body">
+            End date
+            <Input type="date" value={timelineForm.endDate} onChange={event => setTimelineForm(current => ({ ...current, endDate: event.target.value }))} className="mt-1 w-full" />
+          </label>
+          <label className="block text-sm font-medium text-body">
+            Progress (%)
+            <Input type="number" min="0" max="100" value={timelineForm.progressPct} onChange={event => setTimelineForm(current => ({ ...current, progressPct: Number(event.target.value) }))} className="mt-1 w-full" />
+          </label>
+        </div>
+      </FormDialog>
       <FormDialog
         open={teamOpen}
         onClose={() => setTeamOpen(false)}

@@ -16,6 +16,9 @@ import SettingsTabs from './SettingsTabs'
 import ConfirmDialog from '../../../components/common/ConfirmDialog'
 import FormDialog from '../../../components/common/FormDialog'
 import TwoFactorSettings from './TwoFactorSettings'
+import { Button } from '../../../components/ui/button'
+import { Input } from '../../../components/ui/input'
+import { Badge } from '../../../components/ui/badge'
 import { http } from '../../../lib/api/http'
 import { onboardingApi } from '../../../lib/api/onboarding'
 import { settingsApi } from '../../../lib/api/settings'
@@ -171,24 +174,24 @@ export default function SettingsGeneral() {
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
-            <input
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption z-10 pointer-events-none" />
+            <Input
               type="text"
               placeholder="Search settings..."
-              className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className="pl-9 pr-4 py-1.5 h-8 text-sm w-64 bg-surface-raised"
             />
           </div>
 
           <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-strong shrink-0"></div>
 
-          <button
+          <Button
             onClick={() => saveMutation.mutate()}
             disabled={saveMutation.isPending}
-            className="bg-primary text-on-primary px-5 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card whitespace-nowrap disabled:opacity-60 flex items-center gap-2"
+            className="px-5 py-1.5 h-8 text-sm font-semibold whitespace-nowrap"
           >
             {saved ? <Check size={14} /> : saveMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : null}
             {saved ? 'Saved' : 'Save Changes'}
-          </button>
+          </Button>
           {saveMutation.isError && <p role="alert" className="text-xs text-danger">{saveMutation.error?.message || 'Unable to save settings.'}</p>}
         </div>
       </TopBarActions>
@@ -241,30 +244,30 @@ export default function SettingsGeneral() {
               <div className="flex-1 space-y-4 pt-1">
                 <div>
                   <label className="block text-xs font-bold text-heading mb-1.5">Workspace Name</label>
-                  <input
+                  <Input
                     type="text"
                     value={form.name}
                     onChange={setField('name')}
-                    className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="w-full"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-heading mb-1.5">Support Email</label>
-                  <input
+                  <Input
                     type="email"
                     value={form.supportEmail}
                     onChange={setField('supportEmail')}
-                    className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="w-full"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-heading mb-1.5">Logo URL</label>
-                  <input
+                  <Input
                     type="url"
                     value={form.logoUrl}
                     onChange={setField('logoUrl')}
                     placeholder="https://example.com/logo.png"
-                    className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="w-full"
                   />
                 </div>
               </div>
@@ -334,14 +337,14 @@ export default function SettingsGeneral() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-heading mb-1.5">Overtime After (Hours per Day)</label>
-                <input
+                <Input
                   type="number"
                   min="1"
                   max="24"
                   step="0.25"
                   value={form.overtimeThresholdHours}
                   onChange={setField('overtimeThresholdHours')}
-                  className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full"
                 />
                 <p className="mt-1.5 text-xs text-muted">New weekly timesheets use this threshold. Existing weeks keep their recorded threshold.</p>
               </div>
@@ -361,17 +364,17 @@ export default function SettingsGeneral() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-heading mb-1.5">Rate to {settings.currency}</label>
-                <input required type="text" inputMode="decimal" value={rateForm.rateToBase} onChange={(event) => setRateForm((current) => ({ ...current, rateToBase: event.target.value }))} placeholder="e.g. 1.0875" className="w-full border border-border-strong rounded-input px-3 py-2 text-sm" />
+                <Input required type="text" inputMode="decimal" value={rateForm.rateToBase} onChange={(event) => setRateForm((current) => ({ ...current, rateToBase: event.target.value }))} placeholder="e.g. 1.0875" className="w-full" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-heading mb-1.5">Effective at</label>
-                <input required type="datetime-local" value={rateForm.effectiveAt} onChange={(event) => setRateForm((current) => ({ ...current, effectiveAt: event.target.value }))} className="w-full border border-border-strong rounded-input px-3 py-2 text-sm" />
+                <Input required type="datetime-local" value={rateForm.effectiveAt} onChange={(event) => setRateForm((current) => ({ ...current, effectiveAt: event.target.value }))} className="w-full" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-heading mb-1.5">Reference</label>
-                <input type="text" value={rateForm.reference} onChange={(event) => setRateForm((current) => ({ ...current, reference: event.target.value }))} placeholder="Source or note" className="w-full border border-border-strong rounded-input px-3 py-2 text-sm" />
+                <Input type="text" value={rateForm.reference} onChange={(event) => setRateForm((current) => ({ ...current, reference: event.target.value }))} placeholder="Source or note" className="w-full" />
               </div>
-              <button type="submit" disabled={rateMutation.isPending} className="bg-primary text-on-primary px-4 py-2 rounded-input text-sm font-semibold disabled:opacity-60">{rateMutation.isPending ? 'Saving…' : 'Add Rate'}</button>
+              <Button type="submit" disabled={rateMutation.isPending} className="w-full">{rateMutation.isPending ? 'Saving…' : 'Add Rate'}</Button>
             </form>
             {rateMutation.isError && <p role="alert" className="text-xs text-danger mb-3">{rateMutation.error?.message || 'Unable to save exchange rate.'}</p>}
             <div className="divide-y divide-border-default">
@@ -397,14 +400,15 @@ export default function SettingsGeneral() {
                     </p>
                   </div>
                 </div>
-                <button
+                <Button
+                  variant="destructive"
                   onClick={() => setConfirmOpen(true)}
                   disabled={clearMutation.isPending}
-                  className="flex items-center gap-2 bg-danger-hover text-on-primary px-5 py-2.5 rounded-input text-sm font-semibold hover:bg-danger-text transition-colors shadow-card disabled:opacity-60 whitespace-nowrap"
+                  className="whitespace-nowrap"
                 >
                   <RefreshCw size={14} className={clearMutation.isPending ? 'animate-spin' : ''} />
                   Reset sample data...
-                </button>
+                </Button>
               </div>
             )}
 
@@ -413,15 +417,15 @@ export default function SettingsGeneral() {
                 <h3 className="text-sm font-bold text-heading">Delete Workspace</h3>
                 <p className="text-sm text-body-light mt-0.5">Permanently remove all data, projects, and users.</p>
               </div>
-              <button
+              <Button
+                variant="destructive"
                 type="button"
                 onClick={() => { setDeleteConfirmName(''); setDeleteDialogOpen(true) }}
                 disabled={!isOwner || deleteMutation.isPending}
                 title={!isOwner ? 'Only workspace owners can delete this workspace' : undefined}
-                className="bg-danger-hover text-on-primary px-5 py-2.5 rounded-input text-sm font-semibold hover:bg-danger-text transition-colors shadow-card disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Delete Workspace...
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -437,9 +441,9 @@ export default function SettingsGeneral() {
             <div className="bg-surface-muted border border-border-default rounded-card-sm p-5 mb-6 shadow-card">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-sm font-medium text-body-light">Current Plan</span>
-                <span className="bg-primary text-on-primary px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase">
+                <Badge variant="default" className="text-[10px] font-bold tracking-wider uppercase">
                   {activeSubscription?.planName || 'Standard Tier'}
-                </span>
+                </Badge>
               </div>
               <div className="flex items-baseline gap-1 mb-1">
                 <span className="text-3xl font-extrabold text-heading tracking-tight">
@@ -513,20 +517,21 @@ export default function SettingsGeneral() {
 
           {/* Sticky Bottom Actions */}
           <div className="p-8 bg-surface-raised border-t border-border-subtle flex flex-col gap-4 mt-auto">
-            <button
+            <Button
               type="button"
               onClick={() => navigate('/dashboard/settings/billing')}
-              className="w-full bg-primary text-on-primary py-2.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card"
+              className="w-full"
             >
               Manage Billing
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
               type="button"
               onClick={() => navigate('/dashboard/settings/billing')}
-              className="w-full text-sm font-semibold text-body-light hover:text-heading transition-colors"
+              className="w-full text-body-light hover:text-heading"
             >
               View Invoices
-            </button>
+            </Button>
           </div>
 
         </div>
@@ -565,12 +570,12 @@ export default function SettingsGeneral() {
             <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">
               Workspace Name ({settings?.name || activeOrg?.name})
             </label>
-            <input
+            <Input
               type="text"
               value={deleteConfirmName}
               onChange={(e) => setDeleteConfirmName(e.target.value)}
               placeholder={settings?.name || activeOrg?.name}
-              className="w-full border border-border-default rounded-input px-3 py-2 text-sm bg-surface-muted text-heading focus:outline-none focus:ring-2 focus:ring-danger-hover"
+              className="w-full bg-surface-muted"
             />
           </div>
         </div>

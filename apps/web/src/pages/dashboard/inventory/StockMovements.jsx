@@ -21,6 +21,9 @@ import { useActiveMemberRole } from '../../../lib/authClient'
 import { useDebouncedValue } from '../../../lib/useDebouncedValue'
 import FormDialog from '../../../components/common/FormDialog'
 import TopBarActions from '../../../components/TopBarActions'
+import { Button } from '../../../components/ui/button'
+import { Input } from '../../../components/ui/input'
+import { Badge } from '../../../components/ui/badge'
 
 export default function StockMovements() {
   const queryClient = useQueryClient()
@@ -150,16 +153,16 @@ export default function StockMovements() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button
+          <Button
             type="button"
             onClick={openMovementDialog}
             disabled={!canWrite}
             title={noRoleTitle}
-            className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-input text-xs font-semibold hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60"
+            className="h-8 gap-2 px-4 text-xs font-semibold shadow-card"
           >
             <Plus size={14} />
             Record Movement
-          </button>
+          </Button>
           <TopBarActions />
         </div>
       </div>
@@ -256,12 +259,12 @@ export default function StockMovements() {
             {/* Search */}
             <div className="relative flex-1 min-w-[200px] max-w-md">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-              <input
+              <Input
                 type="text"
                 placeholder="Search by product, warehouse, or note..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                className="w-full bg-surface-muted border border-border-default rounded-input pl-9 pr-3 py-1.5 text-xs text-heading placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full bg-surface-muted pl-9 pr-3 py-1.5 text-xs"
               />
             </div>
 
@@ -323,18 +326,20 @@ export default function StockMovements() {
               <Layers size={32} strokeWidth={1.5} />
               <p className="text-sm">No stock movements found.</p>
               {searchInput || warehouseFilter || typeFilter ? (
-                <button
+                <Button
                   type="button"
+                  variant="link"
+                  size="sm"
                   onClick={() => {
                     setSearchInput('')
                     setWarehouseFilter('')
                     setTypeFilter('')
                     setPage(1)
                   }}
-                  className="text-xs font-semibold text-primary hover:underline"
+                  className="h-auto p-0 text-xs font-semibold text-primary"
                 >
                   Clear filters
-                </button>
+                </Button>
               ) : null}
             </div>
           ) : (
@@ -375,24 +380,25 @@ export default function StockMovements() {
                         </td>
                         <td className="px-5 py-3.5 text-xs text-body">
                           {movement.warehouse ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-surface-muted text-heading border border-border-default">
+                            <Badge variant="outline" className="px-2 py-0.5 rounded text-[11px] font-medium bg-surface-muted text-heading border-border-default">
                               {movement.warehouse}
-                            </span>
+                            </Badge>
                           ) : (
                             <span className="text-muted">—</span>
                           )}
                         </td>
                         <td className="px-5 py-3.5 whitespace-nowrap">
-                          <span
+                          <Badge
+                            variant="outline"
                             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
                               isIn
-                                ? 'bg-success-light text-success-text border border-success-border'
-                                : 'bg-danger-light text-danger border border-danger-border'
+                                ? 'bg-success-light text-success-text border-success-border'
+                                : 'bg-danger-light text-danger border-danger-border'
                             }`}
                           >
                             {isIn ? <ArrowDownLeft size={10} /> : <ArrowUpRight size={10} />}
                             {movement.type || (isIn ? 'IN' : 'OUT')}
-                          </span>
+                          </Badge>
                         </td>
                         <td
                           className={`px-5 py-3.5 text-xs font-bold tabular-nums text-right ${
@@ -419,24 +425,28 @@ export default function StockMovements() {
               Page {pagination.page} of {Math.max(1, pagination.totalPages)}
             </span>
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="icon"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1 || isLoading}
-                className="p-1.5 rounded-button border border-border-default bg-surface-raised text-heading hover:bg-surface-muted disabled:opacity-40 transition-colors"
+                className="h-7 w-7 text-heading"
                 aria-label="Previous page"
               >
                 <ChevronLeft size={14} />
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="outline"
+                size="icon"
                 onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
                 disabled={page >= pagination.totalPages || isLoading}
-                className="p-1.5 rounded-button border border-border-default bg-surface-raised text-heading hover:bg-surface-muted disabled:opacity-40 transition-colors"
+                className="h-7 w-7 text-heading"
                 aria-label="Next page"
               >
                 <ChevronRight size={14} />
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -457,13 +467,13 @@ export default function StockMovements() {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-heading mb-1.5">Product</label>
-            <input
+            <Input
               type="search"
               value={productSearchInput}
               onChange={(event) => setProductSearchInput(event.target.value)}
               placeholder="Search products by name or SKU..."
               aria-label="Search products"
-              className="mb-2 w-full border border-border-default rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary"
+              className="mb-2 w-full text-sm bg-surface-raised"
             />
             <select
               value={movementForm.productId}
@@ -485,8 +495,8 @@ export default function StockMovements() {
             {productPagination && productPagination.pages > 1 && <div className="mt-2 flex items-center justify-between text-xs text-muted">
               <span>{productPagination.total.toLocaleString()} matching products · page {productPage} of {productPagination.pages}</span>
               <div className="flex gap-2">
-                <button type="button" aria-label="Previous product page" disabled={productPage <= 1} onClick={() => setProductPage((current) => Math.max(1, current - 1))} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
-                <button type="button" aria-label="Next product page" disabled={productPage >= productPagination.pages} onClick={() => setProductPage((current) => Math.min(productPagination.pages, current + 1))} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+                <Button type="button" variant="outline" size="sm" aria-label="Previous product page" disabled={productPage <= 1} onClick={() => setProductPage((current) => Math.max(1, current - 1))} className="h-7 px-2 text-xs">Previous</Button>
+                <Button type="button" variant="outline" size="sm" aria-label="Next product page" disabled={productPage >= productPagination.pages} onClick={() => setProductPage((current) => Math.min(productPagination.pages, current + 1))} className="h-7 px-2 text-xs">Next</Button>
               </div>
             </div>}
           </div>
@@ -533,7 +543,7 @@ export default function StockMovements() {
 
           <div>
             <label className="block text-xs font-bold text-heading mb-1.5">Quantity</label>
-            <input
+            <Input
               type="number"
               min="1"
               step="1"
@@ -541,18 +551,18 @@ export default function StockMovements() {
               value={movementForm.quantity}
               onChange={(e) => setMovementForm((f) => ({ ...f, quantity: e.target.value }))}
               placeholder="1"
-              className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full text-sm bg-surface-raised"
             />
           </div>
 
           <div>
             <label className="block text-xs font-bold text-heading mb-1.5">Note / Reference (Optional)</label>
-            <input
+            <Input
               type="text"
               value={movementForm.note}
               onChange={(e) => setMovementForm((f) => ({ ...f, note: e.target.value }))}
               placeholder="e.g. PO-2026-081 or Customer order fulfillment"
-              className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full text-sm bg-surface-raised"
             />
           </div>
         </div>

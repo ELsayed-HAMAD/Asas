@@ -1,4 +1,6 @@
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
+import { Card } from '../ui/card'
+import { Badge } from '../ui/badge'
 
 export default function StatCard({ label, value, change, trend = 'neutral', icon: Icon, subtitle }) {
   const isUp = trend === 'up'
@@ -8,21 +10,20 @@ export default function StatCard({ label, value, change, trend = 'neutral', icon
   const valueFontSize = `clamp(0.75rem, ${(130 / Math.max(1, valueLength)).toFixed(2)}cqw, 1.5rem)`
 
   return (
-    <div className="bg-surface-raised rounded-card border border-border-subtle p-4 sm:p-5 shadow-card hover:shadow-card-hover transition-shadow h-full flex flex-col justify-between" style={{ containerType: 'inline-size' }}>
+    <Card className="p-4 sm:p-5 hover:shadow-card-hover transition-shadow h-full flex flex-col justify-between" style={{ containerType: 'inline-size' }}>
       <div className="flex items-start justify-between gap-2 mb-3.5">
         <div className="w-10 h-10 rounded-card-sm bg-surface-muted flex items-center justify-center border border-border-subtle shrink-0">
           {Icon && <Icon size={18} className="text-body-light" />}
         </div>
         {change && (
-          <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-input text-right ${
-            isUp ? 'text-success-text bg-success-light' :
-            isDown ? 'text-info bg-info-light' :
-            'text-body-light bg-surface-muted'
-          }`}>
+          <Badge
+            variant={isUp ? 'success' : isDown ? 'info' : 'secondary'}
+            className="flex items-center gap-1 font-medium px-2 py-1 text-right text-xs"
+          >
             {isUp && <ArrowUpRight size={14} className="shrink-0" />}
             {isDown && <ArrowDownRight size={14} className="shrink-0" />}
             <span className="leading-tight">{change}</span>
-          </div>
+          </Badge>
         )}
       </div>
       <div>
@@ -36,7 +37,7 @@ export default function StatCard({ label, value, change, trend = 'neutral', icon
           )}
         </div>
       </div>
-    </div>
+    </Card>
   )
 }
 

@@ -25,6 +25,10 @@ import FormDialog from '../../../components/common/FormDialog';
 import { useSearchParams } from 'react-router-dom';
 import { useActiveMemberRole } from '../../../lib/authClient';
 import { getMemberRoleName } from '../../../lib/memberRole';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Badge } from '../../../components/ui/badge';
+import { Alert, AlertDescription } from '../../../components/ui/alert';
 
 const metricFontSize = (money) => {
   const label = formatMoney(money)
@@ -191,23 +195,30 @@ export default function Expenses() {
 
       <TopBarActions>
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             disabled={exportMutation.isPending}
             onClick={() => exportMutation.mutate()}
-            className="h-9 px-4 flex items-center gap-2 bg-primary text-white rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer"
+            className="gap-2 h-9 px-4 font-semibold shadow-card"
           >
             <Download size={14} /> {exportMutation.isPending ? 'Exporting...' : 'Export CSV'}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            size="sm"
             onClick={() => { setCreateError(''); setEmployeeSearchInput(''); setEmployeePage(1); setCreateOpen(true); }}
-            className="h-9 px-4 flex items-center gap-2 bg-primary text-white rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card cursor-pointer"
+            className="gap-2 h-9 px-4 font-semibold shadow-card"
           >
             <Plus size={14} /> New Expense
-          </button>
+          </Button>
         </div>
-        {exportMutation.isError && <p role="alert" className="mt-2 text-xs text-danger">{exportMutation.error?.message || 'Could not export expenses.'}</p>}
+        {exportMutation.isError && (
+          <Alert variant="destructive" className="mt-2 py-2 px-3">
+            <AlertDescription className="text-xs">{exportMutation.error?.message || 'Could not export expenses.'}</AlertDescription>
+          </Alert>
+        )}
       </TopBarActions>
 
       {/* ── KPIs Row (Compact, baseline-aligned) ── */}
@@ -274,12 +285,12 @@ export default function Expenses() {
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="relative flex-shrink-0">
                 <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-                <input
+                <Input
                   type="text"
                   value={searchInput}
                   onChange={event => setSearchInput(event.target.value)}
                   placeholder="Search..."
-                  className="pl-8 pr-2.5 h-7 text-xs border border-border-default rounded-input bg-surface-raised w-40 sm:w-52 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                  className="pl-8 pr-2.5 h-7 text-xs bg-surface-raised w-40 sm:w-52"
                 />
               </div>
               <label className="relative flex items-center border border-border-default text-body px-2.5 h-7 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised flex-shrink-0 cursor-pointer">
@@ -390,9 +401,9 @@ export default function Expenses() {
 
                         {/* Status Column */}
                         <td className="px-2.5 py-0 align-middle border-b border-border-subtle text-center whitespace-nowrap">
-                          <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[11px] font-semibold ${badgeStyle}`}>
+                          <Badge variant="outline" className={`border-0 text-[11px] font-semibold ${badgeStyle}`}>
                             {item.status}
-                          </span>
+                          </Badge>
                         </td>
 
                         {/* Amount Column */}
@@ -453,63 +464,80 @@ export default function Expenses() {
                 <div className="space-y-2 pt-1">
                   {/* Below: Compact action group with sufficient width for labels */}
                   <div className="flex items-center gap-1.5">
-                    <button
+                    <Button
                       type="button"
+                      size="sm"
                       disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'PENDING'}
                       onClick={() => statusMutation.mutate('APPROVED')}
-                      className="h-9 flex-1 whitespace-nowrap px-2.5 bg-primary text-white rounded-input text-xs font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer text-center"
+                      className="h-9 flex-1 whitespace-nowrap text-xs font-semibold px-2.5"
                     >
                       Approve
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      size="sm"
                       disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'APPROVED'}
                       onClick={() => statusMutation.mutate('REIMBURSED')}
                       title="Records reimbursement after it has been paid outside Asas."
-                      className="h-9 flex-1 whitespace-nowrap px-2.5 bg-primary text-white rounded-input text-xs font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer text-center"
+                      className="h-9 flex-1 whitespace-nowrap text-xs font-semibold px-2.5"
                     >
                       Mark Reimbursed
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
                       disabled={!selectedRecord || statusMutation.isPending || ['APPROVED', 'REIMBURSED', 'REJECTED', 'VOID'].includes(selectedRecord.status)}
                       onClick={() => statusMutation.mutate('REJECTED')}
-                      className="h-9 px-3 whitespace-nowrap border border-border-default text-body rounded-input text-xs font-medium hover:bg-surface-muted transition-colors disabled:opacity-60 cursor-pointer text-center"
+                      className="h-9 px-3 whitespace-nowrap text-xs font-medium"
                     >
                       Reject
-                    </button>
+                    </Button>
                   </div>
 
                   {/* Clearly separated: Destructive action */}
                   <div className="pt-2 border-t border-border-subtle">
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
                       disabled={!selectedRecord || voidMutation.isPending || selectedRecord.status === 'VOID'}
                       onClick={() => {
                         const reason = window.prompt('Reason for voiding this expense:')?.trim()
                         if (reason) voidMutation.mutate(reason)
                       }}
-                      className="h-9 w-full whitespace-nowrap px-3 border border-danger/40 text-danger rounded-input text-xs font-medium hover:bg-danger/5 transition-colors disabled:opacity-60 cursor-pointer text-center"
+                      className="h-9 w-full whitespace-nowrap text-xs font-medium border-danger/40 text-danger hover:bg-danger/5"
                     >
                       {voidMutation.isPending ? 'Voiding…' : 'Void expense'}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
                 <div className="pt-1">
-                  <span className={`inline-flex items-center justify-center h-8 px-3 w-full rounded-input text-xs font-semibold uppercase tracking-wider ${
-                    selectedRecord.status === 'APPROVED' ? 'bg-accent-light text-accent' :
-                    selectedRecord.status === 'REIMBURSED' ? 'bg-accent text-white' :
-                    selectedRecord.status === 'REJECTED' || selectedRecord.status === 'VOID' ? 'bg-danger-light text-danger' :
-                    'bg-[#fff7ed] text-[#c2410c]'
-                  }`}>
+                  <Badge
+                    variant="outline"
+                    className={`inline-flex items-center justify-center h-8 px-3 w-full text-xs font-semibold uppercase tracking-wider border-0 ${
+                      selectedRecord.status === 'APPROVED' ? 'bg-accent-light text-accent' :
+                      selectedRecord.status === 'REIMBURSED' ? 'bg-accent text-white' :
+                      selectedRecord.status === 'REJECTED' || selectedRecord.status === 'VOID' ? 'bg-danger-light text-danger' :
+                      'bg-[#fff7ed] text-[#c2410c]'
+                    }`}
+                  >
                     {selectedRecord.status}
-                  </span>
+                  </Badge>
                 </div>
               )}
             </div>
-            {statusMutation.isError && <p role="alert" className="text-xs text-danger">{statusMutation.error?.message || 'Unable to update the expense status.'}</p>}
-            {voidMutation.isError && <p role="alert" className="text-xs text-danger">{voidMutation.error?.message || 'Unable to void the expense.'}</p>}
+            {statusMutation.isError && (
+              <Alert variant="destructive" className="py-2 px-3">
+                <AlertDescription className="text-xs">{statusMutation.error?.message || 'Unable to update the expense status.'}</AlertDescription>
+              </Alert>
+            )}
+            {voidMutation.isError && (
+              <Alert variant="destructive" className="py-2 px-3">
+                <AlertDescription className="text-xs">{voidMutation.error?.message || 'Unable to void the expense.'}</AlertDescription>
+              </Alert>
+            )}
 
             {/* AI Data Extraction / Expense Details Card (standardized two-column alignment) */}
             <div className="bg-surface-raised border border-border-default rounded-card-sm p-3.5 shadow-card">
@@ -555,12 +583,12 @@ export default function Expenses() {
                 </div>
                 <div className="flex items-center gap-2.5 text-muted text-xs font-medium">
                   {!receiptOpen ? (
-                    <button type="button" onClick={() => setReceiptOpen(true)} className="hover:text-accent transition-colors text-accent font-semibold cursor-pointer">View Receipt</button>
+                    <Button type="button" variant="link" size="sm" onClick={() => setReceiptOpen(true)} className="h-auto p-0 text-accent font-semibold text-xs">View Receipt</Button>
                   ) : (
                     <>
-                      <button type="button" aria-label="Zoom out receipt" disabled={receiptZoom <= 50} onClick={() => setReceiptZoom(value => Math.max(50, value - 25))} className="hover:text-heading transition-colors disabled:opacity-40 cursor-pointer"><ZoomOut size={13} /></button>
+                      <Button type="button" variant="ghost" size="icon" aria-label="Zoom out receipt" disabled={receiptZoom <= 50} onClick={() => setReceiptZoom(value => Math.max(50, value - 25))} className="h-6 w-6"><ZoomOut size={13} /></Button>
                       <span className="text-[11px]">{receiptZoom}%</span>
-                      <button type="button" aria-label="Zoom in receipt" disabled={receiptZoom >= 200} onClick={() => setReceiptZoom(value => Math.min(200, value + 25))} className="hover:text-heading transition-colors disabled:opacity-40 cursor-pointer"><ZoomIn size={13} /></button>
+                      <Button type="button" variant="ghost" size="icon" aria-label="Zoom in receipt" disabled={receiptZoom >= 200} onClick={() => setReceiptZoom(value => Math.min(200, value + 25))} className="h-6 w-6"><ZoomIn size={13} /></Button>
                     </>
                   )}
                 </div>
@@ -634,13 +662,13 @@ export default function Expenses() {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-heading mb-1.5">Description / Purpose</label>
-            <input
+            <Input
               type="text"
               required
               value={createForm.name}
               onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="e.g. Client lunch meeting"
-              className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full text-sm"
             />
           </div>
 
@@ -650,7 +678,7 @@ export default function Expenses() {
               <select
                 value={createForm.category}
                 onChange={(e) => setCreateForm((f) => ({ ...f, category: e.target.value }))}
-                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full border border-border-default rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 <option value="OFFICE">Office</option>
                 <option value="TRAVEL">Travel</option>
@@ -663,12 +691,12 @@ export default function Expenses() {
 
             <div>
               <label className="block text-xs font-bold text-heading mb-1.5">Merchant</label>
-              <input
+              <Input
                 type="text"
                 value={createForm.merchant}
                 onChange={(e) => setCreateForm((f) => ({ ...f, merchant: e.target.value }))}
                 placeholder="e.g. AWS, Uber"
-                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full text-sm"
               />
             </div>
           </div>
@@ -676,26 +704,26 @@ export default function Expenses() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-heading mb-1.5">Amount</label>
-              <input
+              <Input
                 type="text"
                 inputMode="decimal"
                 required
                 value={createForm.amount}
                 onChange={(e) => setCreateForm((f) => ({ ...f, amount: e.target.value }))}
                 placeholder="0.00"
-                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full text-sm"
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-heading mb-1.5">Tax (Optional)</label>
-              <input
+              <Input
                 type="text"
                 inputMode="decimal"
                 value={createForm.tax}
                 onChange={(e) => setCreateForm((f) => ({ ...f, tax: e.target.value }))}
                 placeholder="0.00"
-                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full text-sm"
               />
             </div>
           </div>
@@ -703,25 +731,25 @@ export default function Expenses() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-heading mb-1.5">Date Incurred</label>
-              <input
+              <Input
                 type="date"
                 required
                 value={createForm.date}
                 onChange={(e) => setCreateForm((f) => ({ ...f, date: e.target.value }))}
-                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full text-sm"
               />
             </div>
 
             {isAdmin && (
               <div>
                 <label className="block text-xs font-bold text-heading mb-1.5">Employee (Optional)</label>
-                <input
+                <Input
                   type="search"
                   aria-label="Search employees"
                   placeholder="Search by name, title, or email"
                   value={employeeSearchInput}
                   onChange={event => { setEmployeeSearchInput(event.target.value); setEmployeePage(1) }}
-                  className="mb-2 w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="mb-2 w-full text-sm"
                 />
                 <select
                   aria-label="Expense employee"
@@ -731,7 +759,7 @@ export default function Expenses() {
                     setCreateForm(current => ({ ...current, employeeId: e.target.value }))
                     setSelectedEmployeeName(employee?.name ?? '')
                   }}
-                  className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full border border-border-default rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent"
                 >
                   <option value="">Select employee...</option>
                   {createForm.employeeId && !(employeesData?.items ?? []).some(employee => employee.id === createForm.employeeId) && (
@@ -746,9 +774,9 @@ export default function Expenses() {
                 {employeesData?.pagination && <div className="mt-2 flex items-center justify-between text-[11px] text-muted">
                   <span>Showing {employeesData.pagination.total === 0 ? 0 : (employeePage - 1) * employeesData.pagination.limit + 1}–{Math.min(employeePage * employeesData.pagination.limit, employeesData.pagination.total)} of {employeesData.pagination.total}</span>
                   <div className="flex items-center gap-2">
-                    <button type="button" disabled={employeePage <= 1} onClick={() => setEmployeePage(current => current - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
+                    <Button type="button" variant="outline" size="sm" disabled={employeePage <= 1} onClick={() => setEmployeePage(current => current - 1)} className="h-6 px-2 text-xs">Previous</Button>
                     <span>Page {employeesData.pagination.pages === 0 ? 0 : employeePage} of {employeesData.pagination.pages}</span>
-                    <button type="button" disabled={employeePage >= employeesData.pagination.pages} onClick={() => setEmployeePage(current => current + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+                    <Button type="button" variant="outline" size="sm" disabled={employeePage >= employeesData.pagination.pages} onClick={() => setEmployeePage(current => current + 1)} className="h-6 px-2 text-xs">Next</Button>
                   </div>
                 </div>}
               </div>

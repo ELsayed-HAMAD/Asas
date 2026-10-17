@@ -10,6 +10,10 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import TopBarActions from '../../../components/TopBarActions';
 import SettingsTabs from './SettingsTabs';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Badge } from '../../../components/ui/badge';
+import { Switch } from '../../../components/ui/switch';
 import { settingsApi } from '../../../lib/api/settings';
 import { queryKeys } from '../../../lib/queryKeys';
 
@@ -130,32 +134,33 @@ export default function SettingsIntegrations() {
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
-            <input
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption z-10 pointer-events-none" />
+            <Input
               type="text"
               placeholder="Search integrations..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className="pl-9 pr-4 py-1.5 h-8 text-sm w-64 bg-surface-raised"
             />
           </div>
 
-          <button
+          <Button
+            variant="outline"
             type="button"
             onClick={() => setStatusFilter(statusFilter === 'ALL' ? 'CONNECTED' : statusFilter === 'CONNECTED' ? 'CONFIGURE' : statusFilter === 'CONFIGURE' ? 'DISCONNECTED' : 'ALL')}
-            className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised disabled:opacity-60"
+            className="h-8 gap-2 text-body"
           >
             Status: {statusFilter === 'ALL' ? 'All' : statusFilter === 'CONNECTED' ? 'Connected' : statusFilter === 'CONFIGURE' ? 'Configure' : 'Disconnected'}
             <ChevronDown size={14} className="text-caption" />
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
             onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 bg-primary text-on-primary px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60"
+            className="h-8 gap-2"
           >
             <Plus size={16} /> Custom Webhook
-          </button>
+          </Button>
         </div>
       </TopBarActions>
 
@@ -186,14 +191,14 @@ export default function SettingsIntegrations() {
                       <IntegrationIcon name={integration.name} />
                     </div>
                     {integration.status === 'CONNECTED' ? (
-                      <span className="inline-flex items-center gap-1.5 bg-success-light text-success-text px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide">
+                      <Badge className="bg-success-light text-success-text hover:bg-success-light gap-1.5 text-[11px] font-bold tracking-wide">
                         <div className="w-1.5 h-1.5 rounded-full bg-success"></div>
                         Connected
-                      </span>
+                      </Badge>
                     ) : (
-                      <span className="inline-flex items-center bg-surface-raised border border-border-default text-body-light px-3 py-1 rounded-full text-[11px] font-bold tracking-wide shadow-card">
+                      <Badge variant="outline" className="text-[11px] font-bold tracking-wide">
                         Configure
-                      </span>
+                      </Badge>
                     )}
                   </div>
                   <div>
@@ -232,23 +237,21 @@ export default function SettingsIntegrations() {
                     {/* Option 1 */}
                     <div className="flex items-center justify-between p-4">
                       <span className="text-sm font-semibold text-heading">Sync Pull Requests</span>
-                      <div
-                        onClick={() => setSync('syncPullRequests', !selected.syncPullRequests)}
-                        className={`w-10 h-5 rounded-full relative flex items-center px-0.5 cursor-pointer shadow-panel ${selected.syncPullRequests ? 'bg-accent' : 'bg-surface-strong'}`}
-                      >
-                        <div className={`w-4 h-4 bg-on-primary rounded-full transition-transform shadow-card ${selected.syncPullRequests ? 'translate-x-5' : 'border border-border-strong'}`}></div>
-                      </div>
+                      <Switch
+                        checked={Boolean(selected.syncPullRequests)}
+                        onCheckedChange={(val) => setSync('syncPullRequests', val)}
+                        color="primary"
+                      />
                     </div>
 
                     {/* Option 2 */}
                     <div className="flex items-center justify-between p-4">
                       <span className="text-sm font-semibold text-heading">Sync CI/CD Status</span>
-                      <div
-                        onClick={() => setSync('syncCiCdStatus', !selected.syncCiCdStatus)}
-                        className={`w-10 h-5 rounded-full relative flex items-center px-0.5 cursor-pointer shadow-panel ${selected.syncCiCdStatus ? 'bg-accent' : 'bg-surface-strong'}`}
-                      >
-                        <div className={`w-4 h-4 bg-on-primary rounded-full transition-transform shadow-card ${selected.syncCiCdStatus ? 'translate-x-5' : 'border border-border-strong'}`}></div>
-                      </div>
+                      <Switch
+                        checked={Boolean(selected.syncCiCdStatus)}
+                        onCheckedChange={(val) => setSync('syncCiCdStatus', val)}
+                        color="primary"
+                      />
                     </div>
 
                     {/* Option 3: Credential */}
@@ -317,17 +320,18 @@ export default function SettingsIntegrations() {
           {/* Sticky Bottom Actions */}
           <div className="p-8 bg-surface-raised border-t border-border-subtle mt-auto space-y-3">
             {selected && selected.status !== 'CONNECTED' ? (
-              <button
+              <Button
                 type="button"
                 onClick={() => connectMutation.mutate(selected.id)}
                 disabled={connectMutation.isPending}
-                className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary py-2.5 rounded-input text-sm font-bold hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60"
+                className="w-full flex items-center justify-center gap-2"
               >
                 {connectMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : null}
                 Connect Integration
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
+                variant="destructive"
                 type="button"
                 onClick={() => {
                   if (selected && window.confirm(`Are you sure you want to disconnect ${selected.name}?`)) {
@@ -335,11 +339,11 @@ export default function SettingsIntegrations() {
                   }
                 }}
                 disabled={!selected || selected?.status === 'DISCONNECTED' || disconnectMutation.isPending}
-                className="w-full flex items-center justify-center gap-2 bg-surface-raised border border-danger-border text-danger py-2.5 rounded-input text-sm font-bold hover:bg-danger-light transition-colors shadow-card disabled:opacity-60"
+                className="w-full flex items-center justify-center gap-2"
               >
                 {disconnectMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Link2Off size={16} />}
                 Disconnect Integration
-              </button>
+              </Button>
             )}
           </div>
 
@@ -359,7 +363,7 @@ export default function SettingsIntegrations() {
             <h2 className="mb-2 text-lg font-bold text-heading">Configure Credential</h2>
             <p className="mb-4 text-xs text-muted">Enter the API key, token, or secret for {selected?.name}. Stored securely on the server.</p>
             <label className="mb-4 block text-sm font-semibold text-heading">Secret / API Key
-              <input
+              <Input
                 type="password"
                 autoFocus
                 required
@@ -367,14 +371,14 @@ export default function SettingsIntegrations() {
                 value={credentialInput}
                 onChange={(event) => setCredentialInput(event.target.value)}
                 placeholder="Enter secret token or key..."
-                className="mt-1 w-full rounded-input border border-border-default bg-surface px-3 py-2 font-normal"
+                className="mt-1 w-full bg-surface"
               />
             </label>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setShowCredentialModal(false)} className="rounded-input border border-border-default px-4 py-2 text-sm">Cancel</button>
-              <button type="submit" disabled={!credentialInput.trim() || toggleMutation.isPending} className="rounded-input bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:opacity-60">
+              <Button type="button" variant="outline" onClick={() => setShowCredentialModal(false)}>Cancel</Button>
+              <Button type="submit" disabled={!credentialInput.trim() || toggleMutation.isPending}>
                 {toggleMutation.isPending ? 'Saving…' : 'Save & Connect'}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -395,18 +399,18 @@ export default function SettingsIntegrations() {
           }}>
             <h2 className="mb-4 text-lg font-bold text-heading">Add custom integration</h2>
             <label className="mb-3 block text-sm font-semibold text-heading">Name
-              <input autoFocus required maxLength={120} value={newName} onChange={(event) => setNewName(event.target.value)} className="mt-1 w-full rounded-input border border-border-default bg-surface px-3 py-2 font-normal" />
+              <Input autoFocus required maxLength={120} value={newName} onChange={(event) => setNewName(event.target.value)} className="mt-1 w-full bg-surface" />
             </label>
             <label className="mb-3 block text-sm font-semibold text-heading">Description
-              <input maxLength={500} value={newDescription} onChange={(event) => setNewDescription(event.target.value)} className="mt-1 w-full rounded-input border border-border-default bg-surface px-3 py-2 font-normal" />
+              <Input maxLength={500} value={newDescription} onChange={(event) => setNewDescription(event.target.value)} className="mt-1 w-full bg-surface" />
             </label>
             <label className="mb-5 block text-sm font-semibold text-heading">Secret / API Key (Optional)
-              <input type="password" maxLength={4096} value={newCredential} onChange={(event) => setNewCredential(event.target.value)} placeholder="Optional webhook token or secret..." className="mt-1 w-full rounded-input border border-border-default bg-surface px-3 py-2 font-normal" />
+              <Input type="password" maxLength={4096} value={newCredential} onChange={(event) => setNewCredential(event.target.value)} placeholder="Optional webhook token or secret..." className="mt-1 w-full bg-surface" />
             </label>
             {createMutation.isError && <p className="mb-3 text-sm text-danger">Could not create integration. Check the name and try again.</p>}
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setShowCreate(false)} className="rounded-input border border-border-default px-4 py-2 text-sm">Cancel</button>
-              <button type="submit" disabled={createMutation.isPending || !newName.trim()} className="rounded-input bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:opacity-60">{createMutation.isPending ? 'Adding…' : 'Add integration'}</button>
+              <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+              <Button type="submit" disabled={createMutation.isPending || !newName.trim()}>{createMutation.isPending ? 'Adding…' : 'Add integration'}</Button>
             </div>
           </form>
         </div>

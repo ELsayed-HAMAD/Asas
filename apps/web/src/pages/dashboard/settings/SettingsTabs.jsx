@@ -1,5 +1,4 @@
 import { Link, useLocation } from 'react-router-dom'
-import { motion } from 'framer-motion'
 
 export default function SettingsTabs() {
   const { pathname } = useLocation()
@@ -25,11 +24,8 @@ export default function SettingsTabs() {
           >
             {tab.name}
             {isActive && (
-              <motion.div
-                layoutId="activeSettingsTab"
-                className="absolute left-0 right-0 bottom-0 h-0.5 bg-primary"
-                initial={false}
-                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              <div
+                className="absolute left-0 right-0 bottom-0 h-0.5 bg-primary transition-all"
               />
             )}
           </Link>

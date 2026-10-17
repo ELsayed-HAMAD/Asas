@@ -11,6 +11,11 @@ import { useActiveMemberRole } from '../../../lib/authClient'
 import { getMemberRoleName } from '../../../lib/memberRole'
 import FormDialog from '../../../components/common/FormDialog'
 import QueryState from '../../../components/common/QueryState'
+import { Button } from '../../../components/ui/button'
+import { Input } from '../../../components/ui/input'
+import { Textarea } from '../../../components/ui/textarea'
+import { Badge } from '../../../components/ui/badge'
+import { Alert, AlertDescription } from '../../../components/ui/alert'
 
 function initials(name = '') {
   return name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase()).join('') || '?'
@@ -112,23 +117,26 @@ function CandidateInspector({ candidate, interviews = [], onClose, canWrite, can
           </div>
 
           <div className="grid grid-cols-2 gap-2 mt-3.5">
-            <button
+            <Button
+              size="sm"
               type="button"
               disabled={!canWrite || !canMoveStage}
               onClick={onSchedule}
               title={!canWrite ? 'Requires the ADMIN role' : !canMoveStage ? 'Candidate is closed' : undefined}
-              className="flex items-center justify-center gap-1.5 bg-primary text-white text-xs font-medium py-2 rounded-input hover:bg-primary-hover disabled:opacity-60 transition-colors cursor-pointer"
+              className="gap-1.5 text-xs py-2"
             >
               <Calendar size={13} /> Schedule
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               type="button"
               disabled={!canWrite || !canMoveStage}
               onClick={onMoveStage}
-              className="flex items-center justify-center gap-1.5 bg-surface-raised border border-border-default text-body text-xs font-medium py-2 rounded-input hover:bg-surface-muted disabled:opacity-60 transition-colors cursor-pointer"
+              className="gap-1.5 text-xs py-2"
             >
               <ArrowRight size={13} /> Move Stage
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -567,13 +575,13 @@ export default function RecruitmentPipeline() {
         {/* Left group */}
         <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
-            <input
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
+            <Input
               type="text"
               value={search}
               onChange={event => { setSearch(event.target.value); setPage(1) }}
               placeholder="Search candidates..."
-              className="pl-9 pr-4 py-2 text-xs border border-border-default rounded-input bg-surface-raised w-72 max-w-full focus:outline-none focus:border-border-strong focus:ring-2 focus:ring-border-subtle transition-all shadow-card"
+              className="pl-9 pr-4 py-2 text-xs w-72 max-w-full"
             />
           </div>
           <div className="relative flex items-center">
@@ -594,30 +602,33 @@ export default function RecruitmentPipeline() {
 
         {/* Right group */}
         <div className="flex items-center gap-2.5 shrink-0 ml-auto">
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
             disabled={!canWrite || exporting}
             title={canWrite ? 'Export all candidates matching the current search' : 'Requires the ADMIN role'}
             onClick={exportCandidates}
-            className="flex items-center gap-2 border border-border-default text-body px-3.5 py-2 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised disabled:opacity-60 cursor-pointer shadow-card"
+            className="gap-2 shadow-sm"
           >
             {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Export
-          </button>
-          <button
+          </Button>
+          <Button
+            size="sm"
             type="button"
             disabled={!canWrite}
             title={canWrite ? undefined : 'Requires the ADMIN role'}
             onClick={() => { setFormError(null); setAddOpen(true) }}
-            className="flex items-center gap-2 bg-primary text-white px-3.5 py-2 rounded-input text-xs font-medium hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer shadow-card"
+            className="gap-2 shadow-sm"
           >
             <UserPlus size={14} /> + Add Candidate
-          </button>
+          </Button>
         </div>
       </div>
       {exportError && (
-        <div role="alert" className="text-xs text-danger -mt-3 mb-4 flex-shrink-0">
-          {exportError}
-        </div>
+        <Alert variant="destructive" className="-mt-3 mb-4 flex-shrink-0">
+          <AlertDescription>{exportError}</AlertDescription>
+        </Alert>
       )}
 
       {/* ── Top 4 KPI Cards (grid-cols-12 gap-5 mb-5) ── */}
@@ -694,9 +705,9 @@ export default function RecruitmentPipeline() {
                         </td>
                         <td className="px-5 py-2.5 text-sm text-body whitespace-nowrap">{cand.role}</td>
                         <td className="px-5 py-2.5 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${STAGE_COLORS[stageLabel] || 'bg-surface-active text-body'}`}>
+                          <Badge variant="outline" className={STAGE_COLORS[stageLabel] || 'bg-surface-active text-body'}>
                             {stageLabel}
-                          </span>
+                          </Badge>
                         </td>
                         <td className="px-5 py-2.5 text-sm text-body-light text-right whitespace-nowrap">
                           {cand.timeInStage || '—'}
@@ -713,23 +724,27 @@ export default function RecruitmentPipeline() {
             <div className="flex-shrink-0 flex items-center justify-between px-5 py-2.5 border-t border-border-default text-xs text-muted bg-surface-muted/30">
               <span>Showing {data.pagination.total === 0 ? 0 : (page - 1) * data.pagination.limit + 1}–{Math.min(page * data.pagination.limit, data.pagination.total)} of {data.pagination.total} candidates</span>
               <div className="flex items-center gap-2">
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   type="button"
                   disabled={page <= 1}
                   onClick={() => setPage(current => current - 1)}
-                  className="rounded border border-border-default px-2 py-1 disabled:opacity-40 hover:bg-surface-muted transition-colors cursor-pointer"
+                  className="h-7 px-2 text-xs"
                 >
                   Previous
-                </button>
+                </Button>
                 <span>Page {data.pagination.pages === 0 ? 0 : page} of {data.pagination.pages}</span>
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   type="button"
                   disabled={page >= data.pagination.pages}
                   onClick={() => setPage(current => current + 1)}
-                  className="rounded border border-border-default px-2 py-1 disabled:opacity-40 hover:bg-surface-muted transition-colors cursor-pointer"
+                  className="h-7 px-2 text-xs"
                 >
                   Next
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -784,75 +799,78 @@ export default function RecruitmentPipeline() {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-muted mb-1">Name <span className="text-danger">*</span></label>
-            <input
+            <Input
               type="text"
               value={form.name}
               onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
               placeholder="e.g. Jordan Blake"
-              className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-muted mb-1">Role <span className="text-danger">*</span></label>
-            <input
+            <Input
               type="text"
               value={form.role}
               onChange={(e) => setForm(f => ({ ...f, role: e.target.value }))}
               placeholder="e.g. Frontend Engineer"
-              className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-muted mb-1">Email</label>
-            <input
+            <Input
               type="email"
               value={form.email}
               onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
               placeholder="jordan@example.com"
-              className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-muted mb-1">Location</label>
-              <input
+              <Input
                 type="text"
                 value={form.location}
                 onChange={(e) => setForm(f => ({ ...f, location: e.target.value }))}
                 placeholder="e.g. Remote"
-                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-muted mb-1">Source</label>
-              <input
+              <Input
                 type="text"
                 value={form.source}
                 onChange={(e) => setForm(f => ({ ...f, source: e.target.value }))}
                 placeholder="e.g. LinkedIn"
-                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
               />
             </div>
           </div>
-          {formError && <p className="text-xs text-danger">{formError}</p>}
+          {formError && (
+            <Alert variant="destructive">
+              <AlertDescription>{formError}</AlertDescription>
+            </Alert>
+          )}
         </div>
       </FormDialog>
 
       <FormDialog open={stageOpen} onClose={() => setStageOpen(false)} title="Move candidate stage" subtitle={selectedCandidate?.name} confirmLabel="Save stage" busy={moveStageMutation.isPending} onConfirm={() => moveStageMutation.mutate()}>
-        <label className="block text-sm font-medium text-body">Stage<select value={nextStage} onChange={event => setNextStage(event.target.value)} className="mt-1 w-full rounded-input border border-border-default px-3 py-2">{(NEXT_STAGES[selectedCandidate?.stage] || []).map(stage => <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>)}</select></label>
+        <label className="block text-sm font-medium text-body">Stage<select value={nextStage} onChange={event => setNextStage(event.target.value)} className="mt-1 w-full rounded-input border border-border-default px-3 py-2 bg-surface-raised">{(NEXT_STAGES[selectedCandidate?.stage] || []).map(stage => <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>)}</select></label>
       </FormDialog>
 
       <FormDialog open={scheduleOpen} onClose={() => setScheduleOpen(false)} title="Schedule interview" subtitle={selectedCandidate?.name} confirmLabel="Schedule interview" busy={scheduleInterviewMutation.isPending} onConfirm={submitInterview}>
         <div className="space-y-3">
-          <label className="block text-sm font-medium text-body">Date and time (your device time)<input type="datetime-local" value={interviewForm.startsAt} onChange={event => setInterviewForm(f => ({ ...f, startsAt: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
+          <label className="block text-sm font-medium text-body">Date and time (your device time)<Input type="datetime-local" value={interviewForm.startsAt} onChange={event => setInterviewForm(f => ({ ...f, startsAt: event.target.value }))} className="mt-1" /></label>
           <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm font-medium text-body">Interview stage<select value={interviewForm.stage} onChange={event => setInterviewForm(f => ({ ...f, stage: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2">{['SCREENING', 'TECH_INTERVIEW', 'FINAL_INTERVIEW'].map(stage => <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>)}</select></label>
-            <label className="block text-sm font-medium text-body">Duration (minutes)<input type="number" min="15" max="480" step="15" value={interviewForm.durationMin} onChange={event => setInterviewForm(f => ({ ...f, durationMin: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
+            <label className="block text-sm font-medium text-body">Interview stage<select value={interviewForm.stage} onChange={event => setInterviewForm(f => ({ ...f, stage: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2 bg-surface-raised">{['SCREENING', 'TECH_INTERVIEW', 'FINAL_INTERVIEW'].map(stage => <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>)}</select></label>
+            <label className="block text-sm font-medium text-body">Duration (minutes)<Input type="number" min="15" max="480" step="15" value={interviewForm.durationMin} onChange={event => setInterviewForm(f => ({ ...f, durationMin: event.target.value }))} className="mt-1" /></label>
           </div>
-          <label className="block text-sm font-medium text-body">Interviewer<input value={interviewForm.interviewer} onChange={event => setInterviewForm(f => ({ ...f, interviewer: event.target.value }))} maxLength={160} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
-          <label className="block text-sm font-medium text-body">Meeting URL<input type="url" value={interviewForm.meetingUrl} onChange={event => setInterviewForm(f => ({ ...f, meetingUrl: event.target.value }))} placeholder="https://..." className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
-          <label className="block text-sm font-medium text-body">Notes<textarea value={interviewForm.notes} onChange={event => setInterviewForm(f => ({ ...f, notes: event.target.value }))} maxLength={2000} rows={3} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
-          {interviewError && <p role="alert" className="text-xs text-danger">{interviewError}</p>}
+          <label className="block text-sm font-medium text-body">Interviewer<Input value={interviewForm.interviewer} onChange={event => setInterviewForm(f => ({ ...f, interviewer: event.target.value }))} maxLength={160} className="mt-1" /></label>
+          <label className="block text-sm font-medium text-body">Meeting URL<Input type="url" value={interviewForm.meetingUrl} onChange={event => setInterviewForm(f => ({ ...f, meetingUrl: event.target.value }))} placeholder="https://..." className="mt-1" /></label>
+          <label className="block text-sm font-medium text-body">Notes<Textarea value={interviewForm.notes} onChange={event => setInterviewForm(f => ({ ...f, notes: event.target.value }))} maxLength={2000} rows={3} className="mt-1" /></label>
+          {interviewError && (
+            <Alert variant="destructive">
+              <AlertDescription>{interviewError}</AlertDescription>
+            </Alert>
+          )}
         </div>
       </FormDialog>
 
@@ -868,79 +886,76 @@ export default function RecruitmentPipeline() {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-muted mb-1">Name <span className="text-danger">*</span></label>
-            <input
+            <Input
               type="text"
               value={editForm.name}
               onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))}
               placeholder="e.g. Jordan Blake"
-              className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-muted mb-1">Role <span className="text-danger">*</span></label>
-            <input
+            <Input
               type="text"
               value={editForm.role}
               onChange={(e) => setEditForm(f => ({ ...f, role: e.target.value }))}
               placeholder="e.g. Frontend Engineer"
-              className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-muted mb-1">Email</label>
-            <input
+            <Input
               type="email"
               value={editForm.email}
               onChange={(e) => setEditForm(f => ({ ...f, email: e.target.value }))}
               placeholder="jordan@example.com"
-              className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-muted mb-1">Location</label>
-              <input
+              <Input
                 type="text"
                 value={editForm.location}
                 onChange={(e) => setEditForm(f => ({ ...f, location: e.target.value }))}
                 placeholder="e.g. Remote"
-                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-muted mb-1">Source</label>
-              <input
+              <Input
                 type="text"
                 value={editForm.source}
                 onChange={(e) => setEditForm(f => ({ ...f, source: e.target.value }))}
                 placeholder="e.g. LinkedIn"
-                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
               />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-muted mb-1">Experience</label>
-              <input
+              <Input
                 type="text"
                 value={editForm.experience}
                 onChange={(e) => setEditForm(f => ({ ...f, experience: e.target.value }))}
                 placeholder="e.g. 5+ years"
-                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-muted mb-1">Education</label>
-              <input
+              <Input
                 type="text"
                 value={editForm.education}
                 onChange={(e) => setEditForm(f => ({ ...f, education: e.target.value }))}
                 placeholder="e.g. BSc Computer Science"
-                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
               />
             </div>
           </div>
-          {editError && <p className="text-xs text-danger">{editError}</p>}
+          {editError && (
+            <Alert variant="destructive">
+              <AlertDescription>{editError}</AlertDescription>
+            </Alert>
+          )}
         </div>
       </FormDialog>
 

@@ -8,6 +8,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useQuery } from '@tanstack/react-query'
 import TopBarActions from '../../components/TopBarActions'
 import StatCard from '../../components/common/StatCard'
+import { Button } from '../../components/ui/button'
 import { dashboardApi } from '../../lib/api/dashboard'
 import { auditLogApi } from '../../lib/api/auditLog'
 import { queryKeys } from '../../lib/queryKeys'
@@ -236,9 +237,9 @@ export default function DashboardOverview() {
 
       <TopBarActions>
         <div className="flex items-center gap-3">
-          <button type="button" onClick={downloadReport} className="bg-surface-raised border border-border-default text-body text-sm font-medium px-4 py-2 rounded-button hover:bg-surface-muted transition-colors">
+          <Button type="button" variant="outline" size="sm" onClick={downloadReport} className="bg-surface-raised font-medium">
             Generate Report
-          </button>
+          </Button>
         </div>
       </TopBarActions>
 

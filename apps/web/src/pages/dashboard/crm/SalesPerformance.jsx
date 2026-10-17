@@ -18,6 +18,17 @@ import { crmApi } from '../../../lib/api/crm';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatCompactTableMoney, formatMoney, formatPercent, moneyToMajor } from '../../../lib/format';
 import { downloadCsv } from '../../../lib/csv';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Badge } from '../../../components/ui/badge';
+import { Progress } from '../../../components/ui/progress';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from '../../../components/ui/dropdown-menu';
 
 const REP_SPARK_COLORS = ['#10b981', '#3b82f6', '#ef4444']
 
@@ -40,7 +51,6 @@ export default function SalesPerformance() {
   const [showAllDeals, setShowAllDeals] = useState(false)
   const [topDealsPage, setTopDealsPage] = useState(1)
   const [repSort, setRepSort] = useState('PIPELINE')
-  const [repMenuOpen, setRepMenuOpen] = useState(false)
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.crm.salesPerformance(year),
     queryFn: () => crmApi.getSalesPerformance(year),
@@ -141,12 +151,12 @@ export default function SalesPerformance() {
           {/* a) "Search..." input: width 240px (fixed, never flexible) */}
           <div className="relative w-[240px] shrink-0">
             <Search size={14} className="absolute inset-inline-start-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-            <input
+            <Input
               type="text"
               placeholder="Search..."
               value={search}
               onChange={event => { setSearch(event.target.value); setTopDealsPage(1); }}
-              className="w-[240px] h-9 ps-9 pe-3 text-xs border border-border-default rounded-input bg-surface-muted text-heading placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-colors shadow-sm"
+              className="w-[240px] h-9 ps-9 pe-3 text-xs bg-surface-muted"
             />
           </div>
 
@@ -166,17 +176,19 @@ export default function SalesPerformance() {
           </label>
 
           {/* c) Month select: min-width 168px, calendar icon, shows "October 2026" in full with NO ellipsis */}
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => { setDealsPeriod(value => value === 'MONTH' ? 'ALL' : 'MONTH'); setShowAllDeals(false); setTopDealsPage(1); }}
-            className="flex items-center justify-between h-9 min-w-[168px] px-2.5 border border-border-default rounded-input text-xs font-medium bg-surface-muted text-body hover:bg-surface transition-colors cursor-pointer shrink-0 gap-2"
+            className="flex items-center justify-between h-9 min-w-[168px] px-2.5 text-xs font-medium bg-surface-muted text-body hover:bg-surface shrink-0 gap-2"
           >
             <div className="flex items-center gap-1.5 whitespace-nowrap">
               <Calendar size={14} className="text-muted shrink-0" />
               <span className="whitespace-nowrap">{dealsPeriod === 'MONTH' ? monthLabel : 'All Dates'}</span>
             </div>
             <ChevronDown size={14} className="text-caption shrink-0" />
-          </button>
+          </Button>
         </div>
 
         {/* Spacer */}
@@ -185,24 +197,26 @@ export default function SalesPerformance() {
         {/* Right group (right-aligned, 8px gap): download icon button (36x36) + "Download Report" primary button (36px high, nowrap) */}
         <div className="flex items-center gap-2 shrink-0 max-[899px]:w-full max-[899px]:justify-end">
           {/* Download icon button (36x36) */}
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={downloadReport}
             aria-label="Download sales report"
-            className="w-9 h-9 min-w-[36px] flex items-center justify-center border border-border-default rounded-input text-muted hover:text-heading hover:bg-surface-muted transition-colors cursor-pointer shrink-0"
+            className="w-9 h-9 min-w-[36px] text-muted hover:text-heading"
             title="Download sales report"
           >
             <Download size={16} />
-          </button>
+          </Button>
 
           {/* "Download Report" primary button (36px high, nowrap) */}
-          <button
+          <Button
             type="button"
             onClick={downloadReport}
-            className="h-9 px-4 bg-primary text-white text-sm font-semibold rounded-input hover:bg-primary-hover transition-colors whitespace-nowrap cursor-pointer shrink-0"
+            className="h-9 px-4 text-sm font-semibold whitespace-nowrap"
           >
             Download Report
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -229,9 +243,11 @@ export default function SalesPerformance() {
               </p>
             </div>
             <div className="mt-1 h-4 min-h-[16px] flex items-center">
-              <div className="w-full bg-surface-strong rounded-full h-[6px] overflow-hidden">
-                <div className="bg-accent h-full rounded-full transition-all" style={{ width: `${attainmentWidth}%` }} />
-              </div>
+              <Progress
+                value={attainmentWidth}
+                className="w-full h-[6px] bg-surface-strong"
+                indicatorClassName="bg-accent"
+              />
             </div>
           </div>
 
@@ -281,9 +297,9 @@ export default function SalesPerformance() {
               <p className="min-w-0 text-2xl font-bold text-heading tracking-tight leading-tight tabular-nums truncate">
                 {summary.averageSalesCycleDays == null ? '—' : `${Math.round(summary.averageSalesCycleDays)} Days`}
               </p>
-              <span className="bg-success-light text-success-text border border-border-default/40 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider leading-none shrink-0 whitespace-nowrap">
+              <Badge variant="outline" className="bg-success-light text-success-text border-border-default/40 px-2 py-0.5 text-[10px] font-bold tracking-wider leading-none shrink-0 whitespace-nowrap">
                 Closed won
-              </span>
+              </Badge>
             </div>
             <div className="mt-1 h-4 min-h-[16px] flex items-center select-none invisible" aria-hidden="true">
               &nbsp;
@@ -299,39 +315,26 @@ export default function SalesPerformance() {
           <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card flex flex-col">
             <div className="h-10 min-h-[40px] flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-heading">Rep Leaderboard</h2>
-              <div className="relative">
-                <button
-                  type="button"
-                  aria-label="Sort rep leaderboard"
-                  aria-expanded={repMenuOpen}
-                  onClick={() => setRepMenuOpen(open => !open)}
-                  className="p-1.5 text-caption hover:text-body transition-colors rounded hover:bg-surface-muted cursor-pointer"
-                >
-                  <MoreHorizontal size={18} />
-                </button>
-                {repMenuOpen && (
-                  <div role="menu" className="absolute inset-inline-end-0 top-full z-20 mt-1 min-w-44 rounded-input border border-border-default bg-surface-raised p-1 shadow-card">
-                    {[
-                      ['PIPELINE', 'Highest pipeline'],
-                      ['REVENUE', 'Highest revenue'],
-                      ['WIN_RATE', 'Highest win rate'],
-                    ].map(([value, label]) => (
-                      <button
-                        key={value}
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={repSort === value}
-                        onClick={() => { setRepSort(value); setRepMenuOpen(false); }}
-                        className={`block w-full rounded px-3 py-2 text-start text-xs font-medium cursor-pointer ${
-                          repSort === value ? 'bg-surface-muted text-heading font-semibold' : 'text-body hover:bg-surface-muted'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Sort rep leaderboard"
+                    className="h-8 w-8 text-caption hover:text-body"
+                  >
+                    <MoreHorizontal size={18} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuRadioGroup value={repSort} onValueChange={setRepSort}>
+                    <DropdownMenuRadioItem value="PIPELINE">Highest pipeline</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="REVENUE">Highest revenue</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="WIN_RATE">Highest win rate</DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             <table className="w-full table-fixed border-collapse">
@@ -523,13 +526,15 @@ export default function SalesPerformance() {
               <h2 className="text-base font-semibold text-heading">
                 {dealsPeriod === 'MONTH' ? `Top Deals · ${monthLabel}` : 'Top Deals · All Dates'}
               </h2>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => { setShowAllDeals(current => !current); setTopDealsPage(1); }}
-                className="text-[13px] font-semibold text-accent hover:text-accent-hover transition-colors cursor-pointer"
+                className="text-[13px] font-semibold text-accent hover:text-accent-hover h-7 px-2"
               >
                 {showAllDeals ? 'Show Top 3' : 'View All'}
-              </button>
+              </Button>
             </div>
 
             {dealsLoading ? (
@@ -564,9 +569,27 @@ export default function SalesPerformance() {
                     <span>Showing {dealsData.pagination.total === 0 ? 0 : (topDealsPage - 1) * dealsData.pagination.limit + 1}–{Math.min(topDealsPage * dealsData.pagination.limit, dealsData.pagination.total)} of {dealsData.pagination.total}</span>
                     {dealsData.pagination.pages > 1 && (
                       <div className="flex items-center gap-2">
-                        <button type="button" disabled={topDealsPage <= 1} onClick={() => setTopDealsPage(page => page - 1)} className="rounded border border-border-default px-2 py-0.5 min-h-[26px] disabled:opacity-40 hover:bg-surface-muted transition-colors cursor-pointer">Previous</button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={topDealsPage <= 1}
+                          onClick={() => setTopDealsPage(page => page - 1)}
+                          className="h-6 px-2 text-xs"
+                        >
+                          Previous
+                        </Button>
                         <span>Page {topDealsPage} of {dealsData.pagination.pages}</span>
-                        <button type="button" disabled={topDealsPage >= dealsData.pagination.pages} onClick={() => setTopDealsPage(page => page + 1)} className="rounded border border-border-default px-2 py-0.5 min-h-[26px] disabled:opacity-40 hover:bg-surface-muted transition-colors cursor-pointer">Next</button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={topDealsPage >= dealsData.pagination.pages}
+                          onClick={() => setTopDealsPage(page => page + 1)}
+                          className="h-6 px-2 text-xs"
+                        >
+                          Next
+                        </Button>
                       </div>
                     )}
                   </div>
