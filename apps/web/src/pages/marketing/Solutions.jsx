@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight, BriefcaseBusiness, ChartNoAxesCombined, ClipboardList, Boxes, UsersRound, ShieldCheck } from 'lucide-react'
 import MarketingPageFrame from '../../components/marketing/MarketingPageFrame'
+import { Badge } from '../../components/ui/badge'
 
 const solutions = [
   {
@@ -55,7 +56,7 @@ export default function Solutions() {
             <h2 className="text-lg font-bold text-heading">{title}</h2>
             <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
             <ul aria-label={`${title} modules`} className="mt-5 flex flex-wrap gap-2">
-              {modules.map(module => <li key={module} className="rounded-full border border-border-subtle bg-surface-muted px-3 py-1 text-xs text-body-light">{module}</li>)}
+              {modules.map(module => <li key={module}><Badge variant="outline">{module}</Badge></li>)}
             </ul>
           </article>
         ))}

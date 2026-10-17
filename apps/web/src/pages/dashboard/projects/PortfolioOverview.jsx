@@ -9,7 +9,7 @@ import {
   Trash2,
   FolderKanban
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Progress } from '../../../components/ui/progress';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { projectsApi } from '../../../lib/api/projects';
 import { hrApi } from '../../../lib/api/hr';
@@ -18,6 +18,9 @@ import { formatCompactTableMoney, formatDate, formatMoney } from '../../../lib/f
 import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Badge } from '../../../components/ui/badge';
 
 const getBadgeStyle = (status) => {
   if (status === 'ACTIVE' || status === 'ON_TRACK' || status === 'COMPLETED') return "bg-success-light text-success-text border border-success-border";
@@ -182,23 +185,23 @@ export default function PortfolioOverview() {
 
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-            <input
+            <Input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search..."
               aria-label="Search projects"
               title="Search projects"
-              className="pl-9 pr-4 h-9 text-sm border border-border-default rounded-input bg-surface-raised w-[220px] focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className="pl-9 pr-4 h-9 text-sm bg-surface-raised w-[220px]"
             />
           </div>
 
-          <button
+          <Button
             onClick={() => setProjectOpen(true)}
-            className="bg-primary text-white px-4 h-9 flex items-center justify-center rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer"
+            className="h-9 px-4 font-semibold"
           >
             New Project
-          </button>
+          </Button>
         </div>
       </TopBarActions>
 
@@ -306,11 +309,12 @@ export default function PortfolioOverview() {
                           {pct(project.utilizationPct)}
                         </td>
                         <td className="ps-3 pe-5 py-0 align-middle text-end whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center justify-center h-[22px] min-w-[90px] px-2.5 rounded text-xs font-semibold whitespace-nowrap text-center ${getBadgeStyle(project.status)}`}
+                          <Badge
+                            variant="outline"
+                            className={`h-[22px] min-w-[90px] px-2.5 rounded text-xs font-semibold whitespace-nowrap justify-center ${getBadgeStyle(project.status)}`}
                           >
                             {formatStatus(project.status)}
-                          </span>
+                          </Badge>
                         </td>
                       </tr>
                     )
@@ -330,29 +334,33 @@ export default function PortfolioOverview() {
               <div className="bg-surface-raised border border-border-default rounded-card-sm p-4 shadow-card flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h2 className="text-lg font-semibold text-heading leading-tight truncate">{selectedProject.name}</h2>
-                  <div className={`mt-1.5 inline-flex px-2.5 py-0.5 rounded text-xs font-semibold tracking-wide ${getBadgeStyle(selectedProject.status)}`}>
+                  <Badge variant="outline" className={`mt-1.5 px-2.5 py-0.5 rounded text-xs font-semibold tracking-wide ${getBadgeStyle(selectedProject.status)}`}>
                     Status: {formatStatus(selectedProject.status)}
-                  </div>
+                  </Badge>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0 pt-0.5">
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => openEditProject(selectedProject)}
-                    className="p-1.5 text-muted hover:text-body hover:bg-surface-muted rounded-input transition-colors cursor-pointer"
+                    className="h-8 w-8 text-muted hover:text-body"
                     title="Edit project"
                     aria-label="Edit project"
                   >
                     <Pencil size={15} />
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setDeleteConfirmOpen(true)}
-                    className="p-1.5 text-muted hover:text-danger hover:bg-danger-light rounded-input transition-colors cursor-pointer"
+                    className="h-8 w-8 text-muted hover:text-danger hover:bg-danger-light"
                     title="Delete project"
                     aria-label="Delete project"
                   >
                     <Trash2 size={15} />
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -377,15 +385,11 @@ export default function PortfolioOverview() {
                   </div>
                 </div>
 
-                <div className="w-full bg-surface-strong rounded-full h-2 mb-2 overflow-hidden">
-                  <motion.div
-                    layout
-                    initial={{ width: 0 }}
-                    animate={{ width: `${selectedBudgetUtil || 0}%` }}
-                    transition={{ type: "spring", stiffness: 100, damping: 20 }}
-                    className="bg-accent h-full rounded-full"
-                  />
-                </div>
+                <Progress
+                  value={Math.min(100, Math.max(0, selectedBudgetUtil || 0))}
+                  className="h-2 mb-2 bg-surface-strong"
+                  indicatorClassName="bg-accent"
+                />
 
                 <div className="text-right">
                   <span className="text-xs font-semibold text-accent">{pct(selectedBudgetUtil)} Utilized</span>
@@ -396,13 +400,15 @@ export default function PortfolioOverview() {
               <div className="bg-surface-raised border border-border-default rounded-card-sm p-4 shadow-card">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Sprints</h3>
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => setSprintOpen(true)}
-                    className="border border-border-default text-body px-3 py-1 rounded-button text-xs font-semibold hover:bg-surface-muted transition-colors uppercase tracking-wider disabled:opacity-60 cursor-pointer"
+                    className="h-7 text-xs font-semibold uppercase tracking-wider"
                   >
                     + Add Sprint
-                  </button>
+                  </Button>
                 </div>
 
                 {velocityComparison?.current && velocityComparison?.previous ? (
@@ -439,13 +445,15 @@ export default function PortfolioOverview() {
                         <ClipboardList size={20} className="text-faint" />
                       </div>
                       <p className="text-sm font-medium text-body-light mb-3">No sprints for this project.</p>
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => setSprintOpen(true)}
-                        className="border border-border-default text-body px-4 py-1.5 rounded-button text-xs font-semibold hover:bg-surface-muted transition-colors uppercase tracking-wider disabled:opacity-60 cursor-pointer"
+                        className="h-8 text-xs font-semibold uppercase tracking-wider"
                       >
                         + Add Sprint
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -460,10 +468,28 @@ export default function PortfolioOverview() {
         </div>
       </div>
       <FormDialog open={projectOpen} onClose={() => setProjectOpen(false)} title="New project" subtitle="Add a project to the portfolio." busy={createProject.isPending} onConfirm={() => createProject.mutate()} confirmLabel="Create project">
-        <div className="space-y-4"><label className="block text-sm font-medium text-body">Project name<input required value={projectForm.name} onChange={event => setProjectForm(current => ({ ...current, name: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Budget<input type="number" min="0" step="0.01" value={projectForm.budget} onChange={event => setProjectForm(current => ({ ...current, budget: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div>
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-body">
+            Project name
+            <Input required value={projectForm.name} onChange={event => setProjectForm(current => ({ ...current, name: event.target.value }))} className="mt-1 w-full" />
+          </label>
+          <label className="block text-sm font-medium text-body">
+            Budget
+            <Input type="number" min="0" step="0.01" value={projectForm.budget} onChange={event => setProjectForm(current => ({ ...current, budget: event.target.value }))} className="mt-1 w-full" />
+          </label>
+        </div>
       </FormDialog>
       <FormDialog open={sprintOpen} onClose={() => setSprintOpen(false)} title="Add sprint" subtitle={selectedProject?.name} busy={createSprint.isPending} onConfirm={() => createSprint.mutate()} confirmLabel="Create sprint">
-        <div className="space-y-4"><label className="block text-sm font-medium text-body">Sprint name<input required value={sprintForm.name} onChange={event => setSprintForm(current => ({ ...current, name: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">End date<input type="date" value={sprintForm.endsAt} onChange={event => setSprintForm(current => ({ ...current, endsAt: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div>
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-body">
+            Sprint name
+            <Input required value={sprintForm.name} onChange={event => setSprintForm(current => ({ ...current, name: event.target.value }))} className="mt-1 w-full" />
+          </label>
+          <label className="block text-sm font-medium text-body">
+            End date
+            <Input type="date" value={sprintForm.endsAt} onChange={event => setSprintForm(current => ({ ...current, endsAt: event.target.value }))} className="mt-1 w-full" />
+          </label>
+        </div>
       </FormDialog>
       <FormDialog
         open={editProjectOpen}
@@ -476,29 +502,31 @@ export default function PortfolioOverview() {
         error={updateProject.error?.message}
       >
         <div className="space-y-4">
-          <label className="block text-sm font-medium text-body">Project name
-            <input
+          <label className="block text-sm font-medium text-body">
+            Project name
+            <Input
               required
               value={editProjectForm.name}
               onChange={event => setEditProjectForm(current => ({ ...current, name: event.target.value }))}
-              className="mt-1 w-full rounded-input border border-border-default px-3 py-2"
+              className="mt-1 w-full"
             />
           </label>
-          <label className="block text-sm font-medium text-body">Budget
-            <input
+          <label className="block text-sm font-medium text-body">
+            Budget
+            <Input
               type="number"
               min="0"
               step="0.01"
               value={editProjectForm.budget}
               onChange={event => setEditProjectForm(current => ({ ...current, budget: event.target.value }))}
-              className="mt-1 w-full rounded-input border border-border-default px-3 py-2"
+              className="mt-1 w-full"
             />
           </label>
           <label className="block text-sm font-medium text-body">Status
             <select
               value={editProjectForm.status}
               onChange={event => setEditProjectForm(current => ({ ...current, status: event.target.value }))}
-              className="mt-1 w-full rounded-input border border-border-default px-3 py-2"
+              className="mt-1 w-full rounded-input border border-border-default px-3 py-2 bg-surface"
             >
               <option value="PLANNING">Planning</option>
               <option value="ACTIVE">Active</option>

@@ -34,6 +34,11 @@ import { useActiveMemberRole, useActiveOrganization, useSession } from '../../..
 import { getMemberRoleName } from '../../../lib/memberRole'
 import { useDebouncedValue } from '../../../lib/useDebouncedValue'
 import StatutoryTaxCalculator from './StatutoryTaxCalculator.jsx'
+import { Button } from '../../../components/ui/button'
+import { Input } from '../../../components/ui/input'
+import { Badge } from '../../../components/ui/badge'
+import { Checkbox } from '../../../components/ui/checkbox'
+import { Alert, AlertDescription } from '../../../components/ui/alert'
 
 // The old page rendered deductions/taxes as a leading-minus negative; the minus only appears
 // for a positive amount (a zero rendered plain), so mirror that instead of an unconditional '-'.
@@ -80,15 +85,17 @@ function PayslipButton({ runId, lineId, onSelect, onNotifyError }) {
   }
 
   return (
-    <button
+    <Button
+      variant="outline"
+      size="sm"
       type="button"
       onClick={handleDownload}
       disabled={pending}
-      className="flex items-center gap-1 border border-border-default text-body px-2 py-0.5 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60 whitespace-nowrap cursor-pointer shrink-0"
+      className="h-7 px-2 text-xs font-medium gap-1 shadow-sm whitespace-nowrap shrink-0"
     >
       {pending ? <Loader2 size={12} className="animate-spin shrink-0" /> : <FileText size={12} className="shrink-0" />}
       <span>Payslip</span>
-    </button>
+    </Button>
   )
 }
 
@@ -565,13 +572,13 @@ export default function Payroll() {
                     <td className="px-6 py-4 text-sm text-body text-right tabular-nums" title={`-${formatMoney(item.deductions, { currency: item.currency })}`}>-{formatCompactTableMoney(item.deductions, { currency: item.currency })}</td>
                     <td className="px-6 py-4 text-sm font-bold text-heading text-right tabular-nums" title={formatMoney(item.net, { currency: item.currency })}>{formatCompactTableMoney(item.net, { currency: item.currency })}</td>
                     <td className="px-6 py-4 text-center">
-                      <span className={`px-2.5 py-1 rounded-input text-xs font-semibold uppercase tracking-wider ${
-                        item.status === 'PAID' ? 'bg-accent-light text-accent' :
-                        item.status === 'APPROVED' ? 'bg-[#fff7ed] text-[#c2410c]' :
-                        'bg-surface-muted text-muted'
-                      }`}>
+                      <Badge variant={
+                        item.status === 'PAID' ? 'success' :
+                        item.status === 'APPROVED' ? 'warning' :
+                        'secondary'
+                      }>
                         {item.status}
-                      </span>
+                      </Badge>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <PayslipButton runId={item.payrollRunId} lineId={item.id} />
@@ -628,13 +635,33 @@ export default function Payroll() {
                   ))}
                 </select>
                 <div className="flex items-center gap-1 border-l border-border-default pl-1.5 ml-1">
-                  <button type="button" aria-label="Previous payroll run page" disabled={payrollRunPage <= 1} onClick={() => setPayrollRunPage(current => current - 1)} className="rounded border border-border-default px-1 py-0.5 text-xs hover:bg-surface-muted transition-colors disabled:opacity-40">‹</button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    type="button"
+                    aria-label="Previous payroll run page"
+                    disabled={payrollRunPage <= 1}
+                    onClick={() => setPayrollRunPage(current => current - 1)}
+                    className="h-6 w-6 p-0 text-xs"
+                  >
+                    ‹
+                  </Button>
                   <span className="text-[11px] text-muted">{listData?.pagination?.pages ? `${payrollRunPage}/${listData.pagination.pages}` : '0/0'}</span>
-                  <button type="button" aria-label="Next payroll run page" disabled={payrollRunPage >= (listData?.pagination?.pages ?? 0)} onClick={() => setPayrollRunPage(current => current + 1)} className="rounded border border-border-default px-1 py-0.5 text-xs hover:bg-surface-muted transition-colors disabled:opacity-40">›</button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    type="button"
+                    aria-label="Next payroll run page"
+                    disabled={payrollRunPage >= (listData?.pagination?.pages ?? 0)}
+                    onClick={() => setPayrollRunPage(current => current + 1)}
+                    className="h-6 w-6 p-0 text-xs"
+                  >
+                    ›
+                  </Button>
                 </div>
               </div>
               <label className="flex items-center gap-1.5 text-xs font-medium text-muted cursor-pointer hover:text-body transition-colors shrink-0">
-                <input type="checkbox" className="w-3.5 h-3.5 rounded border-border-strong text-accent focus:ring-accent" defaultChecked readOnly />
+                <Checkbox defaultChecked disabled className="opacity-100" />
                 <span>Auto-Calculate</span>
               </label>
             </div>
@@ -814,82 +841,94 @@ export default function Payroll() {
 
             {/* Run Lifecycle Action (Void / Pay / Approve) */}
             {activeRun?.status === 'VOID' ? (
-              <span className="rounded-full bg-surface-muted px-2.5 py-1.5 text-xs font-semibold text-muted shrink-0">Voided</span>
+              <Badge variant="secondary">Voided</Badge>
             ) : activeRun?.status === 'PAID' ? (
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 disabled={!isAdmin || voidMutation.isPending}
                 onClick={() => {
                   const reason = window.prompt('Reason for voiding this payroll run:')?.trim()
                   if (reason) voidMutation.mutate(reason)
                 }}
-                className="border border-danger/40 text-danger px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-danger/5 transition-colors disabled:opacity-60 cursor-pointer shrink-0"
+                className="border-danger/40 text-danger hover:bg-danger/5"
               >
                 {voidMutation.isPending ? 'Voiding…' : 'Void run'}
-              </button>
+              </Button>
             ) : activeRun?.status === 'APPROVED' ? (
               <div className="flex items-center gap-2 shrink-0">
-                <button
+                <Button
+                  size="sm"
                   type="button"
                   disabled={payMutation.isPending}
                   title="Records payment after it has been completed outside Asas."
                   onClick={() => { setPayrollActionError(null); payMutation.mutate() }}
-                  className="bg-primary text-white px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer shrink-0"
+                  className="shadow-sm"
                 >
                   {payMutation.isPending ? 'Recording Payment…' : 'Mark Run Paid'}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   type="button"
                   disabled={!isAdmin || voidMutation.isPending}
                   onClick={() => {
                     const reason = window.prompt('Reason for voiding this payroll run:')?.trim()
                     if (reason) voidMutation.mutate(reason)
                   }}
-                  className="border border-danger/40 text-danger px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-danger/5 transition-colors disabled:opacity-60 cursor-pointer shrink-0"
+                  className="border-danger/40 text-danger hover:bg-danger/5"
                 >
                   {voidMutation.isPending ? 'Voiding…' : 'Void run'}
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="flex items-center gap-2 shrink-0">
-                <button
+                <Button
+                  size="sm"
                   type="button"
                   disabled={!activeRun || activeRun.status === 'APPROVED' || approveMutation.isPending}
                   onClick={() => { setPayrollActionError(null); approveMutation.mutate() }}
-                  className="bg-primary text-white px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer shrink-0"
+                  className="shadow-sm"
                 >
                   {activeRun?.status === 'APPROVED' ? 'Pay Run Approved' : 'Approve Pay Run'}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   type="button"
                   disabled={!activeRun || !isAdmin || voidMutation.isPending}
                   onClick={() => {
                     const reason = window.prompt('Reason for voiding this payroll run:')?.trim()
                     if (reason) voidMutation.mutate(reason)
                   }}
-                  className="border border-danger/40 text-danger px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-danger/5 transition-colors disabled:opacity-60 cursor-pointer shrink-0"
+                  className="border-danger/40 text-danger hover:bg-danger/5"
                 >
                   {voidMutation.isPending ? 'Voiding…' : 'Void run'}
-                </button>
+                </Button>
               </div>
             )}
 
             {/* + New Payroll Run Button */}
-            <button
+            <Button
+              size="sm"
               type="button"
               onClick={openNewRunDialog}
               disabled={!isAdmin}
               title={isAdmin ? undefined : 'Requires the ADMIN role'}
-              className="flex items-center gap-1.5 bg-primary text-white px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer shrink-0"
+              className="gap-1.5 shadow-sm"
             >
               <Plus size={14} /> New Payroll Run
-            </button>
+            </Button>
           </div>
         </div>
       </div>
 
       {payrollActionError && (
-        <p role="alert" className="text-xs text-danger font-medium -mt-2">{payrollActionError}</p>
+        <Alert variant="destructive" className="-mt-2">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{payrollActionError}</AlertDescription>
+        </Alert>
       )}
 
       {/* ── KPI Grid (12-column grid, col-span-4 each, gap-5) ── */}
@@ -1072,15 +1111,17 @@ export default function Payroll() {
 
                   {/* Side-by-side Edit payroll inputs and Payslip button */}
                   <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border-subtle">
-                    <button
+                    <Button
+                      variant="outline"
+                      size="sm"
                       type="button"
                       onClick={openLineEditor}
                       disabled={!isAdmin || !activeRun || ['APPROVED', 'PAID'].includes(activeRun.status)}
                       title={!isAdmin ? 'Requires the ADMIN role' : 'Adjust inputs and recalculate this line'}
-                      className="flex-1 rounded-input border border-border-default px-3 py-1.5 text-xs font-medium text-body hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-50 text-center cursor-pointer"
+                      className="flex-1 text-xs"
                     >
                       Edit payroll inputs
-                    </button>
+                    </Button>
                     <div className="shrink-0">
                       <PayslipButton
                         runId={activeRunId}
@@ -1090,10 +1131,10 @@ export default function Payroll() {
                     </div>
                   </div>
                   {payslipError && (
-                    <p className="mt-2 flex items-start gap-1.5 text-xs text-danger">
-                      <AlertCircle size={13} className="flex-shrink-0 mt-0.5" />
-                      {payslipError}
-                    </p>
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{payslipError}</AlertDescription>
+                    </Alert>
                   )}
                 </div>
 
@@ -1297,13 +1338,13 @@ export default function Payroll() {
               Employees{' '}
               <span className="normal-case text-caption font-medium">({selectedEmployeeIds.size} selected)</span>
             </p>
-            <input
+            <Input
               type="search"
               value={employeeSearch}
               onChange={event => { setEmployeeSearch(event.target.value); setEmployeePage(1) }}
               placeholder="Search employees by name, title, email, or employee number"
               aria-label="Search employees for payroll"
-              className={`${DIALOG_INPUT} mb-2`}
+              className="mb-2"
             />
             <div className="max-h-56 overflow-y-auto border border-border-default rounded-button divide-y divide-border-subtle">
               {isLoadingEmployees ? (
@@ -1320,11 +1361,9 @@ export default function Payroll() {
                     key={emp.id}
                     className="flex items-center gap-2.5 px-3 py-2 text-sm text-body cursor-pointer hover:bg-surface-muted"
                   >
-                    <input
-                      type="checkbox"
-                      className="rounded border-border-strong text-accent focus:ring-accent"
+                    <Checkbox
                       checked={selectedEmployeeIds.has(emp.id)}
-                      onChange={() => toggleEmployee(emp.id)}
+                      onCheckedChange={() => toggleEmployee(emp.id)}
                     />
                     <span className="font-medium text-heading">{emp.name}</span>
                     <span className="text-xs text-muted truncate">{emp.title}</span>
@@ -1335,17 +1374,17 @@ export default function Payroll() {
             {employeeData?.pagination && <div className="mt-2 flex items-center justify-between text-xs text-muted">
               <span>{employeeData.pagination.total} matching employee(s) - page {employeePage} of {employeePages}</span>
               <div className="flex items-center gap-2">
-                <button type="button" disabled={employeePage <= 1 || isLoadingEmployees} onClick={() => setEmployeePage(page => page - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
-                <button type="button" disabled={employeePages === 0 || employeePage >= employeePages || isLoadingEmployees} onClick={() => setEmployeePage(page => page + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+                <Button variant="outline" size="sm" type="button" disabled={employeePage <= 1 || isLoadingEmployees} onClick={() => setEmployeePage(page => page - 1)} className="h-7 px-2 text-xs">Previous</Button>
+                <Button variant="outline" size="sm" type="button" disabled={employeePages === 0 || employeePage >= employeePages || isLoadingEmployees} onClick={() => setEmployeePage(page => page + 1)} className="h-7 px-2 text-xs">Next</Button>
               </div>
             </div>}
           </div>
 
           {dialogError && (
-            <p role="alert" className="flex items-start gap-1.5 text-sm text-danger">
-              <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
-              {dialogError}
-            </p>
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{dialogError}</AlertDescription>
+            </Alert>
           )}
         </div>
       </FormDialog>
@@ -1368,10 +1407,15 @@ export default function Payroll() {
             ['bonusAmount', 'Bonus amount', 'text'],
           ].map(([field, labelText, type]) => (
             <label key={field} className="block text-xs font-bold uppercase tracking-wider text-muted">{labelText}
-              <input type={type} min={type === 'number' ? 0 : undefined} step={type === 'number' ? 1 : undefined} inputMode={type === 'text' && field !== 'bonusLabel' ? 'decimal' : undefined} value={lineForm[field]} onChange={event => setLineForm(current => ({ ...current, [field]: event.target.value }))} className={`${DIALOG_INPUT} mt-1 normal-case font-normal tracking-normal`} />
+              <Input type={type} min={type === 'number' ? 0 : undefined} step={type === 'number' ? 1 : undefined} inputMode={type === 'text' && field !== 'bonusLabel' ? 'decimal' : undefined} value={lineForm[field]} onChange={event => setLineForm(current => ({ ...current, [field]: event.target.value }))} className="mt-1 normal-case font-normal tracking-normal" />
             </label>
           ))}
-          {adjustLineMutation.isError && <p role="alert" className="text-sm text-danger">{adjustLineMutation.error?.message || 'Unable to recalculate this line.'}</p>}
+          {adjustLineMutation.isError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{adjustLineMutation.error?.message || 'Unable to recalculate this line.'}</AlertDescription>
+            </Alert>
+          )}
         </div>
       </FormDialog>
       <StatutoryTaxCalculator

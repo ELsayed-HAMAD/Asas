@@ -4,10 +4,9 @@ import {
   LayoutDashboard, Users, CreditCard, Briefcase,
   Package, FolderKanban, Settings, HelpCircle,
   ChevronDown, ChevronRight, Plus, LogOut, Menu,
-  Check, User, Moon, Download, X, Search, Bell, Globe, Mail
+  Check, User, Moon, Download, Search, Bell, Globe, Mail
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { changeLanguage } from '../lib/i18n'
 import {
@@ -16,6 +15,19 @@ import {
 } from '../lib/authClient'
 import FormDialog from '../components/common/FormDialog'
 import CommandPalette from '../components/CommandPalette'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '../components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+} from '../components/ui/dialog'
 
 // ── Navigation config ──────────────────────────────────────
 const NAV = [
@@ -279,7 +291,6 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t })
 function SidebarContent({ navProps, navigate }) {
   const { t, i18n } = useTranslation()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const menuRef = useRef(null)
   const navRef = useRef(null)
   const [switchingOrgId, setSwitchingOrgId] = useState(null)
   const [orgSwitchError, setOrgSwitchError] = useState('')
@@ -315,16 +326,6 @@ function SidebarContent({ navProps, navigate }) {
   const { data: activeMemberRole } = useActiveMemberRole()
   const { data: organizations } = useListOrganizations()
   const queryClient = useQueryClient()
-
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        setUserMenuOpen(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
 
   const displayName = session?.user?.name || 'User'
   const roleName = typeof activeMemberRole === 'string' ? activeMemberRole : activeMemberRole?.role
@@ -510,14 +511,14 @@ function SidebarContent({ navProps, navigate }) {
 
       {/* Quick action */}
       <div className="px-3 py-2 flex-shrink-0">
-        <button
+        <Button
           type="button"
           onClick={() => setQuickEntryOpen(true)}
-          className="w-full h-9 flex items-center justify-center gap-2 bg-primary text-on-primary text-sm font-medium px-3 rounded-button hover:bg-primary-hover active:scale-[0.98] transition-all cursor-pointer"
+          className="w-full h-9 flex items-center justify-center gap-2 cursor-pointer font-medium"
         >
           <Plus size={14} />
           {t('common.newEntry', 'New Entry')}
-        </button>
+        </Button>
       </div>
 
       {/* Main navigation - independently scrollable containing all sections */}
@@ -535,286 +536,249 @@ function SidebarContent({ navProps, navigate }) {
       </nav>
 
       {/* User profile - ONLY element pinned to bottom */}
-      <div ref={menuRef} className="px-3 py-2.5 border-t border-border-subtle flex-shrink-0 relative mt-auto">
-        <AnimatePresence>
-          {userMenuOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: 10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.95 }}
-              transition={{ type: "spring", stiffness: 350, damping: 25 }}
-              className="absolute bottom-full start-3 mb-2 w-72 bg-surface-raised border border-border-default rounded-xl shadow-2xl z-50 overflow-hidden"
+      <div className="px-3 py-2.5 border-t border-border-subtle flex-shrink-0 relative mt-auto">
+        <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              data-testid="user-menu-button"
+              aria-label="User profile menu"
+              aria-expanded={userMenuOpen}
+              className="w-full flex items-center gap-2.5 hover:bg-surface-muted p-2 -mx-2 rounded-lg transition-colors text-left rtl:text-right cursor-pointer"
             >
-              {/* 1. Identity Header */}
-              <div className="p-4 flex items-center gap-4">
-                <div className="relative">
-                  <div className="w-12 h-12 rounded-full bg-surface-strong flex items-center justify-center text-lg font-bold text-body shadow-inner">
-                    {initials}
-                  </div>
-                  <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-success rounded-full border-2 border-surface-raised shadow-sm"></div>
+              <div className="w-8 h-8 rounded-full bg-surface-strong flex items-center justify-center text-xs font-bold text-body flex-shrink-0">
+                {initials}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-heading truncate">{displayName}</p>
+                <p className="text-[11px] font-medium text-caption truncate">{roleLabel}</p>
+              </div>
+            </button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent
+            side="top"
+            align="start"
+            sideOffset={8}
+            className="w-72 p-0 bg-surface-raised border border-border-default rounded-xl shadow-2xl z-50 overflow-hidden"
+          >
+            {/* 1. Identity Header */}
+            <div className="p-4 flex items-center gap-4">
+              <div className="relative">
+                <div className="w-12 h-12 rounded-full bg-surface-strong flex items-center justify-center text-lg font-bold text-body shadow-inner">
+                  {initials}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-base font-bold text-heading truncate leading-tight">{displayName}</p>
-                  <p className="text-sm text-muted truncate mt-0.5">{email}</p>
-                </div>
+                <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-success rounded-full border-2 border-surface-raised shadow-sm" />
               </div>
-
-              {/* 2. Workspace Switcher */}
-              <div className="border-t border-border-subtle p-2">
-                {orgList.length > 1 ? (
-                  <>
-                    {orgList.map(org => {
-                      const isActive = org.id === activeOrganization?.id
-                      return (
-                        <div
-                          key={org.id}
-                          role="button"
-                          tabIndex={isActive || switchingOrgId ? -1 : 0}
-                          onClick={isActive ? undefined : () => handleSwitchOrganization(org.id)}
-                          onKeyDown={isActive || switchingOrgId ? undefined : (e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault()
-                              handleSwitchOrganization(org.id)
-                            }
-                          }}
-                          aria-disabled={Boolean(switchingOrgId)}
-                          className={`px-3 py-2 flex items-center justify-between rounded-input transition-colors ${
-                            isActive ? '' : 'hover:bg-surface-muted cursor-pointer'
-                          } ${switchingOrgId && !isActive ? 'opacity-60' : ''}`}
-                        >
-                          <span className={`text-sm truncate ${isActive ? 'font-semibold text-heading' : 'font-medium text-heading'}`}>
-                            {org.name}
-                          </span>
-                          {isActive && <Check size={16} className="text-accent shrink-0" />}
-                        </div>
-                      )
-                    })}
-                    {orgSwitchError && (
-                      <p className="px-3 py-1.5 text-xs text-danger">{orgSwitchError}</p>
-                    )}
-                  </>
-                ) : (
-                  <div
-                    onClick={() => {
-                      setUserMenuOpen(false)
-                      navigate('/dashboard/settings')
-                    }}
-                    className="px-3 py-2 flex items-center justify-between hover:bg-surface-muted rounded-input cursor-pointer transition-colors"
-                  >
-                    <span className="text-sm font-semibold text-heading truncate">{tenantName}</span>
-                    <Check size={16} className="text-accent shrink-0" />
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUserMenuOpen(false)
-                    setNewWorkspaceName('')
-                    setCreateWorkspaceError('')
-                    setCreateWorkspaceOpen(true)
-                  }}
-                  className="w-full px-3 py-2 flex items-center gap-3 text-sm font-semibold text-accent hover:bg-surface-muted rounded-input cursor-pointer transition-colors mt-1 text-left rtl:text-right"
-                >
-                  <Plus size={16} />
-                  {t('common.createWorkspace', 'Create New Workspace')}
-                </button>
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-bold text-heading truncate leading-tight">{displayName}</p>
+                <p className="text-sm text-muted truncate mt-0.5">{email}</p>
               </div>
+            </div>
 
-              {/* 3. Account Actions */}
-              <div className="border-t border-border-subtle p-2 flex flex-col gap-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUserMenuOpen(false)
-                    setProfileName(displayName)
-                    setCurrentPassword('')
-                    setNewPassword('')
-                    setConfirmPassword('')
-                    setProfileError('')
-                    setProfileSuccess('')
-                    setProfileOpen(true)
-                  }}
-                  className="flex items-center gap-3 text-left rtl:text-right px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
-                >
-                  <User size={16} className="text-caption" />
-                  {t('common.profilePreferences', 'Profile & Preferences')}
-                </button>
-                <button
-                  type="button"
-                  onClick={toggleTheme}
-                  className="flex items-center gap-3 text-left rtl:text-right px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
-                >
-                  <Moon size={16} className="text-caption" />
-                  {t('common.toggleTheme', 'Toggle Theme')}
-                </button>
-                <button
-                  type="button"
-                  data-testid="language-toggle"
-                  onClick={() => {
-                    setUserMenuOpen(false)
-                    changeLanguage(i18n.language === 'ar' ? 'en' : 'ar')
-                  }}
-                  className="flex items-center gap-3 text-left rtl:text-right px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
-                  title={i18n.language === 'ar' ? 'Switch to English' : 'التحويل إلى العربية'}
-                >
-                  <Globe size={16} className="text-caption" />
-                  <span>{i18n.language === 'ar' ? 'English' : 'العربية'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleInstallApp}
-                  className="flex items-center gap-3 text-left rtl:text-right px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
-                >
-                  <Download size={16} className="text-caption" />
-                  {t('common.downloadApp', 'Download Desktop App')}
-                </button>
-              </div>
+            <DropdownMenuSeparator className="my-0" />
 
-              {/* 4. Destructive Action */}
-              <div className="border-t border-border-subtle p-2">
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-3 text-left rtl:text-right px-3 py-2 text-danger hover:bg-danger-light hover:text-danger-hover rounded-input text-sm font-bold transition-colors"
+            {/* 2. Workspace Switcher */}
+            <div className="p-2 space-y-1">
+              {orgList.length > 1 ? (
+                <>
+                  {orgList.map(org => {
+                    const isActive = org.id === activeOrganization?.id
+                    return (
+                      <DropdownMenuItem
+                        key={org.id}
+                        disabled={Boolean(switchingOrgId)}
+                        onClick={isActive ? undefined : () => handleSwitchOrganization(org.id)}
+                        className={`px-3 py-2 flex items-center justify-between rounded-input transition-colors cursor-pointer ${
+                          isActive ? 'font-semibold text-heading' : 'font-medium text-heading hover:bg-surface-muted'
+                        }`}
+                      >
+                        <span className="text-sm truncate">{org.name}</span>
+                        {isActive && <Check size={16} className="text-accent shrink-0" />}
+                      </DropdownMenuItem>
+                    )
+                  })}
+                  {orgSwitchError && (
+                    <p className="px-3 py-1.5 text-xs text-danger">{orgSwitchError}</p>
+                  )}
+                </>
+              ) : (
+                <DropdownMenuItem
+                  onClick={() => navigate('/dashboard/settings')}
+                  className="px-3 py-2 flex items-center justify-between hover:bg-surface-muted rounded-input cursor-pointer transition-colors"
                 >
-                  <LogOut size={16} />
-                  {t('common.logout', 'Log Out')}
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                  <span className="text-sm font-semibold text-heading truncate">{tenantName}</span>
+                  <Check size={16} className="text-accent shrink-0" />
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                onClick={() => {
+                  setNewWorkspaceName('')
+                  setCreateWorkspaceError('')
+                  setCreateWorkspaceOpen(true)
+                }}
+                className="w-full px-3 py-2 flex items-center gap-3 text-sm font-semibold text-accent hover:bg-surface-muted rounded-input cursor-pointer transition-colors"
+              >
+                <Plus size={16} />
+                {t('common.createWorkspace', 'Create New Workspace')}
+              </DropdownMenuItem>
+            </div>
 
-        <button
-          type="button"
-          data-testid="user-menu-button"
-          aria-label="User profile menu"
-          aria-expanded={userMenuOpen}
-          aria-haspopup="true"
-          onClick={() => setUserMenuOpen(!userMenuOpen)}
-          className="w-full flex items-center gap-2.5 hover:bg-surface-muted p-2 -mx-2 rounded-lg transition-colors text-left rtl:text-right"
-        >
-          <div className="w-8 h-8 rounded-full bg-surface-strong flex items-center justify-center text-xs font-bold text-body flex-shrink-0">
-            {initials}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-heading truncate">{displayName}</p>
-            <p className="text-[11px] font-medium text-caption truncate">{roleLabel}</p>
-          </div>
-        </button>
+            <DropdownMenuSeparator className="my-0" />
+
+            {/* 3. Account Actions */}
+            <div className="p-2 flex flex-col gap-1">
+              <DropdownMenuItem
+                onClick={() => {
+                  setProfileName(displayName)
+                  setCurrentPassword('')
+                  setNewPassword('')
+                  setConfirmPassword('')
+                  setProfileError('')
+                  setProfileSuccess('')
+                  setProfileOpen(true)
+                }}
+                className="flex items-center gap-3 px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
+              >
+                <User size={16} className="text-caption" />
+                {t('common.profilePreferences', 'Profile & Preferences')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={toggleTheme}
+                className="flex items-center gap-3 px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
+              >
+                <Moon size={16} className="text-caption" />
+                {t('common.toggleTheme', 'Toggle Theme')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                data-testid="language-toggle"
+                onClick={() => changeLanguage(i18n.language === 'ar' ? 'en' : 'ar')}
+                className="flex items-center gap-3 px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
+                title={i18n.language === 'ar' ? 'Switch to English' : 'التحويل إلى العربية'}
+              >
+                <Globe size={16} className="text-caption" />
+                <span>{i18n.language === 'ar' ? 'English' : 'العربية'}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleInstallApp}
+                className="flex items-center gap-3 px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
+              >
+                <Download size={16} className="text-caption" />
+                {t('common.downloadApp', 'Download Desktop App')}
+              </DropdownMenuItem>
+            </div>
+
+            <DropdownMenuSeparator className="my-0" />
+
+            {/* 4. Destructive Action */}
+            <div className="p-2">
+              <DropdownMenuItem
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-3 py-2 text-danger hover:bg-danger-light hover:text-danger-hover rounded-input text-sm font-bold transition-colors cursor-pointer"
+              >
+                <LogOut size={16} />
+                {t('common.logout', 'Log Out')}
+              </DropdownMenuItem>
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      <AnimatePresence>
-        {quickEntryOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.15 }}
-              className="w-full max-w-lg bg-surface-raised border border-border-default rounded-card-sm shadow-card overflow-hidden"
-            >
-              <div className="flex items-center justify-between p-4 border-b border-border-subtle">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                    <Plus size={18} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-heading">Quick Entry</h3>
-                    <p className="text-xs text-caption">Select a record type to create or manage</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setQuickEntryOpen(false)}
-                  className="p-1 rounded-input text-muted hover:text-heading hover:bg-surface-muted transition-colors cursor-pointer"
-                >
-                  <X size={18} />
-                </button>
+      <Dialog open={quickEntryOpen} onOpenChange={setQuickEntryOpen}>
+        <DialogContent className="w-full max-w-lg p-0 bg-surface-raised border border-border-default rounded-card-sm shadow-card overflow-hidden">
+          <div className="flex items-center justify-between p-4 border-b border-border-subtle">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                <Plus size={18} />
               </div>
-              <div className="p-4 grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/hr/employees?new=1'); }}
-                  className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
-                >
-                  <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
-                    <Users size={18} />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-heading">New Employee</h4>
-                    <p className="text-xs text-caption">Add team member to HR directory</p>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/finance/accounts-payable?new=1'); }}
-                  className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
-                >
-                  <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
-                    <CreditCard size={18} />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-heading">New Payable Bill</h4>
-                    <p className="text-xs text-caption">Record a vendor invoice or bill</p>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/finance/expenses?new=1'); }}
-                  className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
-                >
-                  <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
-                    <CreditCard size={18} />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-heading">New Expense</h4>
-                    <p className="text-xs text-caption">Submit or log an expense receipt</p>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/crm/deals?new=1'); }}
-                  className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
-                >
-                  <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
-                    <Briefcase size={18} />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-heading">New CRM Deal</h4>
-                    <p className="text-xs text-caption">Add sales opportunity to pipeline</p>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/inventory?new=1'); }}
-                  className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
-                >
-                  <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
-                    <Package size={18} />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-heading">New Product</h4>
-                    <p className="text-xs text-caption">Create product in catalog</p>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/projects/sprints?new=1'); }}
-                  className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
-                >
-                  <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
-                    <FolderKanban size={18} />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-heading">Sprints & Tasks</h4>
-                    <p className="text-xs text-caption">View or create project issues</p>
-                  </div>
-                </button>
+              <div>
+                <h3 className="text-base font-semibold text-heading">Quick Entry</h3>
+                <p className="text-xs text-caption">Select a record type to create or manage</p>
               </div>
-            </motion.div>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+          <div className="p-4 grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/hr/employees?new=1'); }}
+              className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
+            >
+              <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                <Users size={18} />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-heading">New Employee</h4>
+                <p className="text-xs text-caption">Add team member to HR directory</p>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/finance/accounts-payable?new=1'); }}
+              className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
+            >
+              <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                <CreditCard size={18} />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-heading">New Payable Bill</h4>
+                <p className="text-xs text-caption">Record a vendor invoice or bill</p>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/finance/expenses?new=1'); }}
+              className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
+            >
+              <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                <CreditCard size={18} />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-heading">New Expense</h4>
+                <p className="text-xs text-caption">Submit or log an expense receipt</p>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/crm/deals?new=1'); }}
+              className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
+            >
+              <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                <Briefcase size={18} />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-heading">New CRM Deal</h4>
+                <p className="text-xs text-caption">Add sales opportunity to pipeline</p>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/inventory?new=1'); }}
+              className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
+            >
+              <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                <Package size={18} />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-heading">New Product</h4>
+                <p className="text-xs text-caption">Create product in catalog</p>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/projects/sprints?new=1'); }}
+              className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
+            >
+              <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                <FolderKanban size={18} />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-heading">Sprints & Tasks</h4>
+                <p className="text-xs text-caption">View or create project issues</p>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Create New Workspace Dialog ── */}
       <FormDialog
@@ -830,13 +794,12 @@ function SidebarContent({ navProps, navigate }) {
       >
         <div>
           <label className="block text-xs font-bold text-heading mb-1.5">Workspace Name</label>
-          <input
+          <Input
             type="text"
             required
             value={newWorkspaceName}
             onChange={(e) => setNewWorkspaceName(e.target.value)}
             placeholder="e.g. Acme Corporation"
-            className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
           />
         </div>
       </FormDialog>
@@ -861,24 +824,23 @@ function SidebarContent({ navProps, navigate }) {
           )}
           <div>
             <label className="block text-xs font-bold text-heading mb-1.5">Email Address</label>
-            <input
+            <Input
               type="email"
               disabled
               value={session?.user?.email || ''}
-              className="w-full border border-border-default rounded-input px-3 py-2 text-sm text-muted bg-surface-muted cursor-not-allowed"
+              className="cursor-not-allowed bg-surface-muted text-muted"
             />
             <p className="text-[11px] text-caption mt-1">Primary account email cannot be modified directly.</p>
           </div>
 
           <div>
             <label className="block text-xs font-bold text-heading mb-1.5">Display Name</label>
-            <input
+            <Input
               type="text"
               required
               value={profileName}
               onChange={(e) => setProfileName(e.target.value)}
               placeholder="Your full name"
-              className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             />
           </div>
 
@@ -887,32 +849,29 @@ function SidebarContent({ navProps, navigate }) {
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-heading mb-1">Current Password</label>
-                <input
+                <Input
                   type="password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="Required to set new password"
-                  className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium text-heading mb-1">New Password</label>
-                <input
+                <Input
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="At least 8 characters"
-                  className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium text-heading mb-1">Confirm New Password</label>
-                <input
+                <Input
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Re-type new password"
-                  className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
             </div>
@@ -1107,10 +1066,11 @@ export default function DashboardLayout() {
           {/* Right group: Global search ⌘K (max 320px) + bell + portal */}
           <div className="flex items-center justify-end gap-3 shrink-0 flex-nowrap min-w-0">
             <div className="hidden sm:flex items-center gap-3 shrink min-w-0">
-              <button
+              <Button
+                variant="outline"
                 type="button"
                 onClick={() => setCommandPaletteOpen(true)}
-                className="flex items-center justify-between w-60 h-9 px-3 text-xs text-muted bg-surface-muted hover:bg-surface border border-border-default rounded-input transition-colors shadow-sm cursor-pointer shrink-0"
+                className="justify-between w-60 h-9 px-3 text-xs text-muted bg-surface-muted hover:bg-surface hover:text-muted border-border-default shadow-sm font-normal shrink-0"
                 title="Global search (⌘K or Ctrl+K)"
                 aria-label="Search or jump to..."
               >
@@ -1121,16 +1081,18 @@ export default function DashboardLayout() {
                 <kbd className="px-1.5 py-0.5 text-[10px] bg-surface-raised border border-border-default rounded text-caption font-mono font-semibold flex-shrink-0">
                   ⌘K
                 </kbd>
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
                 type="button"
                 onClick={() => navigate('/dashboard/settings/notifications')}
-                className="h-9 w-9 flex items-center justify-center text-muted hover:text-heading hover:bg-surface-muted rounded-input transition-colors cursor-pointer flex-shrink-0"
+                className="h-9 w-9 text-muted hover:text-heading hover:bg-surface-muted flex-shrink-0"
                 title="Notification Settings"
                 aria-label="Notification Settings"
               >
                 <Bell size={16} />
-              </button>
+              </Button>
             </div>
 
             <div id="topbar-actions-portal" className="flex min-w-0 items-center justify-end gap-2 flex-shrink-0 min-h-[36px] empty:hidden border-s border-border-default ps-3">

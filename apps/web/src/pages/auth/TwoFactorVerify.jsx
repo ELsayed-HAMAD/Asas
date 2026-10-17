@@ -2,6 +2,16 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Loader2, ShieldCheck } from 'lucide-react'
 import { authClient } from '../../lib/authClient'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
+import { Checkbox } from '../../components/ui/checkbox'
+import { Alert, AlertDescription } from '../../components/ui/alert'
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+  InputOTPSeparator,
+} from '../../components/ui/input-otp'
 
 const REDIRECT_KEY = 'asas.auth.redirectAfterTwoFactor'
 
@@ -51,44 +61,86 @@ export default function TwoFactorVerify() {
         <p className="text-sm text-muted">Enter a code to finish signing in to Asas.</p>
       </div>
 
-      {error && <div role="alert" className="mb-5 rounded-button border border-danger-border bg-danger-light px-3.5 py-2.5 text-sm text-danger">{error}</div>}
+      {error && (
+        <Alert variant="destructive" className="mb-5 py-2.5 px-3.5">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label htmlFor="two-factor-code" className="mb-1.5 block text-sm font-medium text-body">
+          <label htmlFor="two-factor-code" className="mb-2 block text-sm font-medium text-body text-center">
             {useBackupCode ? 'Recovery code' : 'Authenticator code'}
           </label>
-          <input
-            id="two-factor-code"
-            type="text"
-            inputMode={useBackupCode ? 'text' : 'numeric'}
-            autoComplete="one-time-code"
-            autoFocus
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-            placeholder={useBackupCode ? 'Enter a recovery code' : '6-digit code'}
-            className="w-full rounded-button border border-border-default bg-surface-muted px-3.5 py-2.5 text-sm tracking-widest text-heading focus:border-transparent focus:bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent"
-          />
+          {useBackupCode ? (
+            <Input
+              id="two-factor-code"
+              type="text"
+              autoComplete="one-time-code"
+              autoFocus
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              placeholder="Enter a recovery code"
+              className="text-center tracking-widest"
+            />
+          ) : (
+            <div className="flex justify-center my-2">
+              <InputOTP
+                maxLength={6}
+                value={code}
+                onChange={(val) => setCode(val)}
+                autoFocus
+              >
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} />
+                  <InputOTPSlot index={1} />
+                  <InputOTPSlot index={2} />
+                </InputOTPGroup>
+                <InputOTPSeparator />
+                <InputOTPGroup>
+                  <InputOTPSlot index={3} />
+                  <InputOTPSlot index={4} />
+                  <InputOTPSlot index={5} />
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
+          )}
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-body">
-          <input type="checkbox" checked={trustDevice} onChange={(event) => setTrustDevice(event.target.checked)} className="accent-primary" />
-          Trust this device for 30 days
-        </label>
+        <div className="flex items-center justify-center gap-2">
+          <Checkbox
+            id="trust-device"
+            checked={trustDevice}
+            onCheckedChange={(checked) => setTrustDevice(Boolean(checked))}
+          />
+          <label htmlFor="trust-device" className="text-sm text-body cursor-pointer select-none">
+            Trust this device for 30 days
+          </label>
+        </div>
 
-        <button type="submit" disabled={loading || !code.trim()} className="flex w-full items-center justify-center gap-2 rounded-button bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-hover disabled:opacity-60">
+        <Button
+          type="submit"
+          disabled={loading || !code.trim()}
+          className="w-full h-10 font-semibold cursor-pointer"
+        >
           {loading && <Loader2 size={16} className="animate-spin" />}
           Verify and continue
-        </button>
+        </Button>
       </form>
 
       <div className="mt-5 text-center">
-        <button type="button" onClick={() => { setUseBackupCode(value => !value); setCode(''); setError('') }} className="text-sm font-medium text-accent hover:underline">
+        <button
+          type="button"
+          onClick={() => { setUseBackupCode(value => !value); setCode(''); setError('') }}
+          className="text-sm font-medium text-accent hover:underline cursor-pointer"
+        >
           {useBackupCode ? 'Use an authenticator code' : 'Use a recovery code'}
         </button>
       </div>
       <p className="mt-6 text-center text-sm text-muted">
-        <Link to="/login" onClick={() => sessionStorage.removeItem(REDIRECT_KEY)} className="font-medium text-heading hover:underline">Return to sign in</Link>
+        <Link to="/login" onClick={() => sessionStorage.removeItem(REDIRECT_KEY)} className="font-medium text-heading hover:underline">
+          Return to sign in
+        </Link>
       </p>
     </div>
   )

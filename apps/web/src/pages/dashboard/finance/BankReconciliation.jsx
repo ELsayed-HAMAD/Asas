@@ -7,6 +7,9 @@ import { financeApi } from '../../../lib/api/finance'
 import { queryKeys } from '../../../lib/queryKeys'
 import { parseBankStatementCsv } from '../../../lib/bankStatementCsv'
 import { formatCompactTableMoney } from '../../../lib/format'
+import { Button } from '../../../components/ui/button'
+import { Badge } from '../../../components/ui/badge'
+import { Alert, AlertDescription } from '../../../components/ui/alert'
 
 function formatCalendarDate(value) {
   const [year, month, day] = String(value).slice(0, 10).split('-').map(Number)
@@ -83,10 +86,21 @@ export default function BankReconciliation() {
               <span>{selectedFile ? selectedFile.name : 'Choose statement CSV (2 MiB max)'}</span>
               <input className="sr-only" type="file" accept=".csv,text/csv" onChange={event => chooseFile(event.target.files?.[0] ?? null)} />
             </label>
-            {parsedRows && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm"><span className="text-body">{parsedRows.length} rows validated and ready to import</span><button type="button" onClick={importStatement} disabled={importMutation.isPending} className="rounded-input bg-primary px-4 py-2 font-semibold text-on-primary disabled:opacity-60">{importMutation.isPending ? 'Importing…' : 'Import statement'}</button></div>}
+            {parsedRows && (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">
+                <span className="text-body">{parsedRows.length} rows validated and ready to import</span>
+                <Button type="button" onClick={importStatement} disabled={importMutation.isPending} size="sm" className="font-semibold">
+                  {importMutation.isPending ? 'Importing…' : 'Import statement'}
+                </Button>
+              </div>
+            )}
           </section>
 
-          {error && <div role="alert" className="rounded-card-sm border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">{error}</div>}
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
           <QueryState isLoading={importsQuery.isLoading} isError={importsQuery.isError} error={importsQuery.error} isEmpty={imports.length === 0} emptyTitle="No statement imports yet" emptyDescription="Choose a CSV statement above to begin reconciliation.">
             {imports.length > 0 && <>
@@ -101,8 +115,8 @@ export default function BankReconciliation() {
                     <tbody className="divide-y divide-border-default">{currentImport.lines.map(line => <tr key={line.id}>
                       <td className="max-w-sm px-4 py-3"><p className="font-medium text-heading">{line.description}</p><p className="mt-1 text-xs text-muted">{formatCalendarDate(line.postedAt)}{line.reference ? ` · ${line.reference}` : ''}</p></td>
                       <td className="px-4 py-3 font-mono text-heading tabular-nums" title={`${line.amount} ${line.currency}`}>{formatCompactTableMoney(line.amount, { currency: line.currency })}</td>
-                      <td className="px-4 py-3">{line.matchedLedgerLine ? <div className="text-xs text-body"><span className="inline-flex items-center gap-1 font-medium text-success"><Check size={14} /> Reconciled</span><p className="mt-1">{line.matchedLedgerLine.description}</p><p className="mt-0.5 text-muted">{line.matchedLedgerLine.sourceType} · {line.matchedLedgerLine.signedAmount} {line.matchedLedgerLine.currency} · {line.matchedLedgerLine.daysApart} day(s) apart</p></div> : line.suggestedMatches.length ? <div className="space-y-2">{line.suggestedMatches.slice(0, 3).map(candidate => <div key={candidate.journalLineId} className="text-xs text-body"><p>{candidate.description}</p><p className="mt-0.5 text-muted">{candidate.sourceType} · {candidate.signedAmount} {candidate.currency} · {candidate.daysApart} day(s) apart</p></div>)}</div> : <span className="text-xs text-muted">No exact match found</span>}</td>
-                      <td className="px-4 py-3">{line.matchedJournalLineId ? <button type="button" onClick={() => unmatchMutation.mutate({ id: currentImport.id, lineId: line.id })} disabled={unmatchMutation.isPending} className="inline-flex items-center gap-1 rounded-input border border-border-default px-3 py-1.5 text-xs font-medium text-body disabled:opacity-50"><RotateCcw size={13} /> Undo</button> : line.suggestedMatches.length > 0 && <select aria-label={`Match ${line.description}`} defaultValue="" disabled={matchMutation.isPending} onChange={event => { if (event.target.value) matchMutation.mutate({ id: currentImport.id, lineId: line.id, journalLineId: event.target.value }) }} className="max-w-44 rounded-input border border-border-default bg-surface px-2 py-1.5 text-xs"><option value="">Select a candidate…</option>{line.suggestedMatches.map(candidate => <option key={candidate.journalLineId} value={candidate.journalLineId}>{candidate.signedAmount} {candidate.currency} · {candidate.daysApart}d</option>)}</select>}</td>
+                      <td className="px-4 py-3">{line.matchedLedgerLine ? <div className="text-xs text-body"><Badge variant="outline" className="inline-flex items-center gap-1 font-medium text-success border-0 bg-success-light"><Check size={14} /> Reconciled</Badge><p className="mt-1">{line.matchedLedgerLine.description}</p><p className="mt-0.5 text-muted">{line.matchedLedgerLine.sourceType} · {line.matchedLedgerLine.signedAmount} {line.matchedLedgerLine.currency} · {line.matchedLedgerLine.daysApart} day(s) apart</p></div> : line.suggestedMatches.length ? <div className="space-y-2">{line.suggestedMatches.slice(0, 3).map(candidate => <div key={candidate.journalLineId} className="text-xs text-body"><p>{candidate.description}</p><p className="mt-0.5 text-muted">{candidate.sourceType} · {candidate.signedAmount} {candidate.currency} · {candidate.daysApart} day(s) apart</p></div>)}</div> : <span className="text-xs text-muted">No exact match found</span>}</td>
+                      <td className="px-4 py-3">{line.matchedJournalLineId ? <Button type="button" variant="outline" size="sm" onClick={() => unmatchMutation.mutate({ id: currentImport.id, lineId: line.id })} disabled={unmatchMutation.isPending} className="gap-1 h-7 px-2.5 text-xs font-medium"><RotateCcw size={13} /> Undo</Button> : line.suggestedMatches.length > 0 && <select aria-label={`Match ${line.description}`} defaultValue="" disabled={matchMutation.isPending} onChange={event => { if (event.target.value) matchMutation.mutate({ id: currentImport.id, lineId: line.id, journalLineId: event.target.value }) }} className="max-w-44 rounded-input border border-border-default bg-surface px-2 py-1.5 text-xs"><option value="">Select a candidate…</option>{line.suggestedMatches.map(candidate => <option key={candidate.journalLineId} value={candidate.journalLineId}>{candidate.signedAmount} {candidate.currency} · {candidate.daysApart}d</option>)}</select>}</td>
                     </tr>)}</tbody>
                   </table>
                 </section>}

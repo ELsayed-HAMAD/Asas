@@ -23,6 +23,10 @@ import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import TopBarActions from '../../../components/TopBarActions';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Badge } from '../../../components/ui/badge';
+import { Alert, AlertDescription } from '../../../components/ui/alert';
 
 export default function Inventory() {
   const navigate = useNavigate();
@@ -369,15 +373,15 @@ export default function Inventory() {
     <div className="flex-1 min-h-0 flex flex-col bg-surface overflow-hidden min-w-0">
 
       <TopBarActions>
-        <button
+        <Button
           type="button"
           onClick={openCreateDialog}
           disabled={!canWrite}
           title={canWrite ? undefined : noRoleTitle}
-          className="h-9 px-4 rounded-input bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 whitespace-nowrap flex items-center justify-center shrink-0 cursor-pointer shadow-sm"
+          className="h-9 px-4 font-semibold shadow-sm"
         >
           New Product
-        </button>
+        </Button>
       </TopBarActions>
 
       {/* ── Main Split View ── */}
@@ -392,13 +396,13 @@ export default function Inventory() {
 
             <div className="relative w-full min-[900px]:w-auto min-[900px]:flex-1 min-w-[200px] shrink-0">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-              <input
+              <Input
                 type="text"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Search..."
                 aria-label="Search products"
-                className="w-full h-9 pl-9 pr-3 text-sm border border-border-default rounded-input bg-surface-raised text-heading placeholder:text-caption focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent shadow-card"
+                className="w-full h-9 pl-9 pr-3 text-sm bg-surface-raised text-heading placeholder:text-caption shadow-card"
               />
             </div>
 
@@ -427,15 +431,17 @@ export default function Inventory() {
               </select>
             </div>
 
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="icon"
               onClick={() => navigate('/dashboard/inventory/movements')}
               title="Stock Movements"
               aria-label="Stock Movements"
-              className="w-9 h-9 flex items-center justify-center border border-border-default rounded-input bg-surface-raised text-muted hover:text-heading hover:bg-surface-muted transition-colors shadow-card shrink-0 cursor-pointer"
+              className="w-9 h-9 bg-surface-raised text-muted hover:text-heading shadow-card shrink-0"
             >
               <LayoutGrid size={16} />
-            </button>
+            </Button>
           </div>
 
           {/* Table Card (fills the list pane height) */}
@@ -499,15 +505,16 @@ export default function Inventory() {
                             {formatCompactTableMoney(product.price)}
                           </td>
                           <td className="ps-3 pe-5 py-0 align-middle text-end whitespace-nowrap">
-                            <span
-                              className={`inline-flex items-center justify-center h-[22px] min-w-[96px] px-2.5 rounded text-xs font-semibold whitespace-nowrap text-center ${
+                            <Badge
+                              variant="outline"
+                              className={`h-[22px] min-w-[96px] px-2.5 rounded text-xs font-semibold whitespace-nowrap justify-center ${
                                 isLowStock
-                                  ? 'bg-danger-light text-danger border border-danger-border'
-                                  : 'bg-success-light text-success-text border border-[#bbf7d0]'
+                                  ? 'bg-danger-light text-danger border-danger-border'
+                                  : 'bg-success-light text-success-text border-[#bbf7d0]'
                               }`}
                             >
                               {product.stock} {product.status.replaceAll('_', ' ')}
-                            </span>
+                            </Badge>
                           </td>
                         </tr>
                       );
@@ -524,25 +531,29 @@ export default function Inventory() {
                   Showing {data.pagination.total === 0 ? 0 : (productPage - 1) * data.pagination.limit + 1}–{Math.min(productPage * data.pagination.limit, data.pagination.total)} of {data.pagination.total} products
                 </span>
                 <div className="flex items-center gap-2 shrink-0">
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     disabled={productPage <= 1}
                     onClick={() => setProductPage(current => current - 1)}
-                    className="h-7 px-2 rounded border border-border-default text-xs font-medium text-body hover:bg-surface-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="h-7 px-2 text-xs font-medium"
                   >
                     Previous
-                  </button>
+                  </Button>
                   <span className="text-xs whitespace-nowrap">
                     Page {data.pagination.pages === 0 ? 0 : productPage} of {data.pagination.pages}
                   </span>
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     disabled={productPage >= data.pagination.pages}
                     onClick={() => setProductPage(current => current + 1)}
-                    className="h-7 px-2 rounded border border-border-default text-xs font-medium text-body hover:bg-surface-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="h-7 px-2 text-xs font-medium"
                   >
                     Next
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -573,14 +584,16 @@ export default function Inventory() {
                       </p>
                     </div>
                   </div>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => { setSelectedId(null); setManualDeselect(true); }}
-                    className="w-9 h-9 flex items-center justify-center rounded-input text-caption hover:text-body hover:bg-surface-muted transition-colors shrink-0 cursor-pointer"
+                    className="w-9 h-9 text-caption hover:text-body shrink-0"
                     aria-label="Close details"
                   >
                     <X size={18} />
-                  </button>
+                  </Button>
                 </div>
                 {selectedProduct.archivedAt && (
                   <p className="mt-3 rounded-button bg-surface-muted px-3 py-1.5 text-xs font-semibold text-muted">
@@ -704,21 +717,22 @@ export default function Inventory() {
                     }}
                     className="flex gap-2"
                   >
-                    <input
+                    <Input
                       type="text"
                       value={newSupplierName}
                       onChange={(e) => setNewSupplierName(e.target.value)}
                       placeholder="Add supplier name..."
                       disabled={!canWrite || addSupplierMutation.isPending}
-                      className="flex-1 rounded-input border border-border-default bg-surface px-3 py-2 text-sm text-heading placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+                      className="flex-1 bg-surface text-sm"
                     />
-                    <button
+                    <Button
                       type="submit"
+                      size="sm"
                       disabled={!canWrite || !newSupplierName.trim() || addSupplierMutation.isPending}
-                      className="rounded-input bg-primary px-3 py-2 text-xs font-semibold text-white hover:bg-primary-hover disabled:opacity-50"
+                      className="px-3 py-2 text-xs font-semibold"
                     >
                       {addSupplierMutation.isPending ? 'Adding…' : 'Add'}
-                    </button>
+                    </Button>
                   </form>
                   {supplierError && (
                     <p className="text-xs text-danger">{supplierError}</p>
@@ -760,14 +774,16 @@ export default function Inventory() {
                 <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-bold text-muted uppercase tracking-wider">Purchase Orders</p>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="sm"
                       onClick={() => { setPurchaseQuantity('1'); setPurchaseOrderError(''); setPurchaseOrderOpen(true); }}
                       disabled={!canWrite || Boolean(selectedProduct.archivedAt)}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary-hover disabled:opacity-50"
+                      className="h-7 px-2 text-xs font-semibold text-primary hover:text-primary-hover gap-1.5"
                     >
                       <ShoppingCart size={14} /> New Order
-                    </button>
+                    </Button>
                   </div>
                   {isOrdersLoading ? (
                     <div className="flex h-40 items-center justify-center">
@@ -808,40 +824,45 @@ export default function Inventory() {
                                   {formatCompactNumber(po.quantity)}
                                 </td>
                                 <td className="px-4 py-3">
-                                  <span
-                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  <Badge
+                                    variant="outline"
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                       isReceived
-                                        ? 'bg-success-light text-success-text'
+                                        ? 'bg-success-light text-success-text border-success-border'
                                         : isApproved
-                                        ? 'bg-blue-100 text-blue-700'
-                                        : 'bg-surface-strong text-body'
+                                        ? 'bg-blue-100 text-blue-700 border-blue-200'
+                                        : 'bg-surface-strong text-body border-border-default'
                                     }`}
                                   >
                                     {po.status}
-                                  </span>
+                                  </Badge>
                                 </td>
                                 <td className="px-4 py-3 text-right">
                                   {isDraft && (
-                                    <button
+                                    <Button
                                       type="button"
+                                      variant="ghost"
+                                      size="sm"
                                       disabled={!canWrite || approveOrderMutation.isPending}
                                       onClick={() => approveOrderMutation.mutate(po.id)}
-                                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50 mr-2"
+                                      className="h-auto p-0 text-xs font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50 mr-2"
                                       title="Approve order"
                                     >
                                       Approve
-                                    </button>
+                                    </Button>
                                   )}
                                   {(isDraft || isApproved) && (
-                                    <button
+                                    <Button
                                       type="button"
+                                      variant="ghost"
+                                      size="sm"
                                       disabled={!canWrite || receiveOrderMutation.isPending}
                                       onClick={() => receiveOrderMutation.mutate(po.id)}
-                                      className="text-xs font-semibold text-success-text hover:text-green-800 disabled:opacity-50"
+                                      className="h-auto p-0 text-xs font-semibold text-success-text hover:text-green-800 disabled:opacity-50"
                                       title="Receive items into stock"
                                     >
                                       Receive
-                                    </button>
+                                    </Button>
                                   )}
                                   {isReceived && (
                                     <span className="text-xs text-muted">Done</span>
@@ -865,7 +886,7 @@ export default function Inventory() {
                   ) : isMovementsError ? (
                     <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-danger">
                       <p role="alert">{movementsError?.message || 'Unable to load stock movement history.'}</p>
-                      <button type="button" onClick={() => refetchMovements()} className="rounded border border-border-default px-3 py-1.5 text-body hover:bg-surface-muted">Retry</button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => refetchMovements()} className="h-8 px-3">Retry</Button>
                     </div>
                   ) : movements.length === 0 ? (
                     <div className="flex h-full items-center justify-center text-sm text-muted">
@@ -895,13 +916,13 @@ export default function Inventory() {
                                   {movement.note && <div className="text-caption truncate max-w-[180px]" title={movement.note}>{movement.note}</div>}
                                 </td>
                                 <td className="px-4 py-3">
-                                  <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold ${
+                                  <Badge variant="outline" className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
                                     isIn
-                                      ? 'bg-success-light text-success-text border border-success-border'
-                                      : 'bg-danger-light text-danger border border-danger-border'
+                                      ? 'bg-success-light text-success-text border-success-border'
+                                      : 'bg-danger-light text-danger border-danger-border'
                                   }`}>
                                     {isIn ? 'IN' : 'OUT'}
-                                  </span>
+                                  </Badge>
                                 </td>
                                 <td className={`px-4 py-3 text-xs font-semibold tabular-nums text-right ${isIn ? 'text-success-text' : 'text-danger'}`} title={Math.abs(movement.delta).toLocaleString()}>
                                   {isIn ? '+' : '−'}{formatCompactNumber(Math.abs(movement.delta))}
@@ -914,9 +935,9 @@ export default function Inventory() {
                       <div className="flex items-center justify-between border-t border-border-default px-4 py-2 text-xs text-muted">
                         <span>Showing {(movementPage - 1) * (movementData?.pagination?.limit ?? 25) + 1}–{Math.min(movementPage * (movementData?.pagination?.limit ?? 25), movementData?.pagination?.total ?? 0)} of {movementData?.pagination?.total ?? 0} movements</span>
                         <div className="flex items-center gap-2">
-                          <button type="button" aria-label="Previous movement page" disabled={movementPage <= 1} onClick={() => setMovementPage(current => current - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
+                          <Button type="button" variant="outline" size="sm" aria-label="Previous movement page" disabled={movementPage <= 1} onClick={() => setMovementPage(current => current - 1)} className="h-7 px-2 text-xs">Previous</Button>
                           <span>Page {movementPage} of {movementData?.pagination?.pages ?? 0}</span>
-                          <button type="button" aria-label="Next movement page" disabled={movementPage >= (movementData?.pagination?.pages ?? 0)} onClick={() => setMovementPage(current => current + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+                          <Button type="button" variant="outline" size="sm" aria-label="Next movement page" disabled={movementPage >= (movementData?.pagination?.pages ?? 0)} onClick={() => setMovementPage(current => current + 1)} className="h-7 px-2 text-xs">Next</Button>
                         </div>
                       </div>
                     </div>
@@ -935,45 +956,47 @@ export default function Inventory() {
                 )}
                 {/* Row 1: Edit and Adjust Stock, a 2-column grid, equal width */}
                 <div className="grid grid-cols-2 gap-2">
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
                     onClick={() => openEditDialog(selectedProduct)}
                     disabled={!canWrite}
                     title={canWrite ? undefined : noRoleTitle}
-                    className="h-9 flex items-center justify-center gap-2 border border-border-default bg-surface-raised text-body px-3 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors shadow-card disabled:opacity-60 whitespace-nowrap cursor-pointer"
+                    className="h-9 gap-2 text-sm font-medium whitespace-nowrap shadow-card"
                   >
                     <Pencil size={15} /> Edit
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     onClick={openAdjustDialog}
                     disabled={!canWrite || Boolean(selectedProduct.archivedAt)}
                     title={selectedProduct.archivedAt ? 'Restore this product before adjusting stock' : canWrite ? undefined : noRoleTitle}
-                    className="h-9 flex items-center justify-center gap-2 bg-primary text-white px-3 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 whitespace-nowrap cursor-pointer"
+                    className="h-9 gap-2 text-sm font-semibold whitespace-nowrap"
                   >
                     <ArrowDownUp size={15} /> Adjust Stock
-                  </button>
+                  </Button>
                 </div>
                 {/* Row 2: Create Purchase Order, full width */}
-                <button
+                <Button
                   type="button"
                   onClick={() => { setPurchaseQuantity('1'); setPurchaseOrderError(''); setPurchaseOrderOpen(true); }}
                   disabled={!canWrite || Boolean(selectedProduct.archivedAt)}
                   title={selectedProduct.archivedAt ? 'Restore this product before creating an order' : canWrite ? undefined : noRoleTitle}
-                  className="w-full h-9 flex items-center justify-center gap-2 bg-primary text-white rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 whitespace-nowrap cursor-pointer"
+                  className="w-full h-9 gap-2 text-sm font-semibold whitespace-nowrap"
                 >
                   <ShoppingCart size={15} /> Create Purchase Order
-                </button>
+                </Button>
                 {/* Row 3: Archive Product, full width */}
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => setArchiveDialogOpen(true)}
                   disabled={!canWrite || archiveMutation.isPending}
                   title={canWrite ? undefined : noRoleTitle}
-                  className="w-full h-9 rounded-input border border-border-default text-sm font-medium text-body hover:bg-surface-muted transition-colors disabled:opacity-60 whitespace-nowrap cursor-pointer"
+                  className="w-full h-9 text-sm font-medium whitespace-nowrap"
                 >
                   {showArchived ? 'Restore Product' : 'Archive Product'}
-                </button>
+                </Button>
               </div>
             </>
           ) : (
@@ -1000,77 +1023,79 @@ export default function Inventory() {
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-heading mb-1.5">Name</label>
-              <input
+              <Input
                 type="text"
                 value={productForm.name}
                 onChange={(e) => setProductForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="Product name"
-                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full"
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-heading mb-1.5">SKU</label>
-              <input
+              <Input
                 type="text"
                 value={productForm.sku}
                 onChange={(e) => setProductForm((f) => ({ ...f, sku: e.target.value }))}
                 placeholder="e.g. WIDGET-001"
-                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-heading mb-1.5">Price</label>
-                <input
+                <Input
                   type="text"
                   inputMode="decimal"
                   value={productForm.price}
                   onChange={(e) => setProductForm((f) => ({ ...f, price: e.target.value }))}
                   placeholder="0.00"
-                  className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full"
                 />
               </div>
               <div>
                 <label className="block text-xs font-bold text-heading mb-1.5">Min threshold</label>
-                <input
+                <Input
                   type="number"
                   min={0}
                   step={1}
                   value={productForm.minThreshold}
                   onChange={(e) => setProductForm((f) => ({ ...f, minThreshold: e.target.value }))}
                   placeholder="0"
-                  className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full"
                 />
               </div>
             </div>
             {productDialog.mode === 'create' && (
               <div>
                 <label className="block text-xs font-bold text-heading mb-1.5">Initial stock</label>
-                <input
+                <Input
                   type="number"
                   min={0}
                   step={1}
                   value={productForm.stock}
                   onChange={(e) => setProductForm((f) => ({ ...f, stock: e.target.value }))}
                   placeholder="0"
-                  className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full"
                 />
               </div>
             )}
             <div>
               <label className="block text-xs font-bold text-heading mb-1.5">Warehouse</label>
-              <input
+              <Input
                 type="text"
                 value={productForm.warehouse}
                 onChange={(e) => setProductForm((f) => ({ ...f, warehouse: e.target.value }))}
                 placeholder="e.g. Main — Bay A (optional)"
-                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full"
               />
             </div>
             {productError && (
-              <p className="text-sm text-danger flex items-center gap-1.5">
-                <AlertTriangle size={14} /> {productError}
-              </p>
+              <Alert variant="destructive" className="py-2 px-3 text-xs">
+                <AlertDescription className="flex items-center gap-1.5">
+                  <AlertTriangle size={14} /> {productError}
+                </AlertDescription>
+              </Alert>
             )}
           </div>
         </FormDialog>
@@ -1081,8 +1106,15 @@ export default function Inventory() {
           setPurchaseOrderError('');
           purchaseOrderMutation.mutate();
         }} confirmLabel="Create draft order">
-          <label className="block text-sm font-medium text-body">Quantity<input type="number" min={1} step={1} value={purchaseQuantity} onChange={event => setPurchaseQuantity(event.target.value)} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
-          {purchaseOrderError && <p role="alert" className="mt-3 text-sm text-danger">{purchaseOrderError}</p>}
+          <label className="block text-sm font-medium text-body">
+            Quantity
+            <Input type="number" min={1} step={1} value={purchaseQuantity} onChange={event => setPurchaseQuantity(event.target.value)} className="mt-1 w-full" />
+          </label>
+          {purchaseOrderError && (
+            <Alert variant="destructive" className="mt-3 py-2 px-3 text-xs">
+              <AlertDescription>{purchaseOrderError}</AlertDescription>
+            </Alert>
+          )}
         </FormDialog>
         <ConfirmDialog open={archiveDialogOpen} onClose={() => !archiveMutation.isPending && setArchiveDialogOpen(false)} onConfirm={() => archiveMutation.mutate()} title={showArchived ? 'Restore product?' : 'Archive product?'} description={showArchived ? `Restore ${selectedProduct?.name || 'this product'} to the active catalog?` : `Archive ${selectedProduct?.name || 'this product'}? Its stock history and purchase order records will be retained.`} confirmLabel={showArchived ? 'Restore product' : 'Archive product'} busy={archiveMutation.isPending} />
         {createdOrder && (
@@ -1147,30 +1179,32 @@ export default function Inventory() {
             </div>
             <div>
               <label className="block text-xs font-bold text-heading mb-1.5">Quantity</label>
-              <input
+              <Input
                 type="number"
                 min={1}
                 step={1}
                 value={movementForm.qty}
                 onChange={(e) => setMovementForm((f) => ({ ...f, qty: e.target.value }))}
                 placeholder="0"
-                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full"
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-heading mb-1.5">Note</label>
-              <input
+              <Input
                 type="text"
                 value={movementForm.note}
                 onChange={(e) => setMovementForm((f) => ({ ...f, note: e.target.value }))}
                 placeholder="e.g. PO #4521 receipt (optional)"
-                className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full"
               />
             </div>
             {movementError && (
-              <p className="text-sm text-danger flex items-center gap-1.5">
-                <AlertTriangle size={14} /> {movementError}
-              </p>
+              <Alert variant="destructive" className="py-2 px-3 text-xs">
+                <AlertDescription className="flex items-center gap-1.5">
+                  <AlertTriangle size={14} /> {movementError}
+                </AlertDescription>
+              </Alert>
             )}
           </div>
         </FormDialog>

@@ -16,6 +16,11 @@ import { formatDate, formatMoney, formatPercent, moneyToMajor } from '../../../l
 import TopBarActions from '../../../components/TopBarActions';
 import EmptyState from '../../../components/common/EmptyState';
 import FormDialog from '../../../components/common/FormDialog';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Checkbox } from '../../../components/ui/checkbox';
+import { Badge } from '../../../components/ui/badge';
+import { Progress } from '../../../components/ui/progress';
 
 // Chart-only number formatters (axis ticks / tooltips). Money arrives as
 // { amount: minor units, currency } — reduce to a major-unit number for the scale.
@@ -134,7 +139,7 @@ export default function CRMOverview() {
         <div className="flex items-center gap-2">
           <div className="relative">
             <Search size={14} className="absolute inset-inline-start-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-            <input
+            <Input
               type="text"
               placeholder="Search deals..."
               value={search}
@@ -144,17 +149,17 @@ export default function CRMOverview() {
                   navigate(`/dashboard/crm/deals?search=${encodeURIComponent(search.trim())}`)
                 }
               }}
-              className="ps-9 pe-3 h-9 text-xs border border-border-default rounded-input bg-surface-muted hover:bg-surface focus:bg-surface-raised w-[260px] max-w-full focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-colors shadow-sm"
+              className="ps-9 pe-3 h-9 text-xs bg-surface-muted hover:bg-surface focus:bg-surface-raised w-[260px] max-w-full"
             />
           </div>
 
-          <button
+          <Button
             type="button"
             onClick={() => setDealOpen(true)}
-            className="h-9 px-4 flex items-center justify-center bg-primary text-white rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors cursor-pointer shrink-0"
+            className="h-9 px-4 text-sm font-semibold shrink-0"
           >
             New Deal
-          </button>
+          </Button>
         </div>
       </TopBarActions>
 
@@ -252,9 +257,9 @@ export default function CRMOverview() {
               <p className="min-w-0 text-2xl font-bold text-heading tracking-tight leading-tight tabular-nums truncate">
                 {pipeline.openCount}
               </p>
-              <span className="bg-surface-active text-body-light border border-border-default px-2 py-0.5 rounded text-[11px] font-medium leading-none shrink-0 whitespace-nowrap">
+              <Badge variant="outline" className="bg-surface-active text-body-light border-border-default px-2 py-0.5 text-[11px] font-medium leading-none shrink-0 whitespace-nowrap">
                 +{data.createdLast7Days} this week
-              </span>
+              </Badge>
             </div>
             <div className="mt-1 text-xs text-muted leading-tight select-none invisible">
               &nbsp;
@@ -281,12 +286,11 @@ export default function CRMOverview() {
               </p>
             </div>
             <div className="mt-1 flex flex-col justify-end">
-              <div className="w-full bg-surface-active rounded-full h-[3px] overflow-hidden">
-                <div
-                  className="bg-accent h-[3px] rounded-full transition-all"
-                  style={{ width: `${closedPctOfQuota == null ? 0 : Math.min(100, closedPctOfQuota)}%` }}
-                />
-              </div>
+              <Progress
+                value={closedPctOfQuota == null ? 0 : Math.min(100, closedPctOfQuota)}
+                className="h-[3px] bg-surface-active"
+                indicatorClassName="bg-accent"
+              />
             </div>
           </div>
 
@@ -299,14 +303,16 @@ export default function CRMOverview() {
           <div className="col-span-1 lg:col-span-3 bg-surface-raised border border-border-default rounded-card-sm shadow-card p-5 flex flex-col min-h-[320px]">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-heading leading-tight">Revenue Forecast</h2>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => navigate('/dashboard/crm/forecast')}
                 title="View full revenue forecast"
-                className="text-caption hover:text-body transition-colors cursor-pointer ms-auto p-1"
+                className="text-caption hover:text-body ms-auto h-8 w-8"
               >
                 <MoreHorizontal size={18} />
-              </button>
+              </Button>
             </div>
 
             <div className="relative flex-1 w-full min-h-[200px]">
@@ -401,30 +407,28 @@ export default function CRMOverview() {
               <h2 className="text-base font-semibold text-heading leading-tight">Daily Agenda</h2>
             </div>
             <div className="flex items-center gap-2 mb-4">
-              <input
+              <Input
                 value={agendaTitle}
                 onChange={event => setAgendaTitle(event.target.value)}
                 placeholder="Add an agenda item"
-                className="min-w-0 flex-1 h-9 rounded-input border border-border-default px-3 text-xs text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-colors shadow-sm"
+                className="min-w-0 flex-1 h-9 text-xs bg-surface-raised"
               />
-              <button
+              <Button
                 type="button"
                 disabled={!agendaTitle.trim() || createAgenda.isPending}
                 onClick={() => createAgenda.mutate()}
-                className="h-9 px-4 rounded-input bg-primary text-sm font-semibold text-white hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer shrink-0"
+                className="h-9 px-4 text-sm font-semibold shrink-0"
               >
                 Add
-              </button>
+              </Button>
             </div>
             {agenda?.items?.length ? (
               <div className="space-y-2.5">
                 {agenda.items.map(item => (
                   <div key={item.id} className="flex items-center gap-3 border-b border-border-subtle pb-2.5">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={item.done}
-                      onChange={() => crmApi.updateAgenda(item.id, { done: !item.done }).then(() => queryClient.invalidateQueries({ queryKey: queryKeys.crm.agenda() }))}
-                      className="rounded-input border-border-default text-primary focus:ring-accent cursor-pointer"
+                      onCheckedChange={() => crmApi.updateAgenda(item.id, { done: !item.done }).then(() => queryClient.invalidateQueries({ queryKey: queryKeys.crm.agenda() }))}
                     />
                     <span className={item.done ? 'text-sm text-muted line-through' : 'text-sm font-medium text-heading'}>
                       {item.title}
@@ -491,10 +495,47 @@ export default function CRMOverview() {
       </div>
       <FormDialog open={dealOpen} onClose={() => setDealOpen(false)} title="New deal" subtitle="Add a deal to the CRM pipeline." busy={createDeal.isPending} onConfirm={() => createDeal.mutate()} confirmLabel="Create deal">
         <div className="space-y-4">
-          <label className="block text-sm font-medium text-body">Deal name<input required value={dealForm.name} onChange={event => setDealForm(current => ({ ...current, name: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
-          <label className="block text-sm font-medium text-body">Value<input type="number" min="0" step="0.01" value={dealForm.value} onChange={event => setDealForm(current => ({ ...current, value: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
-          <label className="block text-sm font-medium text-body">Stage<select value={dealForm.stage} onChange={event => setDealForm(current => ({ ...current, stage: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="LEADS">Leads</option><option value="PROPOSAL">Proposal</option><option value="NEGOTIATION">Negotiation</option></select></label>
-          <label className="block text-sm font-medium text-body">Expected close date<input type="date" value={dealForm.closeDate} onChange={event => setDealForm(current => ({ ...current, closeDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label>
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Deal name</label>
+            <Input
+              required
+              value={dealForm.name}
+              onChange={event => setDealForm(current => ({ ...current, name: event.target.value }))}
+              className="bg-surface-muted"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Value</label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={dealForm.value}
+              onChange={event => setDealForm(current => ({ ...current, value: event.target.value }))}
+              className="bg-surface-muted"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Stage</label>
+            <select
+              value={dealForm.stage}
+              onChange={event => setDealForm(current => ({ ...current, stage: event.target.value }))}
+              className="w-full h-9 px-3 py-1.5 rounded-input border border-border-default bg-surface-muted text-sm text-body"
+            >
+              <option value="LEADS">Leads</option>
+              <option value="PROPOSAL">Proposal</option>
+              <option value="NEGOTIATION">Negotiation</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Expected close date</label>
+            <Input
+              type="date"
+              value={dealForm.closeDate}
+              onChange={event => setDealForm(current => ({ ...current, closeDate: event.target.value }))}
+              className="bg-surface-muted"
+            />
+          </div>
         </div>
       </FormDialog>
     </div>

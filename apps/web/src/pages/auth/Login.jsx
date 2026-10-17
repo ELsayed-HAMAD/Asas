@@ -3,6 +3,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Loader2, MailCheck, ArrowRight, RefreshCw } from 'lucide-react'
 import { authClient, signIn } from '../../lib/authClient'
 import FormDialog from '../../components/common/FormDialog'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
+import { Checkbox } from '../../components/ui/checkbox'
+import { Alert, AlertDescription, AlertTitle } from '../../components/ui/alert'
 
 function authErrorMessage(error) {
   if (!error) return 'Unable to sign in. Please try again.'
@@ -137,16 +141,16 @@ export default function Login() {
       {/* Error / Unverified Notice */}
       {error && (
         unverifiedEmail ? (
-          <div className="mb-5 p-4 bg-danger-light border border-danger-border rounded-button text-sm">
+          <Alert variant="destructive" className="mb-5 p-4">
             <div className="flex items-start gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-danger/10 text-danger flex-shrink-0 mt-0.5">
                 <MailCheck size={18} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-danger text-sm">Email not verified</h3>
-                <p className="text-xs text-danger-text mt-1 leading-relaxed">
+                <AlertTitle className="text-sm font-semibold">Email not verified</AlertTitle>
+                <AlertDescription className="text-xs mt-1 leading-relaxed text-danger-text">
                   Your email address has not been confirmed yet. Please verify your account using the confirmation email we sent you before signing in.
-                </p>
+                </AlertDescription>
 
                 {resendVerificationNotice && (
                   <p className="mt-2 text-xs font-medium text-body bg-surface-raised p-2 rounded border border-border-default">
@@ -164,11 +168,13 @@ export default function Login() {
                     <ArrowRight size={13} />
                   </Link>
 
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={handleResendVerification}
                     disabled={resendingVerification}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-button bg-surface-raised hover:bg-surface-muted text-body border border-border-default active:scale-[0.98] transition-all disabled:opacity-60 cursor-pointer"
+                    className="h-7 text-xs"
                   >
                     {resendingVerification ? (
                       <>
@@ -181,15 +187,15 @@ export default function Login() {
                         <span>Resend email</span>
                       </>
                     )}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
-          </div>
+          </Alert>
         ) : (
-          <div className="mb-5 px-3.5 py-2.5 bg-danger-light border border-danger-border rounded-button text-sm text-danger">
-            {error}
-          </div>
+          <Alert variant="destructive" className="mb-5 py-2.5 px-3.5">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )
       )}
 
@@ -201,14 +207,13 @@ export default function Login() {
           <label className="block text-sm font-medium text-body mb-1.5">
             Work email
           </label>
-          <input
+          <Input
             type="email"
             name="email"
             value={form.email}
             onChange={handleChange}
             placeholder="you@company.com"
             autoComplete="email"
-            className="w-full px-3.5 py-2.5 text-sm border border-border-default rounded-button bg-surface-muted focus:outline-none focus:ring-2 focus:ring-border-strong focus:bg-surface-raised placeholder:text-caption transition-all"
           />
         </div>
 
@@ -224,25 +229,25 @@ export default function Login() {
                 setForgotSuccess('')
                 setForgotOpen(true)
               }}
-              className="text-xs text-muted hover:text-heading transition-colors"
+              className="text-xs text-muted hover:text-heading transition-colors cursor-pointer"
             >
               Forgot password?
             </button>
           </div>
           <div className="relative">
-            <input
+            <Input
               type={showPass ? 'text' : 'password'}
               name="password"
               value={form.password}
               onChange={handleChange}
               placeholder="••••••••"
               autoComplete="current-password"
-              className="w-full px-3.5 py-2.5 pr-10 text-sm border border-border-default rounded-button bg-surface-muted focus:outline-none focus:ring-2 focus:ring-border-strong focus:bg-surface-raised placeholder:text-caption transition-all"
+              className="pr-10"
             />
             <button
               type="button"
               onClick={() => setShowPass(p => !p)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-caption hover:text-body transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-caption hover:text-body transition-colors cursor-pointer"
             >
               {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
@@ -251,21 +256,17 @@ export default function Login() {
 
         {/* Remember me */}
         <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="remember"
-            className="w-4 h-4 rounded border-border-strong accent-primary cursor-pointer"
-          />
-          <label htmlFor="remember" className="text-sm text-muted cursor-pointer">
+          <Checkbox id="remember" />
+          <label htmlFor="remember" className="text-sm text-muted cursor-pointer select-none">
             Keep me signed in
           </label>
         </div>
 
         {/* Submit */}
-        <button
+        <Button
           type="submit"
           disabled={loading}
-          className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary text-sm font-semibold py-2.5 rounded-button hover:bg-primary-hover disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.99] transition-all"
+          className="w-full h-10 font-semibold cursor-pointer"
         >
           {loading ? (
             <>
@@ -275,7 +276,7 @@ export default function Login() {
           ) : (
             'Sign in'
           )}
-        </button>
+        </Button>
 
       </form>
 

@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { Loader2, ShieldCheck, ShieldOff, RefreshCw } from 'lucide-react'
 import { authClient } from '../../../lib/authClient'
+import { Button } from '../../../components/ui/button'
+import { Input } from '../../../components/ui/input'
+import { Alert, AlertDescription } from '../../../components/ui/alert'
 
 function getError(result, fallback) {
   return result?.error?.message || fallback
@@ -128,8 +131,16 @@ export default function TwoFactorSettings() {
         Google, Microsoft, and GitHub sign-ins use the security controls configured with those identity providers. Asas TOTP verification applies to email and password sign-ins.
       </p>
 
-      {error && <p role="alert" className="rounded-input border border-danger-border bg-danger-light p-3 text-sm text-danger">{error}</p>}
-      {notice && <p role="status" className="rounded-input border border-success-border bg-success-light p-3 text-sm text-success-text">{notice}</p>}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      {notice && (
+        <Alert className="border-success-border bg-success-light text-success-text">
+          <AlertDescription>{notice}</AlertDescription>
+        </Alert>
+      )}
 
       {enrollment ? (
         <form onSubmit={verifyEnrollment} className="space-y-4">
@@ -140,24 +151,24 @@ export default function TwoFactorSettings() {
             <p className="text-xs text-muted">Keep this key private. It can generate sign-in codes for your account.</p>
           </div>
           <label className="block text-sm font-medium text-body" htmlFor="enrollment-code">Authenticator code</label>
-          <input id="enrollment-code" value={code} onChange={event => setCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" className="w-full rounded-input border border-border-default bg-surface-muted px-3 py-2.5 text-sm tracking-widest text-heading focus:outline-none focus:ring-2 focus:ring-accent" placeholder="6-digit code" />
+          <Input id="enrollment-code" value={code} onChange={event => setCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" className="w-full tracking-widest" placeholder="6-digit code" />
           <div className="flex flex-wrap gap-2">
-            <button type="submit" disabled={busy || code.trim().length < 6} className="flex items-center gap-2 rounded-input bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover disabled:opacity-60">
+            <Button type="submit" disabled={busy || code.trim().length < 6}>
               {busy && <Loader2 size={15} className="animate-spin" />} Verify and enable
-            </button>
-            <button type="button" disabled={busy} onClick={() => { setEnrollment(null); setCode(''); setError('') }} className="rounded-input border border-border-default px-4 py-2 text-sm font-medium text-body hover:bg-surface-muted">Cancel setup</button>
+            </Button>
+            <Button type="button" variant="outline" disabled={busy} onClick={() => { setEnrollment(null); setCode(''); setError('') }}>Cancel setup</Button>
           </div>
         </form>
       ) : (
         <form onSubmit={enabled ? disableTwoFactor : startEnrollment} className="space-y-4">
           <label className="block text-sm font-medium text-body" htmlFor="two-factor-password">Confirm with your password</label>
-          <input id="two-factor-password" type="password" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} className="w-full rounded-input border border-border-default bg-surface-muted px-3 py-2.5 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-accent" placeholder="Current password" />
+          <Input id="two-factor-password" type="password" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} className="w-full" placeholder="Current password" />
           <div className="flex flex-wrap gap-2">
-            <button type="submit" disabled={busy || !password} className={`flex items-center gap-2 rounded-input px-4 py-2 text-sm font-semibold disabled:opacity-60 ${enabled ? 'border border-danger-border text-danger hover:bg-danger-light' : 'bg-primary text-on-primary hover:bg-primary-hover'}`}>
+            <Button type="submit" variant={enabled ? 'destructive' : 'default'} disabled={busy || !password}>
               {busy ? <Loader2 size={15} className="animate-spin" /> : enabled ? <ShieldOff size={15} /> : <ShieldCheck size={15} />}
               {enabled ? 'Disable two-factor' : 'Set up authenticator'}
-            </button>
-            {enabled && <button type="button" disabled={busy || !password} onClick={regenerateRecoveryCodes} className="flex items-center gap-2 rounded-input border border-border-default px-4 py-2 text-sm font-medium text-body hover:bg-surface-muted disabled:opacity-60"><RefreshCw size={14} /> Regenerate recovery codes</button>}
+            </Button>
+            {enabled && <Button type="button" variant="outline" disabled={busy || !password} onClick={regenerateRecoveryCodes}><RefreshCw size={14} /> Regenerate recovery codes</Button>}
           </div>
         </form>
       )}

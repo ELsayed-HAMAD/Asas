@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
-import { authClient, signUp, useSession, signOut } from '../../lib/authClient'
-
-function toSlug(value) {
-  const slug = value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-  return slug || `org-${Date.now()}`
-}
+import { signUp, useSession, signOut } from '../../lib/authClient'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
+import { Alert, AlertDescription } from '../../components/ui/alert'
 
 export default function Register() {
   const navigate = useNavigate()
@@ -44,14 +42,15 @@ export default function Register() {
           >
             Continue to Workspace
           </Link>
-          <button
+          <Button
             type="button"
+            variant="outline"
             disabled={signingOut}
             onClick={handleSignOut}
-            className="w-full bg-surface-raised border border-border-default text-body text-sm font-medium py-2.5 rounded-button hover:bg-surface-muted transition-all flex items-center justify-center gap-2"
+            className="w-full h-10"
           >
             {signingOut ? <Loader2 size={16} className="animate-spin" /> : 'Sign out to create a new account'}
-          </button>
+          </Button>
         </div>
       </div>
     )
@@ -92,30 +91,32 @@ export default function Register() {
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="px-3.5 py-2.5 bg-danger-light border border-danger-border rounded-button text-sm text-danger flex flex-col gap-1.5">
-            <span>{error}</span>
-            {/user already exists|already registered/i.test(error) && (
-              <div className="text-xs pt-1 flex items-center gap-2">
-                <Link to="/login" className="underline font-semibold hover:text-danger-hover">
-                  Sign in instead &rarr;
-                </Link>
-                <span>&bull;</span>
-                <Link
-                  to={`/verify-email?email=${encodeURIComponent(form.email.trim())}`}
-                  state={{ email: form.email.trim() }}
-                  className="underline font-semibold hover:text-danger-hover"
-                >
-                  Verify this email &rarr;
-                </Link>
-              </div>
-            )}
-          </div>
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription className="flex flex-col gap-1.5">
+              <span>{error}</span>
+              {/user already exists|already registered/i.test(error) && (
+                <div className="text-xs pt-1 flex items-center gap-2">
+                  <Link to="/login" className="underline font-semibold hover:text-danger-hover">
+                    Sign in instead &rarr;
+                  </Link>
+                  <span>&bull;</span>
+                  <Link
+                    to={`/verify-email?email=${encodeURIComponent(form.email.trim())}`}
+                    state={{ email: form.email.trim() }}
+                    className="underline font-semibold hover:text-danger-hover"
+                  >
+                    Verify this email &rarr;
+                  </Link>
+                </div>
+              )}
+            </AlertDescription>
+          </Alert>
         )}
         <div>
           <label className="block text-sm font-medium text-body mb-1.5" htmlFor="name">
             Full Name
           </label>
-          <input
+          <Input
             id="name"
             name="name"
             type="text"
@@ -123,7 +124,6 @@ export default function Register() {
             onChange={handleChange}
             placeholder="Jane Doe"
             required
-            className="w-full px-3 py-2.5 text-sm border border-border-default rounded-button focus:outline-none focus:ring-4 focus:ring-surface-active focus:border-border-strong transition-all placeholder:text-caption"
           />
         </div>
 
@@ -131,7 +131,7 @@ export default function Register() {
           <label className="block text-sm font-medium text-body mb-1.5" htmlFor="email">
             Work Email
           </label>
-          <input
+          <Input
             id="email"
             name="email"
             type="email"
@@ -139,7 +139,6 @@ export default function Register() {
             onChange={handleChange}
             placeholder="name@company.com"
             required
-            className="w-full px-3 py-2.5 text-sm border border-border-default rounded-button focus:outline-none focus:ring-4 focus:ring-surface-active focus:border-border-strong transition-all placeholder:text-caption"
           />
         </div>
 
@@ -147,7 +146,7 @@ export default function Register() {
           <label className="block text-sm font-medium text-body mb-1.5" htmlFor="password">
             Password
           </label>
-          <input
+          <Input
             id="password"
             name="password"
             type="password"
@@ -155,18 +154,17 @@ export default function Register() {
             onChange={handleChange}
             placeholder="Create a strong password"
             required
-            className="w-full px-3 py-2.5 text-sm border border-border-default rounded-button focus:outline-none focus:ring-4 focus:ring-surface-active focus:border-border-strong transition-all placeholder:text-caption"
           />
           <p className="text-[11px] text-caption mt-1.5">Must be at least 12 characters and include a symbol.</p>
         </div>
 
-        <button
+        <Button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-primary text-on-primary text-sm font-medium py-2.5 rounded-button hover:bg-primary-hover focus:outline-none focus:ring-4 focus:ring-surface-strong transition-all disabled:opacity-70 flex items-center justify-center gap-2 mt-4"
+          className="w-full h-10 mt-4 cursor-pointer"
         >
           {isLoading ? <Loader2 size={16} className="animate-spin" /> : 'Create Account'}
-        </button>
+        </Button>
       </form>
 
       {/* TOS Disclaimer */}

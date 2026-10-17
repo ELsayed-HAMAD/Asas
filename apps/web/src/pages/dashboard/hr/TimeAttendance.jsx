@@ -13,6 +13,11 @@ import { hrApi } from '../../../lib/api/hr';
 import { queryKeys } from '../../../lib/queryKeys';
 import { useActiveMemberRole } from '../../../lib/authClient';
 import { getMemberRoleName } from '../../../lib/memberRole';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Badge } from '../../../components/ui/badge';
+import { Switch } from '../../../components/ui/switch';
+import { Alert, AlertDescription } from '../../../components/ui/alert';
 
 function formatShortDate(dateStr) {
   if (!dateStr) return '—'
@@ -279,40 +284,46 @@ export default function TimeAttendance() {
         {/* Right group: Request Time Off, Export, Approve All Valid aligned flush with right edge */}
         <div className="flex items-center gap-2 shrink-0 ml-auto">
           {data?.selfClock && (
-            <button
+            <Button
+              size="sm"
               type="button"
               disabled={clockMutation.isPending || (Boolean(data.selfClock.clockIn) && Boolean(data.selfClock.clockOut))}
               onClick={() => clockMutation.mutate(data.selfClock.clockIn && !data.selfClock.clockOut ? 'OUT' : 'IN')}
-              className="bg-primary text-white px-3 py-1.5 rounded-input text-xs font-medium hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60 cursor-pointer shrink-0"
+              className="shadow-sm"
             >
               {clockMutation.isPending ? 'Saving...' : data.selfClock.clockIn && !data.selfClock.clockOut ? 'Clock Out' : data.selfClock.clockOut ? 'Shift Complete' : 'Clock In'}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
             onClick={() => setLeaveDialogOpen(true)}
             disabled={!data?.selfClock}
             title={!data?.selfClock ? 'Link an active employee record to request time off' : undefined}
-            className="border border-border-default text-body px-3 py-1.5 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60 cursor-pointer shrink-0"
+            className="shadow-sm"
           >
             Request Time Off
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
             onClick={exportAttendance}
             disabled={isLoading || isError}
-            className="flex items-center gap-1.5 border border-border-default text-body px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60 cursor-pointer shrink-0"
+            className="gap-1.5 shadow-sm"
           >
             <Download size={13} /> Export
-          </button>
-          <button
+          </Button>
+          <Button
+            size="sm"
             type="button"
             onClick={() => approveAllMutation.mutate(eligibleTimesheets.map(item => item.id))}
             disabled={!eligibleTimesheets.length || approveAllMutation.isPending}
-            className="bg-primary text-white px-3 py-1.5 rounded-input text-xs font-medium hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60 cursor-pointer shrink-0"
+            className="shadow-sm"
           >
             {approveAllMutation.isPending ? 'Approving...' : `Approve All Valid${eligibleTimesheets.length ? ` (${eligibleTimesheets.length})` : ''}`}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -337,22 +348,12 @@ export default function TimeAttendance() {
         {/* Auto-Flag Overtime toggle */}
         <div className="flex items-center gap-2 border border-border-default px-2.5 py-1.5 rounded-input text-xs font-medium bg-surface-raised shadow-card shrink-0">
           <span className="text-body text-xs font-medium">Auto-Flag Overtime</span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={autoFlagOvertime}
+          <Switch
+            color="primary"
+            checked={autoFlagOvertime}
+            onCheckedChange={setAutoFlagOvertime}
             aria-label="Auto-Flag Overtime"
-            onClick={() => setAutoFlagOvertime(current => !current)}
-            className={`w-8 h-4 rounded-full relative flex items-center px-0.5 transition-colors cursor-pointer ${
-              autoFlagOvertime ? 'bg-primary' : 'bg-surface-strong'
-            }`}
-          >
-            <div
-              className={`w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${
-                autoFlagOvertime ? 'translate-x-4' : ''
-              }`}
-            />
-          </button>
+          />
         </div>
 
         {(clockMutation.isError || approveMutation.isError || approveAllMutation.isError || createLeaveMutation.isError || leaveDecisionMutation.isError || resolveExceptionMutation.isError || correctPunchMutation.isError) && (
@@ -476,15 +477,9 @@ export default function TimeAttendance() {
                             )}
                           </td>
                           <td className="px-4 py-3 text-center whitespace-nowrap">
-                            {sheet.approvedAt ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-success-light text-success-text">
-                                Approved
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-warning-light text-warning">
-                                Pending
-                              </span>
-                            )}
+                            <Badge variant={sheet.approvedAt ? 'success' : 'warning'}>
+                              {sheet.approvedAt ? 'Approved' : 'Pending'}
+                            </Badge>
                           </td>
                         </tr>
                       );
@@ -506,23 +501,27 @@ export default function TimeAttendance() {
                   Showing {totalTimesheets === 0 ? 0 : (timesheetPage - 1) * TIMESHEET_PAGE_SIZE + 1}–{Math.min(timesheetPage * TIMESHEET_PAGE_SIZE, totalTimesheets)} of {totalTimesheets}
                 </span>
                 <div className="flex items-center gap-2">
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     type="button"
                     disabled={timesheetPage <= 1}
                     onClick={() => setTimesheetPage(p => p - 1)}
-                    className="rounded border border-border-default px-2 py-1 disabled:opacity-40 hover:bg-surface-muted transition-colors cursor-pointer"
+                    className="h-7 px-2 text-xs"
                   >
                     Previous
-                  </button>
+                  </Button>
                   <span>Page {totalTimesheets === 0 ? 0 : timesheetPage} of {timesheetPages}</span>
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     type="button"
                     disabled={timesheetPage >= timesheetPages}
                     onClick={() => setTimesheetPage(p => p + 1)}
-                    className="rounded border border-border-default px-2 py-1 disabled:opacity-40 hover:bg-surface-muted transition-colors cursor-pointer"
+                    className="h-7 px-2 text-xs"
                   >
                     Next
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -949,12 +948,17 @@ export default function TimeAttendance() {
             </select>
           </label>
           <label className="block text-sm font-medium text-body">Start date
-            <input type="date" required value={leaveForm.startDate} onChange={event => setLeaveForm(current => ({ ...current, startDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default bg-surface-raised px-3 py-2 text-sm text-body" />
+            <Input type="date" required value={leaveForm.startDate} onChange={event => setLeaveForm(current => ({ ...current, startDate: event.target.value }))} className="mt-1" />
           </label>
           <label className="block text-sm font-medium text-body">End date <span className="font-normal text-muted">(optional)</span>
-            <input type="date" min={leaveForm.startDate || undefined} value={leaveForm.endDate} onChange={event => setLeaveForm(current => ({ ...current, endDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default bg-surface-raised px-3 py-2 text-sm text-body" />
+            <Input type="date" min={leaveForm.startDate || undefined} value={leaveForm.endDate} onChange={event => setLeaveForm(current => ({ ...current, endDate: event.target.value }))} className="mt-1" />
           </label>
-          {createLeaveMutation.isError && <p role="alert" className="text-sm text-danger">{createLeaveMutation.error?.message || 'Could not submit this request.'}</p>}
+          {createLeaveMutation.isError && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>{createLeaveMutation.error?.message || 'Could not submit this request.'}</AlertDescription>
+            </Alert>
+          )}
         </div>
       </FormDialog>
 
@@ -982,22 +986,32 @@ export default function TimeAttendance() {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm font-medium text-body">Clock-in date
-              <input type="date" required value={correctionForm.clockInDate} onChange={event => setCorrectionForm(current => ({ ...current, clockInDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default bg-surface-raised px-3 py-2 text-sm text-body" />
+              <Input type="date" required value={correctionForm.clockInDate} onChange={event => setCorrectionForm(current => ({ ...current, clockInDate: event.target.value }))} className="mt-1" />
             </label>
             <label className="block text-sm font-medium text-body">Clock-in time
-              <input type="time" required value={correctionForm.clockInTime} onChange={event => setCorrectionForm(current => ({ ...current, clockInTime: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default bg-surface-raised px-3 py-2 text-sm text-body" />
+              <Input type="time" required value={correctionForm.clockInTime} onChange={event => setCorrectionForm(current => ({ ...current, clockInTime: event.target.value }))} className="mt-1" />
             </label>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm font-medium text-body">Clock-out date <span className="font-normal text-muted">(optional)</span>
-              <input type="date" min={correctionForm.clockInDate || undefined} value={correctionForm.clockOutDate} onChange={event => setCorrectionForm(current => ({ ...current, clockOutDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default bg-surface-raised px-3 py-2 text-sm text-body" />
+              <Input type="date" min={correctionForm.clockInDate || undefined} value={correctionForm.clockOutDate} onChange={event => setCorrectionForm(current => ({ ...current, clockOutDate: event.target.value }))} className="mt-1" />
             </label>
             <label className="block text-sm font-medium text-body">Clock-out time <span className="font-normal text-muted">(optional)</span>
-              <input type="time" value={correctionForm.clockOutTime} onChange={event => setCorrectionForm(current => ({ ...current, clockOutTime: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default bg-surface-raised px-3 py-2 text-sm text-body" />
+              <Input type="time" value={correctionForm.clockOutTime} onChange={event => setCorrectionForm(current => ({ ...current, clockOutTime: event.target.value }))} className="mt-1" />
             </label>
           </div>
-          {Boolean(correctionForm.clockOutDate) !== Boolean(correctionForm.clockOutTime) && <p role="alert" className="text-sm text-danger">Enter both clock-out date and time, or leave both empty.</p>}
-          {correctPunchMutation.isError && <p role="alert" className="text-sm text-danger">{correctPunchMutation.error?.message || 'Could not save the punch correction.'}</p>}
+          {Boolean(correctionForm.clockOutDate) !== Boolean(correctionForm.clockOutTime) && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>Enter both clock-out date and time, or leave both empty.</AlertDescription>
+            </Alert>
+          )}
+          {correctPunchMutation.isError && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>{correctPunchMutation.error?.message || 'Could not save the punch correction.'}</AlertDescription>
+            </Alert>
+          )}
         </div>
       </FormDialog>
     </div>

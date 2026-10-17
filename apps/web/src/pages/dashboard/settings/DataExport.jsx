@@ -10,6 +10,9 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import TopBarActions from '../../../components/TopBarActions';
 import SettingsTabs from './SettingsTabs';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Badge } from '../../../components/ui/badge';
 import { exportsApi } from '../../../lib/api/exports';
 import { queryKeys } from '../../../lib/queryKeys';
 import { settingsApi } from '../../../lib/api/settings';
@@ -100,25 +103,26 @@ export default function SettingsDataExport() {
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
-            <input
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption z-10 pointer-events-none" />
+            <Input
               type="text"
               value={jobSearch}
               onChange={event => setJobSearch(event.target.value)}
               placeholder="Search..."
-              className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className="pl-9 pr-4 py-1.5 h-8 text-sm w-64 bg-surface-muted"
             />
           </div>
 
           <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-strong shrink-0"></div>
 
-          <button
+          <Button
+            variant="outline"
             type="button"
             onClick={() => setShowHistory(true)}
-            className="bg-surface-muted border border-border-default text-body px-5 py-1.5 rounded-input text-sm font-semibold hover:bg-surface-active transition-colors whitespace-nowrap disabled:opacity-60"
+            className="h-8 whitespace-nowrap"
           >
             View Export History
-          </button>
+          </Button>
         </div>
       </TopBarActions>
 
@@ -180,11 +184,11 @@ export default function SettingsDataExport() {
 
               {/* Submit Button */}
               <div className="pt-2">
-                <button
+                <Button
                   type="button"
                   onClick={() => createMutation.mutate(SCOPE_TO_KIND[scope] || 'employees')}
                   disabled={createMutation.isPending}
-                  className="w-full bg-primary text-on-primary py-2.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60"
+                  className="w-full"
                 >
                   {createMutation.isPending ? (
                     <span className="inline-flex items-center gap-2">
@@ -193,7 +197,7 @@ export default function SettingsDataExport() {
                   ) : (
                     'Generate Export Archive'
                   )}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -204,7 +208,7 @@ export default function SettingsDataExport() {
 
             <div className="space-y-6">
               {backupsQuery.data?.items?.length ? backupsQuery.data.items.map(backup => <div key={backup.id} className="flex items-center justify-between border border-border-subtle rounded-button p-4"><div><p className="text-sm font-semibold text-heading">{backup.name}</p><p className="text-xs text-muted">{backup.schedule} · {backup.enabled ? 'Enabled' : 'Disabled'}</p></div><button type="button" onClick={() => settingsApi.updateBackup(backup.id, { enabled: !backup.enabled }).then(() => queryClient.invalidateQueries({ queryKey: queryKeys.settings.backups() }))} className="text-xs font-semibold text-accent">{backup.enabled ? 'Disable' : 'Enable'}</button></div>) : <div className="flex flex-col items-center justify-center text-sm text-muted py-8 text-center"><Calendar size={32} className="opacity-20 mb-3" />No scheduled backups configured.</div>}
-              <button type="button" onClick={() => backupMutation.mutate()} disabled={backupMutation.isPending} className="bg-primary text-on-primary px-4 py-2 rounded-input text-sm font-semibold disabled:opacity-60">{backupMutation.isPending ? 'Creating...' : 'Create weekly backup'}</button>
+              <Button type="button" onClick={() => backupMutation.mutate()} disabled={backupMutation.isPending}>{backupMutation.isPending ? 'Creating...' : 'Create weekly backup'}</Button>
             </div>
           </div>
 
@@ -225,7 +229,10 @@ export default function SettingsDataExport() {
                   <div key={job.id} className="flex items-start justify-between gap-3 border-b border-border-subtle pb-3 last:border-b-0 last:pb-0">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-heading truncate">{job.filename || `${job.kind} export`}</p>
-                      <p className="text-[11px] text-muted">{job.kind} · {job.status} · {new Date(job.createdAt).toLocaleDateString()}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <Badge variant={job.status === 'DONE' ? 'default' : 'secondary'} className="text-[10px] py-0 px-1.5">{job.status}</Badge>
+                        <span className="text-[11px] text-muted">{job.kind} · {new Date(job.createdAt).toLocaleDateString()}</span>
+                      </div>
                     </div>
                     {job.status === 'DONE' && <button type="button" onClick={() => handleDownload(job)} className="text-[11px] font-semibold text-accent hover:text-accent-hover">Download</button>}
                   </div>

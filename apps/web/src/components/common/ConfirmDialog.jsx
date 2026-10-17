@@ -1,23 +1,18 @@
 import { Loader2 } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
-import useDialogAccessibility from './useDialogAccessibility'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '../ui/dialog'
+import { Button } from '../ui/button'
+import { Alert, AlertDescription } from '../ui/alert'
 
 /**
- * Confirmation dialog for destructive actions. The legacy `common/ConfirmDialog.jsx` was a
- * 3-line "coming soon" stub — this is the real component, styled with the same design tokens
+ * Confirmation dialog for destructive actions. Styled with the same design tokens
  * as the rest of the app (rounded-card, shadow-elevated, danger accents for destructive use).
- *
- * Usage:
- *   <ConfirmDialog
- *     open={open}
- *     onClose={() => setOpen(false)}
- *     onConfirm={handleConfirm}
- *     title="Clear sample data?"
- *     description="This permanently removes the sample dataset…"
- *     confirmLabel="Clear data"
- *     busy={isPending}
- *     danger
- *   />
  */
 export default function ConfirmDialog({
   open,
@@ -32,67 +27,48 @@ export default function ConfirmDialog({
   danger = false,
   error,
 }) {
-  const isDialogOpen = open ?? isOpen
-  const dialogRef = useDialogAccessibility({ open: isDialogOpen, onClose, busy })
+  const isDialogOpen = Boolean(open ?? isOpen)
 
   return (
-    <AnimatePresence>
-      {isDialogOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-overlay backdrop-blur-sm"
-            onClick={() => !busy && onClose()}
-          />
-          <motion.div
-            initial={{ opacity: 0, y: 12, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.97 }}
-            transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-            ref={dialogRef}
-            role="dialog"
-            tabIndex={-1}
-            aria-modal="true"
-            aria-labelledby="confirm-dialog-title"
-            className="relative w-full max-w-md bg-surface-raised rounded-card border border-border-default shadow-elevated p-6"
+    <Dialog open={isDialogOpen} onOpenChange={(val) => { if (!val && !busy) onClose?.() }}>
+      <DialogContent className="relative w-full max-w-md bg-surface-raised rounded-card border border-border-default shadow-elevated p-6">
+        <DialogHeader className="text-left rtl:text-right">
+          <DialogTitle id="confirm-dialog-title" className="text-lg font-bold text-heading">
+            {title}
+          </DialogTitle>
+          {description && (
+            <DialogDescription className="text-sm text-muted leading-relaxed mt-1.5">
+              {description}
+            </DialogDescription>
+          )}
+        </DialogHeader>
+
+        {error && (
+          <Alert variant="destructive" className="my-2 py-2 px-3">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <DialogFooter className="mt-4 flex items-center justify-end gap-3 sm:space-x-0">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={busy}
           >
-            <h2 id="confirm-dialog-title" className="text-lg font-bold text-heading mb-1.5">
-              {title}
-            </h2>
-            {description && <p className="text-sm text-muted leading-relaxed mb-6">{description}</p>}
-
-            {error && (
-              <p role="alert" className="mb-4 text-sm text-danger">
-                {error}
-              </p>
-            )}
-
-            <div className="flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={busy}
-                className="px-4 py-2 rounded-button text-sm font-medium text-body border border-border-default hover:bg-surface-muted transition-colors disabled:opacity-60"
-              >
-                {cancelLabel}
-              </button>
-              <button
-                type="button"
-                onClick={onConfirm}
-                disabled={busy}
-                className={`flex items-center gap-2 px-4 py-2 rounded-button text-sm font-semibold text-on-primary transition-colors active:scale-[0.99] disabled:opacity-60 ${
-                  danger ? 'bg-danger-hover hover:bg-danger-text' : 'bg-primary hover:bg-primary-hover'
-                }`}
-              >
-                {busy && <Loader2 size={14} className="animate-spin" />}
-                {confirmLabel}
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+            {cancelLabel}
+          </Button>
+          <Button
+            type="button"
+            variant={danger ? 'destructive' : 'default'}
+            onClick={onConfirm}
+            disabled={busy}
+          >
+            {busy && <Loader2 size={14} className="animate-spin" />}
+            {confirmLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

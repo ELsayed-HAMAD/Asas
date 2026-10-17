@@ -9,6 +9,10 @@ import FormDialog from '../../../components/common/FormDialog'
 import { useActiveMemberRole } from '../../../lib/authClient'
 import { getMemberRoleName } from '../../../lib/memberRole'
 import { downloadCsv } from '../../../lib/csv'
+import { Button } from '../../../components/ui/button'
+import { Input } from '../../../components/ui/input'
+import { Badge } from '../../../components/ui/badge'
+import { Alert, AlertDescription } from '../../../components/ui/alert'
 
 
 const EMPTY_OPENING_LINES = [
@@ -44,19 +48,34 @@ export default function TrialBalance() {
       <TopBarActions>
         <label className="flex items-center gap-2 text-sm text-body">
           <span>As of</span>
-          <input aria-label="Trial balance as of date" type="date" value={asOf} onChange={event => setAsOf(event.target.value)} className="rounded-input border border-border-default bg-surface px-2 py-1.5" />
+          <Input aria-label="Trial balance as of date" type="date" value={asOf} onChange={event => setAsOf(event.target.value)} className="h-8 w-auto text-xs" />
         </label>
-        {data && <button type="button" onClick={() => downloadCsv([
-          ['Trial balance', `As of ${data.asOf}`, `Base currency ${data.baseCurrency}`],
-          ['Account code', 'Account', 'Kind', 'Native currency', 'Debit', 'Credit', 'Debit base', 'Credit base', 'Net debit base', 'Net credit base'],
-          ...data.rows.map(row => [row.accountCode, row.accountName, row.accountKind, row.currency, row.debit.amount, row.credit.amount, row.debitBase.amount, row.creditBase.amount, row.netDebitBase.amount, row.netCreditBase.amount]),
-          ['TOTAL', '', '', data.baseCurrency, '', '', data.totalDebitBase.amount, data.totalCreditBase.amount],
-        ], `trial-balance-${data.asOf}.csv`)} className="inline-flex items-center gap-2 rounded-input border border-border-default px-3 py-1.5 text-sm font-medium text-body hover:bg-surface-muted">
-          <Download size={14} /> Export CSV
-        </button>}
-        {data?.rows.length === 0 && canWrite && <button type="button" onClick={() => { openingMutation.reset(); setOpeningOpen(true) }} className="inline-flex items-center gap-2 rounded-input bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">
-          <Plus size={14} /> Record opening balances
-        </button>}
+        {data && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => downloadCsv([
+              ['Trial balance', `As of ${data.asOf}`, `Base currency ${data.baseCurrency}`],
+              ['Account code', 'Account', 'Kind', 'Native currency', 'Debit', 'Credit', 'Debit base', 'Credit base', 'Net debit base', 'Net credit base'],
+              ...data.rows.map(row => [row.accountCode, row.accountName, row.accountKind, row.currency, row.debit.amount, row.credit.amount, row.debitBase.amount, row.creditBase.amount, row.netDebitBase.amount, row.netCreditBase.amount]),
+              ['TOTAL', '', '', data.baseCurrency, '', '', data.totalDebitBase.amount, data.totalCreditBase.amount],
+            ], `trial-balance-${data.asOf}.csv`)}
+            className="gap-2 font-medium"
+          >
+            <Download size={14} /> Export CSV
+          </Button>
+        )}
+        {data?.rows.length === 0 && canWrite && (
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => { openingMutation.reset(); setOpeningOpen(true) }}
+            className="gap-2 font-semibold"
+          >
+            <Plus size={14} /> Record opening balances
+          </Button>
+        )}
       </TopBarActions>
 
       <header>
@@ -70,12 +89,24 @@ export default function TrialBalance() {
       </header>
 
       {isLoading && <div className="flex flex-1 items-center justify-center"><Loader2 className="animate-spin text-muted" size={24} /></div>}
-      {isError && <div role="alert" className="rounded-lg border border-danger/30 bg-danger/5 p-4 text-sm text-danger">Failed to load the trial balance.</div>}
+      {isError && (
+        <Alert variant="destructive">
+          <AlertDescription>Failed to load the trial balance.</AlertDescription>
+        </Alert>
+      )}
       {data && <>
-        {openingMutation.isError && <div role="alert" className="rounded-lg border border-danger/30 bg-danger/5 p-4 text-sm text-danger">{openingMutation.error?.message || 'Could not record opening balances.'}</div>}
-        {!data.isComplete && <div role="status" className="rounded-lg border border-warning/30 bg-warning/5 p-4 text-sm text-body">
-          This report is incomplete in base currency: {data.unvaluedJournalCount} historic journal {data.unvaluedJournalCount === 1 ? 'entry has' : 'entries have'} no recorded FX basis. These entries are not converted or estimated.
-        </div>}
+        {openingMutation.isError && (
+          <Alert variant="destructive">
+            <AlertDescription>{openingMutation.error?.message || 'Could not record opening balances.'}</AlertDescription>
+          </Alert>
+        )}
+        {!data.isComplete && (
+          <Alert className="border-warning/30 bg-warning/5 text-body">
+            <AlertDescription>
+              This report is incomplete in base currency: {data.unvaluedJournalCount} historic journal {data.unvaluedJournalCount === 1 ? 'entry has' : 'entries have'} no recorded FX basis. These entries are not converted or estimated.
+            </AlertDescription>
+          </Alert>
+        )}
         <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-border-default bg-surface-raised p-4">
             <p className="text-xs font-medium uppercase tracking-wide text-muted">Base currency</p>
@@ -98,7 +129,11 @@ export default function TrialBalance() {
             <tbody className="divide-y divide-border-default">
               {data.rows.map(row => <tr key={row.accountId}>
                 <td className="px-4 py-3"><span className="font-mono text-xs text-muted">{row.accountCode}</span><span className="ml-2 font-medium text-body">{row.accountName}</span></td>
-                <td className="px-4 py-3 text-body">{row.accountKind.toLowerCase()}</td>
+                <td className="px-4 py-3 text-body">
+                  <Badge variant="outline" className="text-xs capitalize font-normal border-border-default">
+                    {row.accountKind.toLowerCase()}
+                  </Badge>
+                </td>
                 <td className="px-4 py-3 text-body">{row.currency}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-body" title={formatMoney(row.debit)}>{formatCompactTableMoney(row.debit)}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-body" title={formatMoney(row.credit)}>{formatCompactTableMoney(row.credit)}</td>
@@ -120,21 +155,31 @@ export default function TrialBalance() {
       })}>
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="block text-sm font-medium text-body">Cutover date<input aria-label="Opening balance date" type="date" value={openingDate} onChange={event => setOpeningDate(event.target.value)} className="mt-1 w-full rounded-input border border-border-default bg-surface-raised px-3 py-2" /></label>
-            <label className="block text-sm font-medium text-body">Description<input aria-label="Opening balance description" value={openingDescription} onChange={event => setOpeningDescription(event.target.value)} className="mt-1 w-full rounded-input border border-border-default bg-surface-raised px-3 py-2" maxLength={240} /></label>
+            <label className="block text-sm font-medium text-body">Cutover date
+              <Input aria-label="Opening balance date" type="date" value={openingDate} onChange={event => setOpeningDate(event.target.value)} className="mt-1" />
+            </label>
+            <label className="block text-sm font-medium text-body">Description
+              <Input aria-label="Opening balance description" value={openingDescription} onChange={event => setOpeningDescription(event.target.value)} className="mt-1" maxLength={240} />
+            </label>
           </div>
           <p className="text-xs text-muted">Use one line per account. Choose the account’s normal balance side and enter positive amounts. Add an equity line to balance the opening position. This posting is append-only; errors must be corrected with a future reversal workflow.</p>
           <div className="space-y-3">
             {openingLines.map((line, index) => <div key={index} className="grid grid-cols-1 items-end gap-2 rounded-lg border border-border-default p-3 sm:grid-cols-[1fr_1.4fr_1fr_1fr_1fr_auto]">
-              <label className="text-xs font-medium text-muted">Account code<input aria-label={`Account code ${index + 1}`} value={line.code} onChange={event => setOpeningLines(current => current.map((item, row) => row === index ? { ...item, code: event.target.value.toUpperCase() } : item))} className="mt-1 w-full rounded-input border border-border-default px-2 py-2 text-sm text-body" maxLength={32} /></label>
-              <label className="text-xs font-medium text-muted">Account name<input aria-label={`Account name ${index + 1}`} value={line.name} onChange={event => setOpeningLines(current => current.map((item, row) => row === index ? { ...item, name: event.target.value } : item))} className="mt-1 w-full rounded-input border border-border-default px-2 py-2 text-sm text-body" maxLength={80} /></label>
+              <label className="text-xs font-medium text-muted">Account code
+                <Input aria-label={`Account code ${index + 1}`} value={line.code} onChange={event => setOpeningLines(current => current.map((item, row) => row === index ? { ...item, code: event.target.value.toUpperCase() } : item))} className="mt-1 text-sm" maxLength={32} />
+              </label>
+              <label className="text-xs font-medium text-muted">Account name
+                <Input aria-label={`Account name ${index + 1}`} value={line.name} onChange={event => setOpeningLines(current => current.map((item, row) => row === index ? { ...item, name: event.target.value } : item))} className="mt-1 text-sm" maxLength={80} />
+              </label>
               <label className="text-xs font-medium text-muted">Type<select aria-label={`Account type ${index + 1}`} value={line.kind} onChange={event => setOpeningLines(current => current.map((item, row) => row === index ? { ...item, kind: event.target.value } : item))} className="mt-1 w-full rounded-input border border-border-default bg-surface-raised px-2 py-2 text-sm text-body">{['ASSET', 'LIABILITY', 'EQUITY', 'EXPENSE', 'INCOME'].map(kind => <option key={kind} value={kind}>{kind.toLowerCase()}</option>)}</select></label>
               <label className="text-xs font-medium text-muted">Side<select aria-label={`Account side ${index + 1}`} value={line.side} onChange={event => setOpeningLines(current => current.map((item, row) => row === index ? { ...item, side: event.target.value } : item))} className="mt-1 w-full rounded-input border border-border-default bg-surface-raised px-2 py-2 text-sm text-body"><option value="DEBIT">Debit</option><option value="CREDIT">Credit</option></select></label>
-              <label className="text-xs font-medium text-muted">Amount ({data?.baseCurrency})<input aria-label={`Opening amount ${index + 1}`} inputMode="decimal" value={line.amount} onChange={event => setOpeningLines(current => current.map((item, row) => row === index ? { ...item, amount: event.target.value } : item))} className="mt-1 w-full rounded-input border border-border-default px-2 py-2 text-sm text-body" placeholder="0.00" /></label>
-              <button type="button" aria-label={`Remove opening account ${index + 1}`} disabled={openingLines.length <= 2} onClick={() => setOpeningLines(current => current.filter((_, row) => row !== index))} className="rounded-input border border-border-default p-2 text-danger disabled:opacity-40"><Trash2 size={15} /></button>
+              <label className="text-xs font-medium text-muted">Amount ({data?.baseCurrency})
+                <Input aria-label={`Opening amount ${index + 1}`} inputMode="decimal" value={line.amount} onChange={event => setOpeningLines(current => current.map((item, row) => row === index ? { ...item, amount: event.target.value } : item))} className="mt-1 text-sm" placeholder="0.00" />
+              </label>
+              <Button type="button" variant="outline" size="icon" aria-label={`Remove opening account ${index + 1}`} disabled={openingLines.length <= 2} onClick={() => setOpeningLines(current => current.filter((_, row) => row !== index))} className="h-9 w-9 text-danger border-border-default hover:bg-danger-light"><Trash2 size={15} /></Button>
             </div>)}
           </div>
-          <button type="button" onClick={() => setOpeningLines(current => [...current, { code: '', name: '', kind: 'ASSET', side: 'DEBIT', amount: '' }])} className="inline-flex items-center gap-2 rounded-input border border-border-default px-3 py-2 text-sm font-medium text-body hover:bg-surface-muted"><Plus size={14} /> Add account line</button>
+          <Button type="button" variant="outline" size="sm" onClick={() => setOpeningLines(current => [...current, { code: '', name: '', kind: 'ASSET', side: 'DEBIT', amount: '' }])} className="gap-2"><Plus size={14} /> Add account line</Button>
         </div>
       </FormDialog>
     </div>

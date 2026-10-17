@@ -14,6 +14,9 @@ import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney, formatCompactMoney, formatCompactTableMoney, moneyToMajor } from '../../../lib/format';
 import { downloadCsv } from '../../../lib/csv';
 import FormDialog from '../../../components/common/FormDialog';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Badge } from '../../../components/ui/badge';
 
 // Display-only conversion of a wire money object ({amount: minor units, currency}) to a
 // major-unit number, used solely to feed recharts' numeric series / axis ticks. Every
@@ -86,8 +89,6 @@ export default function FinanceOverview() {
   const recentTransactions = (data.recentTransactions ?? []).filter(tx =>
     tx.date.startsWith(`${selectedYear}-`) && (!transactionSearch || tx.description.toLowerCase().includes(transactionSearch.toLowerCase()) || tx.status.toLowerCase().includes(transactionSearch.toLowerCase())),
   )
-
-
 
   function downloadFinanceReport() {
     const rows = [
@@ -163,13 +164,13 @@ export default function FinanceOverview() {
         {/* Left group */}
         <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
-            <input
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
+            <Input
               type="text"
               placeholder="Search..."
               value={transactionSearch}
               onChange={event => setTransactionSearch(event.target.value)}
-              className="pl-9 pr-4 py-2 text-xs border border-border-default rounded-input bg-surface-raised w-72 max-w-full focus:outline-none focus:border-border-strong focus:ring-2 focus:ring-border-subtle transition-all shadow-card"
+              className="ps-9 pe-4 py-2 text-xs w-72 max-w-full bg-surface-raised shadow-card"
             />
           </div>
 
@@ -189,23 +190,25 @@ export default function FinanceOverview() {
 
         {/* Right group */}
         <div className="flex items-center gap-2.5 shrink-0 ml-auto">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={downloadFinanceReport}
             aria-label="Download finance report"
             title="Download finance report"
-            className="flex items-center gap-2 border border-border-default text-body px-3.5 py-2 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card cursor-pointer"
+            className="flex items-center gap-2 text-xs font-medium bg-surface-raised shadow-card"
           >
             <Download size={14} /> Export
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
             onClick={() => setInvoiceOpen(true)}
-            className="flex items-center gap-2 bg-primary text-on-primary px-3.5 py-2 rounded-input text-xs font-medium hover:bg-primary-hover transition-colors shadow-card cursor-pointer"
+            className="flex items-center gap-2 text-xs font-medium shadow-card"
           >
             Create Invoice
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -225,10 +228,10 @@ export default function FinanceOverview() {
             {formatMoney(data.receivableOutstanding)}
           </p>
           <div className="mt-2 flex items-center text-xs leading-normal truncate">
-            <span className="inline-flex items-center gap-1 bg-success-light text-success-text px-2 py-0.5 rounded text-xs font-semibold truncate">
-              <TrendingUp size={12} strokeWidth={2.5} className="shrink-0" />
+            <Badge variant="outline" className="inline-flex items-center gap-1 bg-success-light text-success-text px-2 py-0.5 text-xs font-semibold truncate border-transparent">
+              <TrendingUp size={12} strokeWidth={2.5} className="shrink-0 mr-1" />
               <span className="truncate">{receivablesBadgeText}</span>
-            </span>
+            </Badge>
           </div>
         </div>
 
@@ -311,15 +314,17 @@ export default function FinanceOverview() {
       <div className="bg-surface-raised border border-border-subtle rounded-card shadow-card overflow-hidden mb-5 flex-shrink-0">
         <div className="flex items-center justify-between p-5 pb-2">
           <h2 className="text-base font-bold text-heading">Cash Flow Analysis</h2>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={downloadCashFlow}
             aria-label="Download cash flow data"
             title="Download cash flow data"
-            className="text-caption hover:text-body p-1 rounded hover:bg-surface-muted transition-colors cursor-pointer"
+            className="text-caption hover:text-body h-8 w-8"
           >
             <MoreHorizontal size={18} />
-          </button>
+          </Button>
         </div>
 
         <div className="p-5 pt-0">
@@ -361,13 +366,15 @@ export default function FinanceOverview() {
         <div className="col-span-12 lg:col-span-9 min-w-0 bg-surface-raised border border-border-subtle rounded-card shadow-card overflow-hidden flex flex-col">
           <div className="flex items-center justify-between p-5 border-b border-border-subtle bg-surface-raised">
             <h2 className="text-base font-bold text-heading">Recent Transactions</h2>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => setTransactionSearch('')}
-              className="text-xs font-semibold text-accent hover:text-accent-hover cursor-pointer"
+              className="text-xs font-semibold text-accent hover:text-accent-hover h-6 px-2"
             >
               Clear Search
-            </button>
+            </Button>
           </div>
           <div className="flex-1 overflow-auto">
             <table className="w-full text-left border-collapse">
@@ -401,15 +408,15 @@ export default function FinanceOverview() {
                         { forcePlus: tx.type === 'credit' })}
                     </td>
                     <td className="px-5 py-2.5 text-right whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                      <Badge variant="outline" className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                         tx.status === 'CLEARED'
                           ? (tx.type === 'credit'
-                              ? 'bg-success-light text-success border border-success-border'
-                              : 'bg-surface-muted text-body border border-border-default')
-                          : 'bg-surface-muted text-body-light border border-border-default'
+                              ? 'bg-success-light text-success border-success-border'
+                              : 'bg-surface-muted text-body border-border-default')
+                          : 'bg-surface-muted text-body-light border-border-default'
                       }`}>
                         {tx.status}
-                      </span>
+                      </Badge>
                     </td>
                   </tr>
                 ))}
@@ -477,7 +484,49 @@ export default function FinanceOverview() {
       </div>
 
       <FormDialog open={invoiceOpen} onClose={() => setInvoiceOpen(false)} title="Create invoice" subtitle="Create a receivable invoice for a customer." busy={createInvoice.isPending} onConfirm={() => createInvoice.mutate()} confirmLabel="Create invoice">
-        <div className="space-y-4"><label className="block text-sm font-medium text-body">Customer<select required value={invoiceForm.customerId} onChange={event => setInvoiceForm(current => ({ ...current, customerId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="">Select a customer</option>{(customersData?.items ?? []).map(customer => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label><label className="block text-sm font-medium text-body">Invoice number<input value={invoiceForm.number} onChange={event => setInvoiceForm(current => ({ ...current, number: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Amount<input required type="number" min="0" step="0.01" value={invoiceForm.amount} onChange={event => setInvoiceForm(current => ({ ...current, amount: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Due date<input type="date" value={invoiceForm.dueDate} onChange={event => setInvoiceForm(current => ({ ...current, dueDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Customer</label>
+            <select
+              required
+              value={invoiceForm.customerId}
+              onChange={event => setInvoiceForm(current => ({ ...current, customerId: event.target.value }))}
+              className="w-full h-9 px-3 py-1.5 rounded-input border border-border-default bg-surface-muted text-sm text-body"
+            >
+              <option value="">Select a customer</option>
+              {(customersData?.items ?? []).map(customer => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Invoice number</label>
+            <Input
+              value={invoiceForm.number}
+              onChange={event => setInvoiceForm(current => ({ ...current, number: event.target.value }))}
+              className="bg-surface-muted"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Amount</label>
+            <Input
+              required
+              type="number"
+              min="0"
+              step="0.01"
+              value={invoiceForm.amount}
+              onChange={event => setInvoiceForm(current => ({ ...current, amount: event.target.value }))}
+              className="bg-surface-muted"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Due date</label>
+            <Input
+              type="date"
+              value={invoiceForm.dueDate}
+              onChange={event => setInvoiceForm(current => ({ ...current, dueDate: event.target.value }))}
+              className="bg-surface-muted"
+            />
+          </div>
+        </div>
       </FormDialog>
     </div>
   );

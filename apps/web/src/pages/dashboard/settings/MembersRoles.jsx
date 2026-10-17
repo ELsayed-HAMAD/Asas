@@ -15,6 +15,9 @@ import SettingsTabs from './SettingsTabs'
 import FormDialog from '../../../components/common/FormDialog'
 import ConfirmDialog from '../../../components/common/ConfirmDialog'
 import QueryState from '../../../components/common/QueryState'
+import { Button } from '../../../components/ui/button'
+import { Input } from '../../../components/ui/input'
+import { Badge } from '../../../components/ui/badge'
 import { authClient, useSession, useActiveMemberRole } from '../../../lib/authClient'
 import { getMemberRoleName } from '../../../lib/memberRole'
 import { queryKeys } from '../../../lib/queryKeys'
@@ -148,17 +151,17 @@ export default function MembersRoles() {
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
-            <input
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption z-10 pointer-events-none" />
+            <Input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search members..."
-              className="pl-9 pr-3 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent text-heading"
+              className="pl-9 pr-3 py-1.5 h-8 text-sm w-64 bg-surface-muted text-heading"
             />
           </div>
           {isAdmin && (
-            <button
+            <Button
               type="button"
               onClick={() => {
                 setInviteError('')
@@ -166,11 +169,11 @@ export default function MembersRoles() {
                 setInviteRole('MEMBER')
                 setInviteOpen(true)
               }}
-              className="flex items-center gap-2 bg-primary text-on-primary px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card whitespace-nowrap"
+              className="h-8 gap-2 whitespace-nowrap"
             >
               <UserPlus size={15} />
               Invite Member
-            </button>
+            </Button>
           )}
         </div>
       </TopBarActions>
@@ -197,9 +200,9 @@ export default function MembersRoles() {
                     People with active access to this workspace.
                   </p>
                 </div>
-                <span className="text-xs font-semibold px-2.5 py-1 bg-surface-muted text-muted rounded-full">
+                <Badge variant="outline" className="text-xs font-semibold px-2.5 py-1">
                   {members.length} {members.length === 1 ? 'member' : 'members'}
-                </span>
+                </Badge>
               </div>
 
               <div className="divide-y divide-border-subtle">
@@ -244,17 +247,18 @@ export default function MembersRoles() {
                       </div>
 
                       <div className="flex items-center gap-6 flex-shrink-0">
-                        <span
-                          className={`text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                        <Badge
+                          variant={
                             member.role === 'OWNER'
-                              ? 'bg-primary/15 text-primary border border-primary/20'
+                              ? 'default'
                               : member.role === 'ADMIN'
-                              ? 'bg-accent/15 text-accent border border-accent/20'
-                              : 'bg-surface-muted text-muted border border-border-default'
-                          }`}
+                              ? 'secondary'
+                              : 'outline'
+                          }
+                          className="uppercase tracking-wider"
                         >
                           {member.role}
-                        </span>
+                        </Badge>
 
                         <span className="text-xs text-caption w-28 text-right hidden sm:inline-block">
                           {member.createdAt
@@ -268,7 +272,9 @@ export default function MembersRoles() {
 
                         {isAdmin && (
                           <div className="flex items-center gap-2">
-                            <button
+                            <Button
+                              variant="outline"
+                              size="sm"
                               type="button"
                               onClick={() => {
                                 setSelectedMember(member)
@@ -281,12 +287,14 @@ export default function MembersRoles() {
                                   ? 'Cannot change role of the only owner'
                                   : 'Change member role'
                               }
-                              className="text-xs font-medium text-body-light hover:text-heading px-2.5 py-1 rounded border border-border-default bg-surface hover:bg-surface-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="h-7 text-xs"
                             >
                               Edit Role
-                            </button>
+                            </Button>
 
-                            <button
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               type="button"
                               onClick={() => {
                                 setMemberToRemove(member)
@@ -298,10 +306,10 @@ export default function MembersRoles() {
                                   ? 'Cannot remove the only owner'
                                   : 'Remove member from workspace'
                               }
-                              className="text-muted hover:text-danger-hover p-1.5 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="h-7 w-7 text-muted hover:text-danger-hover"
                             >
                               <Trash2 size={15} />
-                            </button>
+                            </Button>
                           </div>
                         )}
                       </div>
@@ -324,9 +332,9 @@ export default function MembersRoles() {
                       </p>
                     </div>
                   </div>
-                  <span className="text-xs font-semibold px-2.5 py-1 bg-surface-muted text-muted rounded-full">
+                  <Badge variant="outline" className="text-xs font-semibold px-2.5 py-1">
                     {invitations.length} pending
-                  </span>
+                  </Badge>
                 </div>
 
                 <div className="divide-y divide-border-subtle">
@@ -353,14 +361,16 @@ export default function MembersRoles() {
                           Pending
                         </span>
                         {isAdmin && (
-                          <button
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             type="button"
                             onClick={() => cancelInviteMutation.mutate(inv.id)}
                             disabled={cancelInviteMutation.isPending}
-                            className="text-xs font-medium text-danger-hover hover:underline"
+                            className="text-xs font-medium text-danger-hover hover:text-danger-hover h-7 px-2"
                           >
                             Cancel
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -436,13 +446,13 @@ export default function MembersRoles() {
             <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">
               Email Address
             </label>
-            <input
+            <Input
               type="email"
               required
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
               placeholder="colleague@example.com"
-              className="w-full border border-border-default rounded-input px-3 py-2 text-sm bg-surface-muted text-heading focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full bg-surface-muted"
             />
           </div>
 

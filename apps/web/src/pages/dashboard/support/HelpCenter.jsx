@@ -3,6 +3,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Headset, CheckCircle2, Search, Loader2 } from 'lucide-react'
 import TopBarActions from '../../../components/TopBarActions'
 import EmptyState from '../../../components/common/EmptyState'
+import { Button } from '../../../components/ui/button'
+import { Input } from '../../../components/ui/input'
+import { Badge } from '../../../components/ui/badge'
+import { Alert, AlertDescription } from '../../../components/ui/alert'
 import { supportApi } from '../../../lib/api/support'
 import { queryKeys } from '../../../lib/queryKeys'
 import { useActiveMemberRole } from '../../../lib/authClient'
@@ -13,32 +17,32 @@ function getStatusBadge(status) {
   switch (status) {
     case 'OPEN':
       return (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-info-light text-info border border-info-border">
+        <Badge variant="outline" className="gap-1.5 text-[11px] font-bold bg-info-light text-info border-info-border">
           <span className="w-1.5 h-1.5 rounded-full bg-info-dot" />
           Open
-        </span>
+        </Badge>
       )
     case 'IN_PROGRESS':
       return (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-warning-light text-warning-text">
+        <Badge variant="secondary" className="gap-1.5 text-[11px] font-bold bg-warning-light text-warning-text">
           <span className="w-1.5 h-1.5 rounded-full bg-warning" />
           In Progress
-        </span>
+        </Badge>
       )
     case 'RESOLVED':
       return (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-success-light text-success-text border border-success-border">
+        <Badge variant="outline" className="gap-1.5 text-[11px] font-bold bg-success-light text-success-text border-success-border">
           <span className="w-1.5 h-1.5 rounded-full bg-success-dot" />
           Resolved
-        </span>
+        </Badge>
       )
     case 'CLOSED':
     default:
       return (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-surface-muted text-muted border border-border-default">
+        <Badge variant="outline" className="gap-1.5 text-[11px] font-bold bg-surface-muted text-muted border-border-default">
           <span className="w-1.5 h-1.5 rounded-full bg-caption" />
           Closed
-        </span>
+        </Badge>
       )
   }
 }
@@ -84,13 +88,13 @@ export default function SupportDashboard() {
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
-            <input
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption z-10 pointer-events-none" />
+            <Input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Filter tickets..."
-              className="pl-9 pr-4 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className="pl-9 pr-4 py-1.5 h-8 text-sm w-64 bg-surface-raised"
             />
           </div>
         </div>
@@ -108,39 +112,43 @@ export default function SupportDashboard() {
           </div>
 
           {submitSuccess && (
-            <div className="p-3 rounded-card-sm bg-success-light border border-success-border text-xs font-semibold text-success-text flex items-center justify-center gap-2">
+            <Alert className="bg-success-light border-success-border text-success-text">
               <CheckCircle2 size={16} />
-              Your support ticket was submitted and queued for review.
-            </div>
+              <AlertDescription>
+                Your support ticket was submitted and queued for review.
+              </AlertDescription>
+            </Alert>
           )}
 
           {createTicket.isError && (
-            <div className="p-3 rounded-card-sm bg-danger-light border border-danger-border text-xs font-semibold text-danger text-left">
-              {createTicket.error?.message || 'Could not submit support ticket. Please try again.'}
-            </div>
+            <Alert variant="destructive" className="text-left">
+              <AlertDescription>
+                {createTicket.error?.message || 'Could not submit support ticket. Please try again.'}
+              </AlertDescription>
+            </Alert>
           )}
 
           <div className="flex flex-col sm:flex-row gap-2">
-            <input
+            <Input
               value={subject}
               onChange={event => setSubject(event.target.value)}
               placeholder="Describe your issue or question..."
-              className="min-w-0 flex-1 rounded-input border border-border-strong bg-surface px-3 py-2 text-sm text-heading placeholder:text-caption focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className="min-w-0 flex-1 bg-surface"
               onKeyDown={e => {
                 if (e.key === 'Enter' && subject.trim() && !createTicket.isPending) {
                   createTicket.mutate()
                 }
               }}
             />
-            <button
+            <Button
               type="button"
               disabled={!subject.trim() || createTicket.isPending}
               onClick={() => createTicket.mutate()}
-              className="rounded-input bg-primary px-5 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer shadow-card flex items-center justify-center gap-2"
+              className="gap-2 shrink-0"
             >
               {createTicket.isPending && <Loader2 size={14} className="animate-spin" />}
               Submit
-            </button>
+            </Button>
           </div>
 
           <div className="pt-4 border-t border-border-subtle text-left space-y-4">
@@ -177,27 +185,31 @@ export default function SupportDashboard() {
                       {getStatusBadge(ticket.status)}
 
                       {isAdmin && ticket.status !== 'RESOLVED' && ticket.status !== 'CLOSED' && (
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           type="button"
                           onClick={() => updateTicket.mutate({ id: ticket.id, status: 'RESOLVED' })}
                           disabled={updateTicket.isPending}
-                          className="text-[11px] font-semibold text-accent hover:text-accent-hover transition-colors cursor-pointer"
+                          className="h-6 text-[11px] font-semibold text-accent hover:text-accent-hover px-2"
                           title="Mark this ticket as resolved"
                         >
                           Resolve
-                        </button>
+                        </Button>
                       )}
 
                       {isAdmin && ticket.status === 'RESOLVED' && (
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           type="button"
                           onClick={() => updateTicket.mutate({ id: ticket.id, status: 'CLOSED' })}
                           disabled={updateTicket.isPending}
-                          className="text-[11px] font-medium text-caption hover:text-heading transition-colors cursor-pointer"
+                          className="h-6 text-[11px] font-medium text-caption hover:text-heading px-2"
                           title="Close ticket"
                         >
                           Close
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>

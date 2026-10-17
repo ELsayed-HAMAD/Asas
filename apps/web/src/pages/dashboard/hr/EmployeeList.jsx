@@ -18,6 +18,19 @@ import FormDialog from '../../../components/common/FormDialog'
 import ConfirmDialog from '../../../components/common/ConfirmDialog'
 import { useActiveMemberRole } from '../../../lib/authClient'
 import { getMemberRoleName } from '../../../lib/memberRole'
+import { Button } from '../../../components/ui/button'
+import { Input } from '../../../components/ui/input'
+import { Badge } from '../../../components/ui/badge'
+import { Checkbox } from '../../../components/ui/checkbox'
+import { Alert, AlertDescription } from '../../../components/ui/alert'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '../../../components/ui/table'
 
 function initials(name = '') {
   return name
@@ -246,13 +259,13 @@ export default function EmployeeDirectory() {
           {/* Left group (flush with the left edge of TOTAL HEADCOUNT) */}
           <div className="flex flex-wrap items-center gap-2.5">
             <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
-              <input
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
+              <Input
                 type="text"
                 value={search}
                 onChange={event => { setSearch(event.target.value); setPage(1) }}
                 placeholder="Search employees..."
-                className="pl-9 pr-4 py-2 text-sm border border-border-default rounded-input bg-surface-muted/50 w-[280px] focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                className="pl-9 pr-4 py-2 text-sm w-[280px] bg-surface-muted/50"
               />
             </div>
             <select
@@ -264,33 +277,35 @@ export default function EmployeeDirectory() {
               <option value="">Department: All</option>
               {(departmentsData?.items ?? departmentsData ?? []).map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
             </select>
-            <button
+            <Button
+              variant="outline"
               type="button"
               onClick={() => { setDeptError(''); setDeptModalOpen(true) }}
-              className="flex items-center gap-2 border border-border-default text-body px-3.5 py-2 rounded-input text-sm hover:bg-surface-muted transition-colors bg-surface-raised font-medium"
+              className="gap-2 text-body"
               title="Manage departments"
             >
               <Building2 size={16} /> Departments
-            </button>
+            </Button>
           </div>
 
           {/* Right group (flush with the right edge of ON LEAVE) */}
           <div className="flex items-center gap-2.5">
-            <button
+            <Button
+              variant="outline"
               type="button"
               disabled={exportMutation.isPending}
               onClick={() => exportMutation.mutate()}
-              className="flex items-center gap-2 border border-border-default text-body px-3.5 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised disabled:opacity-60"
+              className="gap-2 text-body"
             >
               <Download size={16} /> {exportMutation.isPending ? 'Exporting...' : 'Export Directory'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={() => setCreateOpen(true)}
-              className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors"
+              className="gap-2"
             >
               <Plus size={16} /> Add Employee
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -352,73 +367,69 @@ export default function EmployeeDirectory() {
                 emptyDescription="This workspace is empty. Add an employee or reload sample data from onboarding."
               >
                 <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider shadow-sm">
-                      <tr>
-                        <th className="w-12 px-4 py-3 border-b border-border-default text-center bg-surface-muted">
-                          <input
-                            type="checkbox"
-                            checked={allSelected}
-                            onChange={event => setSelectedIds(event.target.checked ? employees.map(emp => emp.id) : [])}
-                            aria-label="Select all employees on this page"
-                            className="w-4 h-4 rounded border-border-strong text-accent focus:ring-accent"
-                          />
-                        </th>
-                        <th className="px-4 py-3 border-b border-border-default bg-surface-muted">
+                  <Table className="w-full text-left border-collapse">
+                    <TableHeader className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider shadow-sm">
+                      <TableRow className="border-b border-border-default hover:bg-transparent">
+                        <TableHead className="w-12 px-4 py-3 text-center bg-surface-muted">
+                          <div className="flex items-center justify-center">
+                            <Checkbox
+                              checked={allSelected}
+                              onCheckedChange={checked => setSelectedIds(checked ? employees.map(emp => emp.id) : [])}
+                              aria-label="Select all employees on this page"
+                            />
+                          </div>
+                        </TableHead>
+                        <TableHead className="px-4 py-3 bg-surface-muted">
                           <button
                             type="button"
                             onClick={() => { setSortAscending(val => !val); setPage(1) }}
                             aria-label={`Sort employee names ${sortAscending ? 'descending' : 'ascending'}`}
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-muted hover:text-heading uppercase tracking-wider transition-colors"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-muted hover:text-heading uppercase tracking-wider transition-colors cursor-pointer"
                           >
                             <span>Employee</span>
                             <span className="text-xs">{sortAscending ? '↑' : '↓'}</span>
                           </button>
-                        </th>
-                        <th className="px-4 py-3 border-b border-border-default bg-surface-muted">Role</th>
-                        <th className="px-4 py-3 border-b border-border-default bg-surface-muted">Department</th>
-                        <th className="px-4 py-3 border-b border-border-default bg-surface-muted">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border-subtle">
+                        </TableHead>
+                        <TableHead className="px-4 py-3 bg-surface-muted">Role</TableHead>
+                        <TableHead className="px-4 py-3 bg-surface-muted">Department</TableHead>
+                        <TableHead className="px-4 py-3 bg-surface-muted">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody className="divide-y divide-border-subtle">
                       {employees.map(emp => {
                         const isSelected = selectedId === emp.id
                         return (
-                          <tr
+                          <TableRow
                             key={emp.id}
                             onClick={() => setSelectedId(emp.id)}
                             className={`cursor-pointer transition-colors ${
                               isSelected ? 'bg-accent-light/50' : 'bg-surface-raised hover:bg-surface-muted/60'
                             }`}
                           >
-                            <td className="w-12 px-4 py-2.5 text-center">
-                              <input
-                                type="checkbox"
-                                checked={selectedIds.includes(emp.id)}
-                                aria-label={`Select ${emp.name}`}
-                                onClick={event => event.stopPropagation()}
-                                onChange={event => setSelectedIds(current => event.target.checked ? [...new Set([...current, emp.id])] : current.filter(id => id !== emp.id))}
-                                className="w-4 h-4 rounded border-border-strong text-accent focus:ring-accent"
-                              />
-                            </td>
-                            <td className="px-4 py-2.5">
+                            <TableCell className="w-12 px-4 py-2.5 text-center">
+                              <div className="flex items-center justify-center" onClick={event => event.stopPropagation()}>
+                                <Checkbox
+                                  checked={selectedIds.includes(emp.id)}
+                                  aria-label={`Select ${emp.name}`}
+                                  onCheckedChange={checked => setSelectedIds(current => checked ? [...new Set([...current, emp.id])] : current.filter(id => id !== emp.id))}
+                                />
+                              </div>
+                            </TableCell>
+                            <TableCell className="px-4 py-2.5">
                               <span className="text-sm font-semibold text-heading">{emp.name}</span>
-                            </td>
-                            <td className="px-4 py-2.5 text-sm text-body-light">{emp.title}</td>
-                            <td className="px-4 py-2.5 text-sm text-body-light">{emp.department || '—'}</td>
-                            <td className="px-4 py-2.5">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${
-                                emp.status === 'ACTIVE' ? 'bg-success-light text-success-text' : 'bg-warning-light text-warning'
-                              }`}
-                              >
+                            </TableCell>
+                            <TableCell className="px-4 py-2.5 text-sm text-body-light">{emp.title}</TableCell>
+                            <TableCell className="px-4 py-2.5 text-sm text-body-light">{emp.department || '—'}</TableCell>
+                            <TableCell className="px-4 py-2.5">
+                              <Badge variant={emp.status === 'ACTIVE' ? 'success' : 'warning'}>
                                 {STATUS_LABELS[emp.status] || emp.status}
-                              </span>
-                            </td>
-                          </tr>
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
                         )
                       })}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </Table>
                 </div>
               </QueryState>
             </div>
@@ -427,9 +438,27 @@ export default function EmployeeDirectory() {
               <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-t border-border-default text-xs text-muted bg-surface-muted/30">
                 <span>Showing {data.pagination.total === 0 ? 0 : (page - 1) * data.pagination.limit + 1}–{Math.min(page * data.pagination.limit, data.pagination.total)} of {data.pagination.total}</span>
                 <div className="flex items-center gap-2">
-                  <button type="button" disabled={page <= 1} onClick={() => setPage(current => current - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40 hover:bg-surface-muted transition-colors">Previous</button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    disabled={page <= 1}
+                    onClick={() => setPage(current => current - 1)}
+                    className="h-7 px-2 text-xs"
+                  >
+                    Previous
+                  </Button>
                   <span>Page {data.pagination.pages === 0 ? 0 : page} of {data.pagination.pages}</span>
-                  <button type="button" disabled={page >= data.pagination.pages} onClick={() => setPage(current => current + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40 hover:bg-surface-muted transition-colors">Next</button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    disabled={page >= data.pagination.pages}
+                    onClick={() => setPage(current => current + 1)}
+                    className="h-7 px-2 text-xs"
+                  >
+                    Next
+                  </Button>
                 </div>
               </div>
             )}
@@ -646,13 +675,13 @@ export default function EmployeeDirectory() {
 
       <FormDialog open={editOpen} onClose={() => setEditOpen(false)} title="Edit employee" subtitle="Update profile and payroll compensation details." busy={editMutation.isPending} onConfirm={() => editMutation.mutate()} confirmLabel="Save changes">
         <div className="space-y-4">
-          {['name', 'title', 'email', 'location'].map(field => <label key={field} className="block text-sm font-medium text-body"><span className="mb-1 block capitalize">{field}</span><input value={editForm[field]} onChange={event => setEditForm(current => ({ ...current, [field]: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" /></label>)}
+          {['name', 'title', 'email', 'location'].map(field => <label key={field} className="block text-sm font-medium text-body"><span className="mb-1 block capitalize">{field}</span><Input value={editForm[field]} onChange={event => setEditForm(current => ({ ...current, [field]: event.target.value }))} /></label>)}
           <div className="grid grid-cols-2 gap-4">
-            <label className="block text-sm font-medium text-body"><span className="mb-1 block">Salary</span><input type="number" min="0" step="0.01" value={editForm.salary} onChange={event => setEditForm(current => ({ ...current, salary: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" /></label>
-            <label className="block text-sm font-medium text-body"><span className="mb-1 block">Salary basis</span><select value={editForm.salaryBasis} onChange={event => setEditForm(current => ({ ...current, salaryBasis: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2"><option value="">None</option><option value="ANNUAL">Annual</option><option value="MONTHLY">Monthly</option></select></label>
-            <label className="block text-sm font-medium text-body"><span className="mb-1 block">Salary effective from</span><input type="date" required={!!editForm.salary} value={editForm.salaryEffectiveFrom} onChange={event => setEditForm(current => ({ ...current, salaryEffectiveFrom: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" /></label>
+            <label className="block text-sm font-medium text-body"><span className="mb-1 block">Salary</span><Input type="number" min="0" step="0.01" value={editForm.salary} onChange={event => setEditForm(current => ({ ...current, salary: event.target.value }))} /></label>
+            <label className="block text-sm font-medium text-body"><span className="mb-1 block">Salary basis</span><select value={editForm.salaryBasis} onChange={event => setEditForm(current => ({ ...current, salaryBasis: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2 bg-surface-raised"><option value="">None</option><option value="ANNUAL">Annual</option><option value="MONTHLY">Monthly</option></select></label>
+            <label className="block text-sm font-medium text-body"><span className="mb-1 block">Salary effective from</span><Input type="date" required={!!editForm.salary} value={editForm.salaryEffectiveFrom} onChange={event => setEditForm(current => ({ ...current, salaryEffectiveFrom: event.target.value }))} /></label>
             <p className="self-center text-xs text-muted">Set a new date when changing salary or basis. Existing payroll history is preserved.</p>
-            <label className="block text-sm font-medium text-body"><span className="mb-1 block">Employment end date</span><input type="date" min={editForm.hiredAt || undefined} value={editForm.employmentEndDate} onChange={event => setEditForm(current => ({ ...current, employmentEndDate: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" /></label>
+            <label className="block text-sm font-medium text-body"><span className="mb-1 block">Employment end date</span><Input type="date" min={editForm.hiredAt || undefined} value={editForm.employmentEndDate} onChange={event => setEditForm(current => ({ ...current, employmentEndDate: event.target.value }))} /></label>
             <p className="self-center text-xs text-muted">Last eligible paid day. Leave blank while employment is ongoing.</p>
             <p className="col-span-2 -mt-2 text-xs text-muted">If no basis is saved, the payroll run will ask you to confirm one before pricing the run.</p>
           </div>
@@ -660,17 +689,17 @@ export default function EmployeeDirectory() {
       </FormDialog>
       <FormDialog open={createOpen} onClose={() => setCreateOpen(false)} title="Add employee" subtitle="Create an employee profile." busy={createMutation.isPending} onConfirm={() => createMutation.mutate()} confirmLabel="Add employee">
         <div className="space-y-4">
-          {['name', 'title', 'email'].map(field => <label key={field} className="block text-sm font-medium text-body"><span className="mb-1 block capitalize">{field}</span><input type={field === 'email' ? 'email' : 'text'} required={field !== 'email'} value={createForm[field]} onChange={event => setCreateForm(current => ({ ...current, [field]: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" /></label>)}
-          <label className="block text-sm font-medium text-body"><span className="mb-1 block">Department</span><select value={createForm.departmentId} onChange={event => setCreateForm(current => ({ ...current, departmentId: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2"><option value="">No department</option>{(departmentsData?.items ?? departmentsData ?? []).map(department => <option key={department.id} value={department.id}>{department.name}</option>)}</select></label>
+          {['name', 'title', 'email'].map(field => <label key={field} className="block text-sm font-medium text-body"><span className="mb-1 block capitalize">{field}</span><Input type={field === 'email' ? 'email' : 'text'} required={field !== 'email'} value={createForm[field]} onChange={event => setCreateForm(current => ({ ...current, [field]: event.target.value }))} /></label>)}
+          <label className="block text-sm font-medium text-body"><span className="mb-1 block">Department</span><select value={createForm.departmentId} onChange={event => setCreateForm(current => ({ ...current, departmentId: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2 bg-surface-raised"><option value="">No department</option>{(departmentsData?.items ?? departmentsData ?? []).map(department => <option key={department.id} value={department.id}>{department.name}</option>)}</select></label>
 
           <div className="grid grid-cols-2 gap-4">
             <label className="block text-sm font-medium text-body">
               <span className="mb-1 block">Salary</span>
-              <input type="number" step="0.01" value={createForm.salary} onChange={e => setCreateForm(c => ({ ...c, salary: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" />
+              <Input type="number" step="0.01" value={createForm.salary} onChange={e => setCreateForm(c => ({ ...c, salary: e.target.value }))} />
             </label>
             <label className="block text-sm font-medium text-body">
               <span className="mb-1 block">Basis</span>
-              <select value={createForm.salaryBasis} onChange={e => setCreateForm(c => ({ ...c, salaryBasis: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2">
+              <select value={createForm.salaryBasis} onChange={e => setCreateForm(c => ({ ...c, salaryBasis: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2 bg-surface-raised">
                 <option value="">None</option>
                 <option value="ANNUAL">Annual</option>
                 <option value="MONTHLY">Monthly</option>
@@ -678,19 +707,19 @@ export default function EmployeeDirectory() {
             </label>
             <label className="block text-sm font-medium text-body">
               <span className="mb-1 block">Salary effective from</span>
-              <input type="date" required={!!createForm.salary} value={createForm.salaryEffectiveFrom} onChange={e => setCreateForm(c => ({ ...c, salaryEffectiveFrom: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" />
+              <Input type="date" required={!!createForm.salary} value={createForm.salaryEffectiveFrom} onChange={e => setCreateForm(c => ({ ...c, salaryEffectiveFrom: e.target.value }))} />
             </label>
             <label className="block text-sm font-medium text-body">
               <span className="mb-1 block">Hire Date</span>
-              <input type="date" value={createForm.hiredAt} onChange={e => setCreateForm(c => ({ ...c, hiredAt: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" />
+              <Input type="date" value={createForm.hiredAt} onChange={e => setCreateForm(c => ({ ...c, hiredAt: e.target.value }))} />
             </label>
             <label className="block text-sm font-medium text-body">
               <span className="mb-1 block">Employment end date</span>
-              <input type="date" min={createForm.hiredAt || undefined} value={createForm.employmentEndDate} onChange={e => setCreateForm(c => ({ ...c, employmentEndDate: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" />
+              <Input type="date" min={createForm.hiredAt || undefined} value={createForm.employmentEndDate} onChange={e => setCreateForm(c => ({ ...c, employmentEndDate: e.target.value }))} />
             </label>
             <label className="block text-sm font-medium text-body">
               <span className="mb-1 block">Status</span>
-              <select value={createForm.status} onChange={e => setCreateForm(c => ({ ...c, status: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2">
+              <select value={createForm.status} onChange={e => setCreateForm(c => ({ ...c, status: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2 bg-surface-raised">
                 <option value="ACTIVE">Active</option>
                 <option value="ON_LEAVE">On Leave</option>
                 <option value="ARCHIVED">Archived</option>
@@ -698,11 +727,11 @@ export default function EmployeeDirectory() {
             </label>
             <label className="block text-sm font-medium text-body">
               <span className="mb-1 block">Band</span>
-              <input type="text" value={createForm.band} onChange={e => setCreateForm(c => ({ ...c, band: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" />
+              <Input type="text" value={createForm.band} onChange={e => setCreateForm(c => ({ ...c, band: e.target.value }))} />
             </label>
             <label className="block text-sm font-medium text-body">
               <span className="mb-1 block">Equity</span>
-              <input type="number" value={createForm.equityOptions} onChange={e => setCreateForm(c => ({ ...c, equityOptions: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2" />
+              <Input type="number" value={createForm.equityOptions} onChange={e => setCreateForm(c => ({ ...c, equityOptions: e.target.value }))} />
             </label>
           </div>
 
@@ -727,10 +756,10 @@ export default function EmployeeDirectory() {
             </div>
 
             {deptError && (
-              <div role="alert" className="mt-4 p-3 rounded-button bg-danger-light border border-danger-border text-danger text-sm flex items-center gap-2">
-                <AlertTriangle size={16} className="shrink-0" />
-                <span>{deptError}</span>
-              </div>
+              <Alert variant="destructive" className="mt-4">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{deptError}</AlertDescription>
+              </Alert>
             )}
 
             <form
@@ -741,20 +770,20 @@ export default function EmployeeDirectory() {
               }}
               className="mt-4 flex gap-2"
             >
-              <input
+              <Input
                 type="text"
                 placeholder="New department name..."
                 value={newDeptName}
                 onChange={(e) => setNewDeptName(e.target.value)}
-                className="flex-1 rounded-input border border-border-default px-3 py-2 text-sm bg-surface-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                className="flex-1"
               />
-              <button
+              <Button
                 type="submit"
                 disabled={!newDeptName.trim() || createDeptMutation.isPending}
-                className="flex items-center gap-1.5 bg-primary text-white px-4 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors disabled:opacity-50"
+                className="gap-1.5"
               >
                 <Plus size={16} /> Add
-              </button>
+              </Button>
             </form>
 
             <div className="mt-4 max-h-64 overflow-y-auto divide-y divide-border-default border border-border-default rounded-input">
@@ -772,17 +801,17 @@ export default function EmployeeDirectory() {
                         }}
                         className="flex flex-1 items-center gap-2"
                       >
-                        <input
+                        <Input
                           type="text"
                           value={editingDeptName}
                           onChange={(e) => setEditingDeptName(e.target.value)}
-                          className="flex-1 rounded-input border border-border-default px-2.5 py-1 text-sm bg-surface-muted/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                          className="flex-1 h-8 text-sm"
                           autoFocus
                         />
                         <button
                           type="submit"
                           disabled={!editingDeptName.trim() || updateDeptMutation.isPending}
-                          className="p-1.5 text-success-text hover:bg-success-light rounded-input transition-colors disabled:opacity-50"
+                          className="p-1.5 text-success-text hover:bg-success-light rounded-input transition-colors disabled:opacity-50 cursor-pointer"
                           title="Save"
                         >
                           <Check size={16} />
@@ -790,7 +819,7 @@ export default function EmployeeDirectory() {
                         <button
                           type="button"
                           onClick={() => setEditingDeptId(null)}
-                          className="p-1.5 text-muted hover:bg-surface-muted rounded-input transition-colors"
+                          className="p-1.5 text-muted hover:bg-surface-muted rounded-input transition-colors cursor-pointer"
                           title="Cancel"
                         >
                           <X size={16} />
@@ -807,7 +836,7 @@ export default function EmployeeDirectory() {
                               setEditingDeptName(dept.name)
                               setDeptError('')
                             }}
-                            className="p-1.5 text-muted hover:text-body hover:bg-surface-muted rounded-input transition-colors"
+                            className="p-1.5 text-muted hover:text-body hover:bg-surface-muted rounded-input transition-colors cursor-pointer"
                             title="Rename"
                           >
                             <Pencil size={14} />
@@ -818,7 +847,7 @@ export default function EmployeeDirectory() {
                               setDeptError('')
                               setDeletingDept(dept)
                             }}
-                            className="p-1.5 text-muted hover:text-danger hover:bg-danger-light rounded-input transition-colors"
+                            className="p-1.5 text-muted hover:text-danger hover:bg-danger-light rounded-input transition-colors cursor-pointer"
                             title="Delete"
                           >
                             <Trash2 size={14} />
@@ -832,13 +861,13 @@ export default function EmployeeDirectory() {
             </div>
 
             <div className="mt-6 flex justify-end">
-              <button
+              <Button
+                variant="outline"
                 type="button"
                 onClick={() => { setDeptModalOpen(false); setEditingDeptId(null); setDeptError('') }}
-                className="px-4 py-2 border border-border-default rounded-input text-sm font-medium text-body hover:bg-surface-muted transition-colors"
               >
                 Close
-              </button>
+              </Button>
             </div>
           </div>
         </div>
