@@ -1,19 +1,23 @@
 import React, { useState } from 'react';
 import {
-  Search, Send, Filter, ChevronDown,
-  Square, FileText, Paperclip, Phone,
+  Search, Send, ChevronDown,
+  FileText, Paperclip, Phone,
   CircleDot, Circle, Loader2,
   Users, Plus, Pencil, Trash2, X, Check, AlertTriangle
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../../../lib/api/finance';
 import { queryKeys } from '../../../lib/queryKeys';
-import { formatDate, formatMoney } from '../../../lib/format';
-import TopBarActions from '../../../components/TopBarActions';
+import { formatDate, formatMoney, formatCompactTableMoney } from '../../../lib/format';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 // The old page rendered receivable money with no forced decimals (e.g. $320,000) — keep that.
 const money = (v) => formatMoney(v, { minimumFractionDigits: 0 });
+const compactMoney = (v) => formatCompactTableMoney(v, { minimumFractionDigits: 0 });
+const metricFontSize = (v) => {
+  const label = money(v)
+  return `clamp(0.75rem, ${Math.min(14, 130 / Math.max(1, label.length))}cqw, 1.5rem)`
+};
 
 export default function AccountsReceivable() {
   const queryClient = useQueryClient();
@@ -21,6 +25,8 @@ export default function AccountsReceivable() {
   const [activityBody, setActivityBody] = useState('')
   const [activityType, setActivityType] = useState('Note')
   const [search, setSearch] = useState('')
+  const [customerPage, setCustomerPage] = useState(1)
+  const CUSTOMER_PAGE_SIZE = 10
   const [invoicePage, setInvoicePage] = useState(1)
   const [ageFilter, setAgeFilter] = useState('all')
   const [oldestFirst, setOldestFirst] = useState(true)
@@ -119,6 +125,7 @@ export default function AccountsReceivable() {
       .map(c => ({
         id: c.id,
         name: c.name,
+        email: c.email,
         avatar: c.avatarUrl,
         openBalance: c.openBalance,
         status: c.collectionStatus,
@@ -129,6 +136,19 @@ export default function AccountsReceivable() {
       .filter(c => ageFilter === 'all' || (ageFilter === 'overdue' ? c.oldest > 0 : c.oldest === 0))
       .sort((a, b) => oldestFirst ? b.oldest - a.oldest : a.oldest - b.oldest),
   [customers, search, ageFilter, oldestFirst]);
+
+  const totalCustomers = displayItems.length;
+  const customerPages = Math.max(1, Math.ceil(totalCustomers / CUSTOMER_PAGE_SIZE));
+  const paginatedCustomers = React.useMemo(() => {
+    const start = (customerPage - 1) * CUSTOMER_PAGE_SIZE;
+    return displayItems.slice(start, start + CUSTOMER_PAGE_SIZE);
+  }, [displayItems, customerPage]);
+
+  React.useEffect(() => {
+    if (customerPage > customerPages) {
+      setCustomerPage(customerPages);
+    }
+  }, [customerPages, customerPage]);
 
   // Sync selectedId with the filtered list
   React.useEffect(() => {
@@ -159,14 +179,24 @@ export default function AccountsReceivable() {
 
   // KPIs straight from the server AR aging report (SQL buckets, not client-side aggregation):
   // the five cards are open balance + the four day-past-due buckets, all in report order.
-  const bucketTotal = (label) => (summary.agingBuckets ?? []).find(b => b.bucket === label)?.total ?? { amount: 0, currency: 'USD' };
+  const bucket = (label) => (summary.agingBuckets ?? []).find(b => b.bucket === label);
+  const bucketTotal = (label) => bucket(label)?.total ?? { amount: 0, currency: 'USD' };
+  const bucketCount = (label) => bucket(label)?.count ?? 0;
+
   const totalOutstanding = summary.openBalance ?? { amount: 0, currency: 'USD' };
   const current = bucketTotal('current');
   const days1to30 = bucketTotal('1-30');
   const days31to60 = bucketTotal('31-60');
   const days60plus = bucketTotal('60+');
+
+  const currentCount = bucketCount('current');
+  const days1to30Count = bucketCount('1-30');
+  const days31to60Count = bucketCount('31-60');
+  const days60plusCount = bucketCount('60+');
+
   const collectedThisMonth = summary.collectedThisMonthTotal;
   const priorCollections = summary.collectedThisMonthComparison?.previousTotal;
+  const mtdSubtext = `Collected MTD: ${collectedThisMonth ? money(collectedThisMonth) : 'Unavailable'} · Prior: ${priorCollections ? money(priorCollections) : 'Unavailable'}`;
 
   // Outstanding invoices for the selected customer (from the flat invoice list).
   const selectedInvoices = selectedInvoicesData?.items ?? []
@@ -187,101 +217,164 @@ export default function AccountsReceivable() {
   };
 
   return (
-    <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-[1000px]">
+    <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-y-auto min-w-0 px-6 py-5">
 
-      <TopBarActions>
-        <div className="flex items-center gap-3">
+      {/* ── Top Page Toolbar ── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 w-full mb-5 flex-shrink-0">
+        {/* Left group */}
+        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
             <input
               type="text"
               value={search}
-              onChange={event => setSearch(event.target.value)}
-              placeholder="Search..."
-              className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              onChange={event => { setSearch(event.target.value); setCustomerPage(1); }}
+              placeholder="Search customers..."
+              className="pl-9 pr-4 py-2 text-xs border border-border-default rounded-input bg-surface-raised w-72 max-w-full focus:outline-none focus:border-border-strong focus:ring-2 focus:ring-border-subtle transition-all shadow-card"
             />
           </div>
+          <select
+            aria-label="Filter customers by aging status"
+            value={ageFilter}
+            onChange={e => { setAgeFilter(e.target.value); setCustomerPage(1); }}
+            className="border border-border-default text-body text-xs px-3 py-2 rounded-input bg-surface-raised hover:bg-surface-muted transition-colors cursor-pointer outline-none shadow-card"
+          >
+            <option value="all">All</option>
+            <option value="overdue">Overdue</option>
+            <option value="current">Current</option>
+          </select>
+          <select
+            aria-label="Sort customers"
+            value={oldestFirst ? 'oldest' : 'newest'}
+            onChange={e => { setOldestFirst(e.target.value === 'oldest'); setCustomerPage(1); }}
+            className="border border-border-default text-body text-xs px-3 py-2 rounded-input bg-surface-raised hover:bg-surface-muted transition-colors cursor-pointer outline-none shadow-card"
+          >
+            <option value="oldest">Sort: Oldest First</option>
+            <option value="newest">Sort: Newest First</option>
+          </select>
+        </div>
+
+        {/* Right group */}
+        <div className="flex items-center gap-2.5 shrink-0 ml-auto">
           <button 
+            type="button"
             disabled={selectedIds.size === 0 || batchRemindMutation.isPending}
             onClick={handleBatchRemind}
-            className="flex items-center gap-2 bg-surface-muted text-heading px-4 py-1.5 rounded-input text-sm font-medium hover:bg-surface-active transition-colors shadow-card border border-border-default disabled:opacity-60"
+            className="flex items-center gap-1.5 border border-border-default text-body text-xs px-3 py-2 rounded-input font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60 cursor-pointer"
           >
-            {batchRemindMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Send Batch Reminders ({selectedIds.size})
+            {batchRemindMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+            <span>Send Batch Reminders ({selectedIds.size})</span>
           </button>
           <button 
             type="button"
             onClick={() => { setCustomerError(''); setCustomerModalOpen(true); }}
-            className="flex items-center gap-1.5 bg-surface-muted text-heading px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-active transition-colors shadow-card border border-border-default"
+            className="flex items-center gap-1.5 border border-border-default text-body text-xs px-3 py-2 rounded-input font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card cursor-pointer"
             title="Manage customers"
           >
-            <Users size={14} className="text-muted" /> Customers
+            <Users size={13} className="text-muted" />
+            <span>Customers</span>
           </button>
-        </div>
-      </TopBarActions>
-
-      {/* ── KPIs Row ── */}
-      <div className="px-6 py-5 flex-shrink-0 border-b border-border-default bg-surface-muted">
-        <div className="grid grid-cols-5 gap-4">
-          <div className="border border-border-default rounded-button p-4 bg-surface-raised shadow-card">
-            <p className="text-[11px] font-bold text-muted tracking-wide mb-1.5">Total Outstanding</p>
-            <p className="text-2xl font-bold text-heading">{money(totalOutstanding)}</p>
-            <p className="mt-2 text-[11px] text-muted" title="Valued AR collection journals in workspace base currency, net of linked reversals">
-              Collected MTD: {collectedThisMonth ? money(collectedThisMonth) : 'Unavailable'}
-            </p>
-            <p className="text-[11px] text-muted" title="Same elapsed calendar dates in the previous tenant-local month">
-              Prior period: {priorCollections ? money(priorCollections) : 'Unavailable'}
-            </p>
-          </div>
-          <div className="border border-border-default rounded-button p-4 bg-surface-raised shadow-card">
-            <p className="text-[11px] font-bold text-muted tracking-wide mb-1.5">Current</p>
-            <p className="text-2xl font-bold text-heading">{money(current)}</p>
-          </div>
-          <div className="border border-border-default rounded-button p-4 bg-surface-raised shadow-card">
-            <p className="text-[11px] font-bold text-muted tracking-wide mb-1.5">1-30 Days</p>
-            <p className="text-2xl font-bold text-heading">{money(days1to30)}</p>
-          </div>
-          <div className="border border-border-default rounded-button p-4 bg-surface-raised shadow-card">
-            <p className="text-[11px] font-bold text-muted tracking-wide mb-1.5">31-60 Days</p>
-            <p className="text-2xl font-bold text-heading">{money(days31to60)}</p>
-          </div>
-          {/* Highlighted Danger KPI */}
-          <div className={`border border-border-default border-l-4 rounded-button p-4 bg-surface-raised shadow-card ${days60plus.amount > 0 ? 'border-l-red-600' : 'border-l-transparent'}`}>
-            <p className="text-[11px] font-bold text-muted tracking-wide mb-1.5">60+ Days</p>
-            <p className={`text-2xl font-bold ${days60plus.amount > 0 ? 'text-danger' : 'text-heading'}`}>{money(days60plus)}</p>
-          </div>
         </div>
       </div>
 
-      {/* ── Main Split View ── */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* ── 5 Aging KPI Cards ── */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-5 flex-shrink-0">
+        {/* Card 1: Total Outstanding */}
+        <div className="border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col" style={{ containerType: 'inline-size' }}>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">Total Outstanding</p>
+          <p className="min-w-0 text-2xl font-bold text-heading tracking-tight mt-1.5 leading-tight" style={{ fontSize: metricFontSize(totalOutstanding) }}>
+            {money(totalOutstanding)}
+          </p>
+          <p className="mt-1.5 text-xs text-muted truncate" title={mtdSubtext}>
+            {mtdSubtext}
+          </p>
+        </div>
 
-        {/* Left: Table Area */}
-        <div className="flex-1 overflow-y-auto bg-surface-raised flex flex-col">
+        {/* Card 2: Current */}
+        <div className="border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col" style={{ containerType: 'inline-size' }}>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">Current</p>
+          <p className="min-w-0 text-2xl font-bold text-heading tracking-tight mt-1.5 leading-tight" style={{ fontSize: metricFontSize(current) }}>
+            {money(current)}
+          </p>
+          <p className="mt-1.5 text-xs text-muted truncate">
+            {currentCount > 0 ? `${currentCount} current invoice${currentCount === 1 ? '' : 's'}` : 'No current invoices'}
+          </p>
+        </div>
 
-          {/* Table Toolbar */}
-          <div className="flex items-center justify-between px-6 py-3 border-b border-border-default bg-surface-muted/50 flex-shrink-0">
-            <div className="flex items-center gap-4">
-              <Square size={16} className="text-faint" />
-              <button onClick={() => setAgeFilter(current => current === 'all' ? 'overdue' : current === 'overdue' ? 'current' : 'all')} className="flex items-center gap-1.5 text-sm font-medium text-body-light hover:text-heading transition-colors">
-                <Filter size={14} /> {ageFilter === 'all' ? 'All' : ageFilter === 'overdue' ? 'Overdue' : 'Current'} <ChevronDown size={14} className="text-caption" />
-              </button>
-            </div>
-            <button onClick={() => setOldestFirst(current => !current)} className="flex items-center gap-1.5 text-sm font-medium text-body-light hover:text-heading transition-colors">
-              Sort: {oldestFirst ? 'Oldest First' : 'Newest First'} <ChevronDown size={14} className="text-caption" />
-            </button>
-          </div>
+        {/* Card 3: 1-30 Days */}
+        <div className="border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col" style={{ containerType: 'inline-size' }}>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">1-30 Days</p>
+          <p className="min-w-0 text-2xl font-bold text-heading tracking-tight mt-1.5 leading-tight" style={{ fontSize: metricFontSize(days1to30) }}>
+            {money(days1to30)}
+          </p>
+          <p className="mt-1.5 text-xs text-muted truncate">
+            {days1to30Count} invoice{days1to30Count === 1 ? '' : 's'} due
+          </p>
+        </div>
 
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-surface-raised sticky top-0 z-10">
-              <tr>
-                <th className="px-6 py-3 border-b border-border-default w-12"></th>
-                <th className="px-2 py-3 text-[10px] font-bold text-caption uppercase tracking-wider border-b border-border-default">Customer</th>
-                <th className="px-6 py-3 text-[10px] font-bold text-caption uppercase tracking-wider border-b border-border-default text-center">Oldest</th>
-                <th className="px-6 py-3 text-[10px] font-bold text-caption uppercase tracking-wider border-b border-border-default text-right">Outstanding</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-subtle">
-              {displayItems.map(account => {
+        {/* Card 4: 31-60 Days */}
+        <div className="border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col" style={{ containerType: 'inline-size' }}>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">31-60 Days</p>
+          <p className="min-w-0 text-2xl font-bold text-heading tracking-tight mt-1.5 leading-tight" style={{ fontSize: metricFontSize(days31to60) }}>
+            {money(days31to60)}
+          </p>
+          <p className="mt-1.5 text-xs text-muted truncate">
+            {days31to60Count} overdue invoice{days31to60Count === 1 ? '' : 's'}
+          </p>
+        </div>
+
+        {/* Card 5: 60+ Days */}
+        <div className={`border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col ${days60plus.amount > 0 ? 'border-l-4 border-l-red-600' : ''}`} style={{ containerType: 'inline-size' }}>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">60+ Days</p>
+          <p className={`min-w-0 text-2xl font-bold tracking-tight mt-1.5 leading-tight ${days60plus.amount > 0 ? 'text-danger' : 'text-heading'}`} style={{ fontSize: metricFontSize(days60plus) }}>
+            {money(days60plus)}
+          </p>
+          <p className="mt-1.5 text-xs text-muted truncate">
+            {days60plusCount} critical invoice{days60plusCount === 1 ? '' : 's'}
+          </p>
+        </div>
+      </div>
+
+      {/* ── Main Workspace: 12-Column Grid ── */}
+      <div className="grid grid-cols-12 gap-5 items-start">
+
+        {/* Left: Customer Table Card (col-span-8) */}
+        <div className="col-span-12 lg:col-span-8">
+          <div className="bg-surface-raised rounded-card border border-border-default shadow-card overflow-hidden flex flex-col">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px] text-left border-collapse">
+                <thead className="bg-surface-muted/60 border-b border-border-default">
+                  <tr>
+                    <th className="w-12 px-4 py-2.5 text-center">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all customers"
+                        checked={paginatedCustomers.length > 0 && paginatedCustomers.every(c => selectedIds.has(c.id))}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds(current => {
+                              const next = new Set(current);
+                              paginatedCustomers.forEach(c => next.add(c.id));
+                              return next;
+                            });
+                          } else {
+                            setSelectedIds(current => {
+                              const next = new Set(current);
+                              paginatedCustomers.forEach(c => next.delete(c.id));
+                              return next;
+                            });
+                          }
+                        }}
+                        className="w-4 h-4 rounded-sm border-border-default text-primary focus:ring-primary cursor-pointer"
+                      />
+                    </th>
+                    <th className="px-3 py-2.5 text-[10px] font-bold text-caption uppercase tracking-wider">Customer</th>
+                    <th className="px-4 py-2.5 text-[10px] font-bold text-caption uppercase tracking-wider text-center">Oldest</th>
+                    <th className="px-4 py-2.5 text-[10px] font-bold text-caption uppercase tracking-wider text-right">Outstanding</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-subtle">
+              {paginatedCustomers.map(account => {
                 const isSelected = selectedId === account.id;
                 const isSeverelyOverdue = account.oldest > 60;
 
@@ -293,43 +386,44 @@ export default function AccountsReceivable() {
                       isSelected ? 'bg-accent-light/40 border-l-4 border-l-blue-600' : 'bg-surface-raised hover:bg-surface-muted border-l-4 border-l-transparent'
                     }`}
                   >
-                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                    <td className="w-12 px-4 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
+                        aria-label={`Select ${account.name}`}
                         checked={selectedIds.has(account.id)}
                         onChange={() => toggleSelection(account.id)}
                         className="w-4 h-4 rounded-sm border-border-default text-primary focus:ring-primary cursor-pointer"
                       />
                     </td>
-                    <td className="px-2 py-4">
+                    <td className="px-3 py-2.5">
                       <div className="flex items-center gap-3">
                         {account.avatar ? (
-                          <img src={account.avatar} alt="Avatar" className="w-7 h-7 rounded-full shadow-card" />
+                          <img src={account.avatar} alt="Avatar" className="w-7 h-7 rounded-full shadow-card shrink-0" />
                         ) : (
-                          <div className="w-7 h-7 rounded-full bg-[#3d3121] flex items-center justify-center text-[11px] font-bold text-white shadow-card">
+                          <div className="w-7 h-7 rounded-full bg-[#3d3121] flex items-center justify-center text-[11px] font-bold text-white shadow-card shrink-0">
                             {account.name?.substring(0, 2).toUpperCase()}
                           </div>
                         )}
-                        <span className="text-sm font-semibold text-heading">{account.name}</span>
+                        <span className="text-sm font-semibold text-heading truncate">{account.name}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-semibold ${
+                    <td className="px-4 py-2.5 text-center whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
                         isSeverelyOverdue ? 'bg-danger-light text-danger' : 'text-body-light'
                       }`}>
                         {account.oldest} {account.oldest === 1 ? 'Day' : 'Days'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right text-sm font-medium text-heading tabular-nums">
-                      {money(account.openBalance)}
+                    <td className="px-4 py-2.5 text-right text-sm font-semibold text-heading tabular-nums whitespace-nowrap" title={money(account.openBalance)}>
+                      {compactMoney(account.openBalance)}
                     </td>
                   </tr>
-                )
+                );
               })}
 
-              {displayItems.length === 0 && (
+              {paginatedCustomers.length === 0 && (
                 <tr>
-                   <td colSpan={4} className="px-6 py-8 text-center text-muted text-sm">
+                   <td colSpan={4} className="px-6 py-8 text-center text-muted text-xs">
                      No customers found with outstanding balances.
                    </td>
                 </tr>
@@ -338,187 +432,234 @@ export default function AccountsReceivable() {
           </table>
         </div>
 
-        {/* Right: Detail Panel */}
-        {selectedRecord && (
-          <div className="w-[520px] bg-surface-muted border-l border-border-default overflow-y-auto p-6 flex-shrink-0 space-y-6 shadow-panel">
+        {/* Pagination Footer */}
+        <div className="flex items-center justify-between border-t border-border-default px-4 py-2.5 text-xs text-muted bg-surface-raised mt-auto">
+          <span>
+            Showing {totalCustomers > 0 ? (customerPage - 1) * CUSTOMER_PAGE_SIZE + 1 : 0}–{Math.min(customerPage * CUSTOMER_PAGE_SIZE, totalCustomers)} of {totalCustomers}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-label="Back"
+              disabled={customerPage <= 1}
+              onClick={() => setCustomerPage(p => Math.max(1, p - 1))}
+              className="rounded border border-border-default px-2.5 py-1 text-xs font-medium text-body hover:bg-surface-muted transition-colors disabled:opacity-40 cursor-pointer"
+            >
+              Previous
+            </button>
+            <span className="text-xs">Page {customerPages > 0 ? customerPage : 0} of {customerPages}</span>
+            <button
+              type="button"
+              aria-label="Forward"
+              disabled={customerPage >= customerPages}
+              onClick={() => setCustomerPage(p => Math.min(customerPages, p + 1))}
+              className="rounded border border-border-default px-2.5 py-1 text-xs font-medium text-body hover:bg-surface-muted transition-colors disabled:opacity-40 cursor-pointer"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 
-            {/* Customer Header Card */}
-            <div className="bg-surface-raised border border-border-default rounded-card-sm p-6 shadow-card">
-              <div className="flex items-start justify-between mb-8">
-                <div className="flex items-center gap-4">
-                  {selectedRecord.avatar ? (
-                    <img src={selectedRecord.avatar} alt="Avatar" className="w-12 h-12 rounded-button shadow-card" />
-                  ) : (
-                    <div className="w-12 h-12 bg-[#3d3121] rounded-button flex items-center justify-center text-xl font-bold text-white shadow-card">
-                      {selectedRecord.name?.substring(0, 1).toUpperCase()}
-                    </div>
-                  )}
-                  <div>
-                    <h2 className="text-lg font-bold text-heading leading-tight">{selectedRecord.name}</h2>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <span className="text-[11px] font-semibold text-muted">Status:</span>
-                      <select
-                        value={selectedRecord.status || 'CURRENT'}
-                        onChange={(e) => updateCustomerMutation.mutate({ id: selectedRecord.id, collectionStatus: e.target.value })}
-                        disabled={updateCustomerMutation.isPending}
-                        className="text-[11px] font-semibold text-body bg-surface-raised border border-border-default rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-accent"
-                      >
-                        <option value="CURRENT">CURRENT</option>
-                        <option value="AT_RISK">AT RISK</option>
-                        <option value="DELINQUENT">DELINQUENT</option>
-                      </select>
-                      {updateCustomerMutation.isPending && <Loader2 size={12} className="animate-spin text-muted" />}
-                    </div>
-                  </div>
+    {/* Right: Customer Inspector Column (col-span-4 space-y-4) */}
+    <div className="col-span-12 lg:col-span-4 space-y-4">
+      {selectedRecord ? (
+        <>
+          {/* Customer Header Card */}
+          <div className="bg-surface-raised border border-border-default rounded-card p-4 shadow-card space-y-3">
+            {/* Header: Customer Info & Status */}
+            <div className="flex items-center gap-3 min-w-0">
+              {selectedRecord.avatar ? (
+                <img src={selectedRecord.avatar} alt="Avatar" className="w-12 h-12 rounded-button shadow-card shrink-0" />
+              ) : (
+                <div className="w-12 h-12 bg-[#3d3121] rounded-button flex items-center justify-center text-xl font-bold text-white shadow-card shrink-0">
+                  {selectedRecord.name?.substring(0, 1).toUpperCase()}
                 </div>
-                {selectedRecord.openBalance?.amount === 0 ? (
-                  <button disabled className="bg-surface-muted text-body-light border border-border-default px-4 py-2 rounded-input text-sm font-semibold hover:bg-surface-strong transition-colors shadow-card disabled:opacity-60">
-                    View History
-                  </button>
-                ) : (
-                  <button disabled={!selectedInvoices[0] || paymentMutation.isPending} onClick={() => setPaymentTargetId(selectedInvoices[0].id)} className="bg-primary text-white px-4 py-2 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60">
-                    Log Payment
-                  </button>
-                )}
-              </div>
-
-              <div className="flex items-end justify-between border-t border-border-subtle pt-5">
-                <div>
-                  <p className="text-[10px] font-bold text-caption uppercase tracking-wider mb-1">Total Outstanding</p>
-                  <p className="text-4xl font-extrabold text-heading tracking-tight">{money(selectedRecord.openBalance)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-bold text-caption uppercase tracking-wider mb-1">Oldest Invoice</p>
-                  <p className={`text-sm font-bold ${selectedRecord.oldest > 0 ? 'text-danger' : 'text-success'}`}>
-                    {selectedRecord.oldest > 0 ? `${selectedRecord.oldest} ${selectedRecord.oldest === 1 ? 'Day' : 'Days'} Overdue` : 'Current'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Outstanding Invoices Card */}
-            <div className="bg-surface-raised border border-border-default rounded-card-sm shadow-card overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle bg-surface-raised">
-                <h3 className="text-xs font-bold text-heading">Outstanding Invoices</h3>
-                <span className="text-[11px] font-semibold text-muted">{selectedInvoicesData?.pagination?.total ?? 0} Items</span>
-              </div>
-              <div className="divide-y divide-border-subtle">
-
-                {isInvoicesLoading && <div className="p-5 flex justify-center text-muted"><Loader2 size={18} className="animate-spin" /></div>}
-
-                {selectedInvoices.map(inv => {
-                  return (
-                    <div key={inv.id} className="flex items-center justify-between p-5 hover:bg-surface-muted transition-colors">
-                      <div className="flex items-center gap-4">
-                        <div className="p-2 bg-surface-muted border border-border-default rounded-input text-caption">
-                          <FileText size={18} />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-heading">{inv.number || 'No Number'}</p>
-                          <p className="text-[11px] font-medium text-muted mt-0.5">
-                            {inv.daysPastDue > 0 ? (
-                              <span className="text-danger font-bold">Overdue ({inv.daysPastDue}d)</span>
-                            ) : (
-                              <span className="text-success font-bold">Current</span>
-                            )}
-                            {inv.dueDate && ` • Due ${formatDate(inv.dueDate)}`}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm font-bold text-heading tabular-nums">{money(inv.amount)}</span>
-                        <button disabled={paymentMutation.isPending || inv.status === 'PAID'} onClick={() => setPaymentTargetId(inv.id)} className="flex items-center gap-1 border border-border-strong rounded px-2.5 py-1 text-xs font-semibold text-body hover:bg-surface-muted transition-colors bg-surface-raised disabled:opacity-60">
-                          Action <ChevronDown size={12} className="text-caption" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {selectedInvoices.length === 0 && (
-                  <div className="p-5 text-center text-muted text-sm">
-                    {isInvoicesLoading ? 'Loading invoices…' : 'No outstanding invoices.'}
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center justify-between border-t border-border-subtle px-4 py-2 text-xs text-muted">
-                <span>Showing {selectedInvoicesData?.pagination?.total ? (invoicePage - 1) * 10 + 1 : 0}–{Math.min(invoicePage * 10, selectedInvoicesData?.pagination?.total ?? 0)} of {selectedInvoicesData?.pagination?.total ?? 0}</span>
-                <div className="flex items-center gap-2">
-                  <button type="button" disabled={invoicePage <= 1} onClick={() => setInvoicePage(current => current - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
-                  <span>Page {selectedInvoicesData?.pagination?.pages ? invoicePage : 0} of {selectedInvoicesData?.pagination?.pages ?? 0}</span>
-                  <button type="button" disabled={invoicePage >= (selectedInvoicesData?.pagination?.pages ?? 0)} onClick={() => setInvoicePage(current => current + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+              )}
+              <div className="min-w-0">
+                <h2 className="text-base font-bold text-heading leading-tight truncate">{selectedRecord.name}</h2>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="text-[10px] font-bold text-muted uppercase tracking-wider">STATUS:</span>
+                  <select
+                    aria-label="Collection status"
+                    value={selectedRecord.status || 'CURRENT'}
+                    onChange={(e) => updateCustomerMutation.mutate({ id: selectedRecord.id, collectionStatus: e.target.value })}
+                    disabled={updateCustomerMutation.isPending}
+                    className="text-xs font-semibold text-heading bg-surface-raised border border-border-default rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer"
+                  >
+                    <option value="CURRENT">CURRENT</option>
+                    <option value="AT_RISK">AT RISK</option>
+                    <option value="DELINQUENT">DELINQUENT</option>
+                  </select>
+                  {updateCustomerMutation.isPending && <Loader2 size={12} className="animate-spin text-muted" />}
                 </div>
               </div>
             </div>
 
-            {/* Activity Timeline Card — no activity feed in the API; renders its empty state. */}
-            <div className="bg-surface-raised border border-border-default rounded-card-sm shadow-card overflow-hidden flex flex-col">
-              <div className="px-5 py-4 border-b border-border-subtle">
-                <h3 className="text-xs font-bold text-heading">Activity</h3>
+            {/* Total Outstanding & Oldest Invoice */}
+            <div className="pt-2 border-t border-border-subtle flex items-end justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-0.5">Total Outstanding</p>
+                <p className="text-3xl font-extrabold text-heading tracking-tight">{money(selectedRecord.openBalance)}</p>
               </div>
+              <div className="text-right">
+                <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-0.5">Oldest Invoice</p>
+                <p className={`text-xs font-bold ${selectedRecord.oldest > 0 ? 'text-danger' : 'text-success'}`}>
+                  {selectedRecord.oldest > 0 ? `${selectedRecord.oldest} ${selectedRecord.oldest === 1 ? 'Day' : 'Days'} Overdue` : 'Current'}
+                </p>
+              </div>
+            </div>
 
-              <div className="p-5">
-                {/* Input Box */}
-                <div className="border border-border-default rounded-button bg-surface focus-within:bg-surface-raised focus-within:border-border-strong transition-colors mb-6">
-                  <textarea
-                    placeholder="Add a note or log a call..."
-                    value={activityBody}
-                    onChange={event => setActivityBody(event.target.value)}
-                    className="w-full bg-transparent text-sm p-3 outline-none resize-none h-20 text-body placeholder-gray-400"
-                  />
-                  <div className="flex items-center justify-between p-2 border-t border-border-subtle">
-                    <div className="flex items-center gap-2 text-caption px-2">
-                      <button type="button" disabled title="Attachments are not supported for collection activity notes" aria-label="Attach file (not supported)" className="hover:text-body-light transition-colors disabled:opacity-60"><Paperclip size={16} /></button>
-                      <button type="button" aria-label={activityType === 'Call' ? 'Log a call' : 'Add a note'} onClick={() => setActivityType(current => current === 'Note' ? 'Call' : 'Note')} className={`transition-colors ${activityType === 'Call' ? 'text-accent' : 'hover:text-body-light'}`}><Phone size={16} /></button>
+            {/* Action Button */}
+            <div className="pt-1">
+              {selectedRecord.openBalance?.amount === 0 ? (
+                <button
+                  type="button"
+                  disabled
+                  className="w-full whitespace-nowrap px-3 py-2 rounded-input text-xs font-semibold bg-surface-muted text-body-light border border-border-default transition-colors disabled:opacity-60 text-center"
+                >
+                  View History
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!selectedInvoices[0] || paymentMutation.isPending}
+                  onClick={() => setPaymentTargetId(selectedInvoices[0].id)}
+                  className="w-full whitespace-nowrap px-3 py-2 rounded-input text-xs font-semibold bg-primary text-white hover:bg-primary-hover transition-colors disabled:opacity-50 cursor-pointer text-center shadow-card"
+                >
+                  Log Payment
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Outstanding Invoices Card */}
+          <div className="bg-surface-raised border border-border-default rounded-card shadow-card overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle bg-surface-raised">
+              <h3 className="text-xs font-bold text-heading">Outstanding Invoices</h3>
+              <span className="text-[11px] font-semibold text-muted">{selectedInvoicesData?.pagination?.total ?? 0} Items</span>
+            </div>
+            <div className="divide-y divide-border-subtle">
+              {isInvoicesLoading && <div className="p-4 flex justify-center text-muted"><Loader2 size={16} className="animate-spin" /></div>}
+
+              {selectedInvoices.map(inv => (
+                <div key={inv.id} className="flex items-center justify-between p-3.5 hover:bg-surface-muted transition-colors">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 bg-surface-muted border border-border-default rounded-input text-muted shrink-0">
+                      <FileText size={16} />
                     </div>
-                    <button disabled={!activityBody.trim() || activityMutation.isPending} onClick={() => activityMutation.mutate()} className="bg-primary text-white text-xs font-semibold px-4 py-1.5 rounded hover:bg-primary-hover transition-colors disabled:opacity-60">
-                      {activityMutation.isPending ? 'Posting...' : 'Post'}
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-heading truncate">{inv.number || 'No Number'}</p>
+                      <p className="text-[11px] font-medium text-muted mt-0.5 truncate">
+                        {inv.daysPastDue > 0 ? (
+                          <span className="text-danger font-semibold">Overdue ({inv.daysPastDue}d)</span>
+                        ) : (
+                          <span className="text-success font-semibold">Current</span>
+                        )}
+                        {inv.dueDate && ` • Due ${formatDate(inv.dueDate)}`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0 ml-2">
+                    <span className="text-xs font-bold text-heading tabular-nums" title={money(inv.amount)}>{compactMoney(inv.amount)}</span>
+                    <button disabled={paymentMutation.isPending || inv.status === 'PAID'} onClick={() => setPaymentTargetId(inv.id)} className="flex items-center gap-1 border border-border-strong rounded px-2 py-1 text-xs font-semibold text-body hover:bg-surface-muted transition-colors bg-surface-raised disabled:opacity-60 cursor-pointer">
+                      Action <ChevronDown size={12} className="text-caption" />
                     </button>
                   </div>
                 </div>
-                {activityMutation.isError && <p role="alert" className="mb-4 text-xs text-danger">{activityMutation.error?.message || 'Could not post activity.'}</p>}
+              ))}
 
-                {/* Timeline */}
-                <div className="relative pl-3 space-y-6">
-                  {/* Continuous Line */}
-                  <div className="absolute left-[17px] top-2 bottom-6 w-px bg-surface-strong"></div>
-
-                  {(activitiesData?.items ?? []).map((act, index) => (
-                    <div key={act.id} className="relative z-10 flex gap-4">
-                      <div className="bg-surface-raised ring-4 ring-white mt-1">
-                        {index === 0 ? (
-                          <CircleDot size={16} className="text-heading" strokeWidth={2.5} />
-                        ) : (
-                          <Circle size={16} className="text-accent" strokeWidth={2.5} />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start mb-0.5">
-                          <p className="text-sm font-bold text-heading">{act.title}</p>
-                          <span className="text-[10px] font-semibold text-muted">
-                            {new Date(act.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                        <p className="text-[11px] font-medium text-muted mb-2">{act.author}</p>
-                        <div className="bg-surface-muted border border-border-subtle rounded-button p-3 text-[13px] text-body leading-relaxed">
-                          {act.body}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  {(!activitiesData?.items || activitiesData.items.length === 0) && (
-                    <div className="text-center text-muted text-sm py-4">
-                      No activity recorded.
-                    </div>
-                  )}
+              {selectedInvoices.length === 0 && (
+                <div className="p-4 text-center text-muted text-xs">
+                  {isInvoicesLoading ? 'Loading invoices…' : 'No outstanding invoices.'}
                 </div>
+              )}
+            </div>
+            <div className="flex items-center justify-between border-t border-border-subtle px-4 py-2 text-xs text-muted">
+              <span>Showing {selectedInvoicesData?.pagination?.total ? (invoicePage - 1) * 10 + 1 : 0}–{Math.min(invoicePage * 10, selectedInvoicesData?.pagination?.total ?? 0)} of {selectedInvoicesData?.pagination?.total ?? 0}</span>
+              <div className="flex items-center gap-2">
+                <button type="button" disabled={invoicePage <= 1} onClick={() => setInvoicePage(current => current - 1)} className="rounded border border-border-default px-2 py-0.5 text-xs font-medium hover:bg-surface-muted transition-colors disabled:opacity-40 cursor-pointer">Previous</button>
+                <span>Page {selectedInvoicesData?.pagination?.pages ? invoicePage : 0} of {selectedInvoicesData?.pagination?.pages ?? 0}</span>
+                <button type="button" disabled={invoicePage >= (selectedInvoicesData?.pagination?.pages ?? 0)} onClick={() => setInvoicePage(current => current + 1)} className="rounded border border-border-default px-2 py-0.5 text-xs font-medium hover:bg-surface-muted transition-colors disabled:opacity-40 cursor-pointer">Next</button>
               </div>
             </div>
-
           </div>
-        )}
-      </div>
+
+          {/* Activity Timeline Card */}
+          <div className="bg-surface-raised border border-border-default rounded-card shadow-card overflow-hidden flex flex-col">
+            <div className="px-4 py-3 border-b border-border-subtle">
+              <h3 className="text-xs font-bold text-heading">Activity</h3>
+            </div>
+
+            <div className="p-4">
+              {/* Composer */}
+              <div className="border border-border-default rounded-button bg-surface focus-within:bg-surface-raised focus-within:border-border-strong transition-colors mb-3">
+                <textarea
+                  rows={2}
+                  placeholder="Add a note or log a call..."
+                  value={activityBody}
+                  onChange={event => setActivityBody(event.target.value)}
+                  className="w-full bg-transparent text-xs p-2.5 outline-none resize-none min-h-[68px] text-body placeholder-muted"
+                />
+                <div className="flex items-center justify-between px-2.5 py-1.5 border-t border-border-subtle">
+                  <div className="flex items-center gap-2 text-caption">
+                    <button type="button" disabled title="Attachments are not supported for collection activity notes" aria-label="Attach file (not supported)" className="hover:text-body-light transition-colors disabled:opacity-60 cursor-not-allowed"><Paperclip size={14} /></button>
+                    <button type="button" aria-label={activityType === 'Call' ? 'Log a call' : 'Add a note'} onClick={() => setActivityType(current => current === 'Note' ? 'Call' : 'Note')} className={`transition-colors cursor-pointer ${activityType === 'Call' ? 'text-accent' : 'hover:text-body-light'}`}><Phone size={14} /></button>
+                  </div>
+                  <button disabled={!activityBody.trim() || activityMutation.isPending} onClick={() => activityMutation.mutate()} className="bg-primary text-white text-xs font-semibold px-3 py-1 rounded hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer">
+                    {activityMutation.isPending ? 'Posting...' : 'Post'}
+                  </button>
+                </div>
+              </div>
+              {activityMutation.isError && <p role="alert" className="mb-3 text-xs text-danger">{activityMutation.error?.message || 'Could not post activity.'}</p>}
+
+              {/* Timeline */}
+              <div className="relative pl-3 space-y-4">
+                {/* Continuous Line */}
+                <div className="absolute left-[17px] top-2 bottom-6 w-px bg-surface-strong"></div>
+
+                {(activitiesData?.items ?? []).map((act, index) => (
+                  <div key={act.id} className="relative z-10 flex gap-3">
+                    <div className="bg-surface-raised ring-4 ring-white mt-1">
+                      {index === 0 ? (
+                        <CircleDot size={14} className="text-heading" strokeWidth={2.5} />
+                      ) : (
+                        <Circle size={14} className="text-accent" strokeWidth={2.5} />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start mb-0.5">
+                        <p className="text-xs font-bold text-heading truncate">{act.title}</p>
+                        <span className="text-[10px] font-semibold text-muted shrink-0 ml-2">
+                          {new Date(act.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="text-[10px] font-medium text-muted mb-1">{act.author}</p>
+                      <div className="bg-surface-muted border border-border-subtle rounded-button p-2.5 text-xs text-body leading-relaxed">
+                        {act.body}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {(!activitiesData?.items || activitiesData.items.length === 0) && (
+                  <div className="text-center text-muted text-xs py-2">
+                    No activity recorded.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="bg-surface-raised rounded-card border border-border-default shadow-card p-6 text-center text-xs text-muted">
+          Select a customer to view details.
+        </div>
+      )}
+    </div>
+
+  </div>
       <ConfirmDialog
         open={Boolean(paymentTargetId)}
         onClose={() => setPaymentTargetId(null)}

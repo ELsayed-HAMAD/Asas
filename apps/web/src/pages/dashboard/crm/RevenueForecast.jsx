@@ -23,9 +23,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { crmApi } from '../../../lib/api/crm';
 import { queryKeys } from '../../../lib/queryKeys';
 import TopBarActions from '../../../components/TopBarActions';
-import { moneyToMajor, formatCompactMoney } from '../../../lib/format';
+import { moneyToMajor, formatCompactMoney, formatMoney } from '../../../lib/format';
 import { downloadCsv } from '../../../lib/csv';
 import { useActiveMemberRole } from '../../../lib/authClient';
+import { getMemberRoleName } from '../../../lib/memberRole';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
@@ -41,7 +42,7 @@ export default function RevenueForecast() {
   const [quotaToDelete, setQuotaToDelete] = useState(null)
   const queryClient = useQueryClient()
   const { data: activeMemberRole } = useActiveMemberRole()
-  const canManageQuotas = activeMemberRole === 'OWNER' || activeMemberRole === 'ADMIN'
+  const canManageQuotas = ['OWNER', 'ADMIN'].includes(getMemberRoleName(activeMemberRole))
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.crm.forecast(selectedYear),
     queryFn: () => crmApi.getForecast(selectedYear),
@@ -151,6 +152,7 @@ export default function RevenueForecast() {
   // Quota row per rep, joined by repName (the only rep identity forecastByRep carries).
   const availableYears = [...new Set([selectedYear, ...(data.availableYears || [])])].sort((a, b) => b.localeCompare(a))
   const formatCurrency = (num) => formatCompactMoney(num, currency)
+  const formatExactCurrency = (num) => formatMoney(num, { currency })
   const visibleReps = forecastByRep.filter(rep => rep.repName.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
   const displayedReps = showAllReps || search.trim() ? visibleReps : visibleReps.slice(0, 5)
   const exportCsv = () => {
@@ -167,10 +169,10 @@ export default function RevenueForecast() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-[#fafafa] overflow-hidden min-w-[1000px]">
+    <div className="flex h-full flex-col bg-[#fafafa] overflow-hidden min-w-0">
 
       <TopBarActions>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -213,15 +215,15 @@ export default function RevenueForecast() {
         </div>}
 
         {/* ── KPIs Grid ── */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
 
           {/* Closed Won */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col justify-between h-32">
+          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col justify-between min-h-[8.5rem] h-full">
             <div className="flex items-center justify-between">
               <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Closed Won ({selectedYear})</p>
               <CheckCircle2 size={16} className="text-gray-400" />
             </div>
-            <div>
+            <div className="mt-auto pt-2">
               <p className="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">{closedWon == null ? '—' : formatCurrency(wonMajor)}</p>
               <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1.5 overflow-hidden">
                 <div className="bg-[#10b981] h-full rounded-full" style={{ width: `${wonPctToQuota == null ? 0 : Math.min(100, wonPctToQuota)}%` }}></div>
@@ -234,12 +236,12 @@ export default function RevenueForecast() {
           </div>
 
           {/* Committed */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col justify-between h-32">
+          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col justify-between min-h-[8.5rem] h-full">
             <div className="flex items-center justify-between">
               <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Committed</p>
               <Handshake size={16} className="text-[#3b82f6]" />
             </div>
-            <div>
+            <div className="mt-auto pt-2">
               <p className="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">{committedTotal === 0 ? '—' : formatCurrency(committedTotal)}</p>
               <span className="inline-flex items-center gap-1.5 bg-[#eff6ff] text-[#1d4ed8] px-2.5 py-1 rounded text-[10px] font-bold">
                 <div className="w-1.5 h-1.5 bg-[#3b82f6] rounded-full"></div>
@@ -249,12 +251,12 @@ export default function RevenueForecast() {
           </div>
 
           {/* Best Case */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col justify-between h-32">
+          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col justify-between min-h-[8.5rem] h-full">
             <div className="flex items-center justify-between">
               <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Best Case (Upside)</p>
               <TrendingUp size={16} className="text-[#eab308]" />
             </div>
-            <div>
+            <div className="mt-auto pt-2">
               <p className="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">{bestCaseTotal === 0 ? '—' : formatCurrency(bestCaseTotal)}</p>
               <span className="inline-flex items-center gap-1.5 bg-[#fefce8] text-[#a16207] px-2.5 py-1 rounded text-[10px] font-bold">
                 <div className="w-1.5 h-1.5 bg-[#eab308] rounded-full"></div>
@@ -264,12 +266,12 @@ export default function RevenueForecast() {
           </div>
 
           {/* Pipeline Coverage */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col justify-between h-32">
+          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col justify-between min-h-[8.5rem] h-full">
             <div className="flex items-center justify-between">
               <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Pipeline Coverage</p>
               <Filter size={16} className="text-gray-400" />
             </div>
-            <div>
+            <div className="mt-auto pt-2">
               <p className="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">{coverage == null ? '—' : `${coverage.toFixed(1)}x`}</p>
               <span className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium">
                 <Info size={12} className="text-gray-400" />
@@ -327,17 +329,17 @@ export default function RevenueForecast() {
         </div>
 
         {/* ── Bottom Row ── */}
-        <div className="grid grid-cols-12 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
 
           {/* Forecast by Rep Table — real ForecastSnapshot rows */}
-          <div className="col-span-8 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col">
+          <div className="col-span-1 xl:col-span-8 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col overflow-x-auto">
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
               <h2 className="text-lg font-bold text-gray-900">Forecast by Rep</h2>
               <button onClick={() => setShowAllReps(value => !value)} className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors">
                 {showAllReps ? 'Show Top 5' : `View All (${visibleReps.length})`}
               </button>
             </div>
-            <table className="w-full text-left border-collapse">
+            <table className="w-full min-w-[650px] text-left border-collapse">
               <thead className="bg-white">
                 <tr>
                   <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200">Rep</th>
@@ -369,9 +371,9 @@ export default function RevenueForecast() {
                           </div>
                           <span className="text-sm font-semibold text-gray-900">{rep.repName}</span>
                         </td>
-                        <td className="px-6 py-4 text-right text-sm font-bold text-gray-900 tabular-nums">{formatCurrency(toMajor(rep.closed))}</td>
-                        <td className="px-6 py-4 text-right text-sm text-gray-600 font-medium tabular-nums">{formatCurrency(toMajor(rep.commit))}</td>
-                        <td className="px-6 py-4 text-right text-sm text-gray-600 font-medium tabular-nums">{formatCurrency(toMajor(rep.bestCase))}</td>
+                        <td className="px-6 py-4 text-right text-sm font-bold text-gray-900 tabular-nums" title={formatExactCurrency(toMajor(rep.closed))}>{formatCurrency(toMajor(rep.closed))}</td>
+                        <td className="px-6 py-4 text-right text-sm text-gray-600 font-medium tabular-nums" title={formatExactCurrency(toMajor(rep.commit))}>{formatCurrency(toMajor(rep.commit))}</td>
+                        <td className="px-6 py-4 text-right text-sm text-gray-600 font-medium tabular-nums" title={formatExactCurrency(toMajor(rep.bestCase))}>{formatCurrency(toMajor(rep.bestCase))}</td>
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-end gap-2">
                             <div className="w-12 bg-gray-200 rounded-full h-1.5 overflow-hidden">
@@ -389,7 +391,7 @@ export default function RevenueForecast() {
           </div>
 
           {/* Alerts & Shortfall */}
-          <div className="col-span-4 flex flex-col gap-4">
+          <div className="col-span-1 xl:col-span-4 flex flex-col gap-4">
 
             {expectedShortfall > 0 && (
               <div className="bg-[#fef9c3] border border-[#fde047] rounded-xl p-4 flex items-center gap-3 shadow-sm">

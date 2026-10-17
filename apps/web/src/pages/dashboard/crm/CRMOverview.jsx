@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
-  Bell,
-  Moon,
   MoreHorizontal,
   Loader2,
   Mail,
@@ -113,6 +111,9 @@ export default function CRMOverview() {
 
   const monthly = (forecast?.monthlyPipeline || []).map((row) => ({ month: row.month, value: toMajor(row.value) }));
   const pipelineSpark = monthly.map((row) => ({ v: row.value }));
+  const pipelineValueLabel = formatMoney(pipeline.openTotal);
+  const closedWonValueLabel = perf ? formatMoney(perf.yearWonTotal) : '…';
+  const metricFontSize = label => `clamp(0.75rem, ${Math.min(14, 130 / Math.max(1, (label || '').length))}cqw, 1.5rem)`
   const winRateSpark = (data.monthlyWinRate || []).filter((row) => row.rate != null).map((row) => ({ v: row.rate }));
   const currentPeriodWinRate = data.winRateComparison?.current?.rate ?? null;
   const previousPeriodWinRate = data.winRateComparison?.previous?.rate ?? null;
@@ -127,12 +128,12 @@ export default function CRMOverview() {
   const closedPctOfQuota = quotaMajor > 0 && perf ? (toMajor(perf.yearWonTotal) / quotaMajor) * 100 : null;
 
   return (
-    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
+    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
 
       <TopBarActions>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
+            <Search size={14} className="absolute inset-inline-start-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
             <input
               type="text"
               placeholder="Search deals..."
@@ -143,45 +144,29 @@ export default function CRMOverview() {
                   navigate(`/dashboard/crm/deals?search=${encodeURIComponent(search.trim())}`)
                 }
               }}
-              className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className="ps-9 pe-3 h-9 text-xs border border-border-default rounded-input bg-surface-muted hover:bg-surface focus:bg-surface-raised w-[260px] max-w-full focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-colors shadow-sm"
             />
           </div>
 
           <button
             type="button"
-            onClick={() => navigate('/dashboard/settings/notifications')}
-            title="Notification Settings"
-            className="text-muted hover:text-heading transition-colors cursor-pointer"
+            onClick={() => setDealOpen(true)}
+            className="h-9 px-4 flex items-center justify-center bg-primary text-white rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors cursor-pointer shrink-0"
           >
-            <Bell size={18} />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const isDark = document.documentElement.classList.toggle('dark');
-              localStorage.setItem('theme', isDark ? 'dark' : 'light');
-            }}
-            title="Toggle theme"
-            className="text-muted hover:text-heading transition-colors cursor-pointer"
-          >
-            <Moon size={18} />
-          </button>
-
-          <button onClick={() => setDealOpen(true)} className="bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors">
             New Deal
           </button>
         </div>
       </TopBarActions>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-4">
 
-        {/* ── KPIs Grid ── */}
-        <div className="grid grid-cols-4 gap-4">
+        {/* ── KPIs Grid (4 cards, CSS grid, 4 columns, gap 16px, min-height 104px, equal height) ── */}
+        <div className="grid grid-cols-2 min-[1100px]:grid-cols-4 gap-4 items-stretch">
 
-          {/* Total Pipeline */}
-          <div className="relative overflow-hidden bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card h-28">
+          {/* Card 1: Total Pipeline */}
+          <div className="@container relative overflow-hidden bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card min-h-[104px] flex flex-col">
             {/* Background Chart */}
-            <div className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none z-0">
+            <div className="absolute inset-inline-0 bottom-0 h-[22px] pointer-events-none z-0">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={pipelineSpark} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                   <YAxis hide domain={([min, max]) => [min - (max - min) * 3, max]} />
@@ -196,24 +181,35 @@ export default function CRMOverview() {
               </ResponsiveContainer>
             </div>
 
-            {/* Text Foreground */}
-            <div className="relative z-10 h-full flex flex-col justify-between pointer-events-none">
-              <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Total Pipeline</p>
-              <div className="pointer-events-auto">
-                <p className="text-3xl font-bold text-heading tracking-tight leading-none">{formatMoney(pipeline.openTotal)}</p>
-                <p className="text-[9px] text-muted mt-1">
-                  Prior-month value (as of {pipeline.openTotalComparison?.previousAsOfDate ?? pipeline.openCountComparison?.previousAsOfDate}) {pipeline.openTotalComparison?.previousTotal == null
-                    ? 'unavailable'
-                    : formatMoney(pipeline.openTotalComparison.previousTotal)}
+            {/* Foreground */}
+            <div className="relative z-10 flex flex-col pointer-events-none">
+              <div className="flex items-center justify-between min-h-[16px]">
+                <p className="text-xs font-bold text-muted uppercase tracking-wider leading-none">Total Pipeline</p>
+              </div>
+              <div className="pointer-events-auto mt-1 flex items-baseline">
+                <p
+                  className="min-w-0 text-2xl font-bold text-heading tracking-tight leading-tight tabular-nums truncate"
+                  style={{ fontSize: metricFontSize(pipelineValueLabel) }}
+                  title={pipelineValueLabel}
+                >
+                  {pipelineValueLabel}
                 </p>
               </div>
+              <p
+                className="mt-1 text-xs text-muted truncate leading-tight pointer-events-auto"
+                title={`Prior-month value (as of ${pipeline.openTotalComparison?.previousAsOfDate ?? pipeline.openCountComparison?.previousAsOfDate}) ${pipeline.openTotalComparison?.previousTotal == null ? 'unavailable' : formatMoney(pipeline.openTotalComparison.previousTotal)}`}
+              >
+                Prior-month value (as of {pipeline.openTotalComparison?.previousAsOfDate ?? pipeline.openCountComparison?.previousAsOfDate}) {pipeline.openTotalComparison?.previousTotal == null
+                  ? 'unavailable'
+                  : formatMoney(pipeline.openTotalComparison.previousTotal)}
+              </p>
             </div>
           </div>
 
-          {/* Win Rate */}
-          <div className="relative overflow-hidden bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card h-28">
-            {/* Background Chart — monthly closed deal outcomes */}
-            <div className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none z-0">
+          {/* Card 2: Win Rate */}
+          <div className="relative overflow-hidden bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card min-h-[104px] flex flex-col">
+            {/* Background Chart */}
+            <div className="absolute inset-inline-0 bottom-0 h-[22px] pointer-events-none z-0">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={winRateSpark} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                   <YAxis hide domain={[0, 100]} />
@@ -228,64 +224,93 @@ export default function CRMOverview() {
               </ResponsiveContainer>
             </div>
 
-            {/* Text Foreground */}
-            <div className="relative z-10 h-full flex flex-col justify-between pointer-events-none">
-              <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Win Rate</p>
-              <div className="pointer-events-auto">
-                <p className="text-3xl font-bold text-heading tracking-tight leading-none">{formatPercent(data.winRate)}</p>
-                <p className="text-[9px] text-muted mt-1">
-                  MTD {formatPercent(currentPeriodWinRate)} · Prior period {monthlyWinRateDelta == null ? formatPercent(previousPeriodWinRate) : `${monthlyWinRateDelta > 0 ? '+' : ''}${monthlyWinRateDelta.toFixed(1)} pts`}
+            {/* Foreground */}
+            <div className="relative z-10 flex flex-col pointer-events-none">
+              <div className="flex items-center justify-between min-h-[16px]">
+                <p className="text-xs font-bold text-muted uppercase tracking-wider leading-none">Win Rate</p>
+              </div>
+              <div className="pointer-events-auto mt-1 flex items-baseline">
+                <p className="min-w-0 text-2xl font-bold text-heading tracking-tight leading-tight tabular-nums truncate">
+                  {formatPercent(data.winRate)}
                 </p>
               </div>
+              <p
+                className="mt-1 text-xs text-muted truncate leading-tight pointer-events-auto"
+                title={`MTD ${formatPercent(currentPeriodWinRate)} · Prior period ${monthlyWinRateDelta == null ? formatPercent(previousPeriodWinRate) : `${monthlyWinRateDelta > 0 ? '+' : ''}${monthlyWinRateDelta.toFixed(1)} pts`}`}
+              >
+                MTD {formatPercent(currentPeriodWinRate)} · Prior period {monthlyWinRateDelta == null ? formatPercent(previousPeriodWinRate) : `${monthlyWinRateDelta > 0 ? '+' : ''}${monthlyWinRateDelta.toFixed(1)} pts`}
+              </p>
             </div>
           </div>
 
-          {/* Active deal additions over the previous seven days, aggregated by the API. */}
-          <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card flex flex-col justify-between h-28">
-            <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Active Deals</p>
-            <div className="flex items-center gap-3">
-              <p className="text-3xl font-bold text-heading tracking-tight">{pipeline.openCount}</p>
-              <span className="bg-surface-active text-body-light border border-border-default px-2 py-0.5 rounded text-[11px] font-medium mt-1">
+          {/* Card 3: Active Deals */}
+          <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card min-h-[104px] flex flex-col">
+            <div className="flex items-center justify-between min-h-[16px]">
+              <p className="text-xs font-bold text-muted uppercase tracking-wider leading-none">Active Deals</p>
+            </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <p className="min-w-0 text-2xl font-bold text-heading tracking-tight leading-tight tabular-nums truncate">
+                {pipeline.openCount}
+              </p>
+              <span className="bg-surface-active text-body-light border border-border-default px-2 py-0.5 rounded text-[11px] font-medium leading-none shrink-0 whitespace-nowrap">
                 +{data.createdLast7Days} this week
               </span>
             </div>
+            <div className="mt-1 text-xs text-muted leading-tight select-none invisible">
+              &nbsp;
+            </div>
           </div>
 
-          {/* Closed Won — current calendar year, from recorded actual closure dates */}
-          <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card flex flex-col justify-between h-28">
-            <div className="flex justify-between items-center">
-              <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Closed Won ({perf?.year ?? currentYear})</p>
-              <p className="text-[11px] text-muted font-medium">{perf ? `${perf.summary.totalWonCount} deals` : '…'}</p>
+          {/* Card 4: Closed Won */}
+          <div className="@container bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card min-h-[104px] flex flex-col">
+            <div className="flex items-center justify-between min-h-[16px]">
+              <p className="text-xs font-bold text-muted uppercase tracking-wider truncate leading-none">
+                Closed Won ({perf?.year ?? currentYear})
+              </p>
+              <p className="text-xs text-muted font-medium shrink-0 leading-none">
+                {perf ? `${perf.summary.totalWonCount} deals` : '…'}
+              </p>
             </div>
-            <div>
-              <p className="text-3xl font-bold text-heading tracking-tight mb-2">{perf ? formatMoney(perf.yearWonTotal) : '…'}</p>
-              <div className="w-full bg-surface-active rounded-full h-1.5 overflow-hidden">
-                <div className="bg-accent h-1.5 rounded-full" style={{ width: `${closedPctOfQuota == null ? 0 : Math.min(100, closedPctOfQuota)}%` }}></div>
+            <div className="mt-1 flex items-baseline">
+              <p
+                className="min-w-0 text-2xl font-bold text-heading tracking-tight leading-tight tabular-nums truncate"
+                style={perf ? { fontSize: metricFontSize(closedWonValueLabel) } : undefined}
+                title={closedWonValueLabel}
+              >
+                {closedWonValueLabel}
+              </p>
+            </div>
+            <div className="mt-1 flex flex-col justify-end">
+              <div className="w-full bg-surface-active rounded-full h-[3px] overflow-hidden">
+                <div
+                  className="bg-accent h-[3px] rounded-full transition-all"
+                  style={{ width: `${closedPctOfQuota == null ? 0 : Math.min(100, closedPctOfQuota)}%` }}
+                />
               </div>
             </div>
           </div>
 
         </div>
 
-        {/* ── Main Charts Row ── */}
-        <div className="grid grid-cols-5 gap-4">
+        {/* ── Main Charts Row (grid 3fr 2fr, gap 16px, min-height 320px) ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 min-h-[320px] items-stretch">
 
-          {/* Revenue Forecast Area Chart — real open-pipeline value by close month */}
-          <div className="col-span-3 bg-surface-raised border border-border-default rounded-card-sm shadow-card p-6 flex flex-col min-h-[340px]">
+          {/* Revenue Forecast Area Chart (3fr ~60%) */}
+          <div className="col-span-1 lg:col-span-3 bg-surface-raised border border-border-default rounded-card-sm shadow-card p-5 flex flex-col min-h-[320px]">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-heading">Revenue Forecast</h2>
+              <h2 className="text-base font-semibold text-heading leading-tight">Revenue Forecast</h2>
               <button
                 type="button"
                 onClick={() => navigate('/dashboard/crm/forecast')}
                 title="View full revenue forecast"
-                className="text-caption hover:text-body transition-colors cursor-pointer"
+                className="text-caption hover:text-body transition-colors cursor-pointer ms-auto p-1"
               >
-                <MoreHorizontal size={20} />
+                <MoreHorizontal size={18} />
               </button>
             </div>
 
-            <div className="relative flex-1 w-full mt-2" style={{ minHeight: 200 }}>
-              <ResponsiveContainer width="100%" height={200}>
+            <div className="relative flex-1 w-full min-h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={monthly} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="crmRevGrad" x1="0" y1="0" x2="0" y2="1">
@@ -294,8 +319,8 @@ export default function CRMOverview() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-muted)', fontWeight: 500 }} dy={8} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-caption)', fontWeight: 500 }} tickFormatter={(value) => formatCompact(value, currency)} />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--color-muted)', fontWeight: 500 }} dy={8} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--color-caption)', fontWeight: 500 }} tickFormatter={(value) => formatCompact(value, currency)} />
                   <Tooltip
                     contentStyle={{ borderRadius: 10, border: '1px solid var(--color-border-default)', boxShadow: 'var(--shadow-card-hover)', fontSize: 13 }}
                     formatter={(value) => [formatCompact(value, currency), 'Revenue']}
@@ -312,50 +337,54 @@ export default function CRMOverview() {
             </div>
           </div>
 
-          {/* Pipeline Conversion Funnel — real 5-stage funnel from the server */}
-          <div className="col-span-2 bg-surface-raised border border-border-default rounded-card-sm shadow-card p-6 flex flex-col min-h-[340px]">
-            <h2 className="text-lg font-bold text-heading mb-2">Pipeline Conversion</h2>
-            <p className="mb-5 text-xs text-muted">All-time cohorts from recorded stage history. Deals without recorded history are excluded.</p>
+          {/* Pipeline Conversion Funnel (2fr ~40%) */}
+          <div className="col-span-1 lg:col-span-2 bg-surface-raised border border-border-default rounded-card-sm shadow-card p-5 flex flex-col min-h-[320px]">
+            <div className="mb-4">
+              <h2 className="text-base font-semibold text-heading leading-tight">Pipeline Conversion</h2>
+              <p className="mt-1 text-[13px] text-muted line-clamp-2 leading-snug">
+                All-time cohorts from recorded stage history. Deals without recorded history are excluded.
+              </p>
+            </div>
 
-            <div className="flex flex-col items-center flex-1 w-full px-4">
+            <div className="flex flex-col items-center justify-between flex-1 w-full gap-2">
 
-              {/* Leads */}
-              <div className="w-full bg-[#dbeafe] text-[#1e3a8a] py-3 px-4 flex justify-between items-center rounded-input relative transition-all duration-1000">
-                <span className="text-sm font-semibold">Leads</span>
-                <span className="text-sm font-bold">{formatMoney(s.leads.value)}</span>
+              {/* Leads (100% width) */}
+              <div className="w-full min-h-[36px] bg-[#dbeafe] text-[#1e3a8a] py-2 px-3 flex justify-between items-center rounded-input relative transition-all">
+                <span className="text-sm font-semibold whitespace-nowrap text-start">Leads</span>
+                <span className="text-sm font-bold tabular-nums text-end shrink-0">{formatMoney(s.leads.value)}</span>
               </div>
-              <div className="relative -my-2.5 z-10 bg-surface-raised border border-border-strong rounded-input px-2 py-0.5 text-[10px] font-bold text-heading shadow-md">
+              <div className="z-10 h-4 px-2 -my-1 inline-flex items-center justify-center bg-surface-raised border border-border-strong rounded-input text-[10px] font-bold text-heading shadow-sm leading-none shrink-0">
                 {formatConversion(proposalConv)}
               </div>
 
-              {/* Proposal */}
-              <div className="w-[85%] bg-[#ffedd5] text-[#9a3412] py-3 px-4 flex justify-between items-center rounded-input relative transition-all duration-1000">
-                <span className="text-sm font-semibold">Proposal</span>
-                <span className="text-sm font-bold">{formatMoney(s.proposal.value)}</span>
+              {/* Proposal (94% width) */}
+              <div className="w-[94%] min-h-[36px] bg-[#ffedd5] text-[#9a3412] py-2 px-3 flex justify-between items-center rounded-input relative transition-all">
+                <span className="text-sm font-semibold whitespace-nowrap text-start">Proposal</span>
+                <span className="text-sm font-bold tabular-nums text-end shrink-0">{formatMoney(s.proposal.value)}</span>
               </div>
-              <div className="relative -my-2.5 z-10 bg-surface-raised border border-border-strong rounded-input px-2 py-0.5 text-[10px] font-bold text-heading shadow-md">
+              <div className="z-10 h-4 px-2 -my-1 inline-flex items-center justify-center bg-surface-raised border border-border-strong rounded-input text-[10px] font-bold text-heading shadow-sm leading-none shrink-0">
                 {formatConversion(negotiationConv)}
               </div>
 
-              {/* Negotiation */}
-              <div className="w-[70%] bg-[#fee2e2] text-[#991b1b] py-3 px-4 flex justify-between items-center rounded-input relative transition-all duration-1000">
-                <span className="text-sm font-semibold">Negotiation</span>
-                <span className="text-sm font-bold">{formatMoney(s.negotiation.value)}</span>
+              {/* Negotiation (88% width) */}
+              <div className="w-[88%] min-h-[36px] bg-[#fee2e2] text-[#991b1b] py-2 px-3 flex justify-between items-center rounded-input relative transition-all">
+                <span className="text-sm font-semibold whitespace-nowrap text-start">Negotiation</span>
+                <span className="text-sm font-bold tabular-nums text-end shrink-0">{formatMoney(s.negotiation.value)}</span>
               </div>
-              <div className="relative -my-2.5 z-10 bg-surface-raised border border-border-strong rounded-input px-2 py-0.5 text-[10px] font-bold text-heading shadow-md">
+              <div className="z-10 h-4 px-2 -my-1 inline-flex items-center justify-center bg-surface-raised border border-border-strong rounded-input text-[10px] font-bold text-heading shadow-sm leading-none shrink-0">
                 {formatConversion(closedConv)}
               </div>
 
-              {/* Closed Won */}
-              <div className="w-[55%] bg-success-light text-success-text py-3 px-4 flex justify-between items-center rounded-input relative transition-all duration-1000">
-                <span className="text-sm font-semibold">Closed Won</span>
-                <span className="text-sm font-bold">{formatMoney(s.closedWon.value)}</span>
+              {/* Closed Won (82% width) */}
+              <div className="w-[82%] min-h-[36px] bg-success-light text-success-text py-2 px-3 flex justify-between items-center rounded-input relative transition-all">
+                <span className="text-sm font-semibold whitespace-nowrap text-start">Closed Won</span>
+                <span className="text-sm font-bold tabular-nums text-end shrink-0">{formatMoney(s.closedWon.value)}</span>
               </div>
 
-              {/* Closed Lost */}
-              <div className="w-[45%] bg-danger-light text-danger-text py-3 px-4 flex justify-between items-center rounded-input relative transition-all duration-1000">
-                <span className="text-sm font-semibold">Closed Lost</span>
-                <span className="text-sm font-bold">{formatMoney(s.closedLost.value)}</span>
+              {/* Closed Lost (76% width >= 75%) */}
+              <div className="w-[76%] min-h-[36px] bg-danger-light text-danger-text py-2 px-3 flex justify-between items-center rounded-input relative transition-all">
+                <span className="text-sm font-semibold whitespace-nowrap text-start">Closed Lost</span>
+                <span className="text-sm font-bold tabular-nums text-end shrink-0">{formatMoney(s.closedLost.value)}</span>
               </div>
 
             </div>
@@ -363,43 +392,74 @@ export default function CRMOverview() {
 
         </div>
 
-        {/* ── Bottom Row ── */}
-        <div className="grid grid-cols-2 gap-4">
+        {/* ── Bottom Row (grid 3fr 2fr matching charts row, height auto, min-height 180px, items-start) ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
 
-          {/* Daily agenda backed by tenant-scoped AgendaItem records. */}
-          <div className="bg-surface-raised border border-border-default rounded-card-sm shadow-card p-6">
-            <h2 className="text-lg font-bold text-heading mb-6">Daily Agenda</h2>
-            <div className="mb-5 flex gap-2">
-              <input value={agendaTitle} onChange={event => setAgendaTitle(event.target.value)} placeholder="Add an agenda item" className="min-w-0 flex-1 rounded-input border border-border-default px-3 py-2 text-sm" />
-              <button type="button" disabled={!agendaTitle.trim() || createAgenda.isPending} onClick={() => createAgenda.mutate()} className="rounded-input bg-primary px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">Add</button>
+          {/* Daily agenda (3fr ~60%) */}
+          <div className="col-span-1 lg:col-span-3 bg-surface-raised border border-border-default rounded-card-sm shadow-card p-5 flex flex-col min-h-[180px]">
+            <div className="mb-4">
+              <h2 className="text-base font-semibold text-heading leading-tight">Daily Agenda</h2>
             </div>
-            {agenda?.items?.length ? <div className="space-y-3">{agenda.items.map(item => <div key={item.id} className="flex items-center gap-3 border-b border-border-subtle pb-3"><input type="checkbox" checked={item.done} onChange={() => crmApi.updateAgenda(item.id, { done: !item.done }).then(() => queryClient.invalidateQueries({ queryKey: queryKeys.crm.agenda() }))} /><span className={item.done ? 'text-sm text-muted line-through' : 'text-sm font-medium text-heading'}>{item.title}</span></div>)}</div> : <EmptyState title="No agenda items" description="Add a task for this workspace." />}
-          </div>
-
-          {/* Recent Activity */}
-          <div className="bg-surface-raised border border-border-default rounded-card-sm shadow-card p-6">
-            <h2 className="text-lg font-bold text-heading mb-6">Recent Activity</h2>
-
-            {activitiesLoading ? (
-              <p className="text-sm text-muted">Loading activity…</p>
-            ) : recentActivities.length === 0 ? (
-              <div className="relative pl-3 space-y-6">
-                <div className="absolute left-[15px] top-2 bottom-4 w-px bg-surface-strong"></div>
-                <div className="relative z-10 flex gap-4">
-                  <div className="bg-surface-raised ring-4 ring-white mt-1 relative left-0.5">
-                    <div className="w-2.5 h-2.5 bg-surface-muted rounded-full"></div>
+            <div className="flex items-center gap-2 mb-4">
+              <input
+                value={agendaTitle}
+                onChange={event => setAgendaTitle(event.target.value)}
+                placeholder="Add an agenda item"
+                className="min-w-0 flex-1 h-9 rounded-input border border-border-default px-3 text-xs text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-colors shadow-sm"
+              />
+              <button
+                type="button"
+                disabled={!agendaTitle.trim() || createAgenda.isPending}
+                onClick={() => createAgenda.mutate()}
+                className="h-9 px-4 rounded-input bg-primary text-sm font-semibold text-white hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer shrink-0"
+              >
+                Add
+              </button>
+            </div>
+            {agenda?.items?.length ? (
+              <div className="space-y-2.5">
+                {agenda.items.map(item => (
+                  <div key={item.id} className="flex items-center gap-3 border-b border-border-subtle pb-2.5">
+                    <input
+                      type="checkbox"
+                      checked={item.done}
+                      onChange={() => crmApi.updateAgenda(item.id, { done: !item.done }).then(() => queryClient.invalidateQueries({ queryKey: queryKeys.crm.agenda() }))}
+                      className="rounded-input border-border-default text-primary focus:ring-accent cursor-pointer"
+                    />
+                    <span className={item.done ? 'text-sm text-muted line-through' : 'text-sm font-medium text-heading'}>
+                      {item.title}
+                    </span>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-muted">No recent activity to show yet.</p>
-                  </div>
-                </div>
+                ))}
               </div>
             ) : (
-              <div className="relative pl-3 space-y-6">
-                <div className="absolute left-[15px] top-2 bottom-4 w-px bg-surface-strong"></div>
+              <EmptyState
+                title="No agenda items"
+                description="Add a task for this workspace."
+                className="py-6 [&_p:first-child]:text-sm [&_p:first-child]:font-semibold [&_p:last-child]:text-[13px]"
+              />
+            )}
+          </div>
+
+          {/* Recent Activity (2fr ~40%) */}
+          <div className="col-span-1 lg:col-span-2 bg-surface-raised border border-border-default rounded-card-sm shadow-card p-5 flex flex-col min-h-[180px]">
+            <div className="mb-4">
+              <h2 className="text-base font-semibold text-heading leading-tight">Recent Activity</h2>
+            </div>
+
+            {activitiesLoading ? (
+              <p className="text-sm text-muted py-6">Loading activity…</p>
+            ) : recentActivities.length === 0 ? (
+              <div className="py-6 flex items-center gap-3">
+                <div className="w-2.5 h-2.5 bg-surface-muted rounded-full shrink-0" />
+                <p className="text-sm font-medium text-muted">No recent activity to show yet.</p>
+              </div>
+            ) : (
+              <div className="relative ps-3 space-y-4">
+                <div className="absolute inset-inline-start-[15px] top-2 bottom-4 w-px bg-surface-strong" />
                 {recentActivities.map(activity => (
-                  <div key={activity.id} className="relative z-10 flex gap-4">
-                    <div className="bg-surface-raised ring-4 ring-white mt-0.5">
+                  <div key={activity.id} className="relative z-10 flex gap-3">
+                    <div className="bg-surface-raised ring-4 ring-white dark:ring-surface-raised mt-0.5 shrink-0">
                       {activity.type === 'EMAIL' ? (
                         <Mail size={16} className="text-caption" />
                       ) : activity.type === 'CALL' ? (
@@ -416,7 +476,7 @@ export default function CRMOverview() {
                         {activity.type === 'EMAIL' ? 'Email' : activity.type === 'CALL' ? 'Call' : 'Note'} · {activity.actorName || 'Unknown author'} · {formatDate(activity.createdAt, { month: 'short', day: 'numeric', year: 'numeric' })}
                       </p>
                       {activity.body && (
-                        <p className="mt-1.5 whitespace-pre-wrap break-words text-xs text-body line-clamp-2">
+                        <p className="mt-1 whitespace-pre-wrap break-words text-xs text-body line-clamp-2">
                           {activity.body}
                         </p>
                       )}

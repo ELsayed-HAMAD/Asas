@@ -1,4 +1,4 @@
-﻿import { expect, test } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 function json(route, body, status = 200) {
   return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
@@ -94,6 +94,74 @@ test('a rejected sign-in in one browser does not disrupt a concurrent valid user
   }
 })
 
+test('dashboard Arabic direction stays within phone, tablet, and desktop viewports', async ({ browser }) => {
+  const account = { id: 'rtl_review_user', name: 'RTL Review User', email: 'rtl.review@example.test', emailVerified: true }
+  const context = await browser.newContext()
+  await mockAuth(context, account, async route => json(route, { data: {} }))
+  const page = await context.newPage()
+  try {
+    await signIn(page, account)
+    // Header must no longer have a standalone language button
+    await expect(page.locator('header button').filter({ has: page.locator('svg.lucide-globe') })).toHaveCount(0)
+
+    // Open user menu from sidebar footer and click the language toggle inside the panel
+    const userMenuButton = page.locator('button[data-testid="user-menu-button"]').first()
+    await expect(userMenuButton).toBeVisible()
+    await userMenuButton.click()
+
+    const languageToggle = page.locator('button[data-testid="language-toggle"]').first()
+    await expect(languageToggle).toBeVisible()
+    await languageToggle.click()
+    await expect.poll(() => page.evaluate(() => document.documentElement.dir)).toBe('rtl')
+
+    for (const width of [390, 768, 1280]) {
+      await page.setViewportSize({ width, height: 900 })
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
+      await expect(page.getByRole('main')).toHaveCount(1)
+    }
+  } finally {
+    await context.close()
+  }
+})
+
+test('marketing navigation opens useful pages and displays configured prices responsively', async ({ browser }) => {
+  const account = { id: 'marketing_visitor', name: 'Marketing Visitor', email: 'marketing@example.test', emailVerified: true }
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
+  await mockAuth(context, account, async route => {
+    if (new URL(route.request().url()).pathname.endsWith('/billing/plans')) return json(route, { data: { enabled: true, items: [
+      { priceId: 'price_team', name: 'Team', amount: '29.00', currency: 'USD', interval: 'month', seatLimit: 10, storageLimitGb: 100 },
+    ] } })
+    return json(route, { data: {} })
+  })
+  const page = await context.newPage()
+
+  try {
+    await page.goto('/')
+    await page.getByRole('link', { name: 'Features' }).click()
+    await expect(page).toHaveURL(/#features$/)
+    await page.getByRole('link', { name: 'Solutions' }).click()
+    await expect(page.getByRole('heading', { name: 'Connected work across your business' })).toBeVisible()
+    await page.getByRole('link', { name: 'Pricing' }).click()
+    await expect(page.getByRole('heading', { name: 'A clear view of your workspace plan' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Team' })).toBeVisible()
+    await expect(page.getByText('$29.00')).toBeVisible()
+    await page.getByRole('banner').getByRole('link', { name: 'Documentation' }).click()
+    await expect(page.getByRole('heading', { name: 'A practical guide to Asas' })).toBeVisible()
+    await page.goto('/status')
+    await expect(page.getByRole('heading', { name: 'Public live status is not connected' })).toBeVisible()
+
+    for (const path of ['/', '/solutions', '/pricing', '/documentation', '/status']) {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await page.goto(path)
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+      await expect.poll(() => page.locator('header').evaluate(header => header.scrollWidth <= header.clientWidth)).toBe(true)
+      if (path === '/') await expect(page.getByRole('link', { name: 'Features' })).toBeVisible()
+    }
+  } finally {
+    await context.close()
+  }
+})
+
 test('workspace admin can launch hosted plan checkout from Billing & Plans', async ({ browser }) => {
   const account = { id: 'billing_owner', name: 'Billing Workspace Owner', email: 'billing@example.test', emailVerified: true }
   const context = await browser.newContext()
@@ -113,11 +181,445 @@ test('workspace admin can launch hosted plan checkout from Billing & Plans', asy
 
   try {
     await signIn(page, account)
-    await page.goto('/dashboard/settings/billing')
-    await page.getByRole('heading', { name: 'Available plans' }).waitFor()
+    for (const width of [390, 768, 1280]) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/dashboard/settings/billing')
+      await page.getByRole('heading', { name: 'Available plans' }).waitFor()
+      const dimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }))
+      expect(dimensions.content, `Billing page should fit the ${width}px viewport`).toBeLessThanOrEqual(dimensions.viewport)
+      const settingsNavigation = page.getByRole('navigation', { name: 'Settings navigation' })
+      await expect.poll(() => settingsNavigation.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+    }
     await page.getByRole('button', { name: 'Choose plan' }).click()
     await expect(page).toHaveURL('https://checkout.stripe.com/test-session')
     await expect(page).toHaveTitle('Hosted checkout test')
+  } finally {
+    await context.close()
+  }
+})
+
+test('dashboard content fits phone, tablet, and desktop viewports', async ({ browser }) => {
+  const account = { id: 'responsive_owner', name: 'Responsive Workspace Owner', email: 'responsive@example.test', emailVerified: true }
+  const context = await browser.newContext()
+  await mockAuth(context, account, async route => json(route, { data: {} }))
+  const page = await context.newPage()
+
+  try {
+    await signIn(page, account)
+    for (const width of [390, 768, 1280]) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/dashboard')
+      await page.getByRole('heading', { name: 'Cash Flow Analysis' }).waitFor()
+      await expect(page.getByText(/No cash flow data is available for \d{4}\./)).toBeVisible()
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
+      if (width === 390) {
+        const menuButton = page.getByRole('button', { name: 'Open navigation menu' })
+        await menuButton.click()
+        await expect(menuButton).toHaveAttribute('aria-expanded', 'true')
+        await page.keyboard.press('Escape')
+        await expect(menuButton).toHaveAttribute('aria-expanded', 'false')
+      }
+      if (width === 1280) {
+        const userMenuButton = page.getByTestId('user-menu-button')
+        await userMenuButton.click()
+        const logoutButton = page.getByRole('button', { name: 'Log Out' })
+        await expect(logoutButton).toBeVisible()
+        const menuCard = logoutButton.locator('xpath=ancestor::div[contains(@class, "rounded-xl")]')
+        await expect.poll(async () => {
+          const box = await menuCard.boundingBox()
+          return box?.width ?? 0
+        }).toBeGreaterThanOrEqual(285)
+        await userMenuButton.click()
+        await expect(logoutButton).toBeHidden()
+      }
+    }
+  } finally {
+    await context.close()
+  }
+})
+
+test('dashboard summary cards and cash-flow chart fit with populated large values', async ({ browser }) => {
+  const account = { id: 'populated_home_owner', name: 'Populated Home Owner', email: 'populated.home@example.test', emailVerified: true }
+  const year = new Date().getFullYear()
+  const money = amount => ({ amount, currency: 'USD' })
+  const context = await browser.newContext()
+  await mockAuth(context, account, async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/finance/overview')) {
+      return json(route, { data: {
+        payableOutstanding: money(9876543210987),
+        cashFlow: Array.from({ length: 12 }, (_, index) => ({
+          month: `${year}-${String(index + 1).padStart(2, '0')}`,
+          inflow: money((index + 8) * 1_200_000_000),
+          outflow: money((index + 3) * 700_000_000),
+          net: money(((index + 8) * 1_200_000_000) - ((index + 3) * 700_000_000)),
+        })),
+      } })
+    }
+    if (path.endsWith('/crm/overview')) return json(route, { data: { pipeline: {
+      openCount: 83,
+      openTotal: money(12500000000000),
+      openCountComparison: { previousCount: 71 },
+      openTotalComparison: { previousTotal: money(11800000000000) },
+    } } })
+    return json(route, { data: { items: [] } })
+  })
+  const page = await context.newPage()
+  try {
+    await signIn(page, account)
+    for (const width of [390, 768, 1280]) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/dashboard')
+      await expect(page.getByRole('heading', { name: 'Cash Flow Analysis' })).toBeVisible()
+      await expect(page.locator('.recharts-surface').first()).toBeVisible()
+      for (const label of ['Open Pipeline Value', 'Payables Outstanding']) {
+        const card = page.locator('div.bg-surface-raised').filter({ has: page.getByText(label, { exact: true }) }).first()
+        const metric = card.locator('p.text-3xl')
+        await expect(metric).toBeVisible()
+        const dimensions = await metric.evaluate(element => ({
+          clientWidth: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          text: element.textContent,
+        }))
+        expect(dimensions.scrollWidth, `${dimensions.text} should fit at ${width}px`).toBeLessThanOrEqual(dimensions.clientWidth)
+      }
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
+    }
+  } finally {
+    await context.close()
+  }
+})
+
+test('all dashboard routes render without page overflow at phone, tablet, and desktop widths', async ({ browser }) => {
+  test.setTimeout(180_000)
+  const account = { id: 'route_audit_owner', name: 'Route Audit Owner', email: 'route.audit@example.test', emailVerified: true, role: 'ADMIN' }
+  const context = await browser.newContext()
+  const pageErrors = []
+  await mockAuth(context, account, async route => json(route, { error: { message: 'Temporary test outage' } }, 503))
+  const page = await context.newPage()
+  page.on('pageerror', error => pageErrors.push(error.message))
+  const routes = [
+    '/dashboard', '/dashboard/hr/employees', '/dashboard/hr/payroll', '/dashboard/hr/time-attendance', '/dashboard/hr/recruitment',
+    '/dashboard/finance', '/dashboard/finance/accounts-payable', '/dashboard/finance/accounts-receivable', '/dashboard/finance/expenses',
+    '/dashboard/finance/trial-balance', '/dashboard/finance/reconciliation', '/dashboard/crm', '/dashboard/crm/deals',
+    '/dashboard/crm/sales-performance', '/dashboard/crm/revenue-forecast', '/dashboard/inventory', '/dashboard/inventory/movements',
+    '/dashboard/projects', '/dashboard/projects/sprints', '/dashboard/projects/roadmap', '/dashboard/settings',
+    '/dashboard/settings/members', '/dashboard/settings/billing', '/dashboard/settings/integrations',
+    '/dashboard/settings/notifications', '/dashboard/settings/data-export', '/dashboard/support',
+  ]
+
+  try {
+    await signIn(page, account)
+    for (const width of [390, 768, 1280]) {
+      await page.setViewportSize({ width, height: 900 })
+      for (const path of routes) {
+        await page.evaluate(nextPath => {
+          window.history.pushState({}, '', nextPath)
+          window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+        }, path)
+        await expect(page.getByRole('main').first(), `${path} should render its dashboard content`).toBeVisible({ timeout: 15_000 })
+        await expect(page.getByRole('main'), `${path} should expose one main landmark`).toHaveCount(1)
+        await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
+      }
+    }
+    expect(pageErrors, `Unexpected browser errors: ${pageErrors.join('; ')}`).toEqual([])
+  } finally {
+    await context.close()
+  }
+})
+
+test('CRM overview charts and dashboard actions fit phone, tablet, and desktop viewports', async ({ browser }) => {
+  const account = { id: 'responsive_crm_owner', name: 'Responsive CRM Owner', email: 'responsive.crm@example.test', emailVerified: true }
+  const year = new Date().getFullYear()
+  const today = new Date().toISOString().slice(0, 10)
+  const money = amount => ({ amount, currency: 'USD' })
+  const pipeline = { openTotal: money(12500000000), openCount: 48, wonTotal: money(3400000), wonCount: 12, lostTotal: money(1800000), lostCount: 7,
+    openCountComparison: { previousAsOfDate: today, previousCount: 41 }, openTotalComparison: { previousAsOfDate: today, previousTotal: money(10800000000) } }
+  const months = Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, '0')}`)
+  const context = await browser.newContext()
+  await mockAuth(context, account, async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/crm/overview')) return json(route, { data: {
+      pipeline, createdLast7Days: 8, winRate: 38.4,
+      winRateComparison: { current: { startDate: `${year}-10-01`, endDateExclusive: today, wonCount: 12, lostCount: 19, rate: 38.4 }, previous: { startDate: `${year}-09-01`, endDateExclusive: `${year}-10-01`, wonCount: 11, lostCount: 20, rate: 35.5 } },
+      monthlyWinRate: months.map((month, index) => ({ month, rate: 25 + index * 3, wonCount: index + 2, lostCount: 5 })),
+      funnel: [
+        { stage: 'LEADS', count: 96, value: money(18500000), share: 100 },
+        { stage: 'PROPOSAL', count: 54, value: money(11200000), share: 56.25 },
+        { stage: 'NEGOTIATION', count: 28, value: money(6800000), share: 29.17 },
+        { stage: 'CLOSED_WON', count: 12, value: money(3400000), share: 12.5 },
+        { stage: 'CLOSED_LOST', count: 7, value: money(1800000), share: 7.29 },
+      ],
+      stageConversions: [{ fromStage: 'LEADS', toStage: 'PROPOSAL', enteredCount: 96, convertedCount: 54, rate: 56 }, { fromStage: 'PROPOSAL', toStage: 'NEGOTIATION', enteredCount: 54, convertedCount: 28, rate: 52 }, { fromStage: 'NEGOTIATION', toStage: 'CLOSED_WON', enteredCount: 28, convertedCount: 12, rate: 43 }],
+    } })
+    if (path.endsWith('/crm/forecast')) return json(route, { data: {
+      year: String(year), availableYears: [String(year)], forecastByRep: [], quotas: [],
+      monthlyPipeline: months.map((month, index) => ({ month, value: money((12 - index) * 850000) })),
+      monthlyCommit: months.map((month, index) => ({ month, value: money((12 - index) * 420000) })),
+      monthlyWeightedPipeline: months.map((month, index) => ({ month, value: money((12 - index) * 310000) })),
+      summary: { totalPipeline: money(12500000000), totalQuota: money(10000000000), totalCommit: money(4200000000), totalBestCase: money(7800000000), weightedPipeline: money(6900000000), unweightedPipeline: money(12500000000), unweightedDealCount: 48,
+        dealCommit: money(4200000), dealBestCase: money(7800000), dealCommitCount: 11, dealBestCaseCount: 18, quotaAttainmentPct: 34, excludedQuotaCount: 0 },
+    } })
+    if (path.endsWith('/crm/sales-performance')) return json(route, { data: {
+      year: String(year), yearWonTotal: money(3400000000), previousYearWonTotal: money(2750000000), undatedClosedCount: 0,
+      monthlyClosedWon: months.map((month, index) => ({ month, value: money((index + 1) * 180000000), count: index + 1 })),
+      weeklyActivity: [], byRep: [],
+      summary: { totalWon: money(3400000000), totalWonCount: 12, totalLostCount: 19, overallWinRate: 38.4, averageSalesCycleDays: 41 },
+    } })
+    if (path.endsWith('/crm/agenda') || path.endsWith('/crm/activities')) return json(route, { data: { items: [] } })
+    return json(route, { data: {} })
+  })
+  const page = await context.newPage()
+
+  try {
+    await signIn(page, account)
+    for (const width of [390, 768, 1280]) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/dashboard/crm')
+      await expect(page.getByRole('heading', { name: 'Revenue Forecast' })).toBeVisible()
+      await expect(page.locator('.recharts-surface').first()).toBeVisible()
+      await expect(page.getByText('$125,000,000.00').first()).toBeVisible()
+      await expect(page.getByText('$34,000,000.00').first()).toBeVisible()
+      for (const value of ['$125,000,000.00', '$34,000,000.00']) {
+        const metric = page.getByText(value).first()
+        const dimensions = await metric.evaluate(element => ({ text: element.textContent, clientWidth: element.clientWidth, scrollWidth: element.scrollWidth, fontSize: getComputedStyle(element).fontSize }))
+        expect(dimensions.scrollWidth, `${value} should fit its KPI card at ${width}px (${JSON.stringify(dimensions)})`).toBeLessThanOrEqual(dimensions.clientWidth)
+      }
+      await expect.poll(() => page.evaluate(width => {
+        const header = document.querySelector('header')
+        return header.scrollWidth <= header.clientWidth && document.documentElement.scrollWidth <= width
+      }, width)).toBe(true)
+    }
+  } finally {
+    await context.close()
+  }
+})
+
+test('finance overview shows the empty cash-flow state and fits phone and tablet widths', async ({ browser }) => {
+  const account = { id: 'responsive_finance_owner', name: 'Responsive Finance Owner', email: 'responsive.finance@example.test', emailVerified: true }
+  const currentYear = new Date().getFullYear()
+  const money = { amount: 0, currency: 'USD' }
+  const period = year => ({ startDate: `${year}-01-01`, endDateExclusive: `${year + 1}-01-01`, inflow: money, outflow: money, net: money })
+  const context = await browser.newContext()
+  await mockAuth(context, account, async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/finance/overview')) return json(route, { data: {
+      payableOutstanding: money,
+      receivableOutstanding: money,
+      expensesTotal: money,
+      expensesPendingCount: 0,
+      expensesPendingTotal: money,
+      cashFlow: [],
+      cashFlowComparison: { current: period(currentYear), previous: period(currentYear - 1) },
+      recentTransactions: [],
+    } })
+    return json(route, { data: { items: [] } })
+  })
+  const page = await context.newPage()
+
+  try {
+    await signIn(page, account)
+    for (const width of [390, 768]) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/dashboard/finance')
+      await expect(page.getByText(`No cash flow data is available for ${currentYear}.`)).toBeVisible()
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
+    }
+  } finally {
+    await context.close()
+  }
+})
+
+test('finance overview keeps populated currency KPIs and charts inside phone, tablet, and desktop layouts', async ({ browser }) => {
+  const account = { id: 'populated_finance_owner', name: 'Populated Finance Owner', email: 'populated.finance@example.test', emailVerified: true }
+  const year = new Date().getFullYear()
+  const money = amount => ({ amount, currency: 'USD' })
+  const period = (periodYear, netAmount) => ({
+    startDate: `${periodYear}-01-01`, endDateExclusive: `${periodYear + 1}-01-01`,
+    inflow: money(20000000000), outflow: money(12500000000), net: money(netAmount),
+  })
+  const context = await browser.newContext()
+  await mockAuth(context, account, async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/finance/overview')) return json(route, { data: {
+      payableOutstanding: money(4000000000), receivableOutstanding: money(12500000000), expensesTotal: money(6500000000),
+      expensesPendingCount: 4, expensesPendingTotal: money(1200000000),
+      cashFlow: Array.from({ length: 12 }, (_, index) => {
+        const month = `${year}-${String(index + 1).padStart(2, '0')}`
+        const inflow = money((index + 4) * 1200000000)
+        const outflow = money((index + 2) * 800000000)
+        return { month, inflow, outflow, net: money(inflow.amount - outflow.amount) }
+      }),
+      cashFlowComparison: { current: period(year, 7500000000), previous: period(year - 1, 6900000000) },
+      recentTransactions: [{ id: 'tx-long-description', date: `${year}-10-05`, description: 'International enterprise services annual settlement', amount: money(12500000000), type: 'credit', status: 'CLEARED' }],
+    } })
+    if (path.endsWith('/finance/customers')) return json(route, { data: { items: [] } })
+    if (path.endsWith('/finance/receivables')) return json(route, { data: { items: [], pagination: { page: 1, limit: 1, total: 0, pages: 0 }, summary: { collectedThisMonthTotal: money(3200000000), collectedThisMonthComparison: { previousTotal: money(2900000000) } } } })
+    if (path.endsWith('/finance/payables')) return json(route, { data: { items: [], pagination: { page: 1, limit: 1, total: 0, pages: 0 }, summary: { paidThisMonthTotal: money(2100000000), paidThisMonthComparison: { previousTotal: money(1700000000) } } } })
+    return json(route, { data: {} })
+  })
+  const page = await context.newPage()
+
+  try {
+    await signIn(page, account)
+    for (const width of [390, 768, 1280]) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/dashboard/finance')
+      await expect(page.getByRole('heading', { name: 'Cash Flow Analysis' })).toBeVisible()
+      await expect(page.locator('.recharts-surface').first()).toBeVisible()
+      for (const value of ['$125,000,000.00', '$40,000,000.00', '$65,000,000.00', '$75,000,000.00']) {
+        const metric = page.getByText(value, { exact: true })
+        await expect(metric).toBeVisible()
+        const dimensions = await metric.evaluate(element => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth, fontSize: getComputedStyle(element).fontSize }))
+        expect(dimensions.scrollWidth, `${value} should fit at ${width}px (${JSON.stringify(dimensions)})`).toBeLessThanOrEqual(dimensions.clientWidth)
+      }
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
+    }
+  } finally {
+    await context.close()
+  }
+})
+
+test('active sprint burndown chart fits phone, tablet, and desktop layouts with populated history', async ({ browser }) => {
+  const account = { id: 'sprint_chart_admin', name: 'Sprint Chart Admin', email: 'sprint.chart@example.test', emailVerified: true, role: 'ADMIN' }
+  const context = await browser.newContext()
+  const start = new Date('2026-09-01T00:00:00.000Z')
+  const points = Array.from({ length: 30 }, (_, index) => {
+    const day = new Date(start)
+    day.setUTCDate(day.getUTCDate() + index)
+    return {
+      date: day.toISOString().slice(0, 10),
+      remaining: Math.max(0, 32 - index),
+      ideal: Number((32 * (1 - index / 29)).toFixed(1)),
+    }
+  })
+  await mockAuth(context, account, async route => {
+    const url = new URL(route.request().url())
+    if (url.pathname.endsWith('/projects/sprints') && route.request().method() === 'GET') {
+      return json(route, { data: { items: [{
+        id: 'sprint_chart_1', name: 'September delivery sprint', status: 'ACTIVE', projectId: 'project_chart_1',
+        startsAt: start.toISOString(), endsAt: '2026-09-30T23:59:59.000Z', completionPct: 9,
+        issueCounts: { total: 32, done: 3 },
+        velocity: { completedStoryPoints: 8, estimatedCompletedIssues: 3, unestimatedCompletedIssues: 0 },
+        createdAt: start.toISOString(), updatedAt: start.toISOString(),
+      }] } })
+    }
+    if (url.pathname.endsWith('/sprints/sprint_chart_1/burndown')) {
+      return json(route, { data: {
+        sprintId: 'sprint_chart_1', sprintName: 'September delivery sprint', startDate: '2026-09-01',
+        totalScope: 32, completed: 3, undatedCompleted: 1, points,
+      } })
+    }
+    if (url.pathname.endsWith('/sprints/sprint_chart_1/issues')) return json(route, { data: { items: [] } })
+    return json(route, { data: {} })
+  })
+
+  const page = await context.newPage()
+  try {
+    await signIn(page, account)
+    await page.goto('/dashboard/projects/sprints')
+    const chartCard = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Sprint burndown' }) })
+    const chart = chartCard.locator('.recharts-surface')
+    await expect(chart).toBeVisible()
+    await expect(chart.locator('.recharts-line-curve')).toHaveCount(2)
+
+    for (const width of [390, 768, 1280]) {
+      await page.setViewportSize({ width, height: 900 })
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
+      const cardBounds = await chartCard.boundingBox()
+      const chartBounds = await chart.boundingBox()
+      expect(chartBounds.x).toBeGreaterThanOrEqual(cardBounds.x)
+      expect(chartBounds.x + chartBounds.width).toBeLessThanOrEqual(cardBounds.x + cardBounds.width + 1)
+      const tickBounds = await chartCard.evaluate(element => {
+        const card = element.getBoundingClientRect()
+        const labels = [...element.querySelectorAll('svg text')]
+        return {
+          count: labels.length,
+          outside: labels.flatMap(label => {
+          const bounds = label.getBoundingClientRect()
+            return bounds.left < card.left || bounds.right > card.right
+              ? [{ text: label.textContent, left: bounds.left, right: bounds.right, cardLeft: card.left, cardRight: card.right }]
+              : []
+          }),
+        }
+      })
+      expect(tickBounds.count).toBeGreaterThan(0)
+      expect(tickBounds.outside).toEqual([])
+    }
+  } finally {
+    await context.close()
+  }
+})
+
+test('project portfolio keeps populated budget figures and its detail panel usable on narrow screens', async ({ browser }) => {
+  const account = { id: 'portfolio_review_admin', name: 'Portfolio Review Admin', email: 'portfolio.review@example.test', emailVerified: true, role: 'ADMIN' }
+  const context = await browser.newContext()
+  const totalBudget = { amount: 12500000000000, currency: 'USD' }
+  const spent = { amount: 9876543210987, currency: 'USD' }
+  const projectName = 'International Operations Consolidation and Workforce Modernization Program'
+  await mockAuth(context, account, async route => {
+    const url = new URL(route.request().url())
+    if (url.pathname.endsWith('/projects/portfolio')) return json(route, { data: {
+      items: [{
+        projectId: 'portfolio_project_1', name: projectName, status: 'ACTIVE', spent,
+        unvaluedSettlementCount: 0, budget: totalBudget, utilizationPct: 78.9,
+      }],
+      summary: {
+        totalProjects: 11, activeProjects: 7, totalSpent: spent, unvaluedSettlementCount: 0,
+        unassignedSettlementCount: 0, totalBudget, utilizationPct: 78.9,
+      },
+    } })
+    if (url.pathname.endsWith('/projects/sprints')) return json(route, { data: { items: [] } })
+    if (url.pathname.endsWith('/hr/departments')) return json(route, { data: { items: [] } })
+    if (url.pathname.endsWith('/projects/portfolio_project_1/sprint-velocity-comparison')) return json(route, { data: {
+      projectId: 'portfolio_project_1', current: null, previous: null, deltaStoryPoints: null, deltaPct: null,
+    } })
+    return json(route, { data: {} })
+  })
+  const page = await context.newPage()
+  try {
+    await signIn(page, account)
+    for (const width of [390, 768, 1280]) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/dashboard/projects')
+      await expect(page.getByText(projectName, { exact: true }).first()).toBeVisible()
+      const budgetKpiCard = page.getByText('Total Budget', { exact: true }).locator('..')
+      const budgetKpi = budgetKpiCard.locator('p.text-3xl')
+      await expect(budgetKpi).toBeVisible()
+      const budgetCardBounds = await budgetKpiCard.boundingBox()
+      const kpiBounds = await budgetKpi.evaluate(element => {
+        const bounds = element.getBoundingClientRect()
+        return { clientWidth: element.clientWidth, scrollWidth: element.scrollWidth, right: bounds.right }
+      })
+      expect(kpiBounds.scrollWidth, `Portfolio budget KPI should fit at ${width}px`).toBeLessThanOrEqual(kpiBounds.clientWidth)
+      expect(kpiBounds.right, `Portfolio budget KPI should stay inside its card at ${width}px`).toBeLessThanOrEqual(budgetCardBounds.x + budgetCardBounds.width)
+      const panelHeading = page.getByRole('heading', { name: projectName })
+      await expect(panelHeading).toBeVisible()
+      const panelBounds = await panelHeading.evaluate(element => ({
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+      }))
+      expect(panelBounds.scrollWidth, `Project detail heading should fit at ${width}px`).toBeLessThanOrEqual(panelBounds.clientWidth)
+      const financialCard = page.getByRole('heading', { name: 'Financial Health' }).locator('..')
+      const financialCardBounds = await financialCard.boundingBox()
+      const financialValues = await financialCard.locator('p.text-2xl').evaluateAll(elements => elements.map(element => {
+        const bounds = element.getBoundingClientRect()
+        return {
+          text: element.textContent,
+          clientWidth: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          left: bounds.left,
+          right: bounds.right,
+        }
+      }))
+      expect(financialValues).toHaveLength(2)
+      for (const value of financialValues) {
+        expect(value.scrollWidth, `${value.text} should fit in the project detail card at ${width}px`).toBeLessThanOrEqual(value.clientWidth)
+        expect(value.left, `${value.text} should stay inside the project detail card at ${width}px`).toBeGreaterThanOrEqual(financialCardBounds.x)
+        expect(value.right, `${value.text} should stay inside the project detail card at ${width}px`).toBeLessThanOrEqual(financialCardBounds.x + financialCardBounds.width)
+      }
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
+    }
   } finally {
     await context.close()
   }
@@ -319,7 +821,8 @@ test('workspace admin can review earning-year payroll rounding differences', asy
   try {
     await signIn(page, account)
     await page.goto('/dashboard/hr/payroll')
-    await page.getByRole('button', { name: 'Year-end rounding review' }).click()
+    await page.getByRole('button', { name: 'Calculators' }).click()
+    await page.getByRole('menuitem', { name: /Year-end rounding review/ }).click()
     await expect(page.getByRole('heading', { name: 'Earning-year rounding review' })).toBeVisible()
     await expect(page.getByText('Ada Lovelace')).toBeVisible()
     await expect(page.getByText(/not a statutory tax calculation/i)).toBeVisible()
@@ -332,7 +835,7 @@ test('workspace admin can review earning-year payroll rounding differences', asy
 
 test('recruitment candidates are server-paginated and role choices remain complete', async ({ browser }) => {
   const account = { id: 'recruitment_admin', name: 'Recruitment Admin', email: 'recruitment@example.test', emailVerified: true, role: 'ADMIN' }
-  const firstPage = Array.from({ length: 25 }, (_, index) => ({
+  const firstPage = Array.from({ length: 8 }, (_, index) => ({
     id: `candidate_page_one_${index}`,
     name: `Candidate ${String(index + 1).padStart(2, '0')}`,
     role: 'Engineer', stage: 'APPLIED', stageEnteredAt: '2026-10-01T00:00:00.000Z', timeInStage: '11d', activity: [],
@@ -341,11 +844,11 @@ test('recruitment candidates are server-paginated and role choices remain comple
     createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z',
   }))
   const lastCandidate = {
-    ...firstPage[0], id: 'candidate_page_two', name: 'Candidate 26', role: 'Designer',
+    ...firstPage[0], id: 'candidate_page_two', name: 'Candidate 09', role: 'Designer',
   }
   const summary = {
-    stageCounts: { APPLIED: 26, SCREENING: 0, TECH_INTERVIEW: 0, FINAL_INTERVIEW: 0, OFFER_SENT: 0, HIRED: 0, REJECTED: 0 },
-    activeCandidates: 26, totalHired: 0, hiredThisPeriod: 0, hiredPreviousPeriod: 0,
+    stageCounts: { APPLIED: 9, SCREENING: 0, TECH_INTERVIEW: 0, FINAL_INTERVIEW: 0, OFFER_SENT: 0, HIRED: 0, REJECTED: 0 },
+    activeCandidates: 9, totalHired: 0, hiredThisPeriod: 0, hiredPreviousPeriod: 0,
     averageTimeToHireDays: null, averageTimeToHireThisPeriod: null, averageTimeToHirePreviousPeriod: null,
     offerAcceptanceRate: null, offerAcceptanceRateThisPeriod: null, offerAcceptanceRatePreviousPeriod: null,
     offersDecided: 0, offersDecidedThisPeriod: 0, offersDecidedPreviousPeriod: 0,
@@ -363,11 +866,11 @@ test('recruitment candidates are server-paginated and role choices remain comple
       const items = role === 'Designer' || search?.toLowerCase().includes('designer')
         ? [lastCandidate]
         : pageNumber === 1 ? firstPage : [lastCandidate]
-      const total = role === 'Designer' || search?.toLowerCase().includes('designer') ? 1 : 26
-      const pages = Math.ceil(total / 25)
+      const total = role === 'Designer' || search?.toLowerCase().includes('designer') ? 1 : 9
+      const pages = Math.ceil(total / 8)
       return json(route, { data: {
         items,
-        pagination: { page: pageNumber, limit: 25, total, pages },
+        pagination: { page: pageNumber, limit: 8, total, pages },
         summary,
         roleOptions: ['Designer', 'Engineer'],
       } })
@@ -379,14 +882,14 @@ test('recruitment candidates are server-paginated and role choices remain comple
   try {
     await signIn(page, account)
     await page.goto('/dashboard/hr/recruitment')
-    await expect(page.getByText('Candidate 25', { exact: true })).toBeVisible()
-    await expect(page.getByText('Showing 1–25 of 26 candidates')).toBeVisible()
+    await expect(page.getByText('Candidate 08', { exact: true })).toBeVisible()
+    await expect(page.getByText('Showing 1–8 of 9 candidates')).toBeVisible()
     await page.getByRole('button', { name: 'Next', exact: true }).click()
-    await expect.poll(() => requested.some(item => item.page === 2 && item.limit === 25)).toBe(true)
+    await expect.poll(() => requested.some(item => item.page === 2 && item.limit === 8)).toBe(true)
     await expect(page.getByText('Page 2 of 2')).toBeVisible()
-    await expect(page.getByText('Candidate 26', { exact: true })).toBeVisible()
+    await expect(page.getByText('Candidate 09', { exact: true })).toBeVisible()
     await page.getByRole('combobox', { name: 'Filter by candidate role' }).selectOption('Designer')
-    await expect(page.getByText('Candidate 26', { exact: true })).toBeVisible()
+    await expect(page.getByText('Candidate 09', { exact: true })).toBeVisible()
     await expect.poll(() => requested.some(item => item.page === 1 && item.role === 'Designer')).toBe(true)
   } finally {
     await context.close()
@@ -418,9 +921,9 @@ test('expense entry can find and select employees beyond the first page', async 
         policyMatch: null, status: 'PENDING', reimbursedAt: null, reimbursedById: null,
         createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z',
       })
-      const expenses = pageNumber === 1 ? Array.from({ length: 25 }, (_, index) => makeExpense(index + 1)) : [makeExpense(26)]
+      const expenses = limit >= 26 ? Array.from({ length: 26 }, (_, index) => makeExpense(index + 1)) : (pageNumber === 1 ? Array.from({ length: 25 }, (_, index) => makeExpense(index + 1)) : [makeExpense(26)])
       return json(route, { data: {
-        items: expenses, pagination: { page: pageNumber, limit, total: 26, pages: 2 },
+        items: expenses, pagination: { page: pageNumber, limit, total: 26, pages: limit >= 26 ? 1 : 2 },
         summary: { pendingCount: 0, pendingTotal: { amount: 0, currency: 'USD' }, approvedTotal: { amount: 0, currency: 'USD' }, flaggedTotal: { amount: 0, currency: 'USD' } },
       } })
     }
@@ -442,10 +945,7 @@ test('expense entry can find and select employees beyond the first page', async 
   try {
     await signIn(page, account)
     await page.goto('/dashboard/finance/expenses')
-    await expect(page.getByText('Showing 1–25 of 26 expenses')).toBeVisible()
-    await page.getByRole('button', { name: 'Next expense page' }).click()
-    await expect.poll(() => expenseRequests.some(item => item.page === 2 && item.limit === 25)).toBe(true)
-    await expect(page.getByText('Showing 26–26 of 26 expenses')).toBeVisible()
+    await expect(page.getByText('Showing 26 of 26 expenses')).toBeVisible()
     await expect(page.getByText('Merchant 26', { exact: true }).first()).toBeVisible()
     await page.getByRole('button', { name: 'New Expense' }).click()
     await page.getByRole('button', { name: 'Next', exact: true }).click()
@@ -478,11 +978,12 @@ test('accounts payable pages open bills and exposes paid history', async ({ brow
       const history = statusGroup === 'HISTORY'
       const items = history
         ? [{ id: 'bill_paid', vendor: 'Historical Vendor', vendorId: null, invoiceNumber: 'PAID-001', date: '2026-09-05T00:00:00.000Z', dueDate: null, amount: { amount: 5000, currency: 'USD' }, status: 'PAID' }]
-        : pageNumber === 1
-          ? Array.from({ length: 25 }, (_, index) => ({ id: `bill_${index + 1}`, vendor: `Vendor ${index + 1}`, vendorId: null, invoiceNumber: `OPEN-${index + 1}`, date: '2026-10-01T00:00:00.000Z', dueDate: null, amount: { amount: 1000, currency: 'USD' }, status: 'PENDING' }))
-          : [{ id: 'bill_26', vendor: 'Last Open Vendor', vendorId: null, invoiceNumber: 'OPEN-026', date: '2026-10-02T00:00:00.000Z', dueDate: null, amount: { amount: 2000, currency: 'USD' }, status: 'PENDING' }]
-      return json(route, { data: { items, pagination: { page: pageNumber, limit: 25, total: history ? 1 : 26, pages: history ? 1 : 2 }, summary: {
-        openOutstanding: { amount: 27000, currency: 'USD' }, pendingCount: 26, pendingTotal: { amount: 27000, currency: 'USD' }, scheduledCount: 0, scheduledTotal: { amount: 0, currency: 'USD' }, paidCount: 1, paidTotal: { amount: 5000, currency: 'USD' }, rejectedCount: 0, rejectedTotal: { amount: 0, currency: 'USD' }, voidCount: 0, voidTotal: { amount: 0, currency: 'USD' }, pastDueTotal: { amount: 0, currency: 'USD' }, dueIn7DaysTotal: { amount: 0, currency: 'USD' }, paidThisMonthTotal: { amount: 0, currency: 'USD' }, paidThisMonthComparison: null,
+        : [
+            ...Array.from({ length: 8 }, (_, index) => ({ id: `bill_${index + 1}`, vendor: `Vendor ${index + 1}`, vendorId: null, invoiceNumber: `OPEN-${index + 1}`, date: '2026-10-01T00:00:00.000Z', dueDate: null, amount: { amount: 1000, currency: 'USD' }, status: 'PENDING' })),
+            { id: 'bill_09', vendor: 'Last Open Vendor', vendorId: null, invoiceNumber: 'OPEN-009', date: '2026-10-02T00:00:00.000Z', dueDate: null, amount: { amount: 2000, currency: 'USD' }, status: 'PENDING' },
+          ]
+      return json(route, { data: { items, pagination: { page: 1, limit: 100, total: items.length, pages: 1 }, summary: {
+        openOutstanding: { amount: 27000, currency: 'USD' }, pendingCount: 9, pendingTotal: { amount: 27000, currency: 'USD' }, scheduledCount: 0, scheduledTotal: { amount: 0, currency: 'USD' }, paidCount: 1, paidTotal: { amount: 5000, currency: 'USD' }, rejectedCount: 0, rejectedTotal: { amount: 0, currency: 'USD' }, voidCount: 0, voidTotal: { amount: 0, currency: 'USD' }, pastDueTotal: { amount: 0, currency: 'USD' }, dueIn7DaysTotal: { amount: 0, currency: 'USD' }, paidThisMonthTotal: { amount: 0, currency: 'USD' }, paidThisMonthComparison: null,
       } } })
     }
     if (path.endsWith('/finance/vendors')) return json(route, { data: { items: [] } })
@@ -500,11 +1001,12 @@ test('accounts payable pages open bills and exposes paid history', async ({ brow
   const page = await context.newPage()
   try {
     await signIn(page, account)
+    await page.setViewportSize({ width: 390, height: 900 })
     await page.goto('/dashboard/finance/accounts-payable')
-    await expect(page.getByText('Vendor 25', { exact: true })).toBeVisible()
-    await expect(page.getByText('Showing 1–25 of 26')).toBeVisible()
-    await page.getByRole('button', { name: 'Next' }).click()
-    await expect.poll(() => requested.some(item => item.page === 2 && item.limit === 25 && item.statusGroup === 'OPEN')).toBe(true)
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+    await expect(page.getByText('Vendor 8', { exact: true })).toBeVisible()
+    await expect(page.getByText('Last Open Vendor', { exact: true })).toBeVisible()
+    await page.getByText('Last Open Vendor', { exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Last Open Vendor' })).toBeVisible()
     await page.getByRole('combobox', { name: 'Payables view' }).selectOption('HISTORY')
     await expect.poll(() => requested.some(item => item.statusGroup === 'HISTORY')).toBe(true)
@@ -624,13 +1126,33 @@ test('product catalog pages beyond the first 100-row cap', async ({ browser }) =
   const page = await context.newPage()
   try {
     await signIn(page, account)
+    await page.setViewportSize({ width: 390, height: 900 })
     await page.goto('/dashboard/inventory')
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
     const table = page.getByRole('table')
     await expect(table.getByText('Product 25', { exact: true })).toBeVisible()
     await expect(page.getByText('Showing 1–25 of 26 products')).toBeVisible()
     await page.getByRole('button', { name: 'Next' }).click()
     await expect.poll(() => requested.some(item => item.page === 2 && item.limit === 25)).toBe(true)
     await expect(table.getByText('Product 26', { exact: true })).toBeVisible()
+    await table.getByText('Product 26', { exact: true }).click()
+    const archiveButton = page.getByRole('button', { name: 'Archive Product' })
+    await archiveButton.click()
+    const confirmation = page.getByRole('dialog')
+    await expect(confirmation).toBeVisible()
+    const confirmationBounds = await confirmation.boundingBox()
+    expect(confirmationBounds.width).toBeLessThanOrEqual(390)
+    expect(confirmationBounds.height).toBeLessThanOrEqual(765)
+    const cancelButton = confirmation.getByRole('button', { name: 'Cancel' })
+    const confirmButton = confirmation.getByRole('button', { name: 'Archive product' })
+    await expect(cancelButton).toBeFocused()
+    await page.keyboard.press('Shift+Tab')
+    await expect(confirmButton).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(cancelButton).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(confirmation).toBeHidden()
+    await expect(archiveButton).toBeFocused()
   } finally {
     await context.close()
   }
@@ -664,8 +1186,43 @@ test('stock movement entry searches and pages the full product catalog while ret
   const page = await context.newPage()
   try {
     await signIn(page, account)
+    await page.setViewportSize({ width: 390, height: 900 })
     await page.goto('/dashboard/inventory/movements')
-    await page.getByRole('button', { name: 'Record Movement' }).click()
+    await expect(page.getByRole('heading', { name: 'Stock Movements' })).toBeVisible()
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+    const openDialogButton = page.getByRole('button', { name: 'Record Movement' })
+    await openDialogButton.click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    const dialogBounds = await dialog.boundingBox()
+    expect(dialogBounds.width).toBeLessThanOrEqual(390)
+    expect(dialogBounds.height).toBeLessThanOrEqual(765)
+    const focusCycle = await dialog.evaluate(element => {
+      const selector = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+      const focusable = [...element.querySelectorAll(selector)].filter(item => item.offsetWidth || item.offsetHeight || item.getClientRects().length)
+      focusable[0]?.focus()
+      return focusable.length
+    })
+    expect(focusCycle).toBeGreaterThan(1)
+    await page.keyboard.press('Shift+Tab')
+    expect(await dialog.evaluate(element => element.contains(document.activeElement))).toBe(true)
+    const lastFocused = await dialog.evaluate(element => {
+      const selector = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+      const focusable = [...element.querySelectorAll(selector)].filter(item => item.offsetWidth || item.offsetHeight || item.getClientRects().length)
+      return focusable.at(-1) === document.activeElement
+    })
+    expect(lastFocused).toBe(true)
+    await page.keyboard.press('Tab')
+    const firstFocused = await dialog.evaluate(element => {
+      const selector = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+      const focusable = [...element.querySelectorAll(selector)].filter(item => item.offsetWidth || item.offsetHeight || item.getClientRects().length)
+      return focusable[0] === document.activeElement
+    })
+    expect(firstFocused).toBe(true)
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+    await expect(openDialogButton).toBeFocused()
+    await openDialogButton.click()
     const productSelect = page.getByRole('combobox').filter({ has: page.locator('option[value^="product_"]') })
     await page.getByRole('button', { name: 'Next product page' }).click()
     await expect.poll(() => requested.some(item => item.page === 2 && item.limit === 25)).toBe(true)

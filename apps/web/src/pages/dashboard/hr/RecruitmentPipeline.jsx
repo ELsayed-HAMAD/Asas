@@ -8,6 +8,7 @@ import {
 import { hrApi } from '../../../lib/api/hr'
 import { queryKeys } from '../../../lib/queryKeys'
 import { useActiveMemberRole } from '../../../lib/authClient'
+import { getMemberRoleName } from '../../../lib/memberRole'
 import FormDialog from '../../../components/common/FormDialog'
 import QueryState from '../../../components/common/QueryState'
 
@@ -65,120 +66,154 @@ function CandidateInspector({ candidate, interviews = [], onClose, canWrite, can
   const hasCv = !!candidate.resumeUrl
 
   return (
-    <div className="w-[340px] bg-surface-raised border-l border-border-subtle flex flex-col h-full flex-shrink-0">
+    <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card flex flex-col overflow-hidden">
 
       {/* Header Actions */}
-      <div className="px-5 py-4 flex items-center justify-between border-b border-border-subtle">
-        <h3 className="text-sm font-semibold text-heading">Candidate Profile</h3>
+      <div className="px-5 py-3.5 flex items-center justify-between border-b border-border-subtle bg-surface-raised">
+        <h3 className="text-sm font-bold text-heading">Candidate Profile</h3>
         <div className="flex items-center gap-2">
           {canWrite && (
             <button
               type="button"
               onClick={onEdit}
               title="Edit Candidate"
-              className="text-caption hover:text-body transition-colors"
+              className="text-caption hover:text-body transition-colors p-1 rounded hover:bg-surface-muted cursor-pointer"
             >
-              <Pencil size={15} />
+              <Pencil size={14} />
             </button>
           )}
-          <button type="button" onClick={onClose} className="text-caption hover:text-body transition-colors">
-            <X size={16} />
+          <button
+            type="button"
+            onClick={onClose}
+            title="Close"
+            className="text-caption hover:text-body transition-colors p-1 rounded hover:bg-surface-muted cursor-pointer"
+          >
+            <X size={15} />
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="p-4 sm:p-5 space-y-3.5">
         {/* Identity */}
-        <div className="p-4 border-b border-border-faint text-center">
-          <div className="w-16 h-16 rounded-full bg-surface-active border border-border-default flex items-center justify-center text-body-light font-bold text-2xl mx-auto mb-3">
-            {avatar}
+        <div className="text-center pb-3 border-b border-border-subtle">
+          <div className="w-12 h-12 rounded-full bg-surface-active border border-border-default flex items-center justify-center text-heading font-bold text-base mx-auto mb-2 overflow-hidden">
+            {typeof avatar === 'string' && avatar.startsWith('http') ? (
+              <img src={avatar} alt={candidate.name} className="w-full h-full object-cover" />
+            ) : (
+              avatar
+            )}
           </div>
-          <h2 className="text-lg font-bold text-heading leading-tight">{candidate.name}</h2>
-          <p className="text-sm text-muted mt-0.5">{candidate.role}</p>
+          <h2 className="text-base font-bold text-heading leading-tight">{candidate.name}</h2>
+          <p className="text-xs text-muted mt-0.5">{candidate.role}</p>
 
-          <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted">
+          <div className="flex items-center justify-center gap-4 mt-2.5 text-xs text-muted">
             <span className="flex items-center gap-1.5"><MapPin size={12} /> {profile.location || '—'}</span>
             <span className="flex items-center gap-1.5"><Mail size={12} /> {profile.email || 'Email'}</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 mt-5">
-            <button type="button" disabled={!canWrite || !canMoveStage} onClick={onSchedule} title={!canWrite ? 'Requires the ADMIN role' : !canMoveStage ? 'Candidate is closed' : undefined} className="flex items-center justify-center gap-1.5 bg-primary text-white text-xs font-medium py-2 rounded-button hover:bg-primary-hover disabled:opacity-60">
-              <Calendar size={14} /> Schedule
+          <div className="grid grid-cols-2 gap-2 mt-3.5">
+            <button
+              type="button"
+              disabled={!canWrite || !canMoveStage}
+              onClick={onSchedule}
+              title={!canWrite ? 'Requires the ADMIN role' : !canMoveStage ? 'Candidate is closed' : undefined}
+              className="flex items-center justify-center gap-1.5 bg-primary text-white text-xs font-medium py-2 rounded-input hover:bg-primary-hover disabled:opacity-60 transition-colors cursor-pointer"
+            >
+              <Calendar size={13} /> Schedule
             </button>
-            <button type="button" disabled={!canWrite || !canMoveStage} onClick={onMoveStage} className="flex items-center justify-center gap-1.5 bg-surface-raised border border-border-default text-body text-xs font-medium py-2 rounded-button hover:bg-surface-muted disabled:opacity-60">
-              <ArrowRight size={14} /> Move Stage
+            <button
+              type="button"
+              disabled={!canWrite || !canMoveStage}
+              onClick={onMoveStage}
+              className="flex items-center justify-center gap-1.5 bg-surface-raised border border-border-default text-body text-xs font-medium py-2 rounded-input hover:bg-surface-muted disabled:opacity-60 transition-colors cursor-pointer"
+            >
+              <ArrowRight size={13} /> Move Stage
             </button>
           </div>
         </div>
 
         {/* Profile Details */}
-        <div className="p-4 space-y-6">
+        <div className="space-y-3">
+          {/* Overview Section: 3-column horizontal grid */}
           <div>
-            <h4 className="text-[10px] font-semibold text-caption uppercase tracking-wider mb-3">Interviews</h4>
-            <div className="space-y-2">
-              {interviews.length === 0 ? <p className="text-xs text-muted">No interviews scheduled.</p> : interviews.map(interview => (
-                <div key={interview.id} className="rounded-card-sm border border-border-default p-3 text-xs">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-heading">{STAGE_LABELS[interview.stage]} · {new Date(interview.startsAt).toLocaleString()}</p>
-                      <p className="text-muted mt-1">{interview.durationMin} min{interview.interviewer ? ` · ${interview.interviewer}` : ''} · {interview.status.toLowerCase()}</p>
-                      {interview.meetingUrl && <a href={interview.meetingUrl} target="_blank" rel="noreferrer" className="text-accent underline mt-1 inline-block">Meeting link</a>}
-                      {interview.notes && <p className="text-body-light mt-1 whitespace-pre-wrap">{interview.notes}</p>}
-                    </div>
-                    {interview.status === 'SCHEDULED' && canWrite && <button type="button" onClick={() => onCancelInterview(interview.id)} className="text-danger hover:underline">Cancel</button>}
-                  </div>
-                </div>
-              ))}
+            <h4 className="text-[10px] font-semibold text-caption uppercase tracking-wider mb-2">Overview</h4>
+            <div className="grid grid-cols-3 gap-3 py-3 border-y border-border-subtle text-xs">
+              <div className="min-w-0">
+                <span className="block text-muted text-[11px] mb-0.5 truncate">Current Role</span>
+                <span className="font-semibold text-heading truncate block" title={profile.currentRole || '—'}>{profile.currentRole || '—'}</span>
+              </div>
+              <div className="min-w-0">
+                <span className="block text-muted text-[11px] mb-0.5 truncate">Experience</span>
+                <span className="font-semibold text-heading truncate block" title={profile.experience || '—'}>{profile.experience || '—'}</span>
+              </div>
+              <div className="min-w-0">
+                <span className="block text-muted text-[11px] mb-0.5 truncate">Source</span>
+                <span className="font-semibold text-heading truncate block" title={profile.source || '—'}>{profile.source || '—'}</span>
+              </div>
             </div>
           </div>
+
+          {/* Interviews */}
           <div>
-            <h4 className="text-[10px] font-semibold text-caption uppercase tracking-wider mb-3">Overview</h4>
-            <div className="space-y-3 text-sm">
-              <div>
-                <span className="block text-muted text-xs mb-0.5">Current Role</span>
-                <span className="font-medium text-heading">{profile.currentRole || '—'}</span>
-              </div>
-              <div>
-                <span className="block text-muted text-xs mb-0.5">Experience</span>
-                <span className="font-medium text-heading">{profile.experience || '—'}</span>
-              </div>
-              <div>
-                <span className="block text-muted text-xs mb-0.5">Source</span>
-                <span className="font-medium text-heading">{profile.source || '—'}</span>
-              </div>
+            <h4 className="text-[10px] font-semibold text-caption uppercase tracking-wider mb-2">Interviews</h4>
+            <div className="space-y-2">
+              {interviews.length === 0 ? (
+                <p className="text-xs text-muted">No interviews scheduled.</p>
+              ) : (
+                interviews.map(interview => (
+                  <div key={interview.id} className="rounded-input border border-border-default p-2.5 text-xs bg-surface-muted/30">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-heading">{STAGE_LABELS[interview.stage]} · {new Date(interview.startsAt).toLocaleString()}</p>
+                        <p className="text-muted mt-0.5 text-[11px]">{interview.durationMin} min{interview.interviewer ? ` · ${interview.interviewer}` : ''} · {interview.status.toLowerCase()}</p>
+                        {interview.meetingUrl && <a href={interview.meetingUrl} target="_blank" rel="noreferrer" className="text-accent underline mt-1 inline-block text-[11px]">Meeting link</a>}
+                        {interview.notes && <p className="text-body-light mt-1 whitespace-pre-wrap text-[11px]">{interview.notes}</p>}
+                      </div>
+                      {interview.status === 'SCHEDULED' && canWrite && (
+                        <button type="button" onClick={() => onCancelInterview(interview.id)} className="text-danger hover:underline text-xs shrink-0 cursor-pointer">
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
           {/* Resume Card — the old mock card, now backed by the real CV surface (upload / view) */}
           <div>
-            <h4 className="text-[10px] font-semibold text-caption uppercase tracking-wider mb-3">Resume</h4>
+            <h4 className="text-[10px] font-semibold text-caption uppercase tracking-wider mb-2">Resume</h4>
             <CvSection key={candidate.id} candidate={candidate} hasCv={hasCv} canWrite={canWrite} />
           </div>
 
           {/* Activity Log */}
           <div>
-            <h4 className="text-[10px] font-semibold text-caption uppercase tracking-wider mb-3">Activity Log</h4>
-            <div className="space-y-4">
+            <h4 className="text-[10px] font-semibold text-caption uppercase tracking-wider mb-2">Activity Log</h4>
+            <div className="space-y-2.5">
               {activity.length === 0 ? (
                 <p className="text-xs text-muted">No recent activity.</p>
               ) : (
-                activity.map((log, i) => (
-                  <div key={i} className="flex gap-3">
+                activity.slice(0, 4).map((log, i) => (
+                  <div key={i} className="flex gap-2.5">
                     <div className="relative flex flex-col items-center">
-                      <div className="w-1.5 h-1.5 rounded-full bg-gray-300 mt-1.5" />
-                      {i !== activity.length - 1 && (
-                        <div className="w-px h-full bg-surface-active absolute top-3" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-accent mt-1.5 shrink-0" />
+                      {i !== Math.min(activity.length, 4) - 1 && (
+                        <div className="w-px h-full bg-border-subtle absolute top-3" />
                       )}
                     </div>
-                    <div>
+                    <div className="min-w-0 pb-1">
                       <p className="text-xs font-semibold text-heading">{log.action === 'stage.changed' ? 'Stage changed' : log.action === 'cv.uploaded' ? 'CV uploaded' : log.action === 'interview.scheduled' ? 'Interview scheduled' : log.action === 'interview.cancelled' ? 'Interview cancelled' : 'Candidate created'}</p>
                       <p className="text-[11px] text-body-light leading-relaxed mt-0.5">{log.description || '—'}</p>
-                      <p className="text-[9px] text-caption mt-1">
+                      <p className="text-[9px] text-caption mt-0.5">
                         {new Date(log.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
                       </p>
                     </div>
                   </div>
                 ))
+              )}
+              {activity.length > 4 && (
+                <p className="text-[10px] text-muted pt-0.5">+{activity.length - 4} older activities</p>
               )}
             </div>
           </div>
@@ -315,9 +350,10 @@ export default function RecruitmentPipeline() {
   const [interviewError, setInterviewError] = useState(null)
   const [exportError, setExportError] = useState(null)
   const [exporting, setExporting] = useState(false)
+  const hasManuallyClosedRef = useRef(false)
 
   const { data: activeMemberRole } = useActiveMemberRole()
-  const roleName = typeof activeMemberRole === 'string' ? activeMemberRole : activeMemberRole?.role
+  const roleName = getMemberRoleName(activeMemberRole)
   const canWrite = roleName === 'OWNER' || roleName === 'ADMIN'
 
   const [roleFilter, setRoleFilter] = useState('ALL')
@@ -371,7 +407,7 @@ export default function RecruitmentPipeline() {
 
   const candidateQuery = {
     page,
-    limit: 25,
+    limit: 8,
     search: search || undefined,
     role: roleFilter === 'ALL' ? undefined : roleFilter,
   }
@@ -499,9 +535,9 @@ export default function RecruitmentPipeline() {
   // The endpoint's `summary` is `null` (nothing to aggregate), so the KPI cards derive their
   // stage counts from the loaded page — `limit: 100` covers the full dataset, mirroring the
   // old client-side `stats` tally.
-  // Auto-select first candidate if none selected
+  // Auto-select first candidate if none selected and not manually closed
   useEffect(() => {
-    if (!selectedId && candidates.length > 0) {
+    if (!selectedId && candidates.length > 0 && !hasManuallyClosedRef.current) {
       setSelectedId(candidates[0].id)
     }
   }, [candidates, selectedId])
@@ -511,185 +547,229 @@ export default function RecruitmentPipeline() {
   const summary = data?.summary
   const periodDelta = (current, previous, unit, digits = 0) => current == null || previous == null
     ? 'No comparable period data'
-    : `${current - previous > 0 ? '+' : ''}${(current - previous).toFixed(digits)} ${unit} vs prior month-to-date`
+    : `${current - previous > 0 ? '+' : ''}${(current - previous).toFixed(digits)} ${unit} vs prior MTD`
   const displayStats = [
-    { label: 'Active Candidates', value: summary?.activeCandidates ?? '—', trend: 'neutral', sub: 'Current pipeline' },
-    { label: 'Hired (month to date)', value: summary?.hiredThisPeriod ?? '—', trend: 'neutral', sub: periodDelta(summary?.hiredThisPeriod, summary?.hiredPreviousPeriod, 'hires') },
-    { label: 'Avg Time to Hire (MTD)', value: summary?.averageTimeToHireThisPeriod == null ? '—' : summary.averageTimeToHireThisPeriod + ' days', trend: 'neutral', sub: periodDelta(summary?.averageTimeToHireThisPeriod, summary?.averageTimeToHirePreviousPeriod, 'days', 1) },
-    { label: 'Offer Acceptance (MTD)', value: summary?.offerAcceptanceRateThisPeriod == null ? '—' : summary.offerAcceptanceRateThisPeriod + '%', trend: 'neutral', sub: `${summary?.offersDecidedThisPeriod ?? 0} decisions · ${periodDelta(summary?.offerAcceptanceRateThisPeriod, summary?.offerAcceptanceRatePreviousPeriod, 'points', 1)}` },
+    { label: 'ACTIVE CANDIDATES', value: summary?.activeCandidates ?? '—', trend: 'neutral', sub: 'Current pipeline' },
+    { label: 'HIRED (MTD)', value: summary?.hiredThisPeriod ?? '—', trend: 'neutral', sub: periodDelta(summary?.hiredThisPeriod, summary?.hiredPreviousPeriod, 'hires') },
+    { label: 'AVG TIME TO HIRE (MTD)', value: summary?.averageTimeToHireThisPeriod == null ? '—' : `${summary.averageTimeToHireThisPeriod} days`, trend: 'neutral', sub: periodDelta(summary?.averageTimeToHireThisPeriod, summary?.averageTimeToHirePreviousPeriod, 'days', 1) },
+    {
+      label: 'OFFER ACCEPTANCE (MTD)',
+      value: summary?.offerAcceptanceRateThisPeriod == null ? '—' : `${summary.offerAcceptanceRateThisPeriod}%`,
+      trend: 'neutral',
+      sub: `${summary?.offersDecidedThisPeriod ?? 0} decisions · ${summary?.offerAcceptanceRateThisPeriod == null || summary?.offerAcceptanceRatePreviousPeriod == null ? 'No prior data' : periodDelta(summary?.offerAcceptanceRateThisPeriod, summary?.offerAcceptanceRatePreviousPeriod, 'pts', 1)}`
+    },
   ]
 
   return (
-    <div className="flex h-full overflow-hidden bg-surface-raised">
-
-      {/* ── Left Side: Pipeline List ── */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-
-        {/* Header & Stats */}
-        <div className="p-8 border-b border-border-subtle flex-shrink-0">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-heading tracking-tight">Recruitment Pipeline</h1>
-              <p className="text-sm text-muted mt-1">Track and manage active candidate pipelines.</p>
-            </div>
-            <button
-              disabled={!canWrite}
-              title={canWrite ? undefined : 'Requires the ADMIN role'}
-              onClick={() => { setFormError(null); setAddOpen(true) }}
-              className="bg-primary text-white text-sm font-medium px-4 py-2 rounded-button hover:bg-primary-hover transition-colors flex items-center gap-2 disabled:opacity-60"
-            >
-              <UserPlus size={16} /> Add Candidate
-            </button>
+    <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-y-auto min-w-0 px-6 py-5">
+      {/* ── Top Toolbar (Single Row across 12-column width) ── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 w-full mb-5 flex-shrink-0">
+        {/* Left group */}
+        <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
+            <input
+              type="text"
+              value={search}
+              onChange={event => { setSearch(event.target.value); setPage(1) }}
+              placeholder="Search candidates..."
+              className="pl-9 pr-4 py-2 text-xs border border-border-default rounded-input bg-surface-raised w-72 max-w-full focus:outline-none focus:border-border-strong focus:ring-2 focus:ring-border-subtle transition-all shadow-card"
+            />
           </div>
-
-          <div className="grid grid-cols-4 gap-4">
-            {displayStats.map(stat => (
-              <div key={stat.label} className="bg-surface-raised border border-border-subtle rounded-card-sm p-4 shadow-card">
-                <span className="text-xs font-medium text-muted">{stat.label}</span>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-3xl font-bold text-heading">{stat.value}</span>
-                  <span className={`text-[10px] font-medium ${
-                    stat.trend === 'up' ? 'text-success' :
-                    stat.trend === 'down' ? 'text-danger' : 'text-caption'
-                  }`}>
-                    {stat.sub}
-                  </span>
-                </div>
-              </div>
-            ))}
+          <div className="relative flex items-center">
+            <Filter size={14} className="absolute left-3 pointer-events-none text-muted" />
+            <select
+              aria-label="Filter by candidate role"
+              value={roleFilter}
+              onChange={event => { setRoleFilter(event.target.value); setPage(1) }}
+              className="appearance-none bg-surface-raised border border-border-default text-body text-xs pl-8 pr-7 py-2 rounded-input hover:bg-surface-muted transition-colors cursor-pointer outline-none shadow-card"
+            >
+              <option value="ALL">Role: All</option>
+              {availableRoles.map(role => (
+                <option key={role} value={role}>{role}</option>
+              ))}
+            </select>
           </div>
         </div>
 
-        {/* Toolbar */}
-        <div className="px-8 py-3 border-b border-border-subtle bg-surface-muted/50 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
-              <input
-                type="text"
-                value={search}
-                onChange={event => { setSearch(event.target.value); setPage(1) }}
-                placeholder="Search candidates..."
-                className="pl-9 pr-4 py-1.5 text-sm border border-border-default rounded-button bg-surface-raised w-64 focus:outline-none focus:border-border-strong focus:ring-4 focus:ring-border-subtle transition-all"
-              />
-            </div>
-            <div className="relative flex items-center">
-              <Filter size={14} className="absolute left-3 pointer-events-none text-muted" />
-              <select
-                aria-label="Filter by candidate role"
-                value={roleFilter}
-                onChange={event => { setRoleFilter(event.target.value); setPage(1) }}
-                className="appearance-none bg-surface-raised border border-border-default text-body text-sm pl-8 pr-7 py-1.5 rounded-button hover:bg-surface-muted transition-colors cursor-pointer outline-none"
-              >
-                <option value="ALL">Role: All</option>
-                {availableRoles.map(role => (
-                  <option key={role} value={role}>{role}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <button type="button" disabled={!canWrite || exporting} title={canWrite ? 'Export all candidates matching the current search' : 'Requires the ADMIN role'} onClick={exportCandidates} className="flex items-center gap-2 text-muted text-sm hover:text-heading font-medium px-3 py-1.5 disabled:opacity-60">
+        {/* Right group */}
+        <div className="flex items-center gap-2.5 shrink-0 ml-auto">
+          <button
+            type="button"
+            disabled={!canWrite || exporting}
+            title={canWrite ? 'Export all candidates matching the current search' : 'Requires the ADMIN role'}
+            onClick={exportCandidates}
+            className="flex items-center gap-2 border border-border-default text-body px-3.5 py-2 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised disabled:opacity-60 cursor-pointer shadow-card"
+          >
             {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Export
           </button>
-        </div>
-        {exportError && <p role="alert" className="px-8 py-2 text-xs text-danger">{exportError}</p>}
-
-        {/* Data Table */}
-        <div className="flex-1 overflow-auto">
-          <QueryState
-            isLoading={isLoading}
-            isError={isError}
-            error={error}
-            isEmpty={!visibleCandidates.length}
-            emptyTitle="No candidates found"
-            emptyDescription="Add a candidate or load the sample pack to see data."
+          <button
+            type="button"
+            disabled={!canWrite}
+            title={canWrite ? undefined : 'Requires the ADMIN role'}
+            onClick={() => { setFormError(null); setAddOpen(true) }}
+            className="flex items-center gap-2 bg-primary text-white px-3.5 py-2 rounded-input text-xs font-medium hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer shadow-card"
           >
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-surface-muted/80 sticky top-0 z-10 backdrop-blur-sm">
-                <tr>
-                  <th className="px-8 py-3 text-[10px] font-semibold text-caption uppercase tracking-wider border-b border-border-subtle">Candidate</th>
-                  <th className="px-8 py-3 text-[10px] font-semibold text-caption uppercase tracking-wider border-b border-border-subtle">Role</th>
-                  <th className="px-8 py-3 text-[10px] font-semibold text-caption uppercase tracking-wider border-b border-border-subtle">Stage</th>
-                  <th className="px-8 py-3 text-[10px] font-semibold text-caption uppercase tracking-wider border-b border-border-subtle text-right">Time in Stage</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-faint">
-                {visibleCandidates.map(cand => {
-                  const stageLabel = STAGE_LABELS[cand.stage] || cand.stage
-                  return (
-                    <tr
-                      key={cand.id}
-                      onClick={() => setSelectedId(cand.id)}
-                      className={`group cursor-pointer transition-colors ${
-                        selectedId === cand.id ? 'bg-accent-light/50' : 'hover:bg-surface-muted'
-                      }`}
-                    >
-                      <td className="px-8 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-strong flex items-center justify-center text-xs font-semibold text-heading overflow-hidden">
-                            {cand.avatarUrl ? (
-                              <img src={cand.avatarUrl} alt={cand.name} className="w-full h-full object-cover" />
-                            ) : (
-                              cand.name.split(' ').map(n=>n[0]).join('').slice(0,2)
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-heading">{cand.name}</p>
-                            <p className="text-[11px] text-muted">{cand.email || '—'}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-8 py-3 text-sm text-body">{cand.role}</td>
-                      <td className="px-8 py-3">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-input text-[10px] font-medium ${STAGE_COLORS[stageLabel] || 'bg-surface-active text-body'}`}>
-                          {stageLabel}
-                        </span>
-                      </td>
-                      <td className="px-8 py-3 text-sm text-body-light text-right">
-                        {cand.timeInStage || '—'}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </QueryState>
+            <UserPlus size={14} /> + Add Candidate
+          </button>
         </div>
-        {data?.pagination && <div className="flex items-center justify-between px-8 py-3 border-t border-border-default text-xs text-muted">
-          <span>Showing {data.pagination.total === 0 ? 0 : (page - 1) * data.pagination.limit + 1}–{Math.min(page * data.pagination.limit, data.pagination.total)} of {data.pagination.total} candidates</span>
-          <div className="flex items-center gap-2">
-            <button type="button" disabled={page <= 1} onClick={() => setPage(current => current - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
-            <span>Page {data.pagination.pages === 0 ? 0 : page} of {data.pagination.pages}</span>
-            <button type="button" disabled={page >= data.pagination.pages} onClick={() => setPage(current => current + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+      </div>
+      {exportError && (
+        <div role="alert" className="text-xs text-danger -mt-3 mb-4 flex-shrink-0">
+          {exportError}
+        </div>
+      )}
+
+      {/* ── Top 4 KPI Cards (grid-cols-12 gap-5 mb-5) ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-5 mb-5 flex-shrink-0">
+        {displayStats.map(stat => (
+          <div
+            key={stat.label}
+            className="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-auto flex flex-col justify-start"
+          >
+            <p className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none">
+              {stat.label}
+            </p>
+            <p className="text-2xl font-bold text-heading mt-1 leading-tight">
+              {stat.value}
+            </p>
+            <p className="text-xs text-muted mt-1 leading-normal truncate" title={stat.sub}>
+              {stat.sub}
+            </p>
           </div>
-        </div>}
+        ))}
       </div>
 
-      {/* ── Right Side: Inspector Panel ── */}
-      {selectedId && (
-        <CandidateInspector
-          candidate={selectedCandidate ? {
-            ...selectedCandidate,
-            avatar: selectedCandidate.avatarUrl,
-            profile: {
-              location: selectedCandidate.location,
-              email: selectedCandidate.email,
-              currentRole: selectedCandidate.currentRole,
-              experience: selectedCandidate.experience,
-              source: selectedCandidate.source,
-            },
-            activity: selectedCandidate.activity,
-          } : null}
-          interviews={interviews}
-          canWrite={canWrite}
-          canMoveStage={!!NEXT_STAGES[selectedCandidate?.stage]?.length}
-          onMoveStage={() => { setNextStage(NEXT_STAGES[selectedCandidate.stage][0]); setStageOpen(true) }}
-          onSchedule={() => { setInterviewError(null); setInterviewForm({ startsAt: '', durationMin: '60', stage: selectedCandidate?.stage === 'FINAL_INTERVIEW' ? 'FINAL_INTERVIEW' : 'TECH_INTERVIEW', interviewer: '', meetingUrl: '', notes: '' }); setScheduleOpen(true) }}
-          onCancelInterview={interviewId => cancelInterviewMutation.mutate(interviewId)}
-          onEdit={openEditCandidate}
-          onClose={() => setSelectedId(null)}
-        />
-      )}
+      {/* ── Main Workspace: Master Table (col-span-8) & Right Inspector (col-span-4) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start flex-1 min-h-0">
+        {/* Left Column (col-span-8): Candidate Table Card */}
+        <div className="col-span-12 lg:col-span-8 min-w-0 bg-surface-raised rounded-card border border-border-subtle shadow-card flex flex-col overflow-hidden">
+          <div className="overflow-x-auto">
+            <QueryState
+              isLoading={isLoading}
+              isError={isError}
+              error={error}
+              isEmpty={!visibleCandidates.length}
+              emptyTitle="No candidates found"
+              emptyDescription="Add a candidate or load the sample pack to see data."
+            >
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
+                  <tr>
+                    <th className="px-5 py-3 text-left bg-surface-muted">Candidate</th>
+                    <th className="px-5 py-3 text-left bg-surface-muted whitespace-nowrap">Role</th>
+                    <th className="px-5 py-3 text-left bg-surface-muted whitespace-nowrap">Stage</th>
+                    <th className="px-5 py-3 text-right bg-surface-muted whitespace-nowrap">Time in Stage</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-subtle">
+                  {visibleCandidates.map(cand => {
+                    const stageLabel = STAGE_LABELS[cand.stage] || cand.stage
+                    const isSelected = selectedId === cand.id
+                    return (
+                      <tr
+                        key={cand.id}
+                        onClick={() => {
+                          hasManuallyClosedRef.current = false
+                          setSelectedId(cand.id)
+                        }}
+                        className={`group cursor-pointer transition-colors h-14 ${
+                          isSelected ? 'bg-accent-light/50' : 'bg-surface-raised hover:bg-surface-muted/60'
+                        }`}
+                      >
+                        <td className="px-5 py-2.5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-strong flex items-center justify-center text-xs font-semibold text-heading overflow-hidden shrink-0">
+                              {cand.avatarUrl ? (
+                                <img src={cand.avatarUrl} alt={cand.name} className="w-full h-full object-cover" />
+                              ) : (
+                                cand.name.split(' ').map(n => n[0]).join('').slice(0, 2)
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-heading truncate">{cand.name}</p>
+                              <p className="text-[11px] text-muted truncate">{cand.email || '—'}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-5 py-2.5 text-sm text-body whitespace-nowrap">{cand.role}</td>
+                        <td className="px-5 py-2.5 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${STAGE_COLORS[stageLabel] || 'bg-surface-active text-body'}`}>
+                            {stageLabel}
+                          </span>
+                        </td>
+                        <td className="px-5 py-2.5 text-sm text-body-light text-right whitespace-nowrap">
+                          {cand.timeInStage || '—'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </QueryState>
+          </div>
+
+          {data?.pagination && (
+            <div className="flex-shrink-0 flex items-center justify-between px-5 py-2.5 border-t border-border-default text-xs text-muted bg-surface-muted/30">
+              <span>Showing {data.pagination.total === 0 ? 0 : (page - 1) * data.pagination.limit + 1}–{Math.min(page * data.pagination.limit, data.pagination.total)} of {data.pagination.total} candidates</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={page <= 1}
+                  onClick={() => setPage(current => current - 1)}
+                  className="rounded border border-border-default px-2 py-1 disabled:opacity-40 hover:bg-surface-muted transition-colors cursor-pointer"
+                >
+                  Previous
+                </button>
+                <span>Page {data.pagination.pages === 0 ? 0 : page} of {data.pagination.pages}</span>
+                <button
+                  type="button"
+                  disabled={page >= data.pagination.pages}
+                  onClick={() => setPage(current => current + 1)}
+                  className="rounded border border-border-default px-2 py-1 disabled:opacity-40 hover:bg-surface-muted transition-colors cursor-pointer"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Column (col-span-4): Candidate Profile Inspector Card */}
+        <div className="col-span-12 lg:col-span-4 min-w-0">
+          {selectedId && selectedCandidate ? (
+            <CandidateInspector
+              candidate={{
+                ...selectedCandidate,
+                avatar: selectedCandidate.avatarUrl,
+                profile: {
+                  location: selectedCandidate.location,
+                  email: selectedCandidate.email,
+                  currentRole: selectedCandidate.currentRole,
+                  experience: selectedCandidate.experience,
+                  source: selectedCandidate.source,
+                },
+                activity: selectedCandidate.activity,
+              }}
+              interviews={interviews}
+              canWrite={canWrite}
+              canMoveStage={!!NEXT_STAGES[selectedCandidate?.stage]?.length}
+              onMoveStage={() => { setNextStage(NEXT_STAGES[selectedCandidate.stage][0]); setStageOpen(true) }}
+              onSchedule={() => { setInterviewError(null); setInterviewForm({ startsAt: '', durationMin: '60', stage: selectedCandidate?.stage === 'FINAL_INTERVIEW' ? 'FINAL_INTERVIEW' : 'TECH_INTERVIEW', interviewer: '', meetingUrl: '', notes: '' }); setScheduleOpen(true) }}
+              onCancelInterview={interviewId => cancelInterviewMutation.mutate(interviewId)}
+              onEdit={openEditCandidate}
+              onClose={() => {
+                hasManuallyClosedRef.current = true
+                setSelectedId(null)
+              }}
+            />
+          ) : (
+            <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card p-6 text-center text-sm text-muted">
+              Select a candidate to view details.
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* ── Add Candidate Dialog ── */}
       <FormDialog

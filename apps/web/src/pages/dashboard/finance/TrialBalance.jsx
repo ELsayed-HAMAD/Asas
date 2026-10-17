@@ -3,10 +3,11 @@ import { useState } from 'react'
 import { Download, Loader2, Plus, Scale, Trash2 } from 'lucide-react'
 import { financeApi } from '../../../lib/api/finance'
 import { queryKeys } from '../../../lib/queryKeys'
-import { formatMoney } from '../../../lib/format'
+import { formatMoney, formatCompactTableMoney } from '../../../lib/format'
 import TopBarActions from '../../../components/TopBarActions'
 import FormDialog from '../../../components/common/FormDialog'
 import { useActiveMemberRole } from '../../../lib/authClient'
+import { getMemberRoleName } from '../../../lib/memberRole'
 import { downloadCsv } from '../../../lib/csv'
 
 
@@ -23,7 +24,7 @@ export default function TrialBalance() {
   const [openingDescription, setOpeningDescription] = useState('Opening balances')
   const [openingLines, setOpeningLines] = useState(EMPTY_OPENING_LINES)
   const { data: activeMemberRole } = useActiveMemberRole()
-  const canWrite = ['OWNER', 'ADMIN'].includes(activeMemberRole?.role)
+  const canWrite = ['OWNER', 'ADMIN'].includes(getMemberRoleName(activeMemberRole))
   const openingMutation = useMutation({
     mutationFn: financeApi.createOpeningBalance,
     onSuccess: () => {
@@ -99,15 +100,15 @@ export default function TrialBalance() {
                 <td className="px-4 py-3"><span className="font-mono text-xs text-muted">{row.accountCode}</span><span className="ml-2 font-medium text-body">{row.accountName}</span></td>
                 <td className="px-4 py-3 text-body">{row.accountKind.toLowerCase()}</td>
                 <td className="px-4 py-3 text-body">{row.currency}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-body">{formatMoney(row.debit)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-body">{formatMoney(row.credit)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-body">{formatMoney(row.netDebitBase)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-body">{formatMoney(row.netCreditBase)}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-body" title={formatMoney(row.debit)}>{formatCompactTableMoney(row.debit)}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-body" title={formatMoney(row.credit)}>{formatCompactTableMoney(row.credit)}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-body" title={formatMoney(row.netDebitBase)}>{formatCompactTableMoney(row.netDebitBase)}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-body" title={formatMoney(row.netCreditBase)}>{formatCompactTableMoney(row.netCreditBase)}</td>
               </tr>)}
               {data.rows.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-muted">No ledger accounts have been recorded.</td></tr>}
             </tbody>
             <tfoot className="border-t border-border-default bg-surface-muted font-semibold text-heading">
-              <tr><td colSpan={5} className="px-4 py-3">Base currency totals</td><td className="px-4 py-3 text-right tabular-nums">{formatMoney(data.totalDebitBase)}</td><td className="px-4 py-3 text-right tabular-nums">{formatMoney(data.totalCreditBase)}</td></tr>
+              <tr><td colSpan={5} className="px-4 py-3">Base currency totals</td><td className="px-4 py-3 text-right tabular-nums" title={formatMoney(data.totalDebitBase)}>{formatCompactTableMoney(data.totalDebitBase)}</td><td className="px-4 py-3 text-right tabular-nums" title={formatMoney(data.totalCreditBase)}>{formatCompactTableMoney(data.totalCreditBase)}</td></tr>
             </tfoot>
           </table>
         </div>

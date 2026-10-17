@@ -114,6 +114,19 @@
   --spacing-grid: 1.5rem;
   --spacing-grid-lg: 2rem;
   --spacing-sidebar: 13.75rem;
+  --height-accent-bar: 3px;
+  --deals-header-h: 40px;
+  --height-progress-bar: 6px;
+  --deals-cols: minmax(240px, 1fr) 120px 130px;
+  --deals-inline-padding: 16px;
+
+  /* ── SHARED COMPONENT DIMENSIONS ─────────────────────────────── */
+  --height-nav-item: 2.5rem;          /* 40px */
+  --height-nav-subitem: 2.125rem;     /* 34px */
+  --height-table-header: 2.5rem;      /* 40px */
+  --height-table-row: 3.25rem;        /* 52px */
+  --height-control: 2.25rem;          /* 36px */
+  --width-detail-panel: clamp(340px, 26vw, 400px);
 }
 
 /* ── GLOBAL BODY STYLES ───────────────────────────────────────── */
@@ -171,6 +184,24 @@ html {
   .no-scrollbar {
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
+  }
+  .scrollbar-soft {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  .scrollbar-soft:hover {
+    scrollbar-color: var(--color-border-strong) transparent;
+  }
+  .scrollbar-soft::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+  .scrollbar-soft:hover::-webkit-scrollbar-thumb {
+    background: var(--color-border-strong);
+  }
+  @media (hover: none) {
+    .reveal-on-hover {
+      opacity: 1 !important;
+    }
   }
 }
 

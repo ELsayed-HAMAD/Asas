@@ -118,10 +118,10 @@ export default function SettingsNotifications() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
+    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
 
       <TopBarActions>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
             <input
@@ -149,10 +149,10 @@ export default function SettingsNotifications() {
       <SettingsTabs />
 
       {/* ── Main Split View ── */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden">
 
         {/* Left: Configuration Content Area */}
-        <div className="flex-1 overflow-y-auto p-8 max-w-4xl space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-8 max-w-4xl space-y-6">
 
           {/* Delivery Schedule Card */}
           <div className="bg-surface-raised border border-border-default rounded-card-sm p-card shadow-card">
@@ -236,7 +236,7 @@ export default function SettingsNotifications() {
         </div>
 
         {/* Right: Live Preview Panel */}
-        <div className="w-[360px] bg-surface-raised border-l border-border-default flex flex-col flex-shrink-0 z-10">
+        <div className="w-full xl:w-[360px] xl:flex-shrink-0 bg-surface-raised border-t xl:border-t-0 xl:border-l border-border-default flex flex-col max-h-[65vh] xl:max-h-none z-10">
 
           <div className="flex-1 overflow-y-auto p-8 space-y-8">
 

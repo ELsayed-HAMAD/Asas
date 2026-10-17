@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
 import { Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import useDialogAccessibility from './useDialogAccessibility'
 
 /**
  * Form dialog for create/edit flows (the new-feature surface of Phase 4). Shares the same
@@ -47,20 +47,7 @@ export default function FormDialog({
   confirmVariant = 'primary',
 }) {
   const isDialogOpen = open ?? isOpen
-
-  useEffect(() => {
-    if (!isDialogOpen) return
-    function onKeyDown(event) {
-      if (event.key === 'Escape' && !busy) onClose()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = previousOverflow
-    }
-  }, [isDialogOpen, busy, onClose])
+  const dialogRef = useDialogAccessibility({ open: isDialogOpen, onClose, busy })
 
   // Native form submit: Enter in a field and the submit button both land here. We prevent the
   // browser's default navigation and delegate to the page's handler, but never while busy.
@@ -85,7 +72,9 @@ export default function FormDialog({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.97 }}
             transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+            ref={dialogRef}
             role="dialog"
+            tabIndex={-1}
             aria-modal="true"
             aria-labelledby="form-dialog-title"
             className={`relative w-full ${width} bg-surface-raised rounded-card border border-border-default shadow-elevated flex flex-col max-h-[85vh]`}

@@ -2,8 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
   Search,
   ChevronDown,
-  CheckSquare,
-  Square,
   AlertTriangle,
   Sparkles,
   CheckCircle2,
@@ -19,25 +17,30 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { financeApi } from '../../../lib/api/finance';
 import { hrApi } from '../../../lib/api/hr';
 import { queryKeys } from '../../../lib/queryKeys';
-import { formatMoney } from '../../../lib/format';
+import { formatMoney, formatCompactTableMoney } from '../../../lib/format';
 import { downloadCsv } from '../../../lib/csv';
 import { useDebouncedValue } from '../../../lib/useDebouncedValue';
 import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
 import { useSearchParams } from 'react-router-dom';
 import { useActiveMemberRole } from '../../../lib/authClient';
+import { getMemberRoleName } from '../../../lib/memberRole';
+
+const metricFontSize = (money) => {
+  const label = formatMoney(money)
+  return `clamp(0.75rem, ${Math.min(14, 130 / Math.max(1, label.length))}cqw, 1.875rem)`
+}
 
 export default function Expenses() {
   const queryClient = useQueryClient();
   const { data: activeMemberRole } = useActiveMemberRole();
-  const isAdmin = ['OWNER', 'ADMIN'].includes(activeMemberRole?.role);
+  const isAdmin = ['OWNER', 'ADMIN'].includes(getMemberRoleName(activeMemberRole));
   const [selectedId, setSelectedId] = useState(null);
   const [searchInput, setSearchInput] = useState('');
   // Debounce the search box so each keystroke doesn't fire a list request and collapse the table.
   const search = useDebouncedValue(searchInput)
   const [departmentId, setDepartmentId] = useState('')
   const [sort, setSort] = useState('desc')
-  const [expensePage, setExpensePage] = useState(1)
   const [receiptZoom, setReceiptZoom] = useState(100)
   const [receiptOpen, setReceiptOpen] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -79,8 +82,6 @@ export default function Expenses() {
     else if (pages > 0 && employeePage > pages) setEmployeePage(pages)
   }, [employeesData?.pagination?.pages, employeePage])
 
-  useEffect(() => { setExpensePage(1) }, [search, departmentId, sort])
-
   const createExpenseMutation = useMutation({
     mutationFn: () => {
       const payload = {
@@ -121,16 +122,10 @@ export default function Expenses() {
   const { data: departmentsData } = useQuery({ queryKey: queryKeys.hr.departments.list(), queryFn: hrApi.getDepartments })
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: queryKeys.finance.expenses.list({ page: expensePage, limit: 25, search: search || undefined, departmentId: departmentId || undefined, sort }),
-    queryFn: () => financeApi.listExpenses({ page: expensePage, limit: 25, search: search || undefined, departmentId: departmentId || undefined, sort }),
+    queryKey: queryKeys.finance.expenses.list({ page: 1, limit: 100, search: search || undefined, departmentId: departmentId || undefined, sort }),
+    queryFn: () => financeApi.listExpenses({ page: 1, limit: 100, search: search || undefined, departmentId: departmentId || undefined, sort }),
     placeholderData: keepPreviousData,
   });
-  useEffect(() => {
-    const pages = data?.pagination?.pages
-    if (pages === undefined) return
-    if (pages === 0 && expensePage !== 1) setExpensePage(1)
-    else if (pages > 0 && expensePage > pages) setExpensePage(pages)
-  }, [data?.pagination?.pages, expensePage])
   useEffect(() => {
     const rows = data?.items || []
     if (!rows.some(row => row.id === selectedId)) setSelectedId(rows[0]?.id ?? null)
@@ -192,35 +187,22 @@ export default function Expenses() {
   const violationAmount = summary.flaggedTotal ?? { amount: 0, currency: 'USD' };
 
   return (
-    <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-[1000px]">
+    <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-0">
 
       <TopBarActions>
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
-            <input
-              type="text"
-              value={searchInput}
-              onChange={event => setSearchInput(event.target.value)}
-              placeholder="Search..."
-              className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-56 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-            />
-          </div>
-          <label className="relative flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised">
-            <span className="sr-only">Filter expenses by department</span>
-            <select value={departmentId} onChange={event => setDepartmentId(event.target.value)} className="appearance-none bg-transparent pr-5 outline-none">
-                <option value="">All Depts</option>
-              {(departmentsData?.items ?? departmentsData ?? []).map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
-            </select>
-            <ChevronDown size={14} className="pointer-events-none absolute right-2 text-caption" />
-          </label>
-          <button disabled={exportMutation.isPending} onClick={() => exportMutation.mutate()} className="flex items-center gap-2 bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={exportMutation.isPending}
+            onClick={() => exportMutation.mutate()}
+            className="h-9 px-4 flex items-center gap-2 bg-primary text-white rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer"
+          >
             <Download size={14} /> {exportMutation.isPending ? 'Exporting...' : 'Export CSV'}
           </button>
           <button
             type="button"
             onClick={() => { setCreateError(''); setEmployeeSearchInput(''); setEmployeePage(1); setCreateOpen(true); }}
-            className="flex items-center gap-2 bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card"
+            className="h-9 px-4 flex items-center gap-2 bg-primary text-white rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors shadow-card cursor-pointer"
           >
             <Plus size={14} /> New Expense
           </button>
@@ -228,194 +210,294 @@ export default function Expenses() {
         {exportMutation.isError && <p role="alert" className="mt-2 text-xs text-danger">{exportMutation.error?.message || 'Could not export expenses.'}</p>}
       </TopBarActions>
 
-      {/* ── KPIs Row ── */}
-      <div className="px-6 py-5 flex-shrink-0 border-b border-border-default bg-surface-muted">
-        <div className="grid grid-cols-3 gap-4">
-          <div className="border border-border-default rounded-card-sm p-5 bg-surface-raised shadow-card flex flex-col justify-between">
-            <div className="flex justify-between items-start mb-2">
-              <p className="text-[11px] font-semibold text-muted tracking-wide">Pending Approval</p>
-            </div>
-            <div className="flex justify-between items-end">
-              <p className="text-3xl font-bold text-heading">{formatMoney(pendingAmount)}</p>
-              <span className="bg-surface-active text-muted px-2.5 py-1 rounded-input text-[10px] font-bold uppercase tracking-wider">
+      {/* ── KPIs Row (Compact, baseline-aligned) ── */}
+      <div className="px-4 sm:px-6 py-2.5 flex-shrink-0 border-b border-border-default bg-surface-muted">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Card 1: Pending Approval */}
+          <div className="border border-border-default rounded-card-sm px-3.5 py-2.5 bg-surface-raised shadow-card flex flex-col justify-between" style={{ containerType: 'inline-size' }}>
+            <p className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none">Pending Approval</p>
+            <div className="flex items-baseline justify-between gap-2 mt-1">
+              <p className="min-w-0 text-xl font-bold text-heading tracking-tight tabular-nums" style={{ fontSize: metricFontSize(pendingAmount) }}>
+                {formatMoney(pendingAmount)}
+              </p>
+              <span className="bg-surface-active text-muted px-2 py-0.5 rounded-input text-[11px] font-bold uppercase tracking-wider inline-flex items-center h-[20px] shrink-0">
                 {pendingCount} Reports
               </span>
             </div>
+            <p className="mt-1 text-xs text-muted truncate leading-tight">
+              {pendingCount === 1 ? '1 report awaiting review' : `${pendingCount} reports awaiting review`}
+            </p>
           </div>
 
-          <div className="border border-border-default rounded-card-sm p-5 bg-surface-raised shadow-card flex flex-col justify-between">
-            <div className="flex justify-between items-start mb-2">
-              <p className="text-[11px] font-semibold text-muted tracking-wide">Approved Expenses</p>
-            </div>
-            <div className="flex justify-between items-end">
-              <p className="text-3xl font-bold text-heading">{formatMoney(approvedAmount)}</p>
-              <span className="bg-accent-light text-accent px-2.5 py-1 rounded-input text-[10px] font-bold uppercase tracking-wider">
+          {/* Card 2: Approved Expenses */}
+          <div className="border border-border-default rounded-card-sm px-3.5 py-2.5 bg-surface-raised shadow-card flex flex-col justify-between" style={{ containerType: 'inline-size' }}>
+            <p className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none">Approved Expenses</p>
+            <div className="flex items-baseline justify-between gap-2 mt-1">
+              <p className="min-w-0 text-xl font-bold text-heading tracking-tight tabular-nums" style={{ fontSize: metricFontSize(approvedAmount) }}>
+                {formatMoney(approvedAmount)}
+              </p>
+              <span className="bg-accent-light text-accent px-2 py-0.5 rounded-input text-[11px] font-bold uppercase tracking-wider inline-flex items-center h-[20px] shrink-0">
                 {summary.approvedCount ?? 0} Reports
               </span>
             </div>
-            <p className="mt-2 text-xs text-muted" title="Valued reimbursement journals in workspace base currency, net of linked reversals.">
+            <p className="mt-1 text-xs text-muted truncate leading-tight" title="Valued reimbursement journals in workspace base currency, net of linked reversals.">
               Reimbursed MTD: {summary.reimbursedThisMonthTotal == null ? 'unavailable' : formatMoney(summary.reimbursedThisMonthTotal)} · Prior period: {summary.reimbursedThisMonthComparison?.previousTotal == null ? 'unavailable' : formatMoney(summary.reimbursedThisMonthComparison.previousTotal)}
             </p>
           </div>
 
-          <div className="border border-border-default rounded-card-sm p-5 bg-surface-raised shadow-card flex flex-col justify-between">
-            <div className="flex justify-between items-start mb-2">
-              <p className="text-[11px] font-semibold text-muted tracking-wide">Policy Violations</p>
-            </div>
-            <div className="flex justify-between items-end">
-              <p className="text-3xl font-bold text-heading">{formatMoney(violationAmount)}</p>
-              <span className="flex items-center gap-1 bg-danger-light text-danger-hover px-2.5 py-1 rounded-input text-[10px] font-bold uppercase tracking-wider">
-                <AlertTriangle size={12} strokeWidth={3} /> {summary.flaggedCount ?? 0} Reports
+          {/* Card 3: Policy Violations */}
+          <div className="border border-border-default rounded-card-sm px-3.5 py-2.5 bg-surface-raised shadow-card flex flex-col justify-between" style={{ containerType: 'inline-size' }}>
+            <p className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none">Policy Violations</p>
+            <div className="flex items-baseline justify-between gap-2 mt-1">
+              <p className="min-w-0 text-xl font-bold text-heading tracking-tight tabular-nums" style={{ fontSize: metricFontSize(violationAmount) }}>
+                {formatMoney(violationAmount)}
+              </p>
+              <span className="flex items-center gap-1 bg-danger-light text-danger-hover px-2 py-0.5 rounded-input text-[11px] font-bold uppercase tracking-wider inline-flex items-center h-[20px] shrink-0">
+                <AlertTriangle size={11} strokeWidth={3} /> {summary.flaggedCount ?? 0} Reports
               </span>
             </div>
+            <p className="mt-1 text-xs text-muted truncate leading-tight">
+              {(summary.flaggedCount ?? 0) === 0 ? 'No active policy alerts' : `${summary.flaggedCount} flagged for review`}
+            </p>
           </div>
         </div>
       </div>
 
       {/* ── Main Split View ── */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col min-[1100px]:flex-row overflow-y-auto min-[1100px]:overflow-hidden">
 
-        {/* Left: Table Area */}
-        <div className="flex-1 overflow-y-auto bg-surface-raised flex flex-col border-r border-border-default">
+        {/* Left: List Pane */}
+        <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-surface-muted min-[1100px]:border-r border-border-default p-3 gap-2.5">
 
-          {/* Table Toolbar */}
-          <div className="flex items-center justify-between px-6 py-3 border-b border-border-default bg-surface-raised flex-shrink-0">
-            <div className="flex items-center gap-3 text-sm text-body-light font-medium">
-              <Square size={16} className="text-faint" />
-              {selectedId ? '1 selected' : '0 selected'}
+          {/* List Pane Toolbar (compact height 44px) */}
+          <div className="h-11 flex-shrink-0 px-3 flex items-center justify-between gap-2.5 bg-surface-raised rounded-card-sm border border-border-default shadow-card">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="relative flex-shrink-0">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={event => setSearchInput(event.target.value)}
+                  placeholder="Search..."
+                  className="pl-8 pr-2.5 h-7 text-xs border border-border-default rounded-input bg-surface-raised w-40 sm:w-52 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                />
+              </div>
+              <label className="relative flex items-center border border-border-default text-body px-2.5 h-7 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised flex-shrink-0 cursor-pointer">
+                <span className="sr-only">Filter expenses by department</span>
+                <select
+                  value={departmentId}
+                  onChange={event => setDepartmentId(event.target.value)}
+                  className="appearance-none bg-transparent pr-4 text-xs outline-none cursor-pointer"
+                >
+                  <option value="">All Depts</option>
+                  {(departmentsData?.items ?? departmentsData ?? []).map(department => (
+                    <option key={department.id} value={department.id}>{department.name}</option>
+                  ))}
+                </select>
+                <ChevronDown size={13} className="pointer-events-none absolute right-1.5 text-caption" />
+              </label>
             </div>
-            <button type="button" onClick={() => setSort(value => value === 'desc' ? 'asc' : 'desc')} aria-label={`Sort expenses: ${sort === 'desc' ? 'newest first' : 'oldest first'}`} className="flex items-center gap-1.5 text-sm font-medium text-body-light hover:text-heading transition-colors">
-              Sort: {sort === 'desc' ? 'Newest First' : 'Oldest First'} <ChevronDown size={14} className="text-caption" />
-            </button>
+            <label className="relative flex items-center border border-border-default text-body px-2.5 h-7 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised flex-shrink-0 cursor-pointer">
+              <span className="sr-only">Sort expenses</span>
+              <select
+                aria-label="Sort expenses"
+                value={sort}
+                onChange={event => setSort(event.target.value)}
+                className="appearance-none bg-transparent pr-4 text-xs outline-none cursor-pointer font-medium text-body-light hover:text-heading"
+              >
+                <option value="desc">Sort: Newest First</option>
+                <option value="asc">Sort: Oldest First</option>
+              </select>
+              <ChevronDown size={13} className="pointer-events-none absolute right-1.5 text-caption" />
+            </label>
           </div>
 
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-surface-raised sticky top-0 z-10">
-              <tr>
-                <th className="px-6 py-3 border-b border-border-default w-12"></th>
-                <th className="px-2 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-default">Employee</th>
-                <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-default text-left">Merchant</th>
-                <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-default text-left">Expense Date</th>
-                <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-default text-right">Amount</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-border-subtle">
-              {items.map(item => {
-                const isSelected = selectedId === item.id;
-
-                let badgeStyle = "bg-surface-active text-body-light";
-                if (item.status === 'PENDING') badgeStyle = "bg-[#fff7ed] text-[#c2410c]";
-                if (item.status === 'FLAGGED') badgeStyle = "bg-danger-light text-danger-hover";
-
-                // Generate consistent colors based on string
-                const hashCode = (str) => {
-                  let hash = 0;
-                  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-                  return hash;
-                };
-                const colors = ['bg-primary', 'bg-accent', 'bg-green-600', 'bg-orange-600', 'bg-purple-600'];
-                const name = item.employee || 'Unassigned';
-                const bgClass = colors[Math.abs(hashCode(name)) % colors.length];
-
-                return (
-                  <tr
-                    key={item.id}
-                    onClick={() => setSelectedId(item.id)}
-                    className={`cursor-pointer transition-colors ${
-                      isSelected ? 'bg-surface-active/70 border-l-4 border-l-black' : 'bg-surface-raised hover:bg-surface-muted border-l-4 border-l-transparent'
-                    }`}
-                  >
-                    <td className="px-6 py-3.5">
-                      {isSelected
-                        ? <CheckSquare size={16} className="text-black" fill="black" stroke="white" />
-                        : <Square size={16} className="text-faint" />
-                      }
-                    </td>
-                    <td className="px-2 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full ${bgClass} flex items-center justify-center text-xs font-bold text-white`}>
-                          {name?.substring(0, 1).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-heading leading-tight">{name}</p>
-                          <p className="text-[11px] text-muted">{item.category}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-3.5 text-sm text-heading font-medium">
-                      {item.merchant || '—'}
-                    </td>
-                    <td className="px-6 py-3.5 text-sm text-body-light">
-                      {new Date(item.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit' })}
-                    </td>
-                    <td className="px-6 py-3.5 text-right flex flex-col justify-end items-end gap-1">
-                      <span className="text-sm font-bold text-heading tabular-nums">
-                        {formatMoney(item.amount)}
-                      </span>
-                      <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${badgeStyle}`}>
-                        {item.status}
-                      </span>
-                    </td>
+          {/* Table Card (wrapped in a card: 1px border, border-radius 12-16px, overflow hidden) */}
+          <div className="bg-surface-raised rounded-card border border-border-default shadow-card overflow-hidden flex flex-col flex-1 min-h-0">
+            {/* Table Container (scrolls vertically on its own with sticky header) */}
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-surface-raised">
+              <table className="w-full table-fixed text-left border-collapse">
+                <colgroup>
+                  <col className="min-w-[170px]" />
+                  <col className="w-[20%] min-w-[110px]" />
+                  <col className="w-[85px] lg:w-[90px]" />
+                  <col className="w-[100px] lg:w-[105px]" />
+                  <col className="w-[100px] lg:w-[105px]" />
+                </colgroup>
+                <thead className="bg-surface-muted/60 border-b border-border-default sticky top-0 z-10 h-10">
+                  <tr className="h-10">
+                    <th className="px-3 py-0 text-left text-xs font-semibold uppercase tracking-[0.04em] text-muted">Employee</th>
+                    <th className="w-[20%] min-w-[110px] px-2.5 py-0 text-left text-xs font-semibold uppercase tracking-[0.04em] text-muted">Merchant</th>
+                    <th className="w-[85px] lg:w-[90px] px-2.5 py-0 text-left text-xs font-semibold uppercase tracking-[0.04em] text-muted">Expense Date</th>
+                    <th className="w-[100px] lg:w-[105px] px-2.5 py-0 text-center text-xs font-semibold uppercase tracking-[0.04em] text-muted">Status</th>
+                    <th className="w-[100px] lg:w-[105px] px-2.5 pr-4 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted">Amount</th>
                   </tr>
-                )
-              })}
+                </thead>
 
-              {items.length === 0 && (
-                <tr>
-                   <td colSpan={5} className="px-6 py-8 text-center text-muted text-sm">
-                     No expenses found.
-                   </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          {data.pagination && <div className="flex items-center justify-between border-t border-border-default px-6 py-3 text-xs text-muted">
-            <span>Showing {data.pagination.total === 0 ? 0 : (expensePage - 1) * data.pagination.limit + 1}–{Math.min(expensePage * data.pagination.limit, data.pagination.total)} of {data.pagination.total} expenses</span>
-            {data.pagination.pages > 1 && <div className="flex items-center gap-2">
-              <button type="button" aria-label="Previous expense page" disabled={expensePage <= 1 || isLoading} onClick={() => setExpensePage(page => Math.max(1, page - 1))} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
-              <span>Page {expensePage} of {data.pagination.pages}</span>
-              <button type="button" aria-label="Next expense page" disabled={expensePage >= data.pagination.pages || isLoading} onClick={() => setExpensePage(page => Math.min(data.pagination.pages, page + 1))} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
-            </div>}
-          </div>}
+                <tbody>
+                  {items.map(item => {
+                    const isSelected = selectedId === item.id;
+
+                    let badgeStyle = "bg-surface-active text-body-light";
+                    if (item.status === 'PENDING') badgeStyle = "bg-[#fff7ed] text-[#c2410c]";
+                    if (item.status === 'FLAGGED') badgeStyle = "bg-danger-light text-danger-hover";
+
+                    // Generate consistent colors based on string
+                    const hashCode = (str) => {
+                      let hash = 0;
+                      for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                      return hash;
+                    };
+                    const colors = ['bg-primary', 'bg-accent', 'bg-green-600', 'bg-orange-600', 'bg-purple-600'];
+                    const name = item.employee || 'Unassigned';
+                    const bgClass = colors[Math.abs(hashCode(name)) % colors.length];
+
+                    return (
+                      <tr
+                        key={item.id}
+                        onClick={() => setSelectedId(item.id)}
+                        className={`h-[48px] cursor-pointer transition-colors ${
+                          isSelected
+                            ? 'bg-accent-light/40'
+                            : 'bg-surface-raised hover:bg-surface-muted'
+                        }`}
+                      >
+                        {/* Employee Column (name above category, 3px accent bar when selected) */}
+                        <td className="relative px-3 py-0 align-middle border-b border-border-subtle min-w-0">
+                          {isSelected && (
+                            <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-blue-600 pointer-events-none" />
+                          )}
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`w-7 h-7 rounded-full ${bgClass} flex items-center justify-center text-[11px] font-bold text-white shadow-card shrink-0`}>
+                              {name?.substring(0, 1).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-heading truncate leading-tight" title={name}>{name}</p>
+                              <p className="text-[10px] text-muted truncate leading-tight mt-0.5" title={item.category}>{item.category}</p>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Merchant Column */}
+                        <td className="px-2.5 py-0 align-middle border-b border-border-subtle text-xs font-medium text-body truncate" title={item.merchant || '—'}>
+                          {item.merchant || '—'}
+                        </td>
+
+                        {/* Expense Date Column */}
+                        <td className="px-2.5 py-0 align-middle border-b border-border-subtle text-xs font-medium text-muted whitespace-nowrap">
+                          {new Date(item.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit' })}
+                        </td>
+
+                        {/* Status Column */}
+                        <td className="px-2.5 py-0 align-middle border-b border-border-subtle text-center whitespace-nowrap">
+                          <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[11px] font-semibold ${badgeStyle}`}>
+                            {item.status}
+                          </span>
+                        </td>
+
+                        {/* Amount Column */}
+                        <td className="px-2.5 pr-4 py-0 align-middle border-b border-border-subtle text-right text-xs font-semibold text-heading tabular-nums whitespace-nowrap" title={formatMoney(item.amount)}>
+                          {formatCompactTableMoney(item.amount)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {items.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-8 text-center text-muted text-xs">
+                        No expenses found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Table Footer (pinned to bottom of card, height 36px) */}
+            {data.pagination && (
+              <div className="h-9 flex-shrink-0 border-t border-border-default px-3 flex items-center text-xs text-muted bg-surface-raised">
+                <span>Showing {items.length} of {data.pagination.total} expenses</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Right: Detail Panel */}
+        {/* Right: Detail Panel (rebalanced width 380px, compact padding 12px, gaps 10px) */}
         {selectedRecord && (
-          <div className="w-[440px] bg-surface-muted overflow-y-auto p-5 flex-shrink-0 space-y-4">
+          <div className="w-full min-[1100px]:w-[380px] min-[1100px]:flex-shrink-0 bg-surface-muted border-t min-[1100px]:border-t-0 min-[1100px]:border-l border-border-default overflow-y-auto p-3 space-y-2.5">
 
-            {/* Main Card */}
-            <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card flex items-start justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-xl font-bold text-white">
-                  {(selectedRecord.employee || 'Unassigned')?.substring(0, 1).toUpperCase()}
+            {/* Header Card (reorganized: Top: identity + amount, Below: compact action group, Separated: destructive action) */}
+            <div className="bg-surface-raised border border-border-default rounded-card-sm p-3.5 shadow-card space-y-2.5">
+              {/* Top: Employee identity and amount */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 bg-primary rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 shadow-card">
+                    {(selectedRecord.employee || 'Unassigned')?.substring(0, 1).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-bold text-heading leading-tight truncate" title={selectedRecord.employee || 'Unassigned'}>
+                      {selectedRecord.employee || 'Unassigned'}
+                    </h2>
+                    <p className="text-[11px] text-muted truncate leading-tight mt-0.5">{selectedRecord.category}</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-lg font-bold text-heading leading-tight">{selectedRecord.employee || 'Unassigned'}</h2>
-                  <p className="text-2xl font-extrabold text-heading tracking-tight mt-0.5">{formatMoney(selectedRecord.amount)}</p>
+                <div className="text-right shrink-0">
+                  <p className="text-xl font-bold text-heading tracking-tight tabular-nums">
+                    {formatMoney(selectedRecord.amount)}
+                  </p>
                 </div>
               </div>
+
               {isAdmin ? (
-                <div className="flex flex-col gap-2 w-24">
-                  <button disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'PENDING'} onClick={() => statusMutation.mutate('APPROVED')} className="bg-primary text-white w-full py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
-                    Approve
-                  </button>
-                  <button disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'APPROVED'} onClick={() => statusMutation.mutate('REIMBURSED')} title="Records reimbursement after it has been paid outside Asas." className="bg-primary text-white w-full py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60">
-                    Mark Reimbursed
-                  </button>
-                  <button disabled={!selectedRecord || statusMutation.isPending || ['APPROVED', 'REIMBURSED', 'REJECTED', 'VOID'].includes(selectedRecord.status)} onClick={() => statusMutation.mutate('REJECTED')} className="border border-border-default text-body w-full py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60">
-                    Reject
-                  </button>
-                  <button disabled={!selectedRecord || voidMutation.isPending || selectedRecord.status === 'VOID'} onClick={() => {
-                    const reason = window.prompt('Reason for voiding this expense:')?.trim()
-                    if (reason) voidMutation.mutate(reason)
-                  }} className="border border-danger/40 text-danger w-full py-1.5 rounded-input text-sm font-medium hover:bg-danger/5 transition-colors disabled:opacity-60">
-                    {voidMutation.isPending ? 'Voiding…' : 'Void expense'}
-                  </button>
+                <div className="space-y-2 pt-1">
+                  {/* Below: Compact action group with sufficient width for labels */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'PENDING'}
+                      onClick={() => statusMutation.mutate('APPROVED')}
+                      className="h-9 flex-1 whitespace-nowrap px-2.5 bg-primary text-white rounded-input text-xs font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer text-center"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'APPROVED'}
+                      onClick={() => statusMutation.mutate('REIMBURSED')}
+                      title="Records reimbursement after it has been paid outside Asas."
+                      className="h-9 flex-1 whitespace-nowrap px-2.5 bg-primary text-white rounded-input text-xs font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer text-center"
+                    >
+                      Mark Reimbursed
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!selectedRecord || statusMutation.isPending || ['APPROVED', 'REIMBURSED', 'REJECTED', 'VOID'].includes(selectedRecord.status)}
+                      onClick={() => statusMutation.mutate('REJECTED')}
+                      className="h-9 px-3 whitespace-nowrap border border-border-default text-body rounded-input text-xs font-medium hover:bg-surface-muted transition-colors disabled:opacity-60 cursor-pointer text-center"
+                    >
+                      Reject
+                    </button>
+                  </div>
+
+                  {/* Clearly separated: Destructive action */}
+                  <div className="pt-2 border-t border-border-subtle">
+                    <button
+                      type="button"
+                      disabled={!selectedRecord || voidMutation.isPending || selectedRecord.status === 'VOID'}
+                      onClick={() => {
+                        const reason = window.prompt('Reason for voiding this expense:')?.trim()
+                        if (reason) voidMutation.mutate(reason)
+                      }}
+                      className="h-9 w-full whitespace-nowrap px-3 border border-danger/40 text-danger rounded-input text-xs font-medium hover:bg-danger/5 transition-colors disabled:opacity-60 cursor-pointer text-center"
+                    >
+                      {voidMutation.isPending ? 'Voiding…' : 'Void expense'}
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-end gap-1">
-                  <span className={`px-2.5 py-1 rounded-input text-xs font-semibold uppercase tracking-wider ${
+                <div className="pt-1">
+                  <span className={`inline-flex items-center justify-center h-8 px-3 w-full rounded-input text-xs font-semibold uppercase tracking-wider ${
                     selectedRecord.status === 'APPROVED' ? 'bg-accent-light text-accent' :
                     selectedRecord.status === 'REIMBURSED' ? 'bg-accent text-white' :
                     selectedRecord.status === 'REJECTED' || selectedRecord.status === 'VOID' ? 'bg-danger-light text-danger' :
@@ -426,112 +508,110 @@ export default function Expenses() {
                 </div>
               )}
             </div>
-            {statusMutation.isError && <p role="alert" className="text-sm text-danger">{statusMutation.error?.message || 'Unable to update the expense status.'}</p>}
-            {voidMutation.isError && <p role="alert" className="text-sm text-danger">{voidMutation.error?.message || 'Unable to void the expense.'}</p>}
+            {statusMutation.isError && <p role="alert" className="text-xs text-danger">{statusMutation.error?.message || 'Unable to update the expense status.'}</p>}
+            {voidMutation.isError && <p role="alert" className="text-xs text-danger">{voidMutation.error?.message || 'Unable to void the expense.'}</p>}
 
-            {/* AI Data Extraction Card */}
-            <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles size={16} className="text-accent" />
-                <h3 className="text-xs font-bold text-heading">Expense details</h3>
+            {/* AI Data Extraction / Expense Details Card (standardized two-column alignment) */}
+            <div className="bg-surface-raised border border-border-default rounded-card-sm p-3.5 shadow-card">
+              <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-border-subtle">
+                <Sparkles size={14} className="text-accent shrink-0" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-heading">Expense details</h3>
               </div>
 
-              <div className="grid grid-cols-2 gap-y-5 gap-x-4">
-                <div>
-                  <p className="text-[10px] font-medium text-muted mb-1">Merchant</p>
-                  <p className="text-sm font-semibold text-heading">{selectedRecord.merchant || '—'}</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none mb-1">Merchant</p>
+                  <p className="text-xs font-semibold text-heading truncate leading-tight" title={selectedRecord.merchant || '—'}>{selectedRecord.merchant || '—'}</p>
                 </div>
-                <div>
-                  <p className="text-[10px] font-medium text-muted mb-1">Category</p>
-                  <p className="text-sm font-semibold text-heading">{selectedRecord.category}</p>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none mb-1">Category</p>
+                  <p className="text-xs font-semibold text-heading truncate leading-tight" title={selectedRecord.category}>{selectedRecord.category}</p>
                 </div>
-                <div>
-                  <p className="text-[10px] font-medium text-muted mb-1">Tax</p>
-                  <p className="text-sm font-semibold text-heading">{formatMoney(selectedRecord.tax)}</p>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none mb-1">Tax</p>
+                  <p className="text-xs font-semibold text-heading tabular-nums leading-tight">{formatMoney(selectedRecord.tax)}</p>
                 </div>
-                <div>
-                  <p className="text-[10px] font-medium text-muted mb-1">Policy Match</p>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none mb-1">Policy Match</p>
                   {selectedRecord.policyMatch === null ? (
-                    <p className="text-sm font-semibold text-muted">—</p>
+                    <p className="text-xs font-semibold text-muted leading-tight">—</p>
                   ) : selectedRecord.policyMatch ? (
-                    <p className="text-sm font-semibold text-accent flex items-center gap-1">
-                      <CheckCircle2 size={14} /> Yes
+                    <p className="text-xs font-semibold text-accent flex items-center gap-1 leading-tight">
+                      <CheckCircle2 size={13} /> Yes
                     </p>
                   ) : (
-                    <p className="text-sm font-semibold text-danger">No</p>
+                    <p className="text-xs font-semibold text-danger leading-tight">No</p>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* PDF Preview Card */}
+            {/* PDF Preview / Expense Summary Card (recovered vertical room) */}
             <div className="bg-surface-raised border border-border-default rounded-card-sm shadow-card flex flex-col overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 bg-surface-raised border-b border-border-subtle">
+              <div className="flex items-center justify-between px-3.5 py-2 bg-surface-raised border-b border-border-subtle">
                 <div className="flex items-center gap-2 text-body">
                   <FileText size={14} className="text-caption" />
                   <span className="text-xs font-medium">Expense summary</span>
                 </div>
-                <div className="flex items-center gap-3 text-muted text-xs font-medium">
+                <div className="flex items-center gap-2.5 text-muted text-xs font-medium">
                   {!receiptOpen ? (
-                    <button type="button" onClick={() => setReceiptOpen(true)} className="hover:text-accent transition-colors text-accent font-semibold">View Receipt</button>
+                    <button type="button" onClick={() => setReceiptOpen(true)} className="hover:text-accent transition-colors text-accent font-semibold cursor-pointer">View Receipt</button>
                   ) : (
                     <>
-                      <button type="button" aria-label="Zoom out receipt" disabled={receiptZoom <= 50} onClick={() => setReceiptZoom(value => Math.max(50, value - 25))} className="hover:text-heading transition-colors disabled:opacity-40"><ZoomOut size={14} /></button>
-                      <span>{receiptZoom}%</span>
-                      <button type="button" aria-label="Zoom in receipt" disabled={receiptZoom >= 200} onClick={() => setReceiptZoom(value => Math.min(200, value + 25))} className="hover:text-heading transition-colors disabled:opacity-40"><ZoomIn size={14} /></button>
+                      <button type="button" aria-label="Zoom out receipt" disabled={receiptZoom <= 50} onClick={() => setReceiptZoom(value => Math.max(50, value - 25))} className="hover:text-heading transition-colors disabled:opacity-40 cursor-pointer"><ZoomOut size={13} /></button>
+                      <span className="text-[11px]">{receiptZoom}%</span>
+                      <button type="button" aria-label="Zoom in receipt" disabled={receiptZoom >= 200} onClick={() => setReceiptZoom(value => Math.min(200, value + 25))} className="hover:text-heading transition-colors disabled:opacity-40 cursor-pointer"><ZoomIn size={13} /></button>
                     </>
                   )}
                 </div>
               </div>
 
               {receiptOpen && (
-              <div className="bg-[#e2e8f0] p-6 pb-8 flex justify-center relative min-h-[420px]">
+                <div className="bg-[#e2e8f0] p-3 flex justify-center relative max-h-[380px] overflow-auto">
+                  {/* Pagination/Nav Control overlay */}
+                  <div onClick={() => setReceiptOpen(false)} className="absolute left-4 top-4 w-7 h-7 bg-primary rounded-full flex items-center justify-center shadow-elevated z-10 cursor-pointer hover:bg-primary transition-colors">
+                    <ChevronLeft size={16} className="text-white" />
+                  </div>
 
-                {/* Pagination/Nav Control overlay */}
-                <div onClick={() => setReceiptOpen(false)} className="absolute left-10 top-16 w-8 h-8 bg-primary rounded-full flex items-center justify-center shadow-elevated z-10 cursor-pointer hover:bg-primary transition-colors">
-                  <ChevronLeft size={16} className="text-white" />
-                </div>
+                  {/* Receipt Visual — original document dimensions preserved */}
+                  <div style={{ zoom: `${receiptZoom}%` }} className="bg-surface-raised w-full max-w-[320px] shadow-elevated rounded-sm p-4 flex flex-col relative z-0 min-h-[280px]">
+                    {/* Background watermark simulation */}
+                    <div className="absolute top-4 right-4 opacity-10">
+                      <div className="w-16 h-16 border-4 border-border-strong rounded-full flex items-center justify-center">
+                        <div className="w-8 h-8 border-4 border-border-strong rounded-full"></div>
+                      </div>
+                    </div>
 
-                {/* Receipt Visual */}
-                <div style={{ zoom: `${receiptZoom}%` }} className="bg-surface-raised w-[320px] shadow-elevated rounded-sm p-6 flex flex-col relative z-0 mt-4 h-[350px]">
+                    <div className="text-right mb-4">
+                      <h3 className="text-base font-black text-heading uppercase tracking-widest">Expense Summary</h3>
+                      <p className="text-[10px] text-muted mt-0.5">{selectedRecord.id}</p>
+                      <p className="text-[10px] text-muted">{new Date(selectedRecord.date).toLocaleDateString()}</p>
+                    </div>
 
-                  {/* Background watermark simulation */}
-                  <div className="absolute top-4 right-4 opacity-10">
-                    <div className="w-16 h-16 border-4 border-border-strong rounded-full flex items-center justify-center">
-                      <div className="w-8 h-8 border-4 border-border-strong rounded-full"></div>
+                    <div className="mb-4">
+                      <p className="text-[8px] font-bold text-caption uppercase tracking-wider mb-0.5">Claimed By</p>
+                      <p className="text-xs font-bold text-heading">{selectedRecord.employee || 'Unassigned'}</p>
+                      <p className="text-[10px] text-muted">Internal expense record</p>
+                    </div>
+
+                    <div className="flex justify-between items-end border-b border-border-subtle pb-1.5 mb-2">
+                      <span className="text-[9px] text-caption">Description</span>
+                      <span className="text-[9px] text-caption">Amount</span>
+                    </div>
+
+                    <div className="flex justify-between items-start mb-auto">
+                      <p className="text-xs text-heading pr-4 leading-relaxed">
+                        {selectedRecord.category} expense at {selectedRecord.merchant || '—'}
+                      </p>
+                      <span className="text-xs text-heading tabular-nums pt-1">{formatMoney(selectedRecord.amount)}</span>
+                    </div>
+
+                    <div className="pt-3 border-t-2 border-gray-900 flex justify-between items-center mt-4">
+                      <span className="text-xs font-bold text-heading">Total {selectedRecord.amount?.currency || 'USD'}</span>
+                      <span className="text-sm font-black text-heading tabular-nums">{formatMoney(selectedRecord.amount)}</span>
                     </div>
                   </div>
-
-                  <div className="text-right mb-6">
-                    <h3 className="text-lg font-black text-heading uppercase tracking-widest">Expense Summary</h3>
-                    <p className="text-[10px] text-muted mt-1">{selectedRecord.id}</p>
-                    <p className="text-[10px] text-muted">{new Date(selectedRecord.date).toLocaleDateString()}</p>
-                  </div>
-
-                  <div className="mb-8">
-                    <p className="text-[8px] font-bold text-caption uppercase tracking-wider mb-1">Claimed By</p>
-                    <p className="text-xs font-bold text-heading">{selectedRecord.employee || 'Unassigned'}</p>
-                    <p className="text-[10px] text-muted">Internal expense record</p>
-                  </div>
-
-                  <div className="flex justify-between items-end border-b border-border-subtle pb-2 mb-3">
-                    <span className="text-[9px] text-caption">Description</span>
-                    <span className="text-[9px] text-caption">Amount</span>
-                  </div>
-
-                  <div className="flex justify-between items-start mb-auto">
-                    <p className="text-xs text-heading pr-4 leading-relaxed">
-                      {selectedRecord.category} expense at {selectedRecord.merchant || '—'}
-                    </p>
-                    <span className="text-xs text-heading tabular-nums pt-1">{formatMoney(selectedRecord.amount)}</span>
-                  </div>
-
-                  <div className="pt-4 border-t-2 border-gray-900 flex justify-between items-center mt-8">
-                    <span className="text-xs font-bold text-heading">Total {selectedRecord.amount?.currency || 'USD'}</span>
-                    <span className="text-sm font-black text-heading tabular-nums">{formatMoney(selectedRecord.amount)}</span>
-                  </div>
                 </div>
-              </div>
               )}
             </div>
 

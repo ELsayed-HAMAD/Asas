@@ -14,7 +14,7 @@ export default function SettingsTabs() {
   ]
 
   return (
-    <div className="flex items-center gap-8 px-8 bg-surface-raised border-b border-border-default z-10 flex-shrink-0 pt-2">
+    <nav aria-label="Settings navigation" className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 bg-surface-raised border-b border-border-default z-10 flex-shrink-0 pt-2 md:gap-x-8 md:px-8">
       {tabs.map(tab => {
         const isActive = pathname === tab.path
         return (
@@ -35,6 +35,6 @@ export default function SettingsTabs() {
           </Link>
         )
       })}
-    </div>
+    </nav>
   )
 }

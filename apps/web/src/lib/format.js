@@ -80,6 +80,21 @@ export function formatCompactMoney(value, currency = defaultCurrency, locale = d
 }
 
 /**
+ * Formats a currency amount compactly for tables (e.g. $1.3M, $45.2K, $850).
+ * Values under 1,000 keep standard currency precision. Values >= 1,000 use compact notation.
+ */
+export function formatCompactTableMoney(value, options = {}) {
+  if (value == null) return '—'
+  const numeric = isMoneyWire(value) ? moneyToMajor(value) : Number(value)
+  if (!Number.isFinite(numeric)) return '—'
+  if (Math.abs(numeric) < 1000) {
+    return formatMoney(value, options)
+  }
+  return formatMoney(value, { ...options, compact: true })
+}
+
+
+/**
  * Format money values safely.
  * Accepts a wire object ({ amount: minor units, currency }), a major-unit number, or a
  * major-unit decimal string. Returns '—' for null/undefined/NaN.
@@ -162,4 +177,10 @@ export function formatDate(value, options, locale = defaultLocale, timeZone = de
   const effectiveTimeZone = dateOnly ? 'UTC' : timeZone
   if (options === undefined) return formatDatePattern(date, defaultDateFormat, locale, effectiveTimeZone)
   return new Intl.DateTimeFormat(locale, { ...options, timeZone: options.timeZone ?? effectiveTimeZone }).format(date)
+}
+
+/** Returns the last 8 characters of an ID, or empty string if not provided. */
+export function shortId(id) {
+  if (!id || typeof id !== 'string') return ''
+  return id.slice(-8)
 }

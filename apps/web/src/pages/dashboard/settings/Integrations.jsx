@@ -125,10 +125,10 @@ export default function SettingsIntegrations() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
+    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
 
       <TopBarActions>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
             <input
@@ -162,11 +162,11 @@ export default function SettingsIntegrations() {
       <SettingsTabs />
 
       {/* ── Main Split View ── */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden">
 
         {/* Left: Integration Cards Grid */}
-        <div className="flex-1 overflow-y-auto p-8">
-          <div className="grid grid-cols-2 gap-6 max-w-4xl">
+        <div className="flex-1 min-w-0 min-h-[320px] overflow-y-auto p-4 sm:p-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-4xl">
 
             {visibleItems.map((integration) => {
               const isSelected = selected?.id === integration.id;
@@ -210,7 +210,7 @@ export default function SettingsIntegrations() {
         </div>
 
         {/* Right: Integration Configuration Panel */}
-        <div className="w-[400px] bg-surface-raised border-l border-border-default flex flex-col flex-shrink-0 shadow-panel z-10">
+        <div className="w-full xl:w-[400px] xl:flex-shrink-0 bg-surface-raised border-t xl:border-t-0 xl:border-l border-border-default flex flex-col max-h-[65vh] xl:max-h-none shadow-panel z-10">
 
           <div className="flex-1 overflow-y-auto p-8">
 

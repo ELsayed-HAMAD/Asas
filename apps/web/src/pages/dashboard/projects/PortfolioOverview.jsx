@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Search,
   ChevronsUpDown,
@@ -6,25 +6,26 @@ import {
   Loader2,
   ClipboardList,
   Pencil,
-  Trash2
+  Trash2,
+  FolderKanban
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { projectsApi } from '../../../lib/api/projects';
 import { hrApi } from '../../../lib/api/hr';
 import { queryKeys } from '../../../lib/queryKeys';
-import { formatDate, formatMoney } from '../../../lib/format';
+import { formatCompactTableMoney, formatDate, formatMoney } from '../../../lib/format';
 import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 const getBadgeStyle = (status) => {
-  if (status === 'ACTIVE' || status === 'ON_TRACK') return "bg-success-light text-success-text";
-  if (status === 'COMPLETED') return "bg-green-100 text-green-700";
-  if (status === 'PLANNING') return "bg-blue-100 text-blue-700";
-  if (status === 'AT_RISK') return "bg-yellow-100 text-yellow-700";
-  if (status === 'DELAYED' || status === 'CANCELLED') return "bg-danger-light text-danger";
-  return "bg-surface-strong text-body";
+  if (status === 'ACTIVE' || status === 'ON_TRACK') return "bg-success-light text-success-text border border-success-border";
+  if (status === 'COMPLETED') return "bg-green-100 text-green-700 border border-green-200";
+  if (status === 'PLANNING') return "bg-blue-100 text-blue-700 border border-blue-200";
+  if (status === 'AT_RISK') return "bg-yellow-100 text-yellow-700 border border-yellow-200";
+  if (status === 'DELAYED' || status === 'CANCELLED') return "bg-danger-light text-danger border border-danger-border";
+  return "bg-surface-strong text-body border border-border-default";
 };
 
 const formatStatus = (status) => {
@@ -130,9 +131,14 @@ export default function PortfolioOverview() {
   });
 
   // Auto-select first project if none selected
-  if (!selectedId && visibleProjects.length > 0) {
-    setSelectedId(visibleProjects[0].id);
-  }
+  useEffect(() => {
+    if (!selectedId && visibleProjects.length > 0) {
+      setSelectedId(visibleProjects[0].id);
+    } else if (visibleProjects.length === 0 && selectedId !== null) {
+      setSelectedId(null);
+    }
+  }, [visibleProjects, selectedId]);
+
 
   const selectedProject = projects.find(p => p.id === selectedId);
   const selectedSprints = selectedProject
@@ -144,6 +150,8 @@ export default function PortfolioOverview() {
   const totalProjects = summary?.totalProjects ?? projects.length;
   const totalBudget = summary?.totalBudget ?? null;
   const budgetUtilization = summary?.utilizationPct ?? null;
+  const totalBudgetText = formatMoney(totalBudget, { maximumFractionDigits: 0 });
+  const totalBudgetFontSize = `clamp(0.75rem, ${(130 / Math.max(1, totalBudgetText.length)).toFixed(2)}cqw, 1.75rem)`;
   const selectedBudgetUtil = selectedProject?.utilizationPct ?? null;
 
   const openEditProject = (proj) => {
@@ -156,14 +164,15 @@ export default function PortfolioOverview() {
   };
 
   return (
-    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
+    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
 
       <TopBarActions>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <select
             value={departmentId}
             onChange={(e) => setDepartmentId(e.target.value)}
-            className="border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent"
+            aria-label="Filter by department"
+            className="border border-border-default text-body px-3 h-9 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent w-auto cursor-pointer"
           >
             <option value="ALL">Filter: All Depts</option>
             {departments.map((d) => (
@@ -172,19 +181,21 @@ export default function PortfolioOverview() {
           </select>
 
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search..."
-              className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-56 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              aria-label="Search projects"
+              title="Search projects"
+              className="pl-9 pr-4 h-9 text-sm border border-border-default rounded-input bg-surface-raised w-[220px] focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
           </div>
 
           <button
             onClick={() => setProjectOpen(true)}
-            className="bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
+            className="bg-primary text-white px-4 h-9 flex items-center justify-center rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer"
           >
             New Project
           </button>
@@ -193,123 +204,152 @@ export default function PortfolioOverview() {
 
       {/* ── KPIs Row ── */}
       <div className="px-6 py-5 flex-shrink-0 border-b border-border-default bg-surface-muted">
-        <div className="grid grid-cols-4 gap-4">
-          <div className="border border-border-default rounded-button p-5 bg-surface-raised shadow-card flex flex-col justify-between">
-            <p className="text-[11px] font-bold text-muted tracking-wide mb-3">Total Active Projects</p>
-            <p className="text-3xl font-bold text-heading">{activeProjects}</p>
-          </div>
-
-          <div className="border border-border-default rounded-button p-5 bg-surface-raised shadow-card flex flex-col justify-between">
-            <p className="text-[11px] font-bold text-muted tracking-wide mb-3">Portfolio Budget Utilization</p>
-            <p className="text-3xl font-bold text-heading">{pct(budgetUtilization)}</p>
-          </div>
-
-          <div className="border border-border-default rounded-button p-5 bg-surface-raised shadow-card flex flex-col justify-between relative">
-            <div className="flex justify-between items-start mb-3">
-              <p className="text-[11px] font-bold text-muted tracking-wide">Total Projects</p>
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="border border-border-default rounded-button px-5 py-4 bg-surface-raised shadow-card flex flex-col justify-between">
+            <p className="text-xs font-medium text-muted mb-2">Total Active Projects</p>
+            <div>
+              <p className="text-[28px] leading-tight font-bold text-heading">{activeProjects}</p>
             </div>
-            <p className="text-3xl font-bold text-heading">{totalProjects}</p>
           </div>
 
-          <div className="border border-border-default rounded-button p-5 bg-surface-raised shadow-card flex flex-col justify-between">
-            <p className="text-[11px] font-bold text-muted tracking-wide mb-3">Total Budget</p>
-            <p className="text-3xl font-bold text-heading">{formatMoney(totalBudget, { maximumFractionDigits: 0 })}</p>
+          <div className="border border-border-default rounded-button px-5 py-4 bg-surface-raised shadow-card flex flex-col justify-between">
+            <p className="text-xs font-medium text-muted mb-2">Portfolio Budget Utilization</p>
+            <div>
+              <p className="text-[28px] leading-tight font-bold text-heading">{pct(budgetUtilization)}</p>
+            </div>
+          </div>
+
+          <div className="border border-border-default rounded-button px-5 py-4 bg-surface-raised shadow-card flex flex-col justify-between">
+            <p className="text-xs font-medium text-muted mb-2">Total Projects</p>
+            <div>
+              <p className="text-[28px] leading-tight font-bold text-heading">{totalProjects}</p>
+            </div>
+          </div>
+
+          <div className="border border-border-default rounded-button px-5 py-4 bg-surface-raised shadow-card flex flex-col justify-between" style={{ containerType: 'inline-size' }}>
+            <p className="text-xs font-medium text-muted mb-2">Total Budget</p>
+            <div>
+              <p className="text-[28px] leading-tight font-bold text-heading" style={{ fontSize: totalBudgetFontSize }}>{totalBudgetText}</p>
+            </div>
           </div>
         </div>
       </div>
 
       {/* ── Main Split View ── */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col xl:flex-row gap-4 p-4 xl:p-5 overflow-hidden bg-surface">
 
-        {/* Left: Table Area */}
-        <div className="flex-1 overflow-y-auto bg-surface-raised flex flex-col border-r border-border-default">
-
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-surface-raised sticky top-0 z-10 border-b border-border-default shadow-card">
-              <tr>
-                <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-default">
-                  <div className="flex items-center gap-1">Project <ChevronsUpDown size={12} className="text-caption" /></div>
-                </th>
-                <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-default">
-                  <div className="flex items-center gap-1">Budget <ChevronsUpDown size={12} className="text-caption" /></div>
-                </th>
-                <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-default">
-                  <div className="flex items-center gap-1">Utilization <ChevronsUpDown size={12} className="text-caption" /></div>
-                </th>
-                <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-default">
-                  <div className="flex items-center gap-1">Status <ChevronsUpDown size={12} className="text-caption" /></div>
-                </th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-border-subtle">
-              {visibleProjects.length === 0 ? (
-                <tr>
-                  <td colSpan="4" className="px-6 py-8 text-center text-sm text-muted">
-                    No projects found matching the selected filters.
-                  </td>
+        {/* Left: Table Card (fills height, card container like Inventory) */}
+        <div data-testid="project-table-card" className="flex-1 min-w-0 bg-surface-raised border border-border-default rounded-card shadow-card flex flex-col overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-width:thin]">
+            <table className="w-full table-fixed border-collapse">
+              <colgroup>
+                <col className="min-w-[200px]" />
+                <col style={{ width: '120px' }} />
+                <col style={{ width: '110px' }} />
+                <col style={{ width: '130px' }} />
+              </colgroup>
+              <thead className="sticky top-0 z-10 bg-surface-muted/95 backdrop-blur-xs border-b border-border-default">
+                <tr className="h-10">
+                  <th className="h-10 ps-5 pe-3 text-start text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">
+                    <div className="flex items-center gap-1">Project <ChevronsUpDown size={12} className="text-caption" /></div>
+                  </th>
+                  <th className="h-10 px-3 text-start text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">
+                    <div className="flex items-center gap-1">Budget <ChevronsUpDown size={12} className="text-caption" /></div>
+                  </th>
+                  <th className="h-10 px-3 text-start text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">
+                    <div className="flex items-center gap-1">Utilization <ChevronsUpDown size={12} className="text-caption" /></div>
+                  </th>
+                  <th className="h-10 ps-3 pe-5 text-end text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">
+                    <div className="flex items-center justify-end gap-1">Status <ChevronsUpDown size={12} className="text-caption" /></div>
+                  </th>
                 </tr>
-              ) : (
-                visibleProjects.map(project => {
-                  const isSelected = selectedId === project.id;
+              </thead>
 
-                  return (
-                    <tr
-                      key={project.id}
-                      onClick={() => setSelectedId(project.id)}
-                      className={`cursor-pointer transition-colors ${
-                        isSelected ? 'bg-accent-light/60 border-l-4 border-l-blue-600' : 'bg-surface-raised hover:bg-surface-muted border-l-4 border-l-transparent'
-                      }`}
-                    >
-                      <td className="px-6 py-3.5">
-                        <span className="text-sm font-bold text-heading">{project.name}</span>
-                      </td>
-                      <td className="px-6 py-3.5 text-sm font-bold text-heading tabular-nums">
-                        {formatMoney(project.budget, { maximumFractionDigits: 0 })}
-                      </td>
-                      <td className="px-6 py-3.5 text-sm text-body-light font-medium">
-                        {pct(project.utilizationPct)}
-                      </td>
-                      <td className="px-6 py-3.5">
-                        <span className={`inline-flex px-2.5 py-1 rounded text-[11px] font-bold tracking-wider ${getBadgeStyle(project.status)}`}>
-                          {formatStatus(project.status)}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
+              <tbody className="divide-y divide-border-subtle">
+                {visibleProjects.length === 0 ? (
+                  <tr className="h-32">
+                    <td colSpan={4} className="px-6 py-8 text-center text-sm text-muted">
+                      No projects found matching the selected filters.
+                    </td>
+                  </tr>
+                ) : (
+                  visibleProjects.map(project => {
+                    const isSelected = selectedId === project.id;
+
+                    return (
+                      <tr
+                        key={project.id}
+                        onClick={() => setSelectedId(project.id)}
+                        className={`relative h-14 cursor-pointer transition-colors ${
+                          isSelected
+                            ? 'bg-accent-light/30'
+                            : 'bg-surface-raised hover:bg-surface-muted/60'
+                        }`}
+                      >
+                        <td className="relative ps-5 pe-3 py-0 align-middle">
+                          {isSelected && (
+                            <span className="absolute inset-y-0 start-0 w-[3px] bg-primary pointer-events-none" aria-hidden="true" />
+                          )}
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-8 h-8 rounded border border-border-default bg-surface-muted flex items-center justify-center shrink-0">
+                              <FolderKanban size={16} className="text-body-light" />
+                            </div>
+                            <span className="text-sm font-medium text-heading truncate whitespace-nowrap" title={project.name}>
+                              {project.name}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-0 align-middle text-sm font-semibold text-heading tabular-nums text-start whitespace-nowrap" title={formatMoney(project.budget, { maximumFractionDigits: 0 })}>
+                          {formatCompactTableMoney(project.budget)}
+                        </td>
+                        <td className="px-3 py-0 align-middle text-sm text-body-light font-medium tabular-nums text-start whitespace-nowrap">
+                          {pct(project.utilizationPct)}
+                        </td>
+                        <td className="ps-3 pe-5 py-0 align-middle text-end whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center justify-center h-[22px] min-w-[90px] px-2.5 rounded text-xs font-semibold whitespace-nowrap text-center ${getBadgeStyle(project.status)}`}
+                          >
+                            {formatStatus(project.status)}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Right: Detail Panel */}
-        <div className="w-[440px] bg-surface-muted overflow-y-auto p-6 flex-shrink-0 space-y-6">
+        <div className="w-full xl:w-[clamp(340px,26vw,400px)] xl:flex-none h-full overflow-y-auto space-y-3">
 
           {selectedProject ? (
             <>
               {/* Header */}
-              <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-bold text-heading leading-tight">{selectedProject.name}</h2>
-                  <div className={`mt-1.5 inline-flex px-3 py-0.5 rounded-full text-[11px] font-bold tracking-wider ${getBadgeStyle(selectedProject.status)}`}>
+              <div className="bg-surface-raised border border-border-default rounded-card-sm p-4 shadow-card flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-lg font-semibold text-heading leading-tight truncate">{selectedProject.name}</h2>
+                  <div className={`mt-1.5 inline-flex px-2.5 py-0.5 rounded text-xs font-semibold tracking-wide ${getBadgeStyle(selectedProject.status)}`}>
                     Status: {formatStatus(selectedProject.status)}
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 flex-shrink-0 pt-0.5">
                   <button
                     type="button"
                     onClick={() => openEditProject(selectedProject)}
-                    className="p-1.5 text-muted hover:text-body hover:bg-surface-muted rounded-input transition-colors"
+                    className="p-1.5 text-muted hover:text-body hover:bg-surface-muted rounded-input transition-colors cursor-pointer"
                     title="Edit project"
+                    aria-label="Edit project"
                   >
                     <Pencil size={15} />
                   </button>
                   <button
                     type="button"
                     onClick={() => setDeleteConfirmOpen(true)}
-                    className="p-1.5 text-muted hover:text-danger hover:bg-danger-light rounded-input transition-colors"
+                    className="p-1.5 text-muted hover:text-danger hover:bg-danger-light rounded-input transition-colors cursor-pointer"
                     title="Delete project"
+                    aria-label="Delete project"
                   >
                     <Trash2 size={15} />
                   </button>
@@ -317,18 +357,23 @@ export default function PortfolioOverview() {
               </div>
 
               {/* Financial Health Card */}
-              <div className="bg-surface-raised border border-border-default rounded-card-sm shadow-card overflow-hidden flex flex-col p-6">
-                <h3 className="text-[11px] font-bold text-muted uppercase tracking-widest mb-6">Financial Health</h3>
+              <div className="bg-surface-raised border border-border-default rounded-card-sm shadow-card overflow-hidden flex flex-col p-4">
+                <h3 className="text-xs font-semibold text-muted uppercase tracking-wider mb-4">Financial Health</h3>
 
-                <div className="flex justify-between items-end mb-4">
+                <div className="flex flex-col gap-3 mb-4 md:flex-row md:justify-between md:items-end xl:flex-col xl:items-stretch">
                   <div>
-                    <p className="text-[11px] font-medium text-muted mb-1">Budget</p>
-                    <p className="text-2xl font-black text-heading tracking-tight tabular-nums">{formatMoney(selectedProject.budget, { maximumFractionDigits: 0 })}</p>
+                    <p className="text-xs font-medium text-muted mb-1">Budget</p>
+                    <p className="text-2xl font-bold text-heading tracking-tight tabular-nums">{formatMoney(selectedProject.budget, { maximumFractionDigits: 0 })}</p>
                   </div>
-                  <div className="text-right">
-            <p className="text-[11px] font-medium text-muted mb-1">Settled Spend</p>
-                    <p className="text-2xl font-black text-accent tracking-tight tabular-nums">{formatMoney(selectedProject.spent, { maximumFractionDigits: 0 })}</p>
-            {(selectedProject.unvaluedSettlementCount > 0 || summary.unassignedSettlementCount > 0) && <p className="mt-2 text-xs text-muted">{selectedProject.unvaluedSettlementCount > 0 ? `${selectedProject.unvaluedSettlementCount} settlement${selectedProject.unvaluedSettlementCount === 1 ? '' : 's'} missing base currency value. ` : ''}{summary.unassignedSettlementCount > 0 ? `${summary.unassignedSettlementCount} settlement${summary.unassignedSettlementCount === 1 ? '' : 's'} not assigned to a project.` : ''}</p>}
+                  <div className="text-left md:text-right xl:text-left">
+                    <p className="text-xs font-medium text-muted mb-1">Settled Spend</p>
+                    <p className="text-xl font-bold text-accent tracking-tight tabular-nums">{formatMoney(selectedProject.spent, { maximumFractionDigits: 0 })}</p>
+                    {(selectedProject.unvaluedSettlementCount > 0 || summary.unassignedSettlementCount > 0) && (
+                      <p className="mt-2 text-xs text-muted">
+                        {selectedProject.unvaluedSettlementCount > 0 ? `${selectedProject.unvaluedSettlementCount} settlement${selectedProject.unvaluedSettlementCount === 1 ? '' : 's'} missing base currency value. ` : ''}
+                        {summary.unassignedSettlementCount > 0 ? `${summary.unassignedSettlementCount} settlement${summary.unassignedSettlementCount === 1 ? '' : 's'} not assigned to a project.` : ''}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -343,43 +388,43 @@ export default function PortfolioOverview() {
                 </div>
 
                 <div className="text-right">
-                  <span className="text-[11px] font-bold text-accent">{pct(selectedBudgetUtil)} Utilized</span>
+                  <span className="text-xs font-semibold text-accent">{pct(selectedBudgetUtil)} Utilized</span>
                 </div>
               </div>
 
               {/* Sprints Tracker Card */}
-              <div className="bg-surface-raised border border-border-default rounded-card-sm p-6 shadow-card">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-[11px] font-bold text-muted uppercase tracking-widest">Sprints</h3>
+              <div className="bg-surface-raised border border-border-default rounded-card-sm p-4 shadow-card">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Sprints</h3>
                   <button
                     type="button"
                     onClick={() => setSprintOpen(true)}
-                    className="border border-border-default text-body px-3 py-1 rounded-button text-[11px] font-bold hover:bg-surface-muted transition-colors uppercase tracking-wider disabled:opacity-60"
+                    className="border border-border-default text-body px-3 py-1 rounded-button text-xs font-semibold hover:bg-surface-muted transition-colors uppercase tracking-wider disabled:opacity-60 cursor-pointer"
                   >
                     + Add Sprint
                   </button>
                 </div>
 
                 {velocityComparison?.current && velocityComparison?.previous ? (
-                  <div className="mb-5 rounded-button bg-surface-muted p-3 text-xs text-body">
+                  <div className="mb-4 rounded-button bg-surface-muted p-3 text-xs text-body">
                     <p className="font-semibold text-heading">Completed story points</p>
                     <p className="mt-1">{velocityComparison.current.name}: {velocityComparison.current.completedStoryPoints ?? 'No estimates'} pts ({formatDate(velocityComparison.current.startsAt)} – {formatDate(velocityComparison.current.endsAt)})</p>
                     <p>{velocityComparison.previous.name}: {velocityComparison.previous.completedStoryPoints ?? 'No estimates'} pts ({formatDate(velocityComparison.previous.startsAt)} – {formatDate(velocityComparison.previous.endsAt)})</p>
                     <p className="mt-1 font-semibold">{velocityComparison.deltaStoryPoints == null ? 'Comparison unavailable: one or both sprints have no estimated completions.' : `${velocityComparison.deltaStoryPoints > 0 ? '+' : ''}${velocityComparison.deltaStoryPoints} pts${velocityComparison.deltaPct == null ? '' : ` (${velocityComparison.deltaPct > 0 ? '+' : ''}${velocityComparison.deltaPct}%)`}`}</p>
                   </div>
                 ) : velocityComparison?.current || selectedSprints.length > 0 ? (
-                  <p className="mb-5 rounded-button bg-surface-muted p-3 text-xs text-muted">A comparison needs two completed sprints with recorded estimates.</p>
+                  <p className="mb-4 rounded-button bg-surface-muted p-3 text-xs text-muted">A comparison needs two completed sprints with recorded estimates.</p>
                 ) : null}
 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {selectedSprints.length > 0 ? (
                     selectedSprints.map(sprint => (
                       <div key={sprint.id} className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Clock size={18} className="text-accent" />
-                          <span className="text-sm font-bold text-heading">{sprint.name}</span>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Clock size={16} className="text-accent flex-shrink-0" />
+                          <span className="text-sm font-semibold text-heading truncate">{sprint.name}</span>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right flex-shrink-0">
                           <span className="block text-sm font-medium text-muted">{sprint.completionPct}%</span>
                           <span className="block text-[11px] text-caption" title={sprint.velocity.unestimatedCompletedIssues ? `${sprint.velocity.unestimatedCompletedIssues} completed issues have no estimate` : undefined}>
                             {sprint.velocity.completedStoryPoints == null ? 'No estimates' : `${sprint.velocity.completedStoryPoints} pts completed`}
@@ -389,14 +434,15 @@ export default function PortfolioOverview() {
                       </div>
                     ))
                   ) : (
-                    <div className="flex flex-col items-center justify-center py-8">
-                      <div className="w-12 h-12 bg-surface-muted rounded-full flex items-center justify-center mb-3">
-                        <ClipboardList size={24} className="text-faint" />
+                    <div className="flex flex-col items-center justify-center py-6">
+                      <div className="w-10 h-10 bg-surface-muted rounded-full flex items-center justify-center mb-2.5">
+                        <ClipboardList size={20} className="text-faint" />
                       </div>
-                      <p className="text-sm font-medium text-body-light mb-4">No sprints for this project.</p>
+                      <p className="text-sm font-medium text-body-light mb-3">No sprints for this project.</p>
                       <button
+                        type="button"
                         onClick={() => setSprintOpen(true)}
-                        className="border border-border-default text-body px-4 py-1.5 rounded-button text-[11px] font-bold hover:bg-surface-muted transition-colors uppercase tracking-wider disabled:opacity-60"
+                        className="border border-border-default text-body px-4 py-1.5 rounded-button text-xs font-semibold hover:bg-surface-muted transition-colors uppercase tracking-wider disabled:opacity-60 cursor-pointer"
                       >
                         + Add Sprint
                       </button>

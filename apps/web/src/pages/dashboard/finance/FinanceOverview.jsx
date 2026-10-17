@@ -11,15 +11,18 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../../../lib/api/finance';
 import { queryKeys } from '../../../lib/queryKeys';
-import { formatMoney, formatCompactMoney, moneyToMajor } from '../../../lib/format';
+import { formatMoney, formatCompactMoney, formatCompactTableMoney, moneyToMajor } from '../../../lib/format';
 import { downloadCsv } from '../../../lib/csv';
-import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
 
 // Display-only conversion of a wire money object ({amount: minor units, currency}) to a
 // major-unit number, used solely to feed recharts' numeric series / axis ticks. Every
 // human-readable figure still goes through formatMoney.
 const major = (money) => (money ? moneyToMajor(money) : 0);
+const metricFontSize = money => {
+  const label = formatMoney(money)
+  return `clamp(0.75rem, ${Math.min(14, 130 / label.length)}cqw, 1.5rem)`
+}
 
 const EXPENSE_COLORS = [
   'var(--color-info)',
@@ -153,18 +156,12 @@ export default function FinanceOverview() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-surface overflow-x-hidden min-w-[1000px]">
+    <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-y-auto min-w-0 px-6 py-5">
 
-      <TopBarActions>
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors">
-            <Calendar size={14} className="text-muted" />
-            <span>Year</span>
-            <select aria-label="Finance calendar year" value={selectedYear} onChange={event => setSelectedYear(event.target.value)} className="bg-transparent focus:outline-none">
-              {availableYears.map(year => <option key={year} value={year}>{year}</option>)}
-            </select>
-          </label>
-
+      {/* ── Page Toolbar (Single Row across 12-column width) ── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 w-full mb-5 flex-shrink-0">
+        {/* Left group */}
+        <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
             <input
@@ -172,103 +169,166 @@ export default function FinanceOverview() {
               placeholder="Search..."
               value={transactionSearch}
               onChange={event => setTransactionSearch(event.target.value)}
-              className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-56 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className="pl-9 pr-4 py-2 text-xs border border-border-default rounded-input bg-surface-raised w-72 max-w-full focus:outline-none focus:border-border-strong focus:ring-2 focus:ring-border-subtle transition-all shadow-card"
             />
           </div>
 
-          <button type="button" onClick={downloadFinanceReport} aria-label="Download finance report" title="Download finance report" className="p-1.5 text-muted hover:text-heading transition-colors">
-            <Download size={18} />
+          <label className="flex items-center gap-2 border border-border-default text-body px-3.5 py-2 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card cursor-pointer shrink-0">
+            <Calendar size={14} className="text-muted" />
+            <span>Year</span>
+            <select
+              aria-label="Finance calendar year"
+              value={selectedYear}
+              onChange={event => setSelectedYear(event.target.value)}
+              className="bg-transparent text-xs font-semibold text-heading focus:outline-none cursor-pointer"
+            >
+              {availableYears.map(year => <option key={year} value={year}>{year}</option>)}
+            </select>
+          </label>
+        </div>
+
+        {/* Right group */}
+        <div className="flex items-center gap-2.5 shrink-0 ml-auto">
+          <button
+            type="button"
+            onClick={downloadFinanceReport}
+            aria-label="Download finance report"
+            title="Download finance report"
+            className="flex items-center gap-2 border border-border-default text-body px-3.5 py-2 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card cursor-pointer"
+          >
+            <Download size={14} /> Export
           </button>
 
-          <button onClick={() => setInvoiceOpen(true)} className="bg-primary text-on-primary px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors">
+          <button
+            type="button"
+            onClick={() => setInvoiceOpen(true)}
+            className="flex items-center gap-2 bg-primary text-on-primary px-3.5 py-2 rounded-input text-xs font-medium hover:bg-primary-hover transition-colors shadow-card cursor-pointer"
+          >
             Create Invoice
           </button>
         </div>
-      </TopBarActions>
+      </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      {/* ── Top 4 KPI Cards Grid (grid-cols-12 gap-5 mb-5) ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-5 mb-5 flex-shrink-0">
 
-        {/* ── KPIs Grid ── */}
-        <div className="grid grid-cols-4 gap-4">
-
-          {/* Receivables Outstanding (replaces the old "Total Cash Balance" — no cash-balance field exists in the API) */}
-          <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card">
-            <div className="flex justify-between items-start mb-3">
-              <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Outstanding Receivables</p>
-              <FileText size={16} className="text-caption" />
-            </div>
-            <div className="flex items-center gap-3">
-              <p className="text-3xl font-extrabold text-heading tracking-tight">{formatMoney(data.receivableOutstanding)}</p>
-              <span className="flex items-center gap-1 bg-success-light text-success-text px-2 py-0.5 rounded text-xs font-bold">
-                <TrendingUp size={12} strokeWidth={3} /> {receivablesBadgeText}
-              </span>
-            </div>
+        {/* Card 1: Outstanding Receivables */}
+        <div className="col-span-12 sm:col-span-6 lg:col-span-3 @container bg-surface-raised border border-border-subtle rounded-card p-4 shadow-card h-auto flex flex-col justify-start">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">Outstanding Receivables</p>
+            <FileText size={15} className="text-caption shrink-0" />
           </div>
-
-          {/* Net Cash Flow (sparkline fed by the real cash-flow series) */}
-          <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card relative overflow-hidden">
-            <div className="flex justify-between items-start mb-1 relative z-10">
-              <p className="text-[10px] font-bold text-muted uppercase tracking-wider w-3/4">Selected Period Net Cash Flow</p>
-              <RefreshCw size={16} className="text-caption" />
-            </div>
-            <p className="text-3xl font-extrabold text-heading tracking-tight relative z-10">{formatMoney(data.cashFlowComparison.current.net)}</p>
-            <p className={`relative z-10 mt-1 text-[10px] font-medium ${cashFlowDeltaMinor > 0 ? 'text-success-text' : cashFlowDeltaMinor < 0 ? 'text-danger' : 'text-muted'}`} title="Compared with the matching date range in the previous year">{cashFlowChangeText}</p>
-            {/* Cash-flow Sparkline */}
-            <div className="absolute bottom-0 left-0 w-full h-12">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={netSeries} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="mrrGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-chart-blue)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="var(--color-chart-blue)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Area type="monotone" dataKey="v" stroke="var(--color-chart-blue)" strokeWidth={2} fill="url(#mrrGrad)" dot={false} animationDuration={800} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+          <p
+            className="min-w-0 mt-2 text-2xl font-bold text-heading leading-tight tracking-tight truncate"
+            style={{ fontSize: metricFontSize(data.receivableOutstanding) }}
+          >
+            {formatMoney(data.receivableOutstanding)}
+          </p>
+          <div className="mt-2 flex items-center text-xs leading-normal truncate">
+            <span className="inline-flex items-center gap-1 bg-success-light text-success-text px-2 py-0.5 rounded text-xs font-semibold truncate">
+              <TrendingUp size={12} strokeWidth={2.5} className="shrink-0" />
+              <span className="truncate">{receivablesBadgeText}</span>
+            </span>
           </div>
-
-          {/* Payables Outstanding */}
-          <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card">
-            <div className="flex justify-between items-start mb-3">
-              <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Outstanding Payables</p>
-              <Wallet size={16} className="text-caption" />
-            </div>
-            <p className="text-3xl font-extrabold text-heading tracking-tight">{formatMoney(data.payableOutstanding)}</p>
-            <div className="flex items-center gap-1.5 text-danger text-xs font-bold mt-2.5">
-              <TrendingUp size={14} strokeWidth={2.5} className="rotate-180" />
-              {payablesBadgeText}
-            </div>
-          </div>
-
-          {/* Expenses Total */}
-          <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card">
-            <div className="flex justify-between items-start mb-3">
-              <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Expenses Total</p>
-              <Flame size={16} className="text-caption" />
-            </div>
-            <p className="text-3xl font-extrabold text-heading tracking-tight">
-              {formatMoney(data.expensesTotal)}
-            </p>
-            <p className="text-xs text-muted mt-2.5 font-medium">
-              {data.expensesPendingCount} pending approval
-            </p>
-          </div>
-
         </div>
 
-        {/* ── Cash Flow Chart ── */}
-        <div className="bg-surface-raised border border-border-default rounded-card-sm shadow-card overflow-hidden">
-          <div className="flex items-center justify-between p-6 pb-2">
-            <h2 className="text-lg font-bold text-heading">Cash Flow Analysis</h2>
-              <button type="button" onClick={downloadCashFlow} aria-label="Download cash flow data" title="Download cash flow data" className="text-caption hover:text-body">
-              <MoreHorizontal size={20} />
-            </button>
+        {/* Card 2: Selected Period Net Cash Flow */}
+        <div className="col-span-12 sm:col-span-6 lg:col-span-3 @container bg-surface-raised border border-border-subtle rounded-card p-4 shadow-card relative overflow-hidden h-auto flex flex-col justify-start">
+          <div className="flex items-center justify-between gap-2 relative z-10">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate" title="Selected Period Net Cash Flow">
+              Selected Period Net Cash Flow
+            </p>
+            <RefreshCw size={15} className="text-caption shrink-0" />
           </div>
+          <p
+            className="min-w-0 mt-2 text-2xl font-bold text-heading leading-tight tracking-tight relative z-10 truncate"
+            style={{ fontSize: metricFontSize(data.cashFlowComparison.current.net) }}
+          >
+            {formatMoney(data.cashFlowComparison.current.net)}
+          </p>
+          <div className="mt-2 relative z-10 flex items-center text-xs leading-normal truncate">
+            <p
+              className={`truncate font-medium text-xs leading-normal ${cashFlowDeltaMinor > 0 ? 'text-success-text' : cashFlowDeltaMinor < 0 ? 'text-danger' : 'text-muted'}`}
+              title={cashFlowChangeText}
+            >
+              {cashFlowChangeText}
+            </p>
+          </div>
+          {/* Cash-flow Sparkline */}
+          <div className="absolute bottom-0 left-0 w-full h-4 overflow-hidden pointer-events-none">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={netSeries} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="mrrGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-chart-blue)" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="var(--color-chart-blue)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area type="monotone" dataKey="v" stroke="var(--color-chart-blue)" strokeWidth={2} fill="url(#mrrGrad)" dot={false} animationDuration={800} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
 
-          <div className="p-6 pt-0">
-            <div className="w-full h-[320px] mt-4">
+        {/* Card 3: Outstanding Payables */}
+        <div className="col-span-12 sm:col-span-6 lg:col-span-3 @container bg-surface-raised border border-border-subtle rounded-card p-4 shadow-card h-auto flex flex-col justify-start">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">Outstanding Payables</p>
+            <Wallet size={15} className="text-caption shrink-0" />
+          </div>
+          <p
+            className="min-w-0 mt-2 text-2xl font-bold text-heading leading-tight tracking-tight truncate"
+            style={{ fontSize: metricFontSize(data.payableOutstanding) }}
+          >
+            {formatMoney(data.payableOutstanding)}
+          </p>
+          <div className="mt-2 flex items-center gap-1.5 text-xs leading-normal truncate text-danger font-semibold">
+            <TrendingUp size={13} strokeWidth={2.5} className="rotate-180 shrink-0" />
+            <span className="truncate">{payablesBadgeText}</span>
+          </div>
+        </div>
+
+        {/* Card 4: Expenses Total */}
+        <div className="col-span-12 sm:col-span-6 lg:col-span-3 @container bg-surface-raised border border-border-subtle rounded-card p-4 shadow-card h-auto flex flex-col justify-start">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">Expenses Total</p>
+            <Flame size={15} className="text-caption shrink-0" />
+          </div>
+          <p
+            className="min-w-0 mt-2 text-2xl font-bold text-heading leading-tight tracking-tight truncate"
+            style={{ fontSize: metricFontSize(data.expensesTotal) }}
+          >
+            {formatMoney(data.expensesTotal)}
+          </p>
+          <div className="mt-2 flex items-center text-xs text-muted leading-normal font-medium truncate">
+            <span className="truncate">{data.expensesPendingCount} pending approval</span>
+          </div>
+        </div>
+
+      </div>
+
+      {/* ── Cash Flow Chart (mb-5) ── */}
+      <div className="bg-surface-raised border border-border-subtle rounded-card shadow-card overflow-hidden mb-5 flex-shrink-0">
+        <div className="flex items-center justify-between p-5 pb-2">
+          <h2 className="text-base font-bold text-heading">Cash Flow Analysis</h2>
+          <button
+            type="button"
+            onClick={downloadCashFlow}
+            aria-label="Download cash flow data"
+            title="Download cash flow data"
+            className="text-caption hover:text-body p-1 rounded hover:bg-surface-muted transition-colors cursor-pointer"
+          >
+            <MoreHorizontal size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 pt-0">
+          {cashFlowData.length === 0 ? (
+            <div className="w-full h-[200px] flex items-center justify-center text-sm text-muted">
+              No cash flow data is available for {selectedYear}.
+            </div>
+          ) : (
+            <div className="w-full h-[300px] mt-2">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={cashFlowData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
@@ -278,7 +338,6 @@ export default function FinanceOverview() {
                     contentStyle={{ borderRadius: 'var(--radius-button)', border: '1px solid var(--color-border-default)', boxShadow: 'var(--shadow-card-hover)', fontSize: 13, padding: '12px', lineHeight: '1.5' }}
                     formatter={(value, name) => {
                       const label = name === 'inflow' ? 'Inflow' : name === 'outflow' ? 'Outflow' : 'Net'
-                      // Do not use Math.abs() for Net so negative values render correctly in the tooltip
                       const formattedValue = name === 'net' ? value : Math.abs(value)
                       return [formatCompactMoney(formattedValue, currency), label]
                     }}
@@ -291,121 +350,132 @@ export default function FinanceOverview() {
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
-          </div>
+          )}
         </div>
-
-        {/* ── Bottom Row ── */}
-        <div className="grid grid-cols-3 gap-6">
-
-          {/* Recent Transactions — the overview endpoint exposes no transactions feed, so the
-              card renders its empty state (no rows) rather than fabricated data. */}
-          <div className="col-span-2 bg-surface-raised border border-border-default rounded-card-sm shadow-card overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between p-6 border-b border-border-subtle">
-              <h2 className="text-lg font-bold text-heading">Recent Transactions</h2>
-              <button type="button" onClick={() => setTransactionSearch('')} className="text-sm font-semibold text-accent hover:text-accent-hover">
-                Clear Search
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-surface-raised">
-                  <tr>
-                    <th className="px-6 py-4 text-[10px] font-bold text-caption uppercase tracking-wider border-b border-border-subtle">Date</th>
-                    <th className="px-6 py-4 text-[10px] font-bold text-caption uppercase tracking-wider border-b border-border-subtle">Description</th>
-                    <th className="px-6 py-4 text-[10px] font-bold text-caption uppercase tracking-wider border-b border-border-subtle text-right">Amount</th>
-                    <th className="px-6 py-4 text-[10px] font-bold text-caption uppercase tracking-wider border-b border-border-subtle text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-faint">
-                  {recentTransactions.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-surface-muted/50">
-                      <td className="px-6 py-4 text-sm text-body-light font-medium">
-                        {new Date(tx.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit' })}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-bold text-heading">{tx.description}</td>
-                      <td className={`px-6 py-4 text-sm font-medium text-right tabular-nums ${
-                        tx.type === 'credit' ? 'text-success' : 'text-heading'
-                      }`}>
-                        {formatMoney(tx.type === 'debit' && tx.amount && typeof tx.amount === 'object'
-                          ? { ...tx.amount, amount: -Math.abs(tx.amount.amount) }
-                          : tx.type === 'debit' ? -Number(tx.amount) : tx.amount,
-                          { forcePlus: tx.type === 'credit' })}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                          tx.status === 'CLEARED'
-                            ? (tx.type === 'credit'
-                                ? 'bg-success-light text-success border border-success-border'
-                                : 'bg-surface-muted text-body border border-border-default')
-                            : 'bg-surface-muted text-body-light border border-border-default'
-                        }`}>
-                          {tx.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  {recentTransactions.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-muted text-sm">
-                        No recent transactions found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Operating Expenses */}
-          <div className="col-span-1 bg-surface-raised border border-border-default rounded-card-sm p-6 shadow-card flex flex-col">
-            <h2 className="text-lg font-bold text-heading mb-8">Operating Expenses</h2>
-
-            {/* Recharts Donut Chart */}
-            <div className="relative w-48 h-48 mx-auto mb-8">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={expenseData.some(s => s.value > 0) ? expenseData.filter(s => s.value > 0) : [{ name: 'No expenses', value: 1, color: 'var(--color-border-default)' }]}
-                    cx="50%" cy="50%"
-                    innerRadius={55} outerRadius={80}
-                    paddingAngle={3}
-                    dataKey="value"
-                    animationDuration={1000}
-                    stroke="none"
-                  >
-                    {expenseData.map((entry) => (
-                      <Cell key={entry.name} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ borderRadius: 'var(--radius-button)', border: '1px solid var(--color-border-default)', boxShadow: 'var(--shadow-card-hover)', fontSize: 13 }}
-                    formatter={(value, name) => [totalExp > 0 ? formatMoney(value, { currency }) : 'No expenses', name]}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-[10px] font-bold text-caption uppercase tracking-widest">Total</span>
-                <span className="text-2xl font-extrabold text-heading mt-0.5">{formatMoney(data.expensesTotal, { compact: true })}</span>
-              </div>
-            </div>
-
-            {/* Legend */}
-            <div className="flex flex-col gap-3 mt-auto">
-              {expenseData.map((item) => (
-                <div key={item.name} className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }}></div>
-                    <span className="text-xs font-semibold text-body-light truncate">{item.name}</span>
-                  </div>
-                  <span className="text-xs font-bold text-heading shrink-0">{item.pct}%</span>
-                </div>
-              ))}
-            </div>
-
-          </div>
-        </div>
-
       </div>
+
+      {/* ── Bottom Row (grid-cols-12 gap-5 items-stretch) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch flex-shrink-0">
+
+        {/* Recent Transactions (col-span-9) */}
+        <div className="col-span-12 lg:col-span-9 min-w-0 bg-surface-raised border border-border-subtle rounded-card shadow-card overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between p-5 border-b border-border-subtle bg-surface-raised">
+            <h2 className="text-base font-bold text-heading">Recent Transactions</h2>
+            <button
+              type="button"
+              onClick={() => setTransactionSearch('')}
+              className="text-xs font-semibold text-accent hover:text-accent-hover cursor-pointer"
+            >
+              Clear Search
+            </button>
+          </div>
+          <div className="flex-1 overflow-auto">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
+                <tr>
+                  <th className="px-5 py-2.5 text-[11px] font-bold text-muted uppercase tracking-wider bg-surface-muted">Date</th>
+                  <th className="px-5 py-2.5 text-[11px] font-bold text-muted uppercase tracking-wider bg-surface-muted">Description</th>
+                  <th className="px-5 py-2.5 text-[11px] font-bold text-muted uppercase tracking-wider text-right bg-surface-muted">Amount</th>
+                  <th className="px-5 py-2.5 text-[11px] font-bold text-muted uppercase tracking-wider text-right bg-surface-muted">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-subtle">
+                {recentTransactions.map((tx) => (
+                  <tr key={tx.id} className="hover:bg-surface-muted/60 transition-colors h-14">
+                    <td className="px-5 py-2.5 text-xs text-body-light font-medium whitespace-nowrap">
+                      {new Date(tx.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit' })}
+                    </td>
+                    <td className="px-5 py-2.5 text-sm font-semibold text-heading truncate max-w-xs">{tx.description}</td>
+                    <td
+                      className={`px-5 py-2.5 text-sm font-semibold text-right tabular-nums whitespace-nowrap ${
+                        tx.type === 'credit' ? 'text-success' : 'text-heading'
+                      }`}
+                      title={formatMoney(tx.type === 'debit' && tx.amount && typeof tx.amount === 'object'
+                        ? { ...tx.amount, amount: -Math.abs(tx.amount.amount) }
+                        : tx.type === 'debit' ? -Number(tx.amount) : tx.amount,
+                        { forcePlus: tx.type === 'credit' })}
+                    >
+                      {formatCompactTableMoney(tx.type === 'debit' && tx.amount && typeof tx.amount === 'object'
+                        ? { ...tx.amount, amount: -Math.abs(tx.amount.amount) }
+                        : tx.type === 'debit' ? -Number(tx.amount) : tx.amount,
+                        { forcePlus: tx.type === 'credit' })}
+                    </td>
+                    <td className="px-5 py-2.5 text-right whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                        tx.status === 'CLEARED'
+                          ? (tx.type === 'credit'
+                              ? 'bg-success-light text-success border border-success-border'
+                              : 'bg-surface-muted text-body border border-border-default')
+                          : 'bg-surface-muted text-body-light border border-border-default'
+                      }`}>
+                        {tx.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {recentTransactions.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-5 py-8 text-center text-muted text-sm">
+                      <div className="min-h-[220px] flex items-center justify-center">
+                        No recent transactions found.
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Operating Expenses (col-span-3) */}
+        <div className="col-span-12 lg:col-span-3 min-w-0 bg-surface-raised border border-border-subtle rounded-card p-5 shadow-card flex flex-col justify-between">
+          <h2 className="text-base font-bold text-heading mb-4">Operating Expenses</h2>
+
+          {/* Recharts Donut Chart */}
+          <div className="relative w-44 h-44 mx-auto mb-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={expenseData.some(s => s.value > 0) ? expenseData.filter(s => s.value > 0) : [{ name: 'No expenses', value: 1, color: 'var(--color-border-default)' }]}
+                  cx="50%" cy="50%"
+                  innerRadius={50} outerRadius={72}
+                  paddingAngle={3}
+                  dataKey="value"
+                  animationDuration={1000}
+                  stroke="none"
+                >
+                  {expenseData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ borderRadius: 'var(--radius-button)', border: '1px solid var(--color-border-default)', boxShadow: 'var(--shadow-card-hover)', fontSize: 13 }}
+                  formatter={(value, name) => [totalExp > 0 ? formatMoney(value, { currency }) : 'No expenses', name]}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span className="text-[10px] font-bold text-caption uppercase tracking-widest">Total</span>
+              <span className="text-xl font-extrabold text-heading mt-0.5">{formatMoney(data.expensesTotal, { compact: true })}</span>
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="flex flex-col gap-2.5 mt-auto">
+            {expenseData.map((item) => (
+              <div key={item.name} className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }}></div>
+                  <span className="text-xs font-semibold text-body-light truncate">{item.name}</span>
+                </div>
+                <span className="text-xs font-bold text-heading shrink-0">{item.pct}%</span>
+              </div>
+            ))}
+          </div>
+
+        </div>
+      </div>
+
       <FormDialog open={invoiceOpen} onClose={() => setInvoiceOpen(false)} title="Create invoice" subtitle="Create a receivable invoice for a customer." busy={createInvoice.isPending} onConfirm={() => createInvoice.mutate()} confirmLabel="Create invoice">
         <div className="space-y-4"><label className="block text-sm font-medium text-body">Customer<select required value={invoiceForm.customerId} onChange={event => setInvoiceForm(current => ({ ...current, customerId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2"><option value="">Select a customer</option>{(customersData?.items ?? []).map(customer => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label><label className="block text-sm font-medium text-body">Invoice number<input value={invoiceForm.number} onChange={event => setInvoiceForm(current => ({ ...current, number: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Amount<input required type="number" min="0" step="0.01" value={invoiceForm.amount} onChange={event => setInvoiceForm(current => ({ ...current, amount: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Due date<input type="date" value={invoiceForm.dueDate} onChange={event => setInvoiceForm(current => ({ ...current, dueDate: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></div>
       </FormDialog>
