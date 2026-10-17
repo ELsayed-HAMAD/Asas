@@ -15,7 +15,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { projectsApi } from '../../../lib/api/projects';
 import { queryKeys } from '../../../lib/queryKeys';
 import { downloadRoadmapCsv } from '../../../lib/roadmapExport';
-import TopBarActions from '../../../components/TopBarActions';
+import PageHeader from '../../../components/common/PageHeader';
+import PageToolbar from '../../../components/common/PageToolbar';
 import FormDialog from '../../../components/common/FormDialog';
 
 export default function Roadmap() {
@@ -103,219 +104,284 @@ export default function Roadmap() {
   }).filter(p => !search.trim() || p.tasks.length > 0 || p.title.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-0">
+    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
 
-      <TopBarActions>
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search..."
-              className="pl-9 pr-4 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-            />
-          </div>
-          <button type="button" onClick={() => setPhaseOpen(true)} className="border border-border-default bg-surface-raised text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted">New Phase</button>
-          <button type="button" disabled={!phases.length} onClick={() => { setTaskForm({ title: '', phaseId: phases[0]?.id || '' }); setTaskOpen(true); }} className="border border-border-default bg-surface-raised text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted disabled:opacity-60">New Task</button>
-
-          <button
-            onClick={() => downloadRoadmapCsv(phases)}
-            className="bg-primary text-white px-5 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
-          >
-            Export
-          </button>
-        </div>
-      </TopBarActions>
-
-      {/* ── Main Workspace ── */}
-      <div className="flex-1 flex overflow-hidden">
-
-        {/* Left Pane Wrapper */}
-        <div className="flex-1 flex flex-col bg-surface-raised min-w-0">
-
-          {/* ── Stats Sub-header ── */}
-          <div className="flex items-center justify-between px-6 md:px-8 py-3 border-b border-border-default flex-shrink-0">
-            <div className="flex items-center gap-8 text-[11px] font-bold tracking-wide uppercase text-muted">
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
-                Active Phases: <span className="text-heading ml-1">{phases.length}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
-                Tracked Tasks: <span className="text-heading ml-1">{totalTasks}</span>
-              </div>
+      {/* ── Page Header (Quiet stats on left, actions on right) ── */}
+      <PageHeader
+        title={
+          <div className="flex items-center gap-6">
+            <div className="flex items-baseline gap-2">
+              <span className="text-xs font-normal text-muted">Active Phases:</span>
+              <span className="text-xl font-medium text-heading tabular-nums">{phases.length}</span>
             </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-xs font-normal text-muted">Tracked Tasks:</span>
+              <span className="text-xl font-medium text-heading tabular-nums">{totalTasks}</span>
+            </div>
+          </div>
+        }
+        actions={
+          <div className="flex items-center gap-3 shrink-0 flex-nowrap">
+            <button
+              type="button"
+              onClick={() => setPhaseOpen(true)}
+              className="h-10 px-3.5 rounded-[10px] border-0 bg-surface-raised text-body text-sm font-medium hover:bg-surface-muted transition-colors cursor-pointer shadow-[0_1px_2px_rgba(16,24,40,0.04)] flex items-center justify-center whitespace-nowrap"
+            >
+              New Phase
+            </button>
 
             <button
-              disabled
-              className="flex items-center gap-2 text-xs font-semibold text-body hover:text-heading transition-colors bg-surface-muted px-3 py-1.5 rounded border border-border-subtle shadow-sm disabled:opacity-60"
+              type="button"
+              disabled={!phases.length}
+              onClick={() => { setTaskForm({ title: '', phaseId: phases[0]?.id || '' }); setTaskOpen(true); }}
+              className="h-10 px-3.5 rounded-[10px] border-0 bg-surface-raised text-body text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60 cursor-pointer shadow-[0_1px_2px_rgba(16,24,40,0.04)] flex items-center justify-center whitespace-nowrap"
             >
-              Timeline: H2 2026 <ChevronDown size={14} className="text-caption" />
+              New Task
+            </button>
+
+            <button
+              type="button"
+              onClick={() => downloadRoadmapCsv(phases)}
+              className="h-10 px-4 rounded-[10px] bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 shrink-0 cursor-pointer shadow-sm flex items-center justify-center whitespace-nowrap"
+            >
+              Export
             </button>
           </div>
+        }
+        className="bg-surface mb-2 px-6"
+      />
 
-          {/* Left: Linear List Area */}
-          <div className="flex-1 overflow-y-auto p-6 md:p-8">
+      {/* ── Main Split View ── */}
+      <div className="flex-1 min-h-0 flex flex-col xl:flex-row gap-5 px-6 pb-6 overflow-hidden bg-surface">
 
-          <div className="max-w-4xl mx-auto space-y-8 pb-12">
-            {filteredPhases.length === 0 ? (
-              <div className="flex w-full items-center justify-center text-sm text-muted py-12">No roadmap data found.</div>
-            ) : (
-              filteredPhases.map(phase => (
-                <div key={phase.id} className="space-y-4">
+        {/* Left Column (List column): Toolbar + Phase Groups */}
+        <div className="flex-1 min-w-0 h-full overflow-y-auto pr-1 scrollbar-soft">
 
-                  {/* Phase Header */}
-                  <div className="flex items-center justify-between border-b border-border-default pb-2">
-                    <div className="flex items-center gap-3">
-                      <Folder size={18} className="text-muted" />
-                      <h3 className="text-sm font-bold text-heading uppercase tracking-widest">{phase.title}</h3>
-                      <span className="text-[10px] font-bold text-muted bg-surface-muted px-2 py-0.5 rounded-full">
-                        {phase.tasks?.length || 0} Tasks
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={deletePhase.isPending}
-                      onClick={() => {
-                        if (window.confirm(`Delete phase "${phase.title}" and its tasks?`)) {
-                          deletePhase.mutate(phase.id);
-                        }
-                      }}
-                      className="text-caption hover:text-danger p-1 rounded transition-colors text-xs disabled:opacity-50"
-                      title="Delete phase"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+          {/* Toolbar: Search roadmap + Timeline */}
+          <PageToolbar
+            className="mb-4"
+            left={
+              <>
+                <div className="relative flex-1 min-w-[160px] max-w-[280px]">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Search..."
+                    aria-label="Search roadmap"
+                    title="Search roadmap"
+                    className="pl-9 pr-4 h-10 text-sm border-0 rounded-[10px] bg-surface-raised text-heading placeholder:text-caption focus:outline-none focus:ring-2 focus:ring-accent shadow-[0_1px_2px_rgba(16,24,40,0.04)] w-full"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  disabled
+                  className="flex items-center gap-1.5 h-10 px-3.5 border-0 bg-surface-raised text-body rounded-[10px] text-xs font-medium shadow-[0_1px_2px_rgba(16,24,40,0.04)] disabled:opacity-60 cursor-not-allowed shrink-0"
+                  title="Timeline: H2 2026"
+                  aria-label="Timeline: H2 2026"
+                >
+                  <span>Timeline: H2 2026</span>
+                  <ChevronDown size={13} className="text-caption" />
+                </button>
+              </>
+            }
+          />
+
+          {/* Phase Groups & Task Rows */}
+          {filteredPhases.length === 0 ? (
+            <div className="flex w-full items-center justify-center text-sm text-muted py-12">
+              No roadmap data found.
+            </div>
+          ) : (
+            filteredPhases.map(phase => (
+              <div key={phase.id} className="mt-7 first:mt-0">
+
+                {/* Phase Header */}
+                <div className="group/phase flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <Folder size={16} className="text-muted shrink-0" />
+                    <h3 className="text-base font-medium text-heading tracking-normal">
+                      {phase.title}
+                    </h3>
+                    <span className="text-[11px] font-medium text-muted bg-surface-muted px-2.5 py-0.5 rounded-full tabular-nums">
+                      {phase.tasks?.length || 0} Tasks
+                    </span>
                   </div>
+                  <button
+                    type="button"
+                    disabled={deletePhase.isPending}
+                    onClick={() => {
+                      if (window.confirm(`Delete phase "${phase.title}" and its tasks?`)) {
+                        deletePhase.mutate(phase.id);
+                      }
+                    }}
+                    className="opacity-40 group-hover/phase:opacity-100 group-focus-within/phase:opacity-100 reveal-on-hover text-caption hover:text-danger p-1 rounded transition-opacity text-xs disabled:opacity-50 cursor-pointer"
+                    title="Delete phase"
+                    aria-label={`Delete phase ${phase.title}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
 
-                  {/* Task List */}
-                  <div className="flex flex-col gap-2">
-                    {(phase.tasks || []).map(task => {
-                      const isSelected = selectedId === task.id;
-                      return (
-                        <div
-                          key={task.id}
-                          onClick={() => { setSelectedId(task.id); setInspectorOpen(true); }}
-                          className={`group flex items-center justify-between p-4 rounded-lg border cursor-pointer transition-all ${isSelected ? 'border-primary bg-primary/5 shadow-sm' : 'border-border-default bg-surface hover:border-border-strong hover:shadow-sm'}`}
-                        >
-                          {/* Left: Info */}
-                          <div className="flex items-center gap-4 flex-1 min-w-0">
-                            {/* Status Indicator */}
-                            <div className="w-2 h-2 rounded-full bg-primary shrink-0"></div>
+                {/* Task List: One white rounded container per phase */}
+                <div className="bg-surface-raised rounded-[14px] p-1 shadow-[0_1px_2px_rgba(16,24,40,0.04)] border-0 flex flex-col gap-1">
+                  {(phase.tasks || []).map(task => {
+                    const isSelected = selectedId === task.id;
+                    return (
+                      <div
+                        key={task.id}
+                        onClick={() => { setSelectedId(task.id); setInspectorOpen(true); }}
+                        className={`group h-[52px] min-h-[52px] px-4 py-0 rounded-[10px] border-0 shadow-none flex items-center justify-between cursor-pointer transition-colors ${
+                          isSelected
+                            ? 'bg-accent-light/40 text-heading'
+                            : 'hover:bg-surface-muted/60'
+                        }`}
+                      >
+                        {/* Left: Status dot + Code + Title + Inline Status chip */}
+                        <div className="flex items-center gap-2.5 min-w-0 pr-4 flex-1">
+                          <div className="w-2 h-2 rounded-full bg-primary shrink-0" />
 
-                            <div className="flex flex-col gap-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                {task.taskCode && (
-                                  <span className="text-[11px] font-semibold text-caption">{task.taskCode}</span>
-                                )}
-                                <span className="inline-flex items-center bg-surface-active px-2 py-0.5 rounded-full text-[10px] font-bold text-body">
-                                  {task.statusLabel || 'Scheduled'}
-                                </span>
-                              </div>
-                              <h4 className="text-[15px] font-bold text-heading truncate">{task.title}</h4>
-                            </div>
+                          {task.taskCode && (
+                            <span className="text-[11px] font-medium text-caption shrink-0 tabular-nums">
+                              {task.taskCode}
+                            </span>
+                          )}
+
+                          <span className="text-sm font-medium text-heading truncate" title={task.title}>
+                            {task.title}
+                          </span>
+
+                          <span className="inline-flex items-center bg-surface-active/60 px-2 py-0.5 rounded-full text-[11px] font-medium text-body capitalize tracking-normal shrink-0">
+                            {task.statusLabel ? task.statusLabel.toLowerCase() : 'scheduled'}
+                          </span>
+                        </div>
+
+                        {/* Right: Fixed columns on ONE line */}
+                        <div className="flex items-center gap-4 shrink-0">
+                          <div className="hidden sm:flex items-center gap-1.5 text-xs font-normal text-muted w-[150px] shrink-0">
+                            <Clock size={12} className="text-caption shrink-0" />
+                            <span className="truncate">
+                              {task.startDate ? new Date(task.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD'} -{task.endDate ? new Date(task.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD'}
+                            </span>
                           </div>
 
-                          {/* Right: Meta & Actions */}
-                          <div className="flex items-center gap-4 md:gap-6 shrink-0 pl-4">
-                            {/* Dates */}
-                            <div className="hidden md:flex items-center gap-1.5 text-[11px] font-medium text-caption bg-surface-muted px-2.5 py-1 rounded-md">
-                              <Clock size={12} className="text-muted" />
-                              <span>
-                                {task.startDate ? new Date(task.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD'} -
-                                {task.endDate ? new Date(task.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD'}
-                              </span>
-                            </div>
+                          <div className="w-[110px] bg-surface-strong rounded-full h-[5px] overflow-hidden shrink-0">
+                            <div
+                              className="bg-primary h-full rounded-full transition-all"
+                              style={{ width: `${task.progressPct || 0}%` }}
+                            />
+                          </div>
 
-                            {/* Progress Ring */}
-                            <div className="flex items-center gap-2 w-20 md:w-24">
-                              <div className="w-full bg-surface-strong rounded-full h-1.5 overflow-hidden">
-                                <div className="bg-primary h-full rounded-full" style={{ width: `${task.progressPct || 0}%` }}></div>
-                              </div>
-                              <span className="text-[11px] font-bold text-body w-7 text-right">{task.progressPct || 0}%</span>
-                            </div>
+                          <span className="text-xs font-medium text-body w-11 min-w-[44px] text-right tabular-nums shrink-0">
+                            {task.progressPct || 0}%
+                          </span>
 
+                          <div className="w-6 min-w-[24px] flex items-center justify-center shrink-0">
                             <ChevronRight size={16} className={`transition-colors ${isSelected ? 'text-primary' : 'text-muted group-hover:text-heading'}`} />
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))
-            )}
-          </div>
-
-        </div>
+              </div>
+            ))
+          )}
         </div>
 
-        {/* Right: Inspector Panel */}
+        {/* Right: Inspector Panel (One white surface, radius 14px, no border, sticky) */}
         {isInspectorOpen && (
-          <div className="w-[340px] bg-surface-muted border-l border-border-default flex flex-col flex-shrink-0 shadow-panel">
+          <div className="w-full xl:w-[clamp(320px,22vw,380px)] xl:flex-none h-full bg-surface-raised rounded-[14px] shadow-[0_1px_2px_rgba(16,24,40,0.04)] border-0 flex flex-col overflow-hidden">
 
             {/* Inspector Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-border-default">
-              <span className="text-[10px] font-bold text-caption uppercase tracking-widest">Inspector</span>
-              <button onClick={() => setInspectorOpen(false)} className="text-caption hover:text-body transition-colors">
+            <div className="flex items-center justify-between p-5 pb-3">
+              <span className="text-xs font-medium text-muted">Inspector</span>
+              <button
+                type="button"
+                onClick={() => setInspectorOpen(false)}
+                className="text-caption hover:text-body transition-colors cursor-pointer p-1"
+                aria-label="Close inspector"
+              >
                 <X size={16} />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5 space-y-5">
-
+            <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-5 space-y-4 scrollbar-soft">
               {selectedTask ? (
                 <>
-                  {/* Task Details Card */}
-                  <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card">
-                    <h2 className="text-xl font-extrabold text-heading leading-tight mb-3">{selectedTask.title}</h2>
-                    <div className="flex items-center gap-3 mb-4">
-                      <span className="inline-flex items-center gap-1.5 bg-surface-active px-2 py-0.5 rounded-full text-[10px] font-bold">
-                        {selectedTask.statusLabel || 'Scheduled'}
+                  {/* Task Details Section */}
+                  <div>
+                    <h2 className="text-xl font-medium text-heading leading-tight mb-2">
+                      {selectedTask.title}
+                    </h2>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="inline-flex items-center bg-surface-active/60 px-2 py-0.5 rounded-full text-xs font-medium text-body capitalize">
+                        {selectedTask.statusLabel ? selectedTask.statusLabel.toLowerCase() : 'scheduled'}
                       </span>
-                      <span className="text-[11px] font-semibold text-caption">{selectedTask.taskCode}</span>
+                      {selectedTask.taskCode && (
+                        <span className="text-xs font-medium text-caption tabular-nums">
+                          {selectedTask.taskCode}
+                        </span>
+                      )}
                     </div>
-                    <p className="text-sm text-body-light leading-relaxed">
+                    <p className="text-xs text-body leading-relaxed">
                       {selectedTask.description || 'No description provided.'}
                     </p>
                   </div>
 
-                  {/* Progress Card */}
-                  <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card">
-                    <div className="flex justify-between items-end mb-6">
+                  {/* Progress & Dates Section - Hairline divider */}
+                  <div className="border-t border-border-subtle/50 pt-4 space-y-3">
+                    <div className="flex justify-between items-baseline">
                       <div>
-                        <p className="text-[10px] font-medium text-caption mb-1">Start Date</p>
-                        <p className="text-sm font-bold text-heading font-mono">
+                        <p className="text-[11px] font-normal text-caption mb-0.5">Start Date</p>
+                        <p className="text-xs font-medium text-heading font-mono">
                           {selectedTask.startDate ? new Date(selectedTask.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}
                         </p>
                       </div>
-                      <div className="h-6 w-px bg-surface-strong mx-2"></div>
                       <div className="text-right">
-                        <p className="text-[10px] font-medium text-caption mb-1">End Date</p>
-                        <p className="text-sm font-bold text-heading font-mono">
+                        <p className="text-[11px] font-normal text-caption mb-0.5">End Date</p>
+                        <p className="text-xs font-medium text-heading font-mono">
                           {selectedTask.endDate ? new Date(selectedTask.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-end mb-2">
-                      <span className="text-[11px] font-semibold text-muted">Progress</span>
-                      <span className="text-[11px] font-bold text-heading">{selectedTask.progressPct || 0}%</span>
-                    </div>
-                    <div className="w-full bg-surface-strong rounded-full h-1.5 overflow-hidden">
-                      <div className="bg-primary h-full rounded-full" style={{ width: `${selectedTask.progressPct || 0}%` }}></div>
+                    <div>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-xs font-normal text-muted">Progress</span>
+                        <span className="text-xs font-medium text-heading tabular-nums">{selectedTask.progressPct || 0}%</span>
+                      </div>
+                      <div className="w-full bg-surface-strong rounded-full h-[5px] overflow-hidden">
+                        <div className="bg-primary h-full rounded-full transition-all" style={{ width: `${selectedTask.progressPct || 0}%` }} />
+                      </div>
                     </div>
                   </div>
 
-                  {/* Assigned Team */}
-                  <div>
-                    <h3 className="text-[10px] font-bold text-caption uppercase tracking-widest mb-3 px-1 mt-6">Assigned Execution Team</h3>
-                    <div className="flex items-center justify-between bg-surface-raised border border-border-default p-4 rounded-button shadow-card">
+                  {/* Assigned Execution Team Section - Hairline divider */}
+                  <div className="border-t border-border-subtle/50 pt-4">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <h3 className="text-xs font-medium text-heading">Assigned Execution Team</h3>
+                      <button
+                        type="button"
+                        disabled={!selectedTask.assignees || selectedTask.assignees.length === 0}
+                        onClick={() => setTeamOpen(true)}
+                        className="text-xs font-medium text-accent hover:underline disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                      >
+                        View All
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between bg-surface-muted/40 p-3 rounded-[10px]">
                       {selectedTask.assignees && selectedTask.assignees.length > 0 ? (
-                        <div className="flex -space-x-2">
+                        <div className="flex -space-x-1.5 overflow-hidden">
                           {selectedTask.assignees.map((assignee, idx) => (
-                            <div key={idx} className="w-7 h-7 rounded-full bg-surface-strong border-2 border-white flex items-center justify-center text-[10px] font-bold text-body z-20" style={{ zIndex: 10 - idx }}>
+                            <div
+                              key={idx}
+                              title={assignee.employee?.name || 'Assignee'}
+                              className="w-6 h-6 rounded-full bg-surface-raised border border-border-default flex items-center justify-center text-[9px] font-medium text-heading overflow-hidden"
+                            >
                               {assignee.employee?.name ? (
                                 assignee.employee.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
                               ) : (
@@ -325,32 +391,25 @@ export default function Roadmap() {
                           ))}
                         </div>
                       ) : (
-                        <div className="text-sm text-muted">No assignees</div>
+                        <div className="text-xs text-muted">No assignees</div>
                       )}
-                      <button
-                        type="button"
-                        disabled={!selectedTask.assignees || selectedTask.assignees.length === 0}
-                        onClick={() => setTeamOpen(true)}
-                        className="text-[11px] font-bold text-heading hover:underline disabled:opacity-60"
-                      >
-                        View All
-                      </button>
                     </div>
                   </div>
                 </>
               ) : (
-                <div className="flex h-full items-center justify-center text-muted text-sm text-center">
+                <div className="h-full flex items-center justify-center text-muted text-[13px] text-center p-6">
                   Select a task in the timeline to view details.
                 </div>
               )}
             </div>
 
-            {/* Inspector Footer */}
+            {/* Inspector Footer (Pinned with hairline above, 40px buttons, rounded-[10px]) */}
             {selectedTask && (
-              <div className="p-5 border-t border-border-default bg-surface-raised mt-auto space-y-2">
+              <div className="p-4 border-t border-border-subtle/50 bg-surface-raised shrink-0 space-y-2">
                 <button
+                  type="button"
                   onClick={() => { setTimelineTaskId(selectedTask.id); setTimelineForm({ startDate: selectedTask.startDate?.slice(0, 10) || '', endDate: selectedTask.endDate?.slice(0, 10) || '', progressPct: selectedTask.progressPct || 0 }); setTimelineOpen(true); }}
-                  className="w-full flex items-center justify-center gap-2 bg-primary text-white py-3 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
+                  className="w-full h-10 flex items-center justify-center gap-2 bg-primary text-white rounded-[10px] text-sm font-semibold hover:bg-primary-hover transition-colors shadow-sm cursor-pointer"
                 >
                   <Edit2 size={14} />
                   Edit Timeline
@@ -363,17 +422,15 @@ export default function Roadmap() {
                       deleteTask.mutate(selectedTask.id);
                     }
                   }}
-                  className="w-full flex items-center justify-center gap-2 border border-danger/30 text-danger bg-danger-light/10 py-2.5 rounded-input text-xs font-semibold hover:bg-danger-light/20 transition-colors disabled:opacity-60"
+                  className="w-full h-10 flex items-center justify-center gap-2 border-0 text-danger bg-danger-light/20 hover:bg-danger-light/30 rounded-[10px] text-xs font-medium transition-colors cursor-pointer disabled:opacity-60"
                 >
                   <Trash2 size={13} />
                   Delete Task
                 </button>
               </div>
             )}
-
           </div>
         )}
-
       </div>
       <FormDialog open={phaseOpen} onClose={() => setPhaseOpen(false)} title="New roadmap phase" busy={createPhase.isPending} onConfirm={() => createPhase.mutate()} confirmLabel="Create phase"><label className="block text-sm font-medium text-body">Phase name<input required value={phaseTitle} onChange={event => setPhaseTitle(event.target.value)} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label></FormDialog>
       <FormDialog open={taskOpen} onClose={() => setTaskOpen(false)} title="New roadmap task" busy={createTask.isPending} onConfirm={() => createTask.mutate()} confirmLabel="Create task"><div className="space-y-4"><label className="block text-sm font-medium text-body">Task name<input required value={taskForm.title} onChange={event => setTaskForm(current => ({ ...current, title: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2" /></label><label className="block text-sm font-medium text-body">Phase<select value={taskForm.phaseId || phases[0]?.id || ''} onChange={event => setTaskForm(current => ({ ...current, phaseId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2">{phases.map(phase => <option key={phase.id} value={phase.id}>{phase.title}</option>)}</select></label></div></FormDialog>
@@ -393,7 +450,7 @@ export default function Roadmap() {
             selectedTask.assignees.map((assignee, idx) => (
               <div key={idx} className="flex items-center justify-between py-2 border-b border-border-default last:border-0">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-surface-strong flex items-center justify-center text-xs font-bold text-heading">
+                  <div className="w-8 h-8 rounded-full bg-surface-strong flex items-center justify-center text-xs font-medium text-heading">
                     {assignee.employee?.name ? assignee.employee.name.slice(0, 2).toUpperCase() : '?'}
                   </div>
                   <div>

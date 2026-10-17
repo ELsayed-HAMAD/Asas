@@ -3,6 +3,13 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, ChevronRight } from 'lucide-react'
 import { useSession } from '../../lib/authClient'
 
+const NAV_LINKS = [
+  { label: 'Features', to: '/#features' },
+  { label: 'Solutions', to: '/solutions' },
+  { label: 'Pricing', to: '/pricing' },
+  { label: 'Documentation', to: '/documentation' },
+]
+
 // ── Mini previews inside feature cards ─────────────────────
 
 function TaskPreview() {
@@ -215,7 +222,7 @@ export default function Landing() {
 
       {/* ── Navbar ── */}
       <header className="sticky top-0 z-50 bg-surface-raised/90 backdrop-blur-sm border-b border-border-subtle">
-        <div className="max-w-6xl mx-auto px-6 py-3.5 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-6 py-3.5 flex flex-wrap items-center justify-between gap-y-3">
           {/* Logo */}
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-button bg-primary flex items-center justify-center text-white text-xs font-bold">A</div>
@@ -223,11 +230,11 @@ export default function Landing() {
           </div>
 
           {/* Nav links */}
-          <nav className="hidden md:flex items-center gap-7">
-            {['Features', 'Solutions', 'Pricing', 'Documentation'].map(link => (
-              <a key={link} href="#" className="text-sm text-muted hover:text-heading transition-colors">
-                {link}
-              </a>
+          <nav className="order-3 flex w-full flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-border-subtle pt-3 text-xs sm:text-sm md:order-2 md:w-auto md:border-0 md:pt-0">
+            {NAV_LINKS.map(link => (
+              <Link key={link.to} to={link.to} className="text-sm text-muted hover:text-heading transition-colors">
+                {link.label}
+              </Link>
             ))}
           </nav>
 
@@ -235,14 +242,14 @@ export default function Landing() {
           {session?.user ? (
             <Link
               to="/dashboard"
-              className="bg-primary text-white text-sm font-medium px-4 py-2 rounded-button hover:bg-primary-hover transition-colors"
+              className="order-2 ml-auto bg-primary text-white text-sm font-medium px-4 py-2 rounded-button hover:bg-primary-hover transition-colors md:order-3"
             >
               Go to Workspace
             </Link>
           ) : (
             <Link
               to="/register"
-              className="bg-primary text-white text-sm font-medium px-4 py-2 rounded-button hover:bg-primary-hover transition-colors"
+              className="order-2 ml-auto bg-primary text-white text-sm font-medium px-4 py-2 rounded-button hover:bg-primary-hover transition-colors md:order-3"
             >
               Book a Demo
             </Link>
@@ -331,7 +338,7 @@ export default function Landing() {
       </section>
 
       {/* ── Features ── */}
-      <section className="max-w-5xl mx-auto px-6 py-24">
+      <section id="features" className="max-w-5xl mx-auto px-6 py-24 scroll-mt-20">
         <div className="text-center mb-14">
           <h2 className="text-2xl md:text-4xl font-extrabold text-heading tracking-tight mb-4">
             Everything you need. Nothing you don't.
@@ -394,11 +401,8 @@ export default function Landing() {
             <Link to="/terms" className="text-xs text-body-light hover:text-caption transition-colors">
               Terms of Service
             </Link>
-            {['Security', 'Status'].map(link => (
-              <a key={link} href="#" className="text-xs text-body-light hover:text-caption transition-colors">
-                {link}
-              </a>
-            ))}
+            <Link to="/documentation#security" className="text-xs text-body-light hover:text-caption transition-colors">Security</Link>
+            <Link to="/status" className="text-xs text-body-light hover:text-caption transition-colors">Status</Link>
           </div>
         </div>
       </footer>

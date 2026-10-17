@@ -202,16 +202,18 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t })
     return (
       <div>
         <button
+          type="button"
           onClick={() => toggleSection(item.id)}
-          className={`w-full flex items-center justify-between px-3 py-2 rounded-button text-sm transition-colors ${
+          aria-expanded={Boolean(isOpen)}
+          className={`w-full h-10 min-h-[40px] max-h-[40px] flex items-center justify-between px-3 rounded-button text-sm transition-colors cursor-pointer ${
             parentActive
               ? 'text-heading font-medium'
               : 'text-muted hover:text-heading hover:bg-surface-muted'
           }`}
         >
           <div className="flex items-center gap-2.5">
-            <item.icon size={16} />
-            {itemLabel}
+            <item.icon size={18} />
+            <span>{itemLabel}</span>
           </div>
           <ChevronDown
             size={13}
@@ -220,7 +222,7 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t })
         </button>
 
         {isOpen && (
-          <div className="ms-4 mt-0.5 border-s border-border-subtle ps-3 space-y-0.5">
+          <div className="ms-4.5 mt-0.5 border-s-2 border-border-subtle/80 ps-2.5 space-y-0.5">
             {item.children.map(child => {
               const isActive = isChildActive(child.path, pathname)
               const childLabel = child.i18nKey && t ? t(child.i18nKey, child.label) : child.label
@@ -229,7 +231,8 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t })
                 key={child.path}
                 to={child.path}
                 onClick={onNavigate}
-                className={`relative block px-3 py-1.5 rounded-button text-sm transition-colors ${
+                data-active={isActive ? "true" : undefined}
+                className={`relative flex items-center h-[34px] min-h-[34px] max-h-[34px] px-2.5 rounded-button text-[13px] leading-none transition-colors ${
                   isActive
                     ? 'bg-surface-active text-heading font-medium'
                     : 'text-muted hover:text-heading hover:bg-surface-muted'
@@ -237,7 +240,7 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t })
               >
                 {isActive && (
                   <div
-                    className="absolute start-0 top-[6px] bottom-[6px] w-[3px] bg-primary rounded-e-full"
+                    className="absolute start-0 top-1.5 bottom-1.5 w-[2.5px] bg-primary rounded-e-full"
                   />
                 )}
                 {childLabel}
@@ -254,7 +257,8 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t })
     <Link
       to={item.path}
       onClick={onNavigate}
-      className={`relative flex items-center gap-2.5 px-3 py-2 rounded-button text-sm transition-colors ${
+      data-active={isActive ? "true" : undefined}
+      className={`relative flex items-center gap-2.5 h-10 min-h-[40px] max-h-[40px] px-3 rounded-button text-sm transition-colors ${
         isActive
           ? 'bg-surface-active text-heading font-medium'
           : 'text-muted hover:text-heading hover:bg-surface-muted'
@@ -262,11 +266,11 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t })
     >
       {isActive && (
         <div
-          className="absolute start-0 top-1.5 bottom-1.5 w-[3px] bg-primary rounded-e-full"
+          className="absolute start-0 top-2 bottom-2 w-[3px] bg-primary rounded-e-full"
         />
       )}
-      <item.icon size={16} />
-      {itemLabel}
+      <item.icon size={18} />
+      <span>{itemLabel}</span>
     </Link>
   )
 }
@@ -276,6 +280,7 @@ function SidebarContent({ navProps, navigate }) {
   const { t, i18n } = useTranslation()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const menuRef = useRef(null)
+  const navRef = useRef(null)
   const [switchingOrgId, setSwitchingOrgId] = useState(null)
   const [orgSwitchError, setOrgSwitchError] = useState('')
   const [quickEntryOpen, setQuickEntryOpen] = useState(false)
@@ -456,13 +461,37 @@ function SidebarContent({ navProps, navigate }) {
     }
   }
 
+  // Auto-scroll the active item into view only if it is outside visible area; reset to 0 if all items fit
+  useEffect(() => {
+    const nav = navRef.current
+    if (!nav) return
+
+    if (nav.scrollHeight <= nav.clientHeight) {
+      nav.scrollTop = 0
+      return
+    }
+
+    const activeEl = nav.querySelector('[data-active="true"]') || nav.querySelector('.bg-surface-active')
+    if (!activeEl) {
+      nav.scrollTop = 0
+      return
+    }
+
+    const navRect = nav.getBoundingClientRect()
+    const elRect = activeEl.getBoundingClientRect()
+
+    if (elRect.top < navRect.top || elRect.bottom > navRect.bottom) {
+      activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }
+  }, [navProps.pathname, navProps.openSections])
+
   const orgList = Array.isArray(organizations) ? organizations : []
 
   return (
-    <div className="flex flex-col h-full relative">
+    <div className="flex flex-col h-full min-h-0 relative">
 
       {/* Brand */}
-      <div className="px-4 py-4 flex items-center gap-3 border-b border-border-subtle flex-shrink-0">
+      <div className="px-4 py-3.5 flex items-center gap-3 border-b border-border-subtle flex-shrink-0">
         <div className="w-8 h-8 rounded-button bg-primary text-on-primary flex items-center justify-center text-sm font-bold flex-shrink-0">
           A
         </div>
@@ -480,33 +509,33 @@ function SidebarContent({ navProps, navigate }) {
       </div>
 
       {/* Quick action */}
-      <div className="px-3 py-3 flex-shrink-0">
+      <div className="px-3 py-2 flex-shrink-0">
         <button
           type="button"
           onClick={() => setQuickEntryOpen(true)}
-          className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary text-sm font-medium px-3 py-2 rounded-button hover:bg-primary-hover active:scale-[0.98] transition-all cursor-pointer"
+          className="w-full h-9 flex items-center justify-center gap-2 bg-primary text-on-primary text-sm font-medium px-3 rounded-button hover:bg-primary-hover active:scale-[0.98] transition-all cursor-pointer"
         >
           <Plus size={14} />
           {t('common.newEntry', 'New Entry')}
         </button>
       </div>
 
-      {/* Main navigation */}
-      <nav className="flex-1 px-2 space-y-0.5 overflow-y-auto no-scrollbar">
+      {/* Main navigation - independently scrollable containing all sections */}
+      <nav ref={navRef} className="flex-1 min-h-0 px-2 space-y-0.5 overflow-y-auto no-scrollbar scrollbar-soft">
         {NAV.map(item => (
           <NavItem key={item.id} item={item} {...navProps} t={t} />
         ))}
+
+        {/* Settings, Support, Help, Data Export moved into scrollable nav */}
+        <div className="pt-2 mt-2 border-t border-border-subtle/60 space-y-0.5">
+          {BOTTOM_NAV.map(item => (
+            <NavItem key={item.id} item={item} {...navProps} t={t} />
+          ))}
+        </div>
       </nav>
 
-      {/* Bottom navigation */}
-      <div className="px-2 py-2 border-t border-border-subtle space-y-0.5 flex-shrink-0">
-        {BOTTOM_NAV.map(item => (
-          <NavItem key={item.id} item={item} {...navProps} t={t} />
-        ))}
-      </div>
-
-      {/* User profile */}
-      <div ref={menuRef} className="px-3 py-3 border-t border-border-subtle flex-shrink-0 relative">
+      {/* User profile - ONLY element pinned to bottom */}
+      <div ref={menuRef} className="px-3 py-2.5 border-t border-border-subtle flex-shrink-0 relative mt-auto">
         <AnimatePresence>
           {userMenuOpen && (
             <motion.div
@@ -514,7 +543,7 @@ function SidebarContent({ navProps, navigate }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.95 }}
               transition={{ type: "spring", stiffness: 350, damping: 25 }}
-              className="absolute bottom-full left-3 mb-2 w-72 bg-surface-raised border border-border-default rounded-xl shadow-2xl z-50 overflow-hidden"
+              className="absolute bottom-full start-3 mb-2 w-72 bg-surface-raised border border-border-default rounded-xl shadow-2xl z-50 overflow-hidden"
             >
               {/* 1. Identity Header */}
               <div className="p-4 flex items-center gap-4">
@@ -620,11 +649,13 @@ function SidebarContent({ navProps, navigate }) {
                 </button>
                 <button
                   type="button"
+                  data-testid="language-toggle"
                   onClick={() => {
                     setUserMenuOpen(false)
                     changeLanguage(i18n.language === 'ar' ? 'en' : 'ar')
                   }}
                   className="flex items-center gap-3 text-left rtl:text-right px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
+                  title={i18n.language === 'ar' ? 'Switch to English' : 'التحويل إلى العربية'}
                 >
                   <Globe size={16} className="text-caption" />
                   <span>{i18n.language === 'ar' ? 'English' : 'العربية'}</span>
@@ -655,8 +686,12 @@ function SidebarContent({ navProps, navigate }) {
 
         <button
           type="button"
+          data-testid="user-menu-button"
+          aria-label="User profile menu"
+          aria-expanded={userMenuOpen}
+          aria-haspopup="true"
           onClick={() => setUserMenuOpen(!userMenuOpen)}
-          className="w-full flex items-center gap-2.5 hover:bg-surface-muted p-2 -mx-2 rounded-lg transition-colors text-left"
+          className="w-full flex items-center gap-2.5 hover:bg-surface-muted p-2 -mx-2 rounded-lg transition-colors text-left rtl:text-right"
         >
           <div className="w-8 h-8 rounded-full bg-surface-strong flex items-center justify-center text-xs font-bold text-body flex-shrink-0">
             {initials}
@@ -916,7 +951,7 @@ function SidebarContent({ navProps, navigate }) {
 
 // ── Main Layout ────────────────────────────────────────────
 export default function DashboardLayout() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const location  = useLocation()
   const navigate  = useNavigate()
   const pathname  = location.pathname
@@ -927,6 +962,7 @@ export default function DashboardLayout() {
   const [openSections, setOpenSections]         = useState({})
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+  const mobileMenuButtonRef = useRef(null)
 
   // Listen for ⌘K / Ctrl+K to toggle Command Palette
   useEffect(() => {
@@ -958,6 +994,21 @@ export default function DashboardLayout() {
     setMobileSidebarOpen(false)
   }, [pathname])
 
+  useEffect(() => {
+    if (!mobileSidebarOpen) return
+    document.getElementById('mobile-navigation-drawer')
+      ?.querySelector('a[href], button:not([disabled]), input:not([disabled])')
+      ?.focus()
+    const handleKeyDown = event => {
+      if (event.key === 'Escape') setMobileSidebarOpen(false)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      mobileMenuButtonRef.current?.focus()
+    }
+  }, [mobileSidebarOpen])
+
   // Onboarding gate: a workspace whose onboarding isn't finished must go to the
   // 3-choice onboarding page, not the dashboard (mirrors the legacy AuthGuard).
   if (activeOrganization && activeOrganization.onboardingStatus === 'PENDING') {
@@ -980,7 +1031,7 @@ export default function DashboardLayout() {
     <div className="flex h-screen bg-surface overflow-hidden">
 
       {/* ── Desktop sidebar ── */}
-      <aside className="hidden md:flex w-55 min-w-55 bg-surface-raised border-e border-border-subtle flex-col relative z-30">
+      <aside className="hidden md:flex w-55 min-w-55 h-screen max-h-screen bg-surface-raised border-e border-border-subtle flex-col relative z-30">
         <SidebarContent navProps={navProps} navigate={navigate} />
       </aside>
 
@@ -988,12 +1039,14 @@ export default function DashboardLayout() {
       {mobileSidebarOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-overlay backdrop-blur-sm"
+          <button
+            type="button"
+            aria-label="Close navigation menu"
+            className="absolute inset-0 border-0 p-0 bg-overlay backdrop-blur-sm"
             onClick={() => setMobileSidebarOpen(false)}
           />
           {/* Drawer */}
-          <aside className="relative z-10 w-55 bg-surface-raised border-e border-border-subtle flex flex-col">
+          <aside id="mobile-navigation-drawer" aria-label="Main navigation" className="relative z-10 w-55 h-full max-h-screen bg-surface-raised border-e border-border-subtle flex flex-col">
             <SidebarContent navProps={navProps} navigate={navigate} />
           </aside>
         </div>
@@ -1003,35 +1056,41 @@ export default function DashboardLayout() {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
         {/* Topbar */}
-        <header className="bg-surface-raised border-b border-border-subtle px-4 md:px-6 py-3 flex items-center justify-between gap-4 flex-shrink-0">
+        {/* Topbar (56px, one row, 12px gaps, nothing wraps) */}
+        <header className="bg-surface-raised border-b border-border-subtle px-4 md:px-6 h-14 min-h-[56px] flex items-center justify-between gap-3 min-w-0">
 
           {/* Left: hamburger (mobile only) + breadcrumb */}
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             <button
+              ref={mobileMenuButtonRef}
+              type="button"
               className="md:hidden text-muted hover:text-heading flex-shrink-0"
               onClick={() => setMobileSidebarOpen(true)}
+              aria-label="Open navigation menu"
+              aria-expanded={mobileSidebarOpen}
+              aria-controls="mobile-navigation-drawer"
             >
               <Menu size={20} />
             </button>
 
             {/* Breadcrumb */}
-            <nav className="flex items-center gap-1 text-sm min-w-0" aria-label="Breadcrumb">
+            <nav className="flex items-center gap-1 text-sm min-w-0 whitespace-nowrap flex-1" aria-label="Breadcrumb">
               {breadcrumbs.map((crumb, i) => {
                 const isLast = i === breadcrumbs.length - 1
                 const crumbPath = '/' + pathname.split('/').filter(Boolean).slice(0, i + 1).join('/')
                 return (
-                  <span key={i} className="flex items-center gap-1 min-w-0">
+                  <span key={i} className={`flex items-center gap-1 min-w-0 whitespace-nowrap ${isLast ? 'flex-shrink-0' : 'shrink'}`}>
                     {i > 0 && (
                       <ChevronRight size={13} className="text-faint flex-shrink-0 rtl:rotate-180" />
                     )}
                     {isLast ? (
-                      <span className="truncate font-semibold text-heading" aria-current="page">
+                      <span className="font-semibold text-heading truncate" aria-current="page" title={typeof crumb === 'string' ? crumb : undefined}>
                         {crumb}
                       </span>
                     ) : (
                       <Link
                         to={crumbPath}
-                        className="truncate text-caption hover:text-heading transition-colors"
+                        className="truncate max-w-[140px] text-caption hover:text-heading transition-colors"
                       >
                         {crumb}
                       </Link>
@@ -1042,44 +1101,45 @@ export default function DashboardLayout() {
             </nav>
           </div>
 
-          {/* Right: search trigger button + dynamically injected page controls */}
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <button
-              type="button"
-              onClick={() => setCommandPaletteOpen(true)}
-              className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-xs text-muted bg-surface-muted hover:bg-surface border border-border-default rounded-input transition-colors shadow-sm"
-              title="Global search (⌘K or Ctrl+K)"
-            >
-              <Search size={14} className="text-caption" />
-              <span className="hidden md:inline text-body-light">{t('common.searchJump', 'Search or jump to...')}</span>
-              <kbd className="px-1.5 py-0.5 text-[10px] bg-surface-raised border border-border-default rounded text-caption font-mono font-semibold">
-                ⌘K
-              </kbd>
-            </button>
-            <button
-              type="button"
-              onClick={() => changeLanguage(i18n.language === 'ar' ? 'en' : 'ar')}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-muted hover:text-heading hover:bg-surface-muted border border-border-default rounded-input transition-colors cursor-pointer"
-              title={i18n.language === 'ar' ? 'Switch to English' : 'التحويل إلى العربية'}
-            >
-              <Globe size={14} className="text-caption" />
-              <span className="hidden sm:inline font-medium">{i18n.language === 'ar' ? 'English' : 'العربية'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/dashboard/settings/notifications')}
-              className="p-1.5 text-muted hover:text-heading hover:bg-surface-muted rounded-input transition-colors cursor-pointer"
-              title="Notification Settings"
-            >
-              <Bell size={16} />
-            </button>
-            <div id="topbar-actions-portal" className="flex items-center gap-2 flex-shrink-0 min-h-[32px]">
+          {/* Spacer: flex: 1 so the left and right groups never touch */}
+          <div className="flex-1" />
+
+          {/* Right group: Global search ⌘K (max 320px) + bell + portal */}
+          <div className="flex items-center justify-end gap-3 shrink-0 flex-nowrap min-w-0">
+            <div className="hidden sm:flex items-center gap-3 shrink min-w-0">
+              <button
+                type="button"
+                onClick={() => setCommandPaletteOpen(true)}
+                className="flex items-center justify-between w-60 h-9 px-3 text-xs text-muted bg-surface-muted hover:bg-surface border border-border-default rounded-input transition-colors shadow-sm cursor-pointer shrink-0"
+                title="Global search (⌘K or Ctrl+K)"
+                aria-label="Search or jump to..."
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Search size={14} className="text-caption flex-shrink-0" />
+                  <span className="truncate text-body-light">{t('common.searchJump', 'Search or jump to...')}</span>
+                </div>
+                <kbd className="px-1.5 py-0.5 text-[10px] bg-surface-raised border border-border-default rounded text-caption font-mono font-semibold flex-shrink-0">
+                  ⌘K
+                </kbd>
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard/settings/notifications')}
+                className="h-9 w-9 flex items-center justify-center text-muted hover:text-heading hover:bg-surface-muted rounded-input transition-colors cursor-pointer flex-shrink-0"
+                title="Notification Settings"
+                aria-label="Notification Settings"
+              >
+                <Bell size={16} />
+              </button>
+            </div>
+
+            <div id="topbar-actions-portal" className="flex min-w-0 items-center justify-end gap-2 flex-shrink-0 min-h-[36px] empty:hidden border-s border-border-default ps-3">
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 min-w-0 min-h-0 overflow-x-auto overflow-y-auto flex flex-col">
           {session?.user && !session.user.emailVerified && (
             <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-2 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200">
               <div className="flex items-center gap-2">

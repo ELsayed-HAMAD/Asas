@@ -3,19 +3,22 @@ import { validatePayrollPeriod } from '@asas/domain/payroll'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Download,
-  MoreHorizontal,
   Loader2,
   Plus,
   Trash2,
   FileText,
   AlertCircle,
   Calculator,
+  ChevronDown,
+  FileSpreadsheet,
+  Landmark,
+  Scale,
+  X,
 } from 'lucide-react'
-import TopBarActions from '../../../components/TopBarActions'
 import FormDialog from '../../../components/common/FormDialog'
 import { hrApi } from '../../../lib/api/hr'
 import { queryKeys } from '../../../lib/queryKeys'
-import { formatMoney, formatDate } from '../../../lib/format'
+import { formatMoney, formatCompactTableMoney, formatDate } from '../../../lib/format'
 import { downloadCsv } from '../../../lib/csv'
 import {
   downloadFile,
@@ -28,14 +31,20 @@ import {
 } from '../../../lib/payrollExport'
 import { clearPayrollRunDraft, payrollRunDraftStorageKey, readPayrollRunDraft, savePayrollRunDraft } from '../../../lib/payrollRunDraft'
 import { useActiveMemberRole, useActiveOrganization, useSession } from '../../../lib/authClient'
+import { getMemberRoleName } from '../../../lib/memberRole'
 import { useDebouncedValue } from '../../../lib/useDebouncedValue'
 import StatutoryTaxCalculator from './StatutoryTaxCalculator.jsx'
 
 // The old page rendered deductions/taxes as a leading-minus negative; the minus only appears
 // for a positive amount (a zero rendered plain), so mirror that instead of an unconditional '-'.
-function formatNegativeDeduction(value, currency) {
-  const options = currency ? { currency } : {}
-  return Number(value) > 0 ? `-${formatMoney(value, options)}` : formatMoney(value, options)
+function formatNegativeDeduction(value, currency, options = {}) {
+  const opt = { ...(currency ? { currency } : {}), ...options }
+  return Number(value) > 0 ? `-${formatMoney(value, opt)}` : formatMoney(value, opt)
+}
+
+function formatCompactNegativeDeduction(value, currency, options = {}) {
+  const opt = { ...(currency ? { currency } : {}), ...options }
+  return Number(value) > 0 ? `-${formatCompactTableMoney(value, opt)}` : formatCompactTableMoney(value, opt)
 }
 
 function payrollDraftStorage() {
@@ -75,10 +84,10 @@ function PayslipButton({ runId, lineId, onSelect, onNotifyError }) {
       type="button"
       onClick={handleDownload}
       disabled={pending}
-      className="flex items-center gap-1.5 border border-border-default text-body px-2.5 py-1 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60"
+      className="flex items-center gap-1 border border-border-default text-body px-2 py-0.5 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60 whitespace-nowrap cursor-pointer shrink-0"
     >
-      {pending ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
-      Payslip
+      {pending ? <Loader2 size={12} className="animate-spin shrink-0" /> : <FileText size={12} className="shrink-0" />}
+      <span>Payslip</span>
     </button>
   )
 }
@@ -90,10 +99,38 @@ export default function Payroll() {
   const { data: sessionData } = useSession()
   const draftStorageKey = payrollRunDraftStorageKey(activeOrganization?.id, sessionData?.user?.id)
   // Read the role object returned by Better Auth; unresolved roles do not grant write access.
-  const isAdmin = ['OWNER', 'ADMIN'].includes(activeMemberRole?.role)
+  const isAdmin = ['OWNER', 'ADMIN'].includes(getMemberRoleName(activeMemberRole))
   const [roundingReviewOpen, setRoundingReviewOpen] = useState(false)
   const [roundingYear, setRoundingYear] = useState(String(new Date().getFullYear()))
   const [statutoryCalculatorOpen, setStatutoryCalculatorOpen] = useState(false)
+
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const [toolsMenuOpen, setToolsMenuOpen] = useState(false)
+  const exportMenuRef = useRef(null)
+  const toolsMenuRef = useRef(null)
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target)) {
+        setExportMenuOpen(false)
+      }
+      if (toolsMenuRef.current && !toolsMenuRef.current.contains(event.target)) {
+        setToolsMenuOpen(false)
+      }
+    }
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        setExportMenuOpen(false)
+        setToolsMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
 
   const [selectedId, setSelectedId] = useState(null)
   const [selectedRunId, setSelectedRunId] = useState('')
@@ -102,6 +139,11 @@ export default function Payroll() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [savedRetryAvailable, setSavedRetryAvailable] = useState(false)
   const requestRef = useRef(null)
+
+  useEffect(() => {
+    setExportMenuOpen(false)
+    setToolsMenuOpen(false)
+  }, [selectedRunId])
 
   useEffect(() => {
     setIsDialogOpen(false)
@@ -165,8 +207,11 @@ export default function Payroll() {
     ? allRecords
     : allRecords.filter(r => (r.employee?.title || '').toLowerCase().includes(departmentFilter.toLowerCase()))
   const money = value => formatMoney(value, run?.currency ? { currency: run.currency } : {})
-  const paidThisMonth = listData?.summary?.paidThisMonthTotal
-  const priorPeriodPaid = listData?.summary?.paidThisMonthComparison?.previousTotal
+  const compactMoney = value => formatCompactTableMoney(value, run?.currency ? { currency: run.currency } : {})
+  const metricFontSize = value => {
+    const label = money(value)
+    return `clamp(0.75rem, ${Math.min(14, 130 / Math.max(1, label.length))}cqw, 1.5rem)`
+  }
 
   // Exact aggregates over every stored line in this run, returned by the API as decimal strings.
   const totals = run?.totals ?? { gross: '0', deductions: '0', net: '0' }
@@ -182,6 +227,7 @@ export default function Payroll() {
   }, [records, selectedId])
 
   const selectedRecord = records.find(r => r.id === selectedId)
+
 
   const [isLineDialogOpen, setIsLineDialogOpen] = useState(false)
   const [lineForm, setLineForm] = useState({ baseSalary: '', missedDaysCount: '', missedDaysAmount: '', bonusLabel: '', bonusAmount: '' })
@@ -467,14 +513,14 @@ export default function Payroll() {
     const currency = payslipsList[0]?.currency || 'USD'
 
     return (
-      <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-[900px]">
+      <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-0">
         {/* Header KPI cards */}
         <div className="border-b border-border-default px-8 py-6 bg-surface-raised">
           <div className="mb-4">
             <h1 className="text-xl font-bold text-heading">My Payslips</h1>
             <p className="text-xs text-muted">View your salary statements and download official PDF payslips.</p>
           </div>
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div className="border border-border-default rounded-card-sm p-5 bg-surface-raised shadow-card">
               <p className="text-[11px] font-semibold text-muted tracking-wide mb-2">Total Net Received</p>
               <p className="text-3xl font-bold text-heading">{formatMoney(totalPaid.toFixed(2), { currency })}</p>
@@ -495,8 +541,8 @@ export default function Payroll() {
 
         {/* Payslips Table */}
         <div className="flex-1 overflow-y-auto px-8 py-6">
-          <div className="border border-border-default rounded-card-sm overflow-hidden bg-surface-raised shadow-card">
-            <table className="w-full text-left border-collapse">
+          <div className="border border-border-default rounded-card-sm overflow-x-auto bg-surface-raised shadow-card">
+            <table className="w-full min-w-[900px] text-left border-collapse">
               <thead className="bg-surface-muted border-b border-border-default">
                 <tr>
                   <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider">Payroll Period</th>
@@ -514,10 +560,10 @@ export default function Payroll() {
                   <tr key={item.id} className="hover:bg-surface-muted transition-colors">
                     <td className="px-6 py-4 font-semibold text-sm text-heading">{item.runLabel}</td>
                     <td className="px-6 py-4 text-sm text-body">{item.payDate ? formatDate(item.payDate) : (item.periodEnd ? formatDate(item.periodEnd) : '—')}</td>
-                    <td className="px-6 py-4 text-sm text-heading text-right tabular-nums">{formatMoney(item.baseSalary, { currency: item.currency })}</td>
-                    <td className="px-6 py-4 text-sm text-heading text-right tabular-nums">{formatMoney(item.gross, { currency: item.currency })}</td>
-                    <td className="px-6 py-4 text-sm text-body text-right tabular-nums">-{formatMoney(item.deductions, { currency: item.currency })}</td>
-                    <td className="px-6 py-4 text-sm font-bold text-heading text-right tabular-nums">{formatMoney(item.net, { currency: item.currency })}</td>
+                    <td className="px-6 py-4 text-sm text-heading text-right tabular-nums" title={formatMoney(item.baseSalary, { currency: item.currency })}>{formatCompactTableMoney(item.baseSalary, { currency: item.currency })}</td>
+                    <td className="px-6 py-4 text-sm text-heading text-right tabular-nums" title={formatMoney(item.gross, { currency: item.currency })}>{formatCompactTableMoney(item.gross, { currency: item.currency })}</td>
+                    <td className="px-6 py-4 text-sm text-body text-right tabular-nums" title={`-${formatMoney(item.deductions, { currency: item.currency })}`}>-{formatCompactTableMoney(item.deductions, { currency: item.currency })}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-heading text-right tabular-nums" title={formatMoney(item.net, { currency: item.currency })}>{formatCompactTableMoney(item.net, { currency: item.currency })}</td>
                     <td className="px-6 py-4 text-center">
                       <span className={`px-2.5 py-1 rounded-input text-xs font-semibold uppercase tracking-wider ${
                         item.status === 'PAID' ? 'bg-accent-light text-accent' :
@@ -548,132 +594,19 @@ export default function Payroll() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-[900px]">
-      <TopBarActions>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={openNewRunDialog}
-            disabled={!isAdmin}
-            title={isAdmin ? undefined : 'Requires the ADMIN role'}
-            className="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            <Plus size={16} /> New Payroll Run
-          </button>
-          <button
-            type="button"
-            disabled={!run || records.length === 0}
-            onClick={exportPaymentSummary}
-            title={run ? 'Export a payroll payment summary CSV' : 'No payroll run loaded'}
-            className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60 cursor-pointer"
-          >
-            <Download size={16} /> Export Payroll CSV
-          </button>
-          {activeRun?.currency === 'EUR' ? (
-            <button
-              type="button"
-              disabled={!run || records.length === 0}
-              onClick={exportSepa}
-              title="Download ISO 20022 SEPA Credit Transfer (.xml) for European banks"
-              className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60 cursor-pointer"
-            >
-              <Download size={16} /> Export SEPA (.xml)
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={!run || records.length === 0}
-              onClick={exportNacha}
-              title="Download standard 94-char fixed-width NACHA Direct Deposit (.ach) file"
-              className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60 cursor-pointer"
-            >
-              <Download size={16} /> Export NACHA (.ach)
-            </button>
-          )}
-          <button
-            type="button"
-            aria-expanded={roundingReviewOpen}
-            onClick={() => setRoundingReviewOpen(open => !open)}
-            className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card"
-          >
-            <Calculator size={15} /> {roundingReviewOpen ? 'Hide rounding review' : 'Year-end rounding review'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatutoryCalculatorOpen(true)}
-            className="flex items-center gap-2 border border-border-default text-body px-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card cursor-pointer"
-          >
-            <Calculator size={15} /> Statutory Tax Calculator
-          </button>
-          {activeRun?.status === 'VOID' ? (
-            <span className="rounded-full bg-surface-muted px-3 py-1.5 text-sm font-semibold text-muted">Voided</span>
-          ) : activeRun?.status === 'PAID' ? (
-            <>
-            <button
-              type="button"
-              onClick={exportLedger}
-              disabled={!run}
-              className="bg-surface-strong text-heading px-5 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors shadow-card disabled:opacity-60"
-            >
-              Export Ledger
-            </button>
-            <button type="button" disabled={!isAdmin || voidMutation.isPending} onClick={() => {
-              const reason = window.prompt('Reason for voiding this payroll run:')?.trim()
-              if (reason) voidMutation.mutate(reason)
-            }} className="border border-danger/40 text-danger px-4 py-2 rounded-input text-sm font-medium hover:bg-danger/5 disabled:opacity-60">
-              {voidMutation.isPending ? 'Voiding…' : 'Void run'}
-            </button>
-            </>
-          ) : activeRun?.status === 'APPROVED' ? (
-            <>
-            <button
-              type="button"
-              disabled={payMutation.isPending}
-              title="Records payment after it has been completed outside Asas."
-              onClick={() => { setPayrollActionError(null); payMutation.mutate() }}
-              className="bg-primary text-white px-5 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {payMutation.isPending ? 'Recording Payment…' : 'Mark Run Paid'}
-            </button>
-            <button type="button" disabled={!isAdmin || voidMutation.isPending} onClick={() => {
-              const reason = window.prompt('Reason for voiding this payroll run:')?.trim()
-              if (reason) voidMutation.mutate(reason)
-            }} className="border border-danger/40 text-danger px-4 py-2 rounded-input text-sm font-medium hover:bg-danger/5 disabled:opacity-60">
-              {voidMutation.isPending ? 'Voiding…' : 'Void run'}
-            </button>
-            </>
-          ) : (
-            <>
-            <button
-              type="button"
-              disabled={!activeRun || activeRun.status === 'APPROVED' || approveMutation.isPending}
-              onClick={() => { setPayrollActionError(null); approveMutation.mutate() }}
-              className="bg-primary text-white px-5 py-2 rounded-input text-sm font-medium hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {activeRun?.status === 'APPROVED' ? 'Pay Run Approved' : 'Approve Pay Run'}
-            </button>
-            <button type="button" disabled={!activeRun || !isAdmin || voidMutation.isPending} onClick={() => {
-              const reason = window.prompt('Reason for voiding this payroll run:')?.trim()
-              if (reason) voidMutation.mutate(reason)
-            }} className="border border-danger/40 text-danger px-4 py-2 rounded-input text-sm font-medium hover:bg-danger/5 disabled:opacity-60">
-              {voidMutation.isPending ? 'Voiding…' : 'Void run'}
-            </button>
-            </>
-          )}
-        </div>
-      </TopBarActions>
-      {payrollActionError && <p role="alert" className="px-6 pt-2 text-sm text-danger">{payrollActionError}</p>}
-
-      <div className="px-6 py-5 flex-shrink-0 border-b border-border-subtle shadow-card z-10 relative">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-6">
-            <div className="flex gap-3">
-              <label className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm bg-surface-raised shadow-card cursor-pointer">
-                <span>Dept</span>
+    <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-y-auto min-w-0 px-6 py-5 space-y-5">
+      {/* ── Fixed Top Controls (Single Toolbar Row) ── */}
+      <div className="flex-shrink-0">
+        <div className="w-full flex flex-wrap lg:flex-nowrap items-start justify-between gap-2.5 min-w-0">
+          {/* Left: All Depts ⌄ + July 2026 · PAID ⌄ + < 1/1 > + Auto-Calculate + Subtitle */}
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
+              <label className="flex items-center border border-border-default text-body px-2.5 py-1.5 rounded-input text-xs bg-surface-raised shadow-card cursor-pointer shrink-0">
                 <select
+                  aria-label="Department"
                   value={departmentFilter}
                   onChange={(e) => setDepartmentFilter(e.target.value)}
-                  className="bg-transparent text-sm outline-none cursor-pointer"
+                  className="bg-transparent text-xs outline-none cursor-pointer"
                 >
                   <option value="ALL">All Depts</option>
                   {departments.map((d) => (
@@ -681,75 +614,336 @@ export default function Payroll() {
                   ))}
                 </select>
               </label>
-              <div className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm bg-surface-raised shadow-card">
-                <label className="flex items-center gap-2">Payroll run
-                  <select aria-label="Payroll run" value={activeRun?.id || ''} onChange={event => { setSelectedRunId(event.target.value); setSelectedId(null) }} className="max-w-56 bg-transparent text-sm outline-none">
-                    {runs.map(item => <option key={item.id} value={item.id}>{item.label} · {item.status}</option>)}
-                  </select>
-                </label>
-                <button type="button" aria-label="Previous payroll run page" disabled={payrollRunPage <= 1} onClick={() => setPayrollRunPage(current => current - 1)} className="rounded border border-border-default px-1.5 py-0.5 disabled:opacity-40">‹</button>
-                <span className="text-[11px] text-muted">{listData?.pagination?.pages ? `${payrollRunPage}/${listData.pagination.pages}` : '0/0'}</span>
-                <button type="button" aria-label="Next payroll run page" disabled={payrollRunPage >= (listData?.pagination?.pages ?? 0)} onClick={() => setPayrollRunPage(current => current + 1)} className="rounded border border-border-default px-1.5 py-0.5 disabled:opacity-40">›</button>
+              <div className="flex items-center border border-border-default text-body px-2.5 py-1.5 rounded-input text-xs bg-surface-raised shadow-card shrink-0">
+                <select
+                  aria-label="Payroll run"
+                  value={activeRun?.id || ''}
+                  onChange={event => { setSelectedRunId(event.target.value); setSelectedId(null) }}
+                  className="max-w-40 sm:max-w-48 bg-transparent text-xs font-normal text-heading outline-none truncate"
+                >
+                  {runs.map(item => (
+                    <option key={item.id} value={item.id}>
+                      {item.label.replace(/\s*Payroll\s*/i, ' ').trim()} · {item.status}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex items-center gap-1 border-l border-border-default pl-1.5 ml-1">
+                  <button type="button" aria-label="Previous payroll run page" disabled={payrollRunPage <= 1} onClick={() => setPayrollRunPage(current => current - 1)} className="rounded border border-border-default px-1 py-0.5 text-xs hover:bg-surface-muted transition-colors disabled:opacity-40">‹</button>
+                  <span className="text-[11px] text-muted">{listData?.pagination?.pages ? `${payrollRunPage}/${listData.pagination.pages}` : '0/0'}</span>
+                  <button type="button" aria-label="Next payroll run page" disabled={payrollRunPage >= (listData?.pagination?.pages ?? 0)} onClick={() => setPayrollRunPage(current => current + 1)} className="rounded border border-border-default px-1 py-0.5 text-xs hover:bg-surface-muted transition-colors disabled:opacity-40">›</button>
+                </div>
               </div>
+              <label className="flex items-center gap-1.5 text-xs font-medium text-muted cursor-pointer hover:text-body transition-colors shrink-0">
+                <input type="checkbox" className="w-3.5 h-3.5 rounded border-border-strong text-accent focus:ring-accent" defaultChecked readOnly />
+                <span>Auto-Calculate</span>
+              </label>
             </div>
-            <div className="h-4 w-px bg-border-default" />
-            <label className="flex items-center gap-2 text-sm text-body cursor-pointer">
-              <input type="checkbox" className="rounded border-border-strong text-accent focus:ring-accent" defaultChecked readOnly />
-              Auto-Calculate
-            </label>
+            <p className="mt-1 text-[11px] text-muted flex items-center gap-1.5 truncate">
+              <span className="shrink-0 font-medium text-heading">Pay date {activeRun?.payDate ? formatDate(activeRun.payDate) : '—'}</span>
+              <span>·</span>
+              <span className="truncate">Earning period {run?.periodStart && run?.periodEnd ? `${run.periodStart} – ${run.periodEnd}` : 'not recorded (legacy run)'}</span>
+            </p>
           </div>
-          <div className="text-sm text-muted">
-            {activeRun?.label || 'No payroll run'} · Pay date{' '}
-            {activeRun?.payDate ? formatDate(activeRun.payDate) : '—'}
-            {' · Earning period '}{run?.periodStart && run?.periodEnd ? `${run.periodStart} – ${run.periodEnd}` : 'not recorded (legacy run)'}
-          </div>
-        </div>
 
-        <div className="grid grid-cols-3 gap-4">
-          <div className="border border-border-default rounded-button p-4 bg-surface-muted/40">
-            <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1">Total Gross</p>
-            <p className="text-2xl font-bold text-heading">{money(totals.gross)}</p>
-          </div>
-          <div className="border border-border-default rounded-button p-4 bg-surface-muted/40">
-            <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1">Taxes / Deductions</p>
-            <p className="text-2xl font-bold text-heading">{money(totals.deductions)}</p>
-          </div>
-          <div className="border border-border-default rounded-button p-4 bg-surface-muted/40">
-            <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1">Total Net</p>
-            <p className="text-2xl font-bold text-heading">{money(totals.net)}</p>
-            <p className="mt-2 text-[11px] text-muted" title="Valued payroll payment journals in workspace base currency, net of linked reversals">
-              Workspace paid MTD: {paidThisMonth ? formatMoney(paidThisMonth) : 'Unavailable'}
-            </p>
-            <p className="text-[11px] text-muted" title="Same elapsed calendar dates in the previous tenant-local month">
-              Prior period: {priorPeriodPaid ? formatMoney(priorPeriodPaid) : 'Unavailable'}
-            </p>
+          {/* Right: Calculators ⌄ + Export ⌄ + Void run + + New Payroll Run */}
+          <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
+            {/* Calculators dropdown */}
+            <div className="relative shrink-0" ref={toolsMenuRef}>
+              <button
+                type="button"
+                aria-expanded={toolsMenuOpen}
+                aria-haspopup="true"
+                onClick={() => setToolsMenuOpen(prev => !prev)}
+                className="flex items-center gap-1.5 border border-border-default text-body px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card cursor-pointer shrink-0"
+              >
+                <Calculator size={13} />
+                <span>Calculators</span>
+                {roundingReviewOpen && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" title="Rounding review open" />
+                )}
+                <ChevronDown size={12} className={`text-muted transition-transform duration-150 ${toolsMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {toolsMenuOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-1.5 w-60 bg-surface-raised border border-border-default rounded-card shadow-xl z-50 py-1 divide-y divide-border-subtle"
+                >
+                  <div className="py-1">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setToolsMenuOpen(false)
+                        setStatutoryCalculatorOpen(true)
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-surface-muted transition-colors flex items-start gap-2.5 cursor-pointer"
+                    >
+                      <Calculator size={15} className="text-accent shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-heading leading-tight">Statutory Tax Calculator</p>
+                        <p className="text-[11px] text-muted leading-tight mt-0.5">Withholdings & deduction preview</p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      role="menuitem"
+                      aria-expanded={roundingReviewOpen}
+                      onClick={() => {
+                        setToolsMenuOpen(false)
+                        setRoundingReviewOpen(open => !open)
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-surface-muted transition-colors flex items-start gap-2.5 cursor-pointer"
+                    >
+                      <Scale size={15} className="text-primary shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-semibold text-heading leading-tight">Year-end rounding review</p>
+                          {roundingReviewOpen && (
+                            <span className="text-[10px] bg-accent/15 text-accent px-1.5 py-0.2 rounded font-medium">Active</span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-muted leading-tight mt-0.5">
+                          {roundingReviewOpen ? 'Hide rounding review drawer' : 'Audit cent rounding across runs'}
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Export dropdown */}
+            <div className="relative shrink-0" ref={exportMenuRef}>
+              <button
+                type="button"
+                disabled={!run || records.length === 0}
+                aria-expanded={exportMenuOpen}
+                aria-haspopup="true"
+                onClick={() => setExportMenuOpen(prev => !prev)}
+                title={run ? 'Export payroll files' : 'No payroll run loaded'}
+                className="flex items-center gap-1.5 border border-border-default text-body px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60 cursor-pointer shrink-0"
+              >
+                <Download size={13} />
+                <span>Export</span>
+                <ChevronDown size={12} className={`text-muted transition-transform duration-150 ${exportMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {exportMenuOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-1.5 w-64 bg-surface-raised border border-border-default rounded-card shadow-xl z-50 py-1 divide-y divide-border-subtle"
+                >
+                  <div className="py-1">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setExportMenuOpen(false)
+                        exportPaymentSummary()
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-surface-muted transition-colors flex items-start gap-2.5 cursor-pointer"
+                    >
+                      <FileSpreadsheet size={15} className="text-accent shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-heading leading-tight">Payroll Summary (CSV)</p>
+                        <p className="text-[11px] text-muted leading-tight mt-0.5">Payment breakdown for current run</p>
+                      </div>
+                    </button>
+
+                    {activeRun?.currency === 'EUR' ? (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setExportMenuOpen(false)
+                          exportSepa()
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-surface-muted transition-colors flex items-start gap-2.5 cursor-pointer"
+                      >
+                        <Landmark size={15} className="text-primary shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <p className="font-semibold text-heading leading-tight">SEPA Transfer (.xml)</p>
+                          <p className="text-[11px] text-muted leading-tight mt-0.5">ISO 20022 European bank batch</p>
+                        </div>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setExportMenuOpen(false)
+                          exportNacha()
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-surface-muted transition-colors flex items-start gap-2.5 cursor-pointer"
+                      >
+                        <Landmark size={15} className="text-primary shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <p className="font-semibold text-heading leading-tight">NACHA Direct Deposit (.ach)</p>
+                          <p className="text-[11px] text-muted leading-tight mt-0.5">Standard 94-char ACH bank wire</p>
+                        </div>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="py-1">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={!run || activeRun?.status !== 'PAID'}
+                      onClick={() => {
+                        setExportMenuOpen(false)
+                        exportLedger()
+                      }}
+                      title={activeRun?.status === 'PAID' ? 'Download payroll ledger CSV' : 'Available when run is marked paid'}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-surface-muted transition-colors flex items-start gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      <FileText size={15} className="text-muted shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-heading leading-tight">General Ledger (CSV)</p>
+                        <p className="text-[11px] text-muted leading-tight mt-0.5">
+                          {activeRun?.status === 'PAID' ? 'Accounting ledger entries' : 'Available when run is marked paid'}
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Run Lifecycle Action (Void / Pay / Approve) */}
+            {activeRun?.status === 'VOID' ? (
+              <span className="rounded-full bg-surface-muted px-2.5 py-1.5 text-xs font-semibold text-muted shrink-0">Voided</span>
+            ) : activeRun?.status === 'PAID' ? (
+              <button
+                type="button"
+                disabled={!isAdmin || voidMutation.isPending}
+                onClick={() => {
+                  const reason = window.prompt('Reason for voiding this payroll run:')?.trim()
+                  if (reason) voidMutation.mutate(reason)
+                }}
+                className="border border-danger/40 text-danger px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-danger/5 transition-colors disabled:opacity-60 cursor-pointer shrink-0"
+              >
+                {voidMutation.isPending ? 'Voiding…' : 'Void run'}
+              </button>
+            ) : activeRun?.status === 'APPROVED' ? (
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  disabled={payMutation.isPending}
+                  title="Records payment after it has been completed outside Asas."
+                  onClick={() => { setPayrollActionError(null); payMutation.mutate() }}
+                  className="bg-primary text-white px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer shrink-0"
+                >
+                  {payMutation.isPending ? 'Recording Payment…' : 'Mark Run Paid'}
+                </button>
+                <button
+                  type="button"
+                  disabled={!isAdmin || voidMutation.isPending}
+                  onClick={() => {
+                    const reason = window.prompt('Reason for voiding this payroll run:')?.trim()
+                    if (reason) voidMutation.mutate(reason)
+                  }}
+                  className="border border-danger/40 text-danger px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-danger/5 transition-colors disabled:opacity-60 cursor-pointer shrink-0"
+                >
+                  {voidMutation.isPending ? 'Voiding…' : 'Void run'}
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  disabled={!activeRun || activeRun.status === 'APPROVED' || approveMutation.isPending}
+                  onClick={() => { setPayrollActionError(null); approveMutation.mutate() }}
+                  className="bg-primary text-white px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer shrink-0"
+                >
+                  {activeRun?.status === 'APPROVED' ? 'Pay Run Approved' : 'Approve Pay Run'}
+                </button>
+                <button
+                  type="button"
+                  disabled={!activeRun || !isAdmin || voidMutation.isPending}
+                  onClick={() => {
+                    const reason = window.prompt('Reason for voiding this payroll run:')?.trim()
+                    if (reason) voidMutation.mutate(reason)
+                  }}
+                  className="border border-danger/40 text-danger px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-danger/5 transition-colors disabled:opacity-60 cursor-pointer shrink-0"
+                >
+                  {voidMutation.isPending ? 'Voiding…' : 'Void run'}
+                </button>
+              </div>
+            )}
+
+            {/* + New Payroll Run Button */}
+            <button
+              type="button"
+              onClick={openNewRunDialog}
+              disabled={!isAdmin}
+              title={isAdmin ? undefined : 'Requires the ADMIN role'}
+              className="flex items-center gap-1.5 bg-primary text-white px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer shrink-0"
+            >
+              <Plus size={14} /> New Payroll Run
+            </button>
           </div>
         </div>
       </div>
 
+      {payrollActionError && (
+        <p role="alert" className="text-xs text-danger font-medium -mt-2">{payrollActionError}</p>
+      )}
+
+      {/* ── KPI Grid (12-column grid, col-span-4 each, gap-5) ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-12 gap-5 flex-shrink-0">
+        <div className="lg:col-span-4 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-[92px] flex flex-col justify-start" style={{ containerType: 'inline-size' }}>
+          <p className="text-[11px] font-bold text-muted uppercase tracking-wider leading-none">Total Gross</p>
+          <p className="min-w-0 text-2xl font-bold text-heading mt-3.5 leading-none tracking-tight" style={{ fontSize: metricFontSize(totals.gross) }}>{money(totals.gross)}</p>
+        </div>
+
+        <div className="lg:col-span-4 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-[92px] flex flex-col justify-start" style={{ containerType: 'inline-size' }}>
+          <p className="text-[11px] font-bold text-muted uppercase tracking-wider leading-none">Taxes & Deductions</p>
+          <p className="min-w-0 text-2xl font-bold text-heading mt-3.5 leading-none tracking-tight" style={{ fontSize: metricFontSize(totals.deductions) }}>{money(totals.deductions)}</p>
+        </div>
+
+        <div className="lg:col-span-4 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-[92px] flex flex-col justify-start" style={{ containerType: 'inline-size' }}>
+          <p className="text-[11px] font-bold text-muted uppercase tracking-wider leading-none">Total Net</p>
+          <p className="min-w-0 text-2xl font-bold text-heading mt-3.5 leading-none tracking-tight" style={{ fontSize: metricFontSize(totals.net) }}>{money(totals.net)}</p>
+        </div>
+      </div>
+
       {roundingReviewOpen && (
-        <section aria-label="Year-end rounding review" className="max-h-[40vh] overflow-y-auto border-b border-border-default bg-surface-muted/30 px-6 py-4">
+        <section aria-label="Year-end rounding review" className="flex-shrink-0 max-h-[35vh] overflow-y-auto rounded-card border border-border-default bg-surface-muted/30 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-heading">Earning-year rounding review</h2>
               <p className="mt-1 max-w-3xl text-xs text-muted">Compares summed deductions on paid runs with one currency-precision rounding over gross for each employee, currency, and unchanged saved rate schedule. This is a review of rounding differences, not a statutory tax calculation or an adjustment to payroll.</p>
             </div>
-            <label className="flex items-center gap-2 text-sm text-body">
-              <span>Period start year</span>
-              <input type="number" min="2000" max="2100" value={roundingYear} onChange={event => setRoundingYear(event.target.value)} className="w-24 rounded-input border border-border-default bg-surface-raised px-2 py-1.5" />
-            </label>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 text-xs sm:text-sm text-body">
+                <span>Period start year</span>
+                <input type="number" min="2000" max="2100" value={roundingYear} onChange={event => setRoundingYear(event.target.value)} className="w-24 rounded-input border border-border-default bg-surface-raised px-2 py-1 text-xs sm:text-sm" />
+              </label>
+              <button
+                type="button"
+                aria-label="Close rounding review"
+                onClick={() => setRoundingReviewOpen(false)}
+                className="text-muted hover:text-heading p-1.5 rounded-input hover:bg-surface-muted transition-colors cursor-pointer"
+                title="Close rounding review"
+              >
+                <X size={15} />
+              </button>
+            </div>
           </div>
-          {isLoadingRoundingReview && <p className="mt-4 text-sm text-muted">Calculating rounding differences…</p>}
-          {isRoundingReviewError && <p role="alert" className="mt-4 text-sm text-danger">{roundingReviewError?.message || 'Could not load the rounding review.'}</p>}
+          {isLoadingRoundingReview && <p className="mt-3 text-xs text-muted">Calculating rounding differences…</p>}
+          {isRoundingReviewError && <p role="alert" className="mt-3 text-xs text-danger">{roundingReviewError?.message || 'Could not load the rounding review.'}</p>}
           {roundingReview && !isLoadingRoundingReview && !isRoundingReviewError && (() => {
             const differences = roundingReview.groups.filter(group => [group.variance, ...group.taxLines.map(line => line.variance)].some(value => Number(value) !== 0))
             return (
               <>
-                <p className="mt-3 text-xs text-muted">{roundingReview.groups.length} rate groups reviewed · {roundingReview.excludedManualOverrideLines} {roundingReview.excludedManualOverrideLines === 1 ? 'line' : 'lines'} with manual tax overrides excluded · {roundingReview.excludedUnknownCurrencyLines} {roundingReview.excludedUnknownCurrencyLines === 1 ? 'line' : 'lines'} with unknown currency excluded.</p>
+                <p className="mt-2 text-xs text-muted">{roundingReview.groups.length} rate groups reviewed · {roundingReview.excludedManualOverrideLines} {roundingReview.excludedManualOverrideLines === 1 ? 'line' : 'lines'} with manual tax overrides excluded · {roundingReview.excludedUnknownCurrencyLines} {roundingReview.excludedUnknownCurrencyLines === 1 ? 'line' : 'lines'} with unknown currency excluded.</p>
                 {differences.length === 0 ? (
-                  <p className="mt-3 text-sm text-body">No rounding-only differences were found for {roundingReview.year} paid earning periods.</p>
+                  <p className="mt-2 text-xs text-body">No rounding-only differences were found for {roundingReview.year} paid earning periods.</p>
                 ) : (
-                  <div className="mt-3 overflow-x-auto rounded-button border border-border-default bg-surface-raised">
+                  <div className="mt-2 overflow-x-auto rounded-button border border-border-default bg-surface-raised">
                     <table className="w-full text-left text-xs">
                       <thead className="bg-surface-muted text-muted"><tr>
                         <th className="px-3 py-2">Employee / rate schedule</th><th className="px-3 py-2">Paid lines</th><th className="px-3 py-2">Gross</th><th className="px-3 py-2">Recorded deductions</th><th className="px-3 py-2">Aggregate-rounded</th><th className="px-3 py-2">Variance</th>
@@ -757,7 +951,7 @@ export default function Payroll() {
                       <tbody className="divide-y divide-border-subtle">{differences.map((group, index) => (
                         <tr key={`${group.employeeId}-${index}`}>
                           <td className="px-3 py-2"><p className="font-medium text-heading">{group.employeeName}</p><p className="mt-0.5 text-muted">{group.taxRates.map(rate => `${rate.label} ${rate.rate}%`).join(' · ')} · {group.currency}</p><details className="mt-1"><summary className="cursor-pointer text-muted">Tax-line detail</summary><ul className="mt-1 space-y-1">{group.taxLines.map(line => <li key={line.label}>{line.label}: {formatMoney(line.recorded, { currency: group.currency })} recorded · {formatMoney(line.aggregateRounded, { currency: group.currency })} aggregate · variance {formatMoney(line.variance, { currency: group.currency })}</li>)}</ul></details></td>
-                          <td className="px-3 py-2 text-body">{group.paidLineCount}</td><td className="px-3 py-2 text-body">{formatMoney(group.grossTotal, { currency: group.currency })}</td><td className="px-3 py-2 text-body">{formatMoney(group.recordedDeductions, { currency: group.currency })}</td><td className="px-3 py-2 text-body">{formatMoney(group.aggregateRoundedDeductions, { currency: group.currency })}</td><td className="px-3 py-2 font-semibold text-heading">{formatMoney(group.variance, { currency: group.currency })}</td>
+                          <td className="px-3 py-2 text-body">{group.paidLineCount}</td><td className="px-3 py-2 text-body tabular-nums" title={formatMoney(group.grossTotal, { currency: group.currency })}>{formatCompactTableMoney(group.grossTotal, { currency: group.currency })}</td><td className="px-3 py-2 text-body tabular-nums" title={formatMoney(group.recordedDeductions, { currency: group.currency })}>{formatCompactTableMoney(group.recordedDeductions, { currency: group.currency })}</td><td className="px-3 py-2 text-body tabular-nums" title={formatMoney(group.aggregateRoundedDeductions, { currency: group.currency })}>{formatCompactTableMoney(group.aggregateRoundedDeductions, { currency: group.currency })}</td><td className="px-3 py-2 font-semibold text-heading tabular-nums" title={formatMoney(group.variance, { currency: group.currency })}>{formatCompactTableMoney(group.variance, { currency: group.currency })}</td>
                         </tr>
                       ))}</tbody>
                     </table>
@@ -769,109 +963,132 @@ export default function Payroll() {
         </section>
       )}
 
-      <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 overflow-y-auto">
-          {isLoading && (
-            <div className="flex items-center justify-center gap-2 py-16 text-muted text-sm">
-              <Loader2 size={16} className="animate-spin" /> Loading payroll…
-            </div>
-          )}
-          {isError && (
-            <div className="p-6 text-sm text-danger">
-              {error?.message || 'Unable to load payroll.'}
-            </div>
-          )}
-          {!isLoading && !isError && records.length === 0 && (
-            <div className="p-10 text-center">
-              <p className="text-base font-semibold text-heading mb-1">No payroll lines</p>
-              <p className="text-sm text-muted">Load the sample pack or create a payroll run to see data here.</p>
-            </div>
-          )}
-          {!isLoading && records.length > 0 && (
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-surface-muted/50 sticky top-0 z-10">
-                <tr>
-                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-default">Employee</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-default">Gross</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-default">Deductions</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-default">Net</th>
-                  <th className="px-6 py-3 border-b border-border-default w-12" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-subtle">
-                {records.map(record => {
-                  const isSelected = selectedId === record.id
-                  return (
-                    <tr
-                      key={record.id}
-                      onClick={() => {
-                        setSelectedId(record.id)
-                        setPayslipError(null)
-                      }}
-                      className={`cursor-pointer transition-colors ${isSelected ? 'bg-accent-light/50' : 'hover:bg-surface-muted'}`}
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-surface-strong flex items-center justify-center text-xs font-bold text-heading">
-                            {(record.employee?.name || '?').charAt(0)}
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-heading">{record.employee?.name}</p>
-                            <p className="text-[11px] text-muted">{record.employee?.title || '—'}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-body">{money(record.gross)}</td>
-                      <td className="px-6 py-4 text-sm text-body">{formatNegativeDeduction(record.deductions, run?.currency)}</td>
-                      <td className="px-6 py-4 text-sm font-semibold text-heading">{money(record.net)}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <PayslipButton
-                            runId={activeRunId}
-                            lineId={record.id}
-                            onSelect={() => setSelectedId(record.id)}
-                            onNotifyError={setPayslipError}
-                          />
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setSelectedId(record.id)
-                              if (isAdmin && activeRun && !['APPROVED', 'PAID', 'VOID'].includes(activeRun.status)) {
-                                openLineEditor()
-                              }
-                            }}
-                            title={isAdmin && activeRun && !['APPROVED', 'PAID', 'VOID'].includes(activeRun.status) ? 'Edit line inputs' : 'Inspect line'}
-                            className="p-1 hover:bg-surface-muted rounded transition-colors text-caption hover:text-heading cursor-pointer"
-                          >
-                            <MoreHorizontal size={16} />
-                          </button>
-                        </div>
-                      </td>
+      {/* ── Main Workspace: Table (col-span-8) & Right Inspector Panel (col-span-4) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-0">
+        {/* Table Card (col-span-8) */}
+        <div className="lg:col-span-8 min-w-0 h-[510px] bg-surface-raised rounded-card border border-border-subtle shadow-card flex flex-col overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
+              {isLoading && (
+                <div className="flex items-center justify-center gap-2 py-16 text-muted text-sm">
+                  <Loader2 size={16} className="animate-spin" /> Loading payroll…
+                </div>
+              )}
+              {isError && (
+                <div className="p-6 text-sm text-danger text-center">
+                  {error?.message || 'Unable to load payroll.'}
+                </div>
+              )}
+              {!isLoading && !isError && records.length === 0 && (
+                <div className="p-10 text-center">
+                  <p className="text-base font-semibold text-heading mb-1">No payroll lines</p>
+                  <p className="text-sm text-muted">Load the sample pack or create a payroll run to see data here.</p>
+                </div>
+              )}
+              {!isLoading && records.length > 0 && (
+                <table className="w-full table-fixed text-left border-collapse">
+                  <colgroup>
+                    <col className="w-[35%]" />
+                    <col className="w-[18%]" />
+                    <col className="w-[18%]" />
+                    <col className="w-[16%]" />
+                    <col className="w-[13%] min-w-[85px]" />
+                  </colgroup>
+                  <thead className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left bg-surface-muted">Employee</th>
+                      <th className="px-4 py-2.5 text-right bg-surface-muted">Gross</th>
+                      <th className="px-4 py-2.5 text-right bg-surface-muted">Deductions</th>
+                      <th className="px-4 py-2.5 text-right bg-surface-muted">Net</th>
+                      <th className="px-4 py-2.5 bg-surface-muted text-right" />
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
+                  </thead>
+                  <tbody className="divide-y divide-border-subtle">
+                    {records.map(record => {
+                      const isSelected = selectedId === record.id
+                      return (
+                        <tr
+                          key={record.id}
+                          onClick={() => {
+                            setSelectedId(record.id)
+                            setPayslipError(null)
+                          }}
+                          className={`cursor-pointer transition-colors ${
+                            isSelected ? 'bg-accent-light/50' : 'bg-surface-raised hover:bg-surface-muted/60'
+                          }`}
+                        >
+                          <td className="px-4 py-3.5">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-subtle flex items-center justify-center text-xs font-bold text-heading shrink-0">
+                                {(record.employee?.name || '?').charAt(0)}
+                              </div>
+                              <div className="min-w-0 truncate">
+                                <p className="text-sm font-semibold text-heading truncate">{record.employee?.name}</p>
+                                <p className="text-[11px] text-muted truncate">{record.employee?.title || '—'}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5 text-xs sm:text-sm text-body text-right tabular-nums truncate" title={money(record.gross)}>{compactMoney(record.gross)}</td>
+                          <td className="px-4 py-3.5 text-xs sm:text-sm text-body text-right tabular-nums truncate" title={formatNegativeDeduction(record.deductions, run?.currency)}>{formatCompactNegativeDeduction(record.deductions, run?.currency)}</td>
+                          <td className="px-4 py-3.5 text-xs sm:text-sm font-semibold text-heading text-right tabular-nums truncate" title={money(record.net)}>{compactMoney(record.net)}</td>
+                          <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end whitespace-nowrap">
+                              <PayslipButton
+                                runId={activeRunId}
+                                lineId={record.id}
+                                onSelect={() => setSelectedId(record.id)}
+                                onNotifyError={setPayslipError}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
 
-        <div className="w-[380px] border-l border-border-default p-6 overflow-y-auto flex-shrink-0">
-          {!selectedRecord ? (
-            <p className="text-sm text-muted">Select a payroll line to inspect breakdown.</p>
-          ) : (
-            <div className="space-y-5">
-              <div>
-                <p className="text-xs font-bold text-muted uppercase tracking-wider mb-1">Selected</p>
-                <h2 className="text-xl font-bold text-heading">{selectedRecord.employee?.name}</h2>
-                <p className="text-sm text-muted">{selectedRecord.employee?.title || '—'}</p>
-                <button type="button" onClick={openLineEditor} disabled={!isAdmin || !activeRun || ['APPROVED', 'PAID'].includes(activeRun.status)} title={!isAdmin ? 'Requires the ADMIN role' : 'Adjust inputs and recalculate this line'} className="mt-3 rounded-input border border-border-default px-3 py-1.5 text-sm font-medium text-body hover:bg-surface-muted disabled:opacity-50">Edit payroll inputs</button>
-                <div className="mt-3">
-                  <PayslipButton
-                    runId={activeRunId}
-                    lineId={selectedRecord.id}
-                    onNotifyError={setPayslipError}
-                  />
+          {/* Right Inspector Panel (col-span-4) */}
+          <div className="lg:col-span-4 min-w-0 h-[510px] bg-surface-raised rounded-card border border-border-subtle shadow-card flex flex-col overflow-hidden">
+            {!selectedRecord ? (
+              <div className="flex-1 flex items-center justify-center p-6 text-center text-sm text-muted">
+                Select a payroll line to inspect breakdown.
+              </div>
+            ) : (
+              <>
+                {/* Fixed Inspector Header */}
+                <div className="flex-shrink-0 p-5 border-b border-border-subtle bg-surface-raised">
+                  <p className="text-[11px] font-bold text-muted uppercase tracking-wider mb-2 leading-none">Selected Line</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-surface-strong border border-border-subtle flex items-center justify-center text-sm font-bold text-heading shrink-0">
+                      {(selectedRecord.employee?.name || '?').charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <h2 className="text-sm sm:text-base font-bold text-heading truncate">{selectedRecord.employee?.name}</h2>
+                      <p className="text-xs text-muted truncate">{selectedRecord.employee?.title || '—'}</p>
+                    </div>
+                  </div>
+
+                  {/* Side-by-side Edit payroll inputs and Payslip button */}
+                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border-subtle">
+                    <button
+                      type="button"
+                      onClick={openLineEditor}
+                      disabled={!isAdmin || !activeRun || ['APPROVED', 'PAID'].includes(activeRun.status)}
+                      title={!isAdmin ? 'Requires the ADMIN role' : 'Adjust inputs and recalculate this line'}
+                      className="flex-1 rounded-input border border-border-default px-3 py-1.5 text-xs font-medium text-body hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-50 text-center cursor-pointer"
+                    >
+                      Edit payroll inputs
+                    </button>
+                    <div className="shrink-0">
+                      <PayslipButton
+                        runId={activeRunId}
+                        lineId={selectedRecord.id}
+                        onNotifyError={setPayslipError}
+                      />
+                    </div>
+                  </div>
                   {payslipError && (
                     <p className="mt-2 flex items-start gap-1.5 text-xs text-danger">
                       <AlertCircle size={13} className="flex-shrink-0 mt-0.5" />
@@ -879,47 +1096,80 @@ export default function Payroll() {
                     </p>
                   )}
                 </div>
-              </div>
-              <div className="space-y-3 border border-border-default rounded-button p-4">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted">Period base pay</span>
-                  <span className="font-medium text-heading">{money(selectedRecord.baseSalary ?? selectedRecord.gross)}</span>
-                </div>
-                {selectedRecord.salaryRateSegments?.length <= 1 && selectedRecord.sourceSalary != null && (
-                  <p className="text-xs text-muted">
-                    Source salary: {money(selectedRecord.sourceSalary)} {selectedRecord.salaryBasis?.toLowerCase()} · {run?.periodsPerYear} periods/year · {selectedRecord.eligibleDays}/{selectedRecord.periodDays} eligible calendar days. Period base pay may include manual adjustments.
-                  </p>
-                )}
-                {selectedRecord.salaryRateSegments?.length > 1 && (
-                  <div className="text-xs text-muted">
-                    <p className="font-medium text-body">Effective salary rates used · {selectedRecord.eligibleDays}/{selectedRecord.periodDays} eligible days</p>
-                    <ul className="mt-1 space-y-1">{selectedRecord.salaryRateSegments.map(segment => (
-                      <li key={segment.effectiveFrom}>{money(segment.salary)} {segment.salaryBasis.toLowerCase()} from {formatDate(segment.effectiveFrom)} · {segment.eligibleDays} eligible days</li>
-                    ))}</ul>
+
+                {/* Scrollable Inspector Breakdown */}
+                <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-3">
+                  {/* Subtle 1px divider above EARNINGS */}
+                  <div className="border-t border-slate-100 my-3" />
+
+                  <div>
+                    <p className="text-[10px] font-bold text-caption uppercase tracking-wider mb-2">Earnings</p>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted">Period base pay</span>
+                        <span className="font-semibold text-heading tabular-nums">{money(selectedRecord.baseSalary ?? selectedRecord.gross)}</span>
+                      </div>
+                      {selectedRecord.salaryRateSegments?.length <= 1 && selectedRecord.sourceSalary != null && (
+                        <p className="text-[11px] text-muted leading-relaxed">
+                          Source salary: {money(selectedRecord.sourceSalary)} {selectedRecord.salaryBasis?.toLowerCase()} · {run?.periodsPerYear} periods/year · {selectedRecord.eligibleDays}/{selectedRecord.periodDays} eligible calendar days. Period base pay may include manual adjustments.
+                        </p>
+                      )}
+                      {selectedRecord.salaryRateSegments?.length > 1 && (
+                        <div className="text-[11px] text-muted">
+                          <p className="font-medium text-body">Effective salary rates used · {selectedRecord.eligibleDays}/{selectedRecord.periodDays} eligible days</p>
+                          <ul className="mt-1 space-y-0.5">
+                            {selectedRecord.salaryRateSegments.map(segment => (
+                              <li key={segment.effectiveFrom}>
+                                {money(segment.salary)} {segment.salaryBasis.toLowerCase()} from {formatDate(segment.effectiveFrom)} · {segment.eligibleDays} eligible days
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted">Missed days ({selectedRecord.missedDaysCount || 0})</span>
+                        <span className="font-semibold text-heading tabular-nums">{formatNegativeDeduction(selectedRecord.missedDaysAmount || '0', run?.currency)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted">Bonus {selectedRecord.bonusLabel ? `(${selectedRecord.bonusLabel})` : ''}</span>
+                        <span className="font-semibold text-heading tabular-nums">{money(selectedRecord.bonusAmount || '0')}</span>
+                      </div>
+                    </div>
                   </div>
-                )}
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted">Missed days ({selectedRecord.missedDaysCount || 0})</span>
-                  <span className="font-medium text-heading">{formatNegativeDeduction(selectedRecord.missedDaysAmount || '0', run?.currency)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted">Bonus {selectedRecord.bonusLabel ? `(${selectedRecord.bonusLabel})` : ''}</span>
-                  <span className="font-medium text-heading">{money(selectedRecord.bonusAmount || '0')}</span>
-                </div>
-                {(selectedRecord.taxLines || []).map(tax => (
-                  <div key={tax.id} className="flex justify-between text-sm">
-                    <span className="text-muted flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-muted" />
-                      {tax.label}
-                    </span>
-                    <span className="font-medium text-heading">{formatNegativeDeduction(tax.amount, run?.currency)}</span>
+
+                  {/* Subtle horizontal divider above Taxes & Deductions */}
+                  <div className="border-t border-slate-100 my-3" />
+
+                  <div>
+                    <p className="text-[10px] font-bold text-caption uppercase tracking-wider mb-2">Taxes & Deductions</p>
+                    <div className="space-y-1.5">
+                      {(selectedRecord.taxLines || []).map(tax => (
+                        <div key={tax.id} className="flex justify-between text-xs">
+                          <span className="text-muted flex items-center gap-1.5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-muted shrink-0" />
+                            {tax.label}
+                          </span>
+                          <span className="font-semibold text-heading tabular-nums">{formatNegativeDeduction(tax.amount, run?.currency)}</span>
+                        </div>
+                      ))}
+                      {(!selectedRecord.taxLines || selectedRecord.taxLines.length === 0) && (
+                        <p className="text-[11px] text-muted">No tax lines recorded for this employee.</p>
+                      )}
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+
+                  {/* Subtle horizontal divider above Net Pay */}
+                  <div className="border-t border-slate-100 my-3" />
+
+                  <div className="flex justify-between items-center text-sm font-bold pt-0.5">
+                    <span className="text-heading">Net Pay</span>
+                    <span className="text-accent text-base tabular-nums">{money(selectedRecord.net)}</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      </div>
 
       <FormDialog
         open={isDialogOpen}

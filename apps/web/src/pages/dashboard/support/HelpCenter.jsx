@@ -6,6 +6,7 @@ import EmptyState from '../../../components/common/EmptyState'
 import { supportApi } from '../../../lib/api/support'
 import { queryKeys } from '../../../lib/queryKeys'
 import { useActiveMemberRole } from '../../../lib/authClient'
+import { getMemberRoleName } from '../../../lib/memberRole'
 import { formatDate } from '../../../lib/format'
 
 function getStatusBadge(status) {
@@ -45,7 +46,7 @@ function getStatusBadge(status) {
 export default function SupportDashboard() {
   const queryClient = useQueryClient()
   const { data: memberRole } = useActiveMemberRole()
-  const isAdmin = memberRole === 'ADMIN' || memberRole === 'OWNER'
+  const isAdmin = ['ADMIN', 'OWNER'].includes(getMemberRoleName(memberRole))
 
   const [subject, setSubject] = useState('')
   const [search, setSearch] = useState('')
@@ -79,9 +80,9 @@ export default function SupportDashboard() {
     : allTickets
 
   return (
-    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
+    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
       <TopBarActions>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
             <input
@@ -95,8 +96,8 @@ export default function SupportDashboard() {
         </div>
       </TopBarActions>
 
-      <div className="flex flex-1 items-start justify-center p-8 overflow-y-auto">
-        <div className="w-full max-w-2xl rounded-card-sm border border-border-default bg-surface-raised p-8 text-center shadow-card space-y-6">
+      <div className="flex flex-1 items-start justify-center p-4 sm:p-8 overflow-y-auto">
+        <div className="w-full max-w-2xl rounded-card-sm border border-border-default bg-surface-raised p-5 sm:p-8 text-center shadow-card space-y-6">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-card-sm border border-border-subtle bg-surface-muted text-body-light">
             <Headset size={22} />
           </div>
@@ -119,7 +120,7 @@ export default function SupportDashboard() {
             </div>
           )}
 
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input
               value={subject}
               onChange={event => setSubject(event.target.value)}
@@ -135,7 +136,7 @@ export default function SupportDashboard() {
               type="button"
               disabled={!subject.trim() || createTicket.isPending}
               onClick={() => createTicket.mutate()}
-              className="rounded-input bg-primary px-5 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer shadow-card flex items-center gap-2"
+              className="rounded-input bg-primary px-5 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer shadow-card flex items-center justify-center gap-2"
             >
               {createTicket.isPending && <Loader2 size={14} className="animate-spin" />}
               Submit

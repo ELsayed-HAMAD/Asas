@@ -1,16 +1,15 @@
-import React, { useDeferredValue, useEffect, useState } from 'react';
+import React, { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Search,
-  LayoutGrid,
-  List,
   MoreHorizontal,
   Mail,
   Phone,
   Pencil,
   Circle,
   Loader2,
-  Trash2
+  Trash2,
+  X,
 } from 'lucide-react';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from '@dnd-kit/core';
@@ -19,6 +18,8 @@ import { crmApi } from '../../../lib/api/crm';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney, formatDate, moneyToMajor } from '../../../lib/format';
 import { useActiveMemberRole } from '../../../lib/authClient';
+import { getMemberRoleName } from '../../../lib/memberRole';
+import { formatCompactMoney } from '../../../lib/crmMoney';
 import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
@@ -56,6 +57,17 @@ const getStageBadgeColors = (stage) => {
   }
 };
 
+const getStageDotColor = (stage) => {
+  switch (stage) {
+    case 'LEADS': return 'bg-blue-500';
+    case 'PROPOSAL': return 'bg-orange-500';
+    case 'NEGOTIATION': return 'bg-purple-500';
+    case 'CLOSED_WON': return 'bg-green-500';
+    case 'CLOSED_LOST': return 'bg-red-500';
+    default: return 'bg-muted';
+  }
+};
+
 // Avatar initials derived from the deal's (company or name) — the old rows showed a
 // 2-letter monogram in the avatar box.
 const initials = (deal) => {
@@ -66,122 +78,344 @@ const initials = (deal) => {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 };
 
-function DraggableDealRow({ deal, selected, onSelect, disabled }) {
+export { formatCompactMoney };
+
+
+function StageSwitcherCard({ stage, group, isActive, onSelect }) {
+  const { setNodeRef, isOver } = useDroppable({ id: stage });
+  const summaryKey = stage === 'CLOSED_WON' ? 'wonValue' : stage === 'CLOSED_LOST' ? 'lostValue' : 'openPipelineValue';
+  const totalValue = group?.summary?.[summaryKey];
+  const total = group?.pagination?.total ?? 0;
+  const exactMoney = formatMoney(totalValue || 0, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const countLabel = `${total} ${total === 1 ? 'deal' : 'deals'}`;
+  const cardDescription = `${STAGE_LABELS[stage]}: ${countLabel}, ${exactMoney}`;
+
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      aria-pressed={isActive}
+      aria-label={cardDescription}
+      title={cardDescription}
+      onClick={() => onSelect(stage)}
+      className={`rounded-[12px] p-[10px_12px] min-w-[150px] min-[1100px]:min-w-0 text-start cursor-pointer transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+        isActive
+          ? 'bg-surface-raised border border-primary shadow-[0_0_0_1px_var(--color-primary)]'
+          : 'bg-surface-raised border border-border-default hover:border-border-strong'
+      } ${isOver ? 'ring-2 ring-accent bg-accent-light/30' : ''}`}
+    >
+      <div className="flex items-center justify-between gap-1.5 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={`w-2 h-2 rounded-full shrink-0 ${getStageDotColor(stage)}`} aria-hidden="true" />
+          <span className="text-xs font-semibold text-muted whitespace-nowrap">
+            {STAGE_LABELS[stage]}
+          </span>
+        </div>
+        <span className="text-xs text-muted font-medium shrink-0 whitespace-nowrap ms-auto">
+          {countLabel}
+        </span>
+      </div>
+      <div className="mt-1.5 text-[18px] font-extrabold text-heading tabular-nums leading-tight whitespace-nowrap">
+        {formatCompactMoney(totalValue || 0)}
+      </div>
+    </button>
+  );
+}
+
+function ListDealRow({ deal, selected, onSelect, disabled }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Translate.toString(transform) }}
+      data-deal-id={deal.id}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect(deal.id);
+        }
+      }}
+      style={{
+        transform: CSS.Translate.toString(transform),
+        gridTemplateColumns: 'minmax(240px, 1fr) 120px 130px',
+        paddingInline: '20px',
+      }}
       {...listeners}
       {...attributes}
       onClick={() => onSelect(deal.id)}
-      className={`grid grid-cols-12 items-center px-6 py-4 cursor-grab transition-colors ${
-        selected ? 'bg-surface-raised border-l-4 border-l-blue-600' : 'bg-surface-raised hover:bg-surface-muted border-l-4 border-l-transparent'
+      className={`relative grid items-center gap-x-3 h-14 min-h-[56px] cursor-pointer transition-colors border-b border-border-subtle focus:outline-none focus:ring-2 focus:ring-inset focus:ring-accent ${
+        selected ? 'bg-surface-muted' : 'bg-surface-raised hover:bg-surface-muted/60'
       } ${isDragging || disabled ? 'opacity-60' : ''}`}
     >
-      <div className="col-span-6 flex items-center gap-3">
+      {selected && (
+        <div className="absolute inset-y-0 inset-inline-start-0 w-[3px] bg-accent pointer-events-none" />
+      )}
+      <div className="flex items-center gap-3 min-w-0 overflow-hidden">
         <div className="w-8 h-8 rounded shrink-0 flex items-center justify-center text-xs font-bold bg-surface-strong text-body">
           {initials(deal)}
         </div>
-        <div>
-          <p className="text-sm font-bold text-heading leading-tight">{deal.name}</p>
-          <p className="text-[11px] font-medium text-muted mt-0.5">{deal.company || (deal.owner?.name || 'No company')}</p>
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <p className="text-sm font-bold text-heading truncate leading-tight whitespace-nowrap" title={deal.name}>
+            {deal.name}
+          </p>
+          <p className="text-xs text-muted truncate mt-0.5 leading-tight whitespace-nowrap" title={deal.company || (deal.owner?.name || 'No company')}>
+            {deal.company || (deal.owner?.name || 'No company')}
+          </p>
         </div>
       </div>
-      <div className="col-span-3 flex justify-center">
-        <span className={`inline-flex px-3 py-1 text-[11px] font-semibold rounded-full border ${getStageBadgeColors(deal.stage)}`}>
+      <div className="flex items-center min-w-0">
+        <span className={`h-[22px] min-h-[22px] px-2.5 inline-flex items-center justify-center text-xs font-bold rounded-full border whitespace-nowrap ${getStageBadgeColors(deal.stage)}`}>
           {STAGE_LABELS[deal.stage] || deal.stage}
         </span>
       </div>
-      <div className="col-span-3 text-right">
-        <span className="text-sm font-bold text-heading tabular-nums">{formatMoney(deal.value)}</span>
+      <div className="text-end">
+        <span className="text-sm font-extrabold text-heading tabular-nums whitespace-nowrap">
+          {formatMoney(deal.value)}
+        </span>
       </div>
     </div>
   );
 }
 
-function DraggableDealCard({ deal, selected, onSelect, disabled }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
-  return (
-    <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Translate.toString(transform) }}
-      {...listeners}
-      {...attributes}
-      onClick={() => onSelect(deal.id)}
-      className={`p-3.5 rounded-card-sm border cursor-grab transition-all ${
-        selected ? 'border-accent bg-accent/5 shadow-card' : 'border-border-default bg-surface-raised hover:border-border-strong hover:shadow-card'
-      } ${isDragging || disabled ? 'opacity-60' : ''}`}
-    >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-7 h-7 rounded-button bg-primary flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-            {initials(deal)}
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-bold text-heading truncate">{deal.name}</p>
-            <p className="text-[10px] text-muted truncate">{deal.company || 'No company'}</p>
-          </div>
-        </div>
-        <span className="text-xs font-bold text-heading tabular-nums flex-shrink-0">{formatMoney(deal.value)}</span>
-      </div>
-      <div className="flex items-center justify-between text-[10px] text-muted pt-2 border-t border-border-subtle">
-        <span className={`inline-flex px-2 py-0.5 font-semibold rounded-full border ${getStageBadgeColors(deal.stage)}`}>
-          {STAGE_LABELS[deal.stage] || deal.stage}
-        </span>
-        {deal.winProbability != null && <span>{Math.round(deal.winProbability)}% win</span>}
-      </div>
-    </div>
-  );
-}
 
-function DealStageGroup({ group, selectedId, onSelect, disabled, onPageChange, viewMode = 'list' }) {
-  const { setNodeRef, isOver } = useDroppable({ id: group.stage });
-  const summaryKey = group.stage === 'CLOSED_WON' ? 'wonValue' : group.stage === 'CLOSED_LOST' ? 'lostValue' : 'openPipelineValue';
-  const totalValue = group.summary?.[summaryKey];
-  const page = group.pagination?.page ?? 1;
-  const limit = group.pagination?.limit ?? 25;
-  const pages = Math.max(1, group.pagination?.pages ?? 1);
-  const total = group.pagination?.total ?? 0;
-  const first = total === 0 ? 0 : (page - 1) * limit + 1;
-  const last = Math.min(page * limit, total);
-  return (
-    <div ref={setNodeRef} className={isOver ? 'bg-accent-light/40' : ''}>
-      <div className="flex items-center justify-between px-6 py-2 bg-surface-muted/80 border-b border-border-default">
-        <span className="text-[10px] font-bold text-muted uppercase tracking-wider">
-          {STAGE_LABELS[group.stage]} · {total} {total === 1 ? 'Deal' : 'Deals'}
-        </span>
-        <span className="text-[11px] font-bold text-body-light tabular-nums">{formatMoney(totalValue)}</span>
+function DetailPanel({
+  deal,
+  canWrite,
+  onOpenActivity,
+  onEdit,
+  onDelete,
+  onStageChange,
+  stageError,
+  activitiesLoading,
+  activitiesError,
+  activityData,
+  activityPage,
+  onActivityPageChange,
+  showCloseButton = false,
+  onClose,
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  if (!deal) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted">
+        <p className="text-[13px]">Select a deal to view details.</p>
       </div>
-      {viewMode === 'grid' ? (
-        <div className="grid grid-cols-2 gap-3 p-4">
-          {group.deals.map(deal => (
-            <DraggableDealCard key={deal.id} deal={deal} selected={selectedId === deal.id} onSelect={onSelect} disabled={disabled} />
-          ))}
-          {group.deals.length === 0 && <p className="col-span-2 py-4 text-center text-xs text-muted">No deals</p>}
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header: avatar 48px (radius 12), deal title 16px extrabold (wraps max 2 lines), sub line 13px muted, "..." menu aligned right */}
+      <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-12 h-12 rounded-[12px] bg-primary flex items-center justify-center text-lg font-bold text-white shadow-card shrink-0">
+              {initials(deal)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2
+                className="text-base font-extrabold text-heading leading-snug line-clamp-2"
+                title={deal.name}
+              >
+                {deal.name}
+              </h2>
+              <p className="text-[13px] text-muted mt-1 leading-tight truncate">
+                {deal.company || 'No company'} · {deal.owner?.title || deal.owner?.name || 'Owner unassigned'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setMenuOpen(prev => !prev)}
+                className="text-caption hover:text-body transition-colors p-1.5 rounded hover:bg-surface-muted cursor-pointer"
+                title="Deal options"
+              >
+                <MoreHorizontal size={18} />
+              </button>
+              {menuOpen && (
+                <div className="absolute inset-inline-end-0 mt-1 w-36 rounded-input bg-surface-raised border border-border-default shadow-modal py-1 z-30">
+                  <button
+                    type="button"
+                    onClick={() => { setMenuOpen(false); onDelete(); }}
+                    disabled={!canWrite}
+                    className="w-full text-start px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger-light flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                  >
+                    <Trash2 size={14} /> Delete Deal
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {showCloseButton && onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="text-caption hover:text-body transition-colors p-1.5 rounded hover:bg-surface-muted cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            )}
+          </div>
         </div>
-      ) : (
-        <div className="divide-y divide-border-subtle">
-          {group.deals.map(deal => (
-            <DraggableDealRow key={deal.id} deal={deal} selected={selectedId === deal.id} onSelect={onSelect} disabled={disabled} />
-          ))}
-          {group.deals.length === 0 && <p className="px-6 py-4 text-center text-xs text-muted">No deals</p>}
+
+        {/* Amount: 32px extrabold, existing blue, tabular-nums */}
+        <div className="mt-2">
+          <p className="text-[32px] font-extrabold text-[#2563eb] tracking-tight tabular-nums leading-none">
+            {formatMoney(deal.value)}
+          </p>
+        </div>
+      </div>
+
+      {/* Actions: Log Email / Log Call / Edit in a 3-column grid, 8px gap, 36px high, equal width, nowrap, existing icons */}
+      <div className="grid grid-cols-3 gap-2">
+        <button
+          type="button"
+          onClick={() => onOpenActivity('EMAIL')}
+          disabled={!canWrite}
+          title={!canWrite ? 'Requires the ADMIN role' : 'Record an email activity'}
+          className="flex items-center justify-center gap-1.5 border border-border-default text-body min-h-[36px] h-9 px-2 rounded-input text-sm font-semibold hover:bg-surface-muted transition-colors disabled:opacity-60 whitespace-nowrap cursor-pointer"
+        >
+          <Mail size={16} className="text-muted shrink-0" /> Log Email
+        </button>
+        <button
+          type="button"
+          onClick={() => onOpenActivity('CALL')}
+          disabled={!canWrite}
+          title={!canWrite ? 'Requires the ADMIN role' : 'Record a call activity'}
+          className="flex items-center justify-center gap-1.5 border border-border-default text-body min-h-[36px] h-9 px-2 rounded-input text-sm font-semibold hover:bg-surface-muted transition-colors disabled:opacity-60 whitespace-nowrap cursor-pointer"
+        >
+          <Phone size={16} className="text-muted shrink-0" /> Log Call
+        </button>
+        <button
+          type="button"
+          onClick={onEdit}
+          disabled={!canWrite}
+          title={!canWrite ? 'Requires the ADMIN role' : 'Edit deal'}
+          className="flex items-center justify-center gap-1.5 border border-border-default text-body min-h-[36px] h-9 px-2 rounded-input text-sm font-semibold hover:bg-surface-muted transition-colors disabled:opacity-60 whitespace-nowrap cursor-pointer"
+        >
+          <Pencil size={16} className="text-muted shrink-0" /> Edit
+        </button>
+      </div>
+
+      {/* Stage row: label "STAGE" (11px uppercase muted) left, select (36px) right, 12px gap */}
+      <div>
+        <div className="flex items-center gap-3">
+          <label htmlFor="deal-stage" className="text-[11px] font-semibold text-muted uppercase tracking-wider shrink-0">
+            Stage
+          </label>
+          <select
+            id="deal-stage"
+            value={deal.stage}
+            onChange={(event) => onStageChange(deal, event.target.value)}
+            disabled={!canWrite}
+            title={!canWrite ? 'Requires the ADMIN role' : undefined}
+            className="flex-1 min-h-[36px] h-9 px-3 py-1.5 text-sm font-medium text-body border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-60 cursor-pointer"
+          >
+            {STAGE_ORDER.map((stage) => (
+              <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>
+            ))}
+          </select>
+        </div>
+        {stageError && stageError.id === deal.id && (
+          <p className="mt-2 text-xs font-medium text-danger">
+            {stageError.message}
+          </p>
+        )}
+      </div>
+
+      {/* Win Probability section: only render it if the selected deal has win-probability data */}
+      {deal.winProbability != null && (
+        <div className="pt-4 border-t border-border-default">
+          <h3 className="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2">Win Probability</h3>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold text-heading tabular-nums">
+              {Math.round(deal.winProbability)}%
+            </span>
+            <span className="text-[13px] text-muted">
+              {deal.closeDate ? `Closing ${formatDate(deal.closeDate, { month: 'short', day: 'numeric' })}` : 'No close date'}
+            </span>
+          </div>
+          <div className="w-full bg-surface-strong rounded-full h-[6px] overflow-hidden mt-2">
+            <div
+              className="bg-accent h-full rounded-full transition-all"
+              style={{ width: `${Math.min(100, Math.max(0, deal.winProbability))}%` }}
+            />
+          </div>
         </div>
       )}
-      {total > 0 && <div className="flex items-center justify-between border-t border-border-subtle px-6 py-2 text-xs text-muted">
-        <span>Showing {first}–{last} of {total}</span>
-        <div className="flex items-center gap-2">
-          <button type="button" disabled={page <= 1} onClick={() => onPageChange(group.stage, page - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
-          <span>Page {page} of {pages}</span>
-          <button type="button" disabled={page >= pages} onClick={() => onPageChange(group.stage, page + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
-        </div>
-      </div>}
+
+      {/* Recent Activity section: 1px top divider, label, then existing empty text or activity list */}
+      <div className="pt-4 border-t border-border-default">
+        <h3 className="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2">Recent Activity</h3>
+        {activitiesLoading ? (
+          <p className="text-[13px] text-muted">Loading activity…</p>
+        ) : activitiesError ? (
+          <p role="alert" className="text-[13px] text-danger">Could not load deal activity.</p>
+        ) : null}
+        {!activitiesLoading && !activitiesError && (activityData?.items?.length ?? 0) === 0 && (
+          <p className="text-[13px] text-muted">No recent activity logged for this deal.</p>
+        )}
+        {!activitiesLoading && !activitiesError && (activityData?.items?.length ?? 0) > 0 && (
+          <div className="relative ps-3 space-y-4 mt-3">
+            <div className="absolute inset-inline-start-[19px] top-2 bottom-4 w-px bg-surface-strong" />
+            {activityData.items.slice(0, 3).map(activity => (
+              <div key={activity.id} className="relative z-10 flex gap-3 text-[13px]">
+                <div className="bg-surface-raised ring-4 ring-white dark:ring-surface-raised mt-0.5 rounded-full shrink-0">
+                  {activity.type === 'EMAIL' ? (
+                    <Mail size={16} className="text-faint" />
+                  ) : activity.type === 'CALL' ? (
+                    <Phone size={16} className="text-faint" />
+                  ) : (
+                    <Circle size={16} className="text-faint" strokeWidth={2.5} />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-heading leading-tight">{activity.title}</p>
+                  <p className="mt-0.5 text-xs text-muted">
+                    {activity.type === 'EMAIL' ? 'Email' : activity.type === 'CALL' ? 'Call' : 'Note'} · {activity.actorName || 'Unknown author'} · {formatDate(activity.createdAt, { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                  {activity.body && <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] text-body">{activity.body}</p>}
+                </div>
+              </div>
+            ))}
+            {(activityData.pagination?.pages ?? 0) > 1 && (
+              <div className="flex items-center justify-between pt-2 text-xs text-muted">
+                <button
+                  type="button"
+                  disabled={activityPage <= 1}
+                  onClick={() => onActivityPageChange(page => page - 1)}
+                  className="rounded border border-border-default px-2 py-0.5 min-h-[26px] disabled:opacity-40 hover:bg-surface-muted transition-colors cursor-pointer"
+                >
+                  Newer
+                </button>
+                <span>Page {activityPage} of {activityData.pagination.pages}</span>
+                <button
+                  type="button"
+                  disabled={activityPage >= activityData.pagination.pages}
+                  onClick={() => onActivityPageChange(page => page + 1)}
+                  className="rounded border border-border-default px-2 py-0.5 min-h-[26px] disabled:opacity-40 hover:bg-surface-muted transition-colors cursor-pointer"
+                >
+                  Older
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 export default function DealsPipeline() {
   const [selectedId, setSelectedId] = useState(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const lastFocusedDealIdRef = useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [newDealOpen, setNewDealOpen] = useState(false);
   useEffect(() => {
@@ -192,10 +426,9 @@ export default function DealsPipeline() {
       setSearchParams(next, { replace: true });
     }
   }, [searchParams, setSearchParams]);
-  const [editDealOpen, setEditDealOpen] = useState(false)
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [editForm, setEditForm] = useState(EMPTY_DEAL_FORM)
+  const [editDealOpen, setEditDealOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [editForm, setEditForm] = useState(EMPTY_DEAL_FORM);
   const [dealForm, setDealForm] = useState(EMPTY_DEAL_FORM);
   const [formError, setFormError] = useState(null);
   // { id, message } so a failed stage move is shown only under the deal it failed for.
@@ -204,16 +437,41 @@ export default function DealsPipeline() {
   const [activityTitle, setActivityTitle] = useState('');
   const [activityBody, setActivityBody] = useState('');
   const [activityPage, setActivityPage] = useState(1);
-  const [viewMode, setViewMode] = useState('list');
+  const [activeStage, setActiveStage] = useState(() => {
+    try {
+      const saved = localStorage.getItem('deals_pipeline_active_stage');
+      return STAGE_ORDER.includes(saved) ? saved : 'LEADS';
+    } catch {
+      return 'LEADS';
+    }
+  });
+  const listPaneRef = useRef(null);
   const [search, setSearch] = useState('');
   const [pageByStage, setPageByStage] = useState(() => Object.fromEntries(STAGE_ORDER.map(stage => [stage, 1])));
   const deferredSearch = useDeferredValue(search.trim());
   const pageLimit = 25;
 
+  const handleStageSelect = (stage) => {
+    setActiveStage(stage);
+    try {
+      localStorage.setItem('deals_pipeline_active_stage', stage);
+    } catch {}
+    const targetGroup = groups.find(g => g.stage === stage);
+    if (targetGroup && targetGroup.deals.length > 0) {
+      setSelectedId(targetGroup.deals[0].id);
+      lastFocusedDealIdRef.current = targetGroup.deals[0].id;
+    } else {
+      setSelectedId(null);
+    }
+    if (listPaneRef.current) {
+      listPaneRef.current.scrollTop = 0;
+    }
+  };
+
   // Deal writes are ADMIN-only server-side (`deal.write` permission); the controls below are
   // rendered disabled for non-OWNER/ADMIN members with a hint explaining why.
   const { data: activeMemberRole } = useActiveMemberRole();
-  const canWrite = activeMemberRole === 'OWNER' || activeMemberRole === 'ADMIN';
+  const canWrite = ['OWNER', 'ADMIN'].includes(getMemberRoleName(activeMemberRole));
 
   const queryClient = useQueryClient();
 
@@ -228,10 +486,10 @@ export default function DealsPipeline() {
     queryFn: () => crmApi.getDeal(selectedId),
     enabled: Boolean(selectedId && !deals.some(deal => deal.id === selectedId)),
   });
-  const activityDealId = selectedId ?? deals[0]?.id ?? null;
+  const activityDealId = selectedId;
   const { data: activityData, isLoading: activitiesLoading, isError: activitiesError } = useQuery({
-    queryKey: queryKeys.crm.deals.activities(activityDealId, { page: activityPage, limit: 10 }),
-    queryFn: () => crmApi.listDealActivities(activityDealId, { page: activityPage, limit: 10 }),
+    queryKey: queryKeys.crm.deals.activities(activityDealId, { page: activityPage, limit: 3 }),
+    queryFn: () => crmApi.listDealActivities(activityDealId, { page: activityPage, limit: 3 }),
     enabled: Boolean(activityDealId),
   });
   const isLoading = stageQueries.some(query => query.isLoading);
@@ -271,16 +529,17 @@ export default function DealsPipeline() {
   });
   const editMutation = useMutation({
     mutationFn: () => crmApi.updateDeal(selectedDeal.id, { ...editForm, value: editForm.value || null, closeDate: editForm.closeDate || null, winProbability: editForm.winProbability === '' ? null : Number(editForm.winProbability) }),
-    onSuccess: () => { invalidateCrmDeals(); setEditDealOpen(false) },
-  })
+    onSuccess: () => { invalidateCrmDeals(); setEditDealOpen(false); },
+  });
   const deleteMutation = useMutation({
     mutationFn: (id) => crmApi.deleteDeal(id),
     onSuccess: () => {
       invalidateCrmDeals();
       setDeleteConfirmOpen(false);
       setSelectedId(null);
+      setPanelOpen(false);
     },
-  })
+  });
   const activityMutation = useMutation({
     mutationFn: () => crmApi.createDealActivity(activityDealId, { type: activityDialogType, title: activityTitle.trim(), body: activityBody.trim() || null }),
     onSuccess: () => {
@@ -310,16 +569,63 @@ export default function DealsPipeline() {
   const handleDragEnd = (event) => {
     if (!event.over) return;
     const deal = deals.find(item => item.id === event.active.id);
-    moveDealToStage(deal, event.over.id);
+    if (!deal) return;
+    let targetStage = event.over.id;
+    if (!STAGE_ORDER.includes(targetStage)) {
+      const targetDeal = deals.find(d => d.id === targetStage);
+      if (targetDeal) targetStage = targetDeal.stage;
+    }
+    moveDealToStage(deal, targetStage);
   };
 
   const openActivityDialog = type => {
-    setActivityDialogType(type)
-    setActivityTitle('')
-    setActivityBody('')
-    activityMutation.reset()
-  }
-  const selectDeal = id => { setSelectedId(id); setActivityPage(1) }
+    setActivityDialogType(type);
+    setActivityTitle('');
+    setActivityBody('');
+    activityMutation.reset();
+  };
+
+  const selectDeal = (id) => {
+    lastFocusedDealIdRef.current = id;
+    setSelectedId(id);
+    setPanelOpen(true);
+    setActivityPage(1);
+    const deal = deals.find(d => d.id === id);
+    if (deal?.stage) {
+      setActiveStage(deal.stage);
+      try {
+        localStorage.setItem('deals_pipeline_active_stage', deal.stage);
+      } catch {}
+    }
+  };
+
+  const closePanel = () => {
+    setPanelOpen(false);
+    const targetId = lastFocusedDealIdRef.current || selectedId;
+    if (targetId) {
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-deal-id="${targetId}"]`);
+        if (el) el.focus();
+      });
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (
+        event.key === 'Escape' &&
+        panelOpen &&
+        !newDealOpen &&
+        !editDealOpen &&
+        !deleteConfirmOpen &&
+        !activityDialogType
+      ) {
+        closePanel();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [panelOpen, newDealOpen, editDealOpen, deleteConfirmOpen, activityDialogType]);
 
   const openNewDealDialog = () => {
     setFormError(null);
@@ -347,6 +653,35 @@ export default function DealsPipeline() {
     ? (createMutation.error.message || 'Failed to create the deal.')
     : formError;
 
+  // Keep every stage visible so an empty column is still a valid drop target.
+  const groups = STAGE_ORDER.map((stage, index) => ({
+    stage,
+    deals: stageQueries[index]?.data?.items ?? [],
+    pagination: stageQueries[index]?.data?.pagination,
+    summary: stageQueries[index]?.data?.summary,
+  }));
+
+  const activeGroup = groups.find(g => g.stage === activeStage) || groups[0];
+  const activeSummaryKey = activeGroup?.stage === 'CLOSED_WON' ? 'wonValue' : activeGroup?.stage === 'CLOSED_LOST' ? 'lostValue' : 'openPipelineValue';
+  const activeTotalValue = activeGroup?.summary?.[activeSummaryKey];
+  const activePage = activeGroup?.pagination?.page ?? 1;
+  const activeLimit = activeGroup?.pagination?.limit ?? 25;
+  const activePages = Math.max(1, activeGroup?.pagination?.pages ?? 1);
+  const activeTotal = activeGroup?.pagination?.total ?? 0;
+  const activeFirst = activeTotal === 0 ? 0 : (activePage - 1) * activeLimit + 1;
+  const activeLast = Math.min(activePage * activeLimit, activeTotal);
+
+  useEffect(() => {
+    const currentActiveGroup = groups.find(g => g.stage === activeStage);
+    if (currentActiveGroup && currentActiveGroup.deals.length > 0) {
+      if (!selectedId || !currentActiveGroup.deals.some(d => d.id === selectedId)) {
+        setSelectedId(currentActiveGroup.deals[0].id);
+      }
+    } else if (currentActiveGroup && currentActiveGroup.deals.length === 0) {
+      if (selectedId) setSelectedId(null);
+    }
+  }, [activeStage, groups, selectedId]);
+
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-surface">
@@ -363,240 +698,173 @@ export default function DealsPipeline() {
     );
   }
 
-  // Keep every stage visible so an empty column is still a valid drop target.
-  const groups = STAGE_ORDER.map((stage, index) => ({
-    stage,
-    deals: stageQueries[index]?.data?.items ?? [],
-    pagination: stageQueries[index]?.data?.pagination,
-    summary: stageQueries[index]?.data?.summary,
-  }));
-
-  const firstDeal = groups.find(group => group.deals.length > 0)?.deals[0] || null;
-  const effectiveSelectedId = selectedId || (firstDeal ? firstDeal.id : null);
-  const selectedDeal = deals.find((d) => d.id === effectiveSelectedId) || (selectedDetail?.id === effectiveSelectedId ? selectedDetail : null);
+  const selectedDeal = deals.find((d) => d.id === selectedId) || (selectedDetail?.id === selectedId ? selectedDetail : null);
   const changeStagePage = (stage, page) => setPageByStage(current => ({ ...current, [stage]: page }));
   const openEditDeal = () => {
-    if (!selectedDeal) return
-    const storedBucket = selectedDeal.forecastBucket || ''
-    const normalizedBucket = storedBucket.toUpperCase()
-    const forecastBucket = ['PIPELINE', 'COMMIT', 'BEST_CASE'].includes(normalizedBucket) ? normalizedBucket : (storedBucket || 'PIPELINE')
-    setEditForm({ name: selectedDeal.name, value: String(moneyToMajor(selectedDeal.value)), stage: selectedDeal.stage, closeDate: selectedDeal.closeDate?.slice(0, 10) || '', winProbability: selectedDeal.winProbability == null ? '' : String(selectedDeal.winProbability), forecastBucket })
-    setEditDealOpen(true)
-  }
+    if (!selectedDeal) return;
+    const storedBucket = selectedDeal.forecastBucket || '';
+    const normalizedBucket = storedBucket.toUpperCase();
+    const forecastBucket = ['PIPELINE', 'COMMIT', 'BEST_CASE'].includes(normalizedBucket) ? normalizedBucket : (storedBucket || 'PIPELINE');
+    setEditForm({ name: selectedDeal.name, value: String(moneyToMajor(selectedDeal.value)), stage: selectedDeal.stage, closeDate: selectedDeal.closeDate?.slice(0, 10) || '', winProbability: selectedDeal.winProbability == null ? '' : String(selectedDeal.winProbability), forecastBucket });
+    setEditDealOpen(true);
+  };
 
   return (
-    <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-[1000px]">
+    <div className="flex-1 min-w-0 flex flex-col bg-surface-raised">
 
       <TopBarActions>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          {/* Table Search (~240px, 36px high, matching search style) */}
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
+            <Search size={14} className="absolute inset-inline-start-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
             <input
               type="text"
               value={search}
-              onChange={event => { setSearch(event.target.value); setPageByStage(Object.fromEntries(STAGE_ORDER.map(stage => [stage, 1]))) }}
+              onChange={event => { setSearch(event.target.value); setPageByStage(Object.fromEntries(STAGE_ORDER.map(stage => [stage, 1]))); }}
               placeholder="Search..."
-              className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted w-64 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              className="w-[240px] h-9 ps-9 pe-3 text-sm bg-surface-muted border border-border-default rounded-input text-heading placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
           </div>
 
-          <div className="flex items-center border border-border-default rounded-input overflow-hidden bg-surface-muted">
-            <button
-              type="button"
-              onClick={() => setViewMode('grid')}
-              aria-label="Grid view"
-              className={`p-1.5 transition-colors border-r border-border-default ${
-                viewMode === 'grid'
-                  ? 'text-heading bg-surface-raised shadow-card'
-                  : 'text-caption hover:text-body hover:bg-surface-raised'
-              }`}
-            >
-              <LayoutGrid size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('list')}
-              aria-label="List view"
-              className={`p-1.5 transition-colors ${
-                viewMode === 'list'
-                  ? 'text-heading bg-surface-raised shadow-card'
-                  : 'text-caption hover:text-body hover:bg-surface-raised'
-              }`}
-            >
-              <List size={16} />
-            </button>
-          </div>
-
+          {/* New Deal button (36px high) */}
           <button
+            type="button"
             disabled={!canWrite}
             onClick={openNewDealDialog}
             title={!canWrite ? 'Requires the ADMIN role' : undefined}
-            className="bg-primary text-white px-5 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
+            className="h-9 px-4 bg-primary text-white text-sm font-semibold rounded-input hover:bg-primary-hover transition-colors disabled:opacity-60 flex items-center justify-center cursor-pointer whitespace-nowrap"
           >
             New Deal
           </button>
         </div>
       </TopBarActions>
 
-      {/* ── Main Split View ── */}
-      <div className="flex-1 flex overflow-hidden">
-
-        {/* Left: Deal List Area */}
-        <div className="w-[55%] flex flex-col bg-surface-raised border-r border-border-default overflow-y-auto">
-
-          {/* Table Header (list view only) */}
-          {viewMode === 'list' && (
-            <div className="grid grid-cols-12 px-6 py-3 border-b border-border-default bg-surface-raised flex-shrink-0">
-              <div className="col-span-6 text-[10px] font-bold text-muted uppercase tracking-wider">Deal Name</div>
-              <div className="col-span-3 text-[10px] font-bold text-muted uppercase tracking-wider text-center">Stage</div>
-              <div className="col-span-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Value</div>
-            </div>
-          )}
-
-          <div className="flex-1 pb-10">
-            <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-              {groups.map(group => (
-                <DealStageGroup
-                  key={group.stage}
-                  group={group}
-                  selectedId={effectiveSelectedId}
-                  onSelect={selectDeal}
-                  onPageChange={changeStagePage}
-                  disabled={stageMutation.isPending || !canWrite}
-                  viewMode={viewMode}
-                />
-              ))}
-            </DndContext>
+      {/* ── Main Workspace ── */}
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <div className="flex-1 min-w-0 flex flex-col p-6 pt-4 gap-4">
+          {/* 4) STAGE CARDS ROW (Switcher) - All 5 in one row */}
+          <div className="grid grid-cols-[repeat(5,minmax(150px,1fr))] min-[1100px]:grid-cols-[repeat(5,minmax(0,1fr))] gap-2 shrink-0 overflow-x-auto min-[1100px]:overflow-visible [scrollbar-width:thin]">
+            {groups.map(group => (
+              <StageSwitcherCard
+                key={group.stage}
+                stage={group.stage}
+                group={group}
+                isActive={activeStage === group.stage}
+                onSelect={handleStageSelect}
+              />
+            ))}
           </div>
-        </div>
 
-        {/* Right: Deal Detail Panel */}
-        <div className="w-[45%] bg-surface-raised overflow-y-auto flex-shrink-0">
+          {/* 2) TWO-COLUMN AREA (grid: 1fr 380px, align-items: start, gap 16) */}
+          <div className="grid grid-cols-1 min-[1100px]:grid-cols-[1fr_380px] items-start gap-4 min-w-0">
+            {/* 5) LIST PANE CARD */}
+            <div
+              data-testid="deals-list-card"
+              className="rounded-[12px] border border-border-default bg-surface-raised flex flex-col min-w-0 overflow-hidden"
+            >
+              {/* Column Header (outside scroll area, fixed height) */}
+              <div
+                className="grid items-center border-b border-border-default bg-surface-muted/90 backdrop-blur-xs text-[11px] font-semibold uppercase text-muted tracking-[0.06em] shrink-0 h-10 min-h-[40px] px-5 gap-x-3"
+                style={{
+                  gridTemplateColumns: 'minmax(240px, 1fr) 120px 130px',
+                }}
+              >
+                <div className="text-start">DEAL NAME</div>
+                <div className="text-start">STAGE</div>
+                <div className="text-end">VALUE</div>
+              </div>
 
-          {selectedDeal ? (
-            <>
-              {/* Top Section */}
-              <div className="p-8 border-b border-border-default">
-                <div className="flex items-start justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-button bg-primary flex items-center justify-center text-xl font-bold text-white shadow-card">
-                      {initials(selectedDeal)}
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-heading tracking-tight leading-tight">{selectedDeal.name}</h2>
-                      <p className="text-sm text-muted mt-1">{selectedDeal.company || 'No company'} · {selectedDeal.owner?.title || 'Owner unassigned'}</p>
-                    </div>
+              {/* Group header bar */}
+              <div
+                className="grid items-center bg-surface-muted/90 backdrop-blur-xs border-b border-border-default h-9 min-h-[36px] px-5 gap-x-3 text-[11px] font-semibold text-muted uppercase tracking-[0.06em] shrink-0"
+                style={{
+                  gridTemplateColumns: 'minmax(240px, 1fr) 120px 130px',
+                }}
+              >
+                <div className="col-span-2 flex items-center gap-2 min-w-0">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${getStageDotColor(activeGroup.stage)}`} aria-hidden="true" />
+                  <span className="truncate">
+                    {STAGE_LABELS[activeGroup.stage].toUpperCase()} - {activeTotal} {activeTotal === 1 ? 'DEAL' : 'DEALS'}
+                  </span>
+                </div>
+                <div className="text-end">
+                  <span className="text-[13px] font-semibold text-body tabular-nums whitespace-nowrap">
+                    {formatMoney(activeTotalValue || 0)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Active Stage Deals */}
+              <div
+                ref={listPaneRef}
+                className="min-w-0"
+              >
+                {activeGroup.deals.map(deal => (
+                  <ListDealRow
+                    key={deal.id}
+                    deal={deal}
+                    selected={selectedId === deal.id}
+                    onSelect={selectDeal}
+                    disabled={stageMutation.isPending || !canWrite}
+                  />
+                ))}
+                {activeGroup.deals.length === 0 && (
+                  <div className="py-12 flex items-center justify-center text-[13px] text-muted">
+                    No deals in this stage
                   </div>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setMenuOpen(prev => !prev)}
-                      className="text-caption hover:text-body transition-colors p-1 rounded hover:bg-surface-muted"
-                      title="Deal options"
-                    >
-                      <MoreHorizontal size={20} />
-                    </button>
-                    {menuOpen && (
-                      <div className="absolute right-0 mt-1 w-36 rounded-input bg-surface-raised border border-border-default shadow-modal py-1 z-20">
-                        <button
-                          type="button"
-                          onClick={() => { setMenuOpen(false); setDeleteConfirmOpen(true); }}
-                          disabled={!canWrite}
-                          className="w-full text-left px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger-light flex items-center gap-2 disabled:opacity-50"
-                        >
-                          <Trash2 size={14} /> Delete Deal
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mb-8">
-                  <p className="text-4xl font-extrabold text-[#2563eb] tracking-tight tabular-nums">{formatMoney(selectedDeal.value)}</p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <button onClick={() => openActivityDialog('EMAIL')} disabled={!canWrite} title={!canWrite ? 'Requires the ADMIN role' : 'Record an email activity'} className="flex-1 flex items-center justify-center gap-2 border border-border-default text-body py-2.5 rounded-input text-sm font-semibold hover:bg-surface-muted transition-colors disabled:opacity-60">
-                    <Mail size={16} className="text-muted" /> Log Email
-                  </button>
-                  <button onClick={() => openActivityDialog('CALL')} disabled={!canWrite} title={!canWrite ? 'Requires the ADMIN role' : 'Record a call activity'} className="flex-1 flex items-center justify-center gap-2 border border-border-default text-body py-2.5 rounded-input text-sm font-semibold hover:bg-surface-muted transition-colors disabled:opacity-60">
-                    <Phone size={16} className="text-muted" /> Log Call
-                  </button>
-                  <button onClick={openEditDeal} disabled={!canWrite} title={!canWrite ? 'Requires the ADMIN role' : 'Edit deal'} className="flex-1 flex items-center justify-center gap-2 border border-border-default text-body py-2.5 rounded-input text-sm font-semibold hover:bg-surface-muted transition-colors disabled:opacity-60">
-                    <Pencil size={16} className="text-muted" /> Edit
-                  </button>
-                </div>
-
-                {/* Stage move — a select is the faithful equivalent of the old page's per-stage actions */}
-                <div className="mt-6 flex items-center gap-3">
-                  <label htmlFor="deal-stage" className="w-14 flex-shrink-0 text-[10px] font-bold text-muted uppercase tracking-wider">Stage</label>
-                  <select
-                    id="deal-stage"
-                    value={selectedDeal.stage}
-                    onChange={(event) => moveDealToStage(selectedDeal, event.target.value)}
-                    disabled={!canWrite || stageMutation.isPending}
-                    title={!canWrite ? 'Requires the ADMIN role' : undefined}
-                    className="flex-1 px-3 py-2 text-sm font-medium text-body border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-60"
-                  >
-                    {STAGE_ORDER.map((stage) => (
-                      <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>
-                    ))}
-                  </select>
-                </div>
-                {stageError && stageError.id === selectedDeal.id && (
-                  <p className="mt-3 text-xs font-medium text-danger">
-                    {stageError.message}
-                  </p>
                 )}
               </div>
 
-              {/* Win Probability Section */}
-              <div className="p-8 border-b border-border-default">
-                <h3 className="text-[10px] font-bold text-muted uppercase tracking-wider mb-5">Win Probability</h3>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-bold text-heading">{selectedDeal.winProbability == null ? '—' : `${Math.round(selectedDeal.winProbability)}%`}</span>
-                  <span className="text-[11px] font-medium text-muted">
-                    {selectedDeal.closeDate ? `Closing ${formatDate(selectedDeal.closeDate, { month: 'short', day: 'numeric' })}` : 'No close date'}
-                  </span>
-                </div>
-                <div className="w-full bg-surface-strong rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-accent h-full rounded-full" style={{ width: `${selectedDeal.winProbability ?? 0}%` }}></div>
+              {/* Pagination footer: pinned at bottom of card */}
+              <div className="flex items-center justify-between border-t border-border-subtle bg-surface-raised min-h-[36px] h-9 px-5 text-xs text-muted shrink-0">
+                <span>Showing {activeFirst}–{activeLast} of {activeTotal}</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={activePage <= 1}
+                    onClick={() => changeStagePage(activeGroup.stage, activePage - 1)}
+                    className="rounded border border-border-default px-2 py-0.5 min-h-[26px] disabled:opacity-40 hover:bg-surface-muted transition-colors cursor-pointer"
+                  >
+                    Previous
+                  </button>
+                  <span>Page {activePage} of {activePages}</span>
+                  <button
+                    type="button"
+                    disabled={activePage >= activePages}
+                    onClick={() => changeStagePage(activeGroup.stage, activePage + 1)}
+                    className="rounded border border-border-default px-2 py-0.5 min-h-[26px] disabled:opacity-40 hover:bg-surface-muted transition-colors cursor-pointer"
+                  >
+                    Next
+                  </button>
                 </div>
               </div>
-
-              {/* Recorded deal activity */}
-              <div className="p-8">
-                <h3 className="text-[10px] font-bold text-muted uppercase tracking-wider mb-6">Recent Activity</h3>
-                {activitiesLoading ? <p className="text-sm text-muted">Loading activity…</p> : activitiesError ? <p role="alert" className="text-sm text-danger">Could not load deal activity.</p> : null}
-                {!activitiesLoading && !activitiesError && (activityData?.items?.length ?? 0) === 0 && <p className="text-sm text-muted">No recent activity logged for this deal.</p>}
-                {!activitiesLoading && !activitiesError && (activityData?.items?.length ?? 0) > 0 && <div className="relative pl-3 space-y-6">
-                  <div className="absolute left-[19px] top-2 bottom-4 w-px bg-surface-strong"></div>
-                  {activityData.items.map(activity => <div key={activity.id} className="relative z-10 flex gap-4">
-                    <div className="bg-surface-raised ring-4 ring-white mt-0.5">
-                      {activity.type === 'EMAIL' ? <Mail size={18} className="text-faint" /> : activity.type === 'CALL' ? <Phone size={18} className="text-faint" /> : <Circle size={18} className="text-faint" strokeWidth={2.5} />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-heading">{activity.title}</p>
-                      <p className="mt-0.5 text-[11px] text-muted">{activity.type === 'EMAIL' ? 'Email' : activity.type === 'CALL' ? 'Call' : 'Note'} · {activity.actorName || 'Unknown author'} · {formatDate(activity.createdAt, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                      {activity.body && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-body">{activity.body}</p>}
-                    </div>
-                  </div>)}
-                  {(activityData.pagination?.pages ?? 0) > 1 && <div className="flex items-center justify-between pt-2 text-xs text-muted">
-                    <button type="button" disabled={activityPage <= 1} onClick={() => setActivityPage(page => page - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Newer</button>
-                    <span>Page {activityPage} of {activityData.pagination.pages}</span>
-                    <button type="button" disabled={activityPage >= activityData.pagination.pages} onClick={() => setActivityPage(page => page + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Older</button>
-                  </div>}
-                </div>}
-              </div>
-            </>
-          ) : (
-            <div className="flex h-full items-center justify-center text-muted">
-              Select a deal to view details.
             </div>
-          )}
 
+            {/* 6) DETAIL PANEL: natural content height, sticky on >= 1100px */}
+            <aside
+              role="complementary"
+              aria-label="Deal details"
+              className="w-full min-[1100px]:w-[380px] min-[1100px]:shrink-0 min-[1100px]:sticky min-[1100px]:top-4 self-start rounded-[12px] border border-border-default bg-surface-raised p-5 flex flex-col space-y-4"
+            >
+              <DetailPanel
+                deal={selectedDeal}
+                canWrite={canWrite}
+                onOpenActivity={openActivityDialog}
+                onEdit={openEditDeal}
+                onDelete={() => setDeleteConfirmOpen(true)}
+                onStageChange={moveDealToStage}
+                stageError={stageError}
+                activitiesLoading={activitiesLoading}
+                activitiesError={activitiesError}
+                activityData={activityData}
+                activityPage={activityPage}
+                onActivityPageChange={setActivityPage}
+                showCloseButton={false}
+              />
+            </aside>
+          </div>
         </div>
-      </div>
+      </DndContext>
 
       {/* New Deal Dialog */}
       <FormDialog

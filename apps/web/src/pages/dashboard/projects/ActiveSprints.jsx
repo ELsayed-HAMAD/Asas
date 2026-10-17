@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   Search,
   ChevronDown,
   Rocket,
   Clock,
-  Bell,
   MoreHorizontal,
   X,
   Circle,
@@ -20,14 +19,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { projectsApi } from '../../../lib/api/projects';
 import { queryKeys } from '../../../lib/queryKeys';
-import { formatDate } from '../../../lib/format';
+import { formatDate, shortId } from '../../../lib/format';
 import { selectActiveSprint } from '../../../lib/projectSprint';
-import TopBarActions from '../../../components/TopBarActions';
+import PageHeader from '../../../components/common/PageHeader';
+import PageToolbar from '../../../components/common/PageToolbar';
+import GroupedList from '../../../components/common/GroupedList';
+import SidePanelSection from '../../../components/common/SidePanelSection';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 export default function ActiveSprints() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState(null);
   const [selectedSprintId, setSelectedSprintId] = useState(null);
@@ -154,11 +155,15 @@ export default function ActiveSprints() {
   const dynamicCompletionPct = issues.length > 0 ? Math.round((doneIssues.length / issues.length) * 100) : 0;
 
   // Auto-select first issue if none selected
-  if (!selectedId && issues.length > 0) {
-    // Try to select the first non-done issue, otherwise just the first issue
-    const firstActive = issues.find(i => i.status !== 'DONE');
-    setSelectedId(firstActive ? firstActive.id : issues[0].id);
-  }
+  useEffect(() => {
+    if (!selectedId && issues.length > 0) {
+      const firstActive = issues.find(i => i.status !== 'DONE');
+      setSelectedId(firstActive ? firstActive.id : issues[0].id);
+    } else if (issues.length === 0 && selectedId !== null) {
+      setSelectedId(null);
+    }
+  }, [issues, selectedId]);
+
 
   const selectedIssue = issues.find(i => i.id === selectedId);
   // Custom Icon for 'In Progress' (Half filled circle)
@@ -175,128 +180,105 @@ export default function ActiveSprints() {
       <div
         key={issue.id}
         onClick={() => setSelectedId(issue.id)}
-        className={`flex items-center justify-between p-3 rounded-button border cursor-pointer transition-colors ${
+        className={`group h-12 min-h-[48px] px-3 py-0 rounded-[10px] border-0 shadow-none flex items-center justify-between cursor-pointer transition-colors ${
           isSelected
-            ? 'bg-accent-light/30 border-accent-light border-l-4 border-l-blue-600 shadow-card'
+            ? 'bg-accent-light/40 text-heading'
             : isDone
-            ? 'bg-surface-raised border-border-default hover:border-border-strong border-l-4 border-l-transparent shadow-card opacity-60 hover:opacity-100'
-            : 'bg-surface-raised border-border-default hover:border-border-strong border-l-4 border-l-transparent shadow-card'
+            ? 'hover:bg-surface-muted/60 opacity-60 hover:opacity-100'
+            : 'hover:bg-surface-muted/60'
         }`}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 min-w-0 pr-3">
           {isDone ? (
-            <CheckSquare size={20} className="text-success" />
+            <CheckSquare size={16} className="text-success shrink-0" />
           ) : issue.status === 'IN_PROGRESS' ? (
-            <HalfCircleIcon className="w-5 h-5 text-[#3b82f6]" />
+            <HalfCircleIcon className="w-4 h-4 text-[#3b82f6] shrink-0" />
           ) : issue.status === 'IN_REVIEW' ? (
-            <Eye size={20} className="text-[#eab308]" />
+            <Eye size={16} className="text-[#eab308] shrink-0" />
           ) : (
-            <Circle size={20} className="text-faint" />
+            <Circle size={16} className="text-faint shrink-0" />
           )}
-          <span className={`text-sm font-medium text-muted ${isDone ? 'line-through' : ''}`}>
-            {issue.key || issue.id.substring(issue.id.length - 8)}
+          <span
+            className="text-xs font-medium text-muted shrink-0 tabular-nums"
+            title={issue.id}
+          >
+            {shortId(issue.id)}
           </span>
-          <span className={`text-sm font-bold text-heading ml-1 ${isDone ? 'line-through' : ''}`}>
-            {issue.title}
+          <span
+            className={`text-sm font-medium text-heading truncate ${isDone ? 'line-through text-muted' : ''}`}
+            title={issue.title}
+          >
+            {issue.key ? `${issue.key} ` : ''}{issue.title}
           </span>
         </div>
-        <div className="flex items-center gap-4">
-          {issue.tag && (
-            <span className="bg-surface-active text-body-light px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider">
-              {issue.tag}
-            </span>
-          )}
-          {!isDone && (
-            issue.priority === 'HIGH' || issue.priority === 'URGENT' ? (
-              <ChevronsUp size={16} className="text-danger" strokeWidth={3} />
+
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="w-14 min-w-[56px] flex items-center justify-center">
+            {issue.tag ? (
+              <span className="inline-flex items-center justify-center min-w-[44px] bg-surface-active/60 text-body px-2 py-0.5 rounded-full text-[11px] font-medium capitalize tracking-normal text-center">
+                {issue.tag}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="w-6 min-w-[24px] flex items-center justify-center">
+            {!isDone && (
+              issue.priority === 'HIGH' || issue.priority === 'URGENT' ? (
+                <ChevronsUp size={16} className="text-danger shrink-0" strokeWidth={2.5} />
+              ) : (
+                <span className={`flex items-center justify-center transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 reveal-on-hover'}`}>
+                  <Equal size={16} className="text-caption shrink-0" strokeWidth={2} />
+                </span>
+              )
+            )}
+          </div>
+
+          <div className={`w-7 min-w-[28px] flex items-center justify-center transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 reveal-on-hover'}`}>
+            {issue.assignees && issue.assignees.length > 0 ? (
+              <div className="flex -space-x-1.5 overflow-hidden">
+                {issue.assignees.slice(0, 3).map((a, idx) => (
+                  <div
+                    key={a.id || idx}
+                    title={a.employee?.name || 'Assignee'}
+                    className="w-6 h-6 rounded-full bg-surface-raised border border-border-default flex items-center justify-center text-[9px] font-medium text-heading overflow-hidden"
+                  >
+                    {a.employee?.avatarUrl ? (
+                      <img src={a.employee.avatarUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      (a.employee?.name || 'U').slice(0, 2).toUpperCase()
+                    )}
+                  </div>
+                ))}
+              </div>
             ) : (
-              <Equal size={16} className="text-caption" strokeWidth={3} />
-            )
-          )}
-          {issue.assignees && issue.assignees.length > 0 ? (
-            <div className="flex -space-x-1.5 overflow-hidden">
-              {issue.assignees.slice(0, 3).map((a, idx) => (
-                <div
-                  key={a.id || idx}
-                  title={a.employee?.name || 'Assignee'}
-                  className="w-6 h-6 rounded-full bg-surface-raised border border-border-default flex items-center justify-center text-[9px] font-bold text-heading overflow-hidden"
-                >
-                  {a.employee?.avatarUrl ? (
-                    <img src={a.employee.avatarUrl} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    (a.employee?.name || 'U').slice(0, 2).toUpperCase()
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div
-              title="Unassigned"
-              className="w-6 h-6 rounded-full bg-surface-active border border-border-default flex items-center justify-center text-[9px] text-muted font-medium"
-            >
-              —
-            </div>
-          )}
+              <div
+                title="Unassigned"
+                className="w-6 h-6 rounded-full bg-surface-active border border-border-default flex items-center justify-center text-[9px] text-muted font-medium"
+              >
+                —
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-[1000px]">
-
-      <TopBarActions>
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search issues..."
-              className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted w-72 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setIssueOpen(true)}
-            disabled={!activeSprint || activeSprint.status !== 'ACTIVE'}
-            className="bg-surface-raised border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60 cursor-pointer"
-          >
-            New Issue
-          </button>
-          <button
-            type="button"
-            onClick={() => setGroupBy(prev => prev === 'status' ? 'priority' : 'status')}
-            className="flex items-center gap-2 border border-border-default text-body px-3 py-1.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors cursor-pointer"
-          >
-            Group: {groupBy === 'status' ? 'Status' : 'Priority'} <ChevronDown size={14} className="text-caption" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setCompleteConfirmOpen(true)}
-            disabled={!activeSprint || activeSprint.status !== 'ACTIVE' || completeSprint.isPending}
-            className="bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer"
-          >
-            {completeSprint.isPending ? 'Completing...' : 'Complete Sprint'}
-          </button>
-        </div>
-      </TopBarActions>
+    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
 
       {activeSprint ? (
         <>
-          {/* ── Sprint Info Bar ── */}
-          <div className="flex items-center justify-between px-6 py-3 border-b border-border-default bg-surface-raised flex-shrink-0 text-sm">
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2 font-bold text-heading">
-                <Rocket size={16} className="text-body" />
+          {/* ── Sprint Header (PageHeader) ── */}
+          <PageHeader
+            title={
+              <div className="flex items-center gap-2">
+                <Rocket size={18} className="text-body shrink-0" />
                 {sprints.length > 1 ? (
                   <select
                     value={activeSprint.id}
                     onChange={(e) => setSelectedSprintId(e.target.value)}
-                    className="bg-transparent font-bold text-heading border-none focus:outline-none cursor-pointer pr-1"
+                    className="bg-transparent font-medium text-heading border-none focus:outline-none cursor-pointer pr-1 text-lg"
                     aria-label="Select sprint"
                   >
                     {sprints.map((s) => (
@@ -308,259 +290,306 @@ export default function ActiveSprints() {
                 ) : (
                   <span>{activeSprint.name}</span>
                 )}
+                {activeSprint.status === 'ACTIVE' && (
+                  <span className="bg-success-light text-success-text text-[11px] font-medium px-2 py-0.5 rounded-full inline-flex items-center">
+                    ACTIVE
+                  </span>
+                )}
               </div>
-
-              <div className="w-px h-4 bg-gray-300"></div>
-
-              <div className="flex items-center gap-2 text-muted font-medium" title={activeSprint.endsAt ? formatDate(activeSprint.endsAt, { dateStyle: 'medium' }) : undefined}>
-                <Clock size={16} className="text-caption" />
-                Time Remaining: {(() => {
-                  if (!activeSprint.endsAt) return 'TBD'
-                  const days = Math.ceil((new Date(activeSprint.endsAt).getTime() - Date.now()) / 86400000)
-                  if (days > 0) return `${days} ${days === 1 ? 'day' : 'days'} left`
-                  if (days === 0) return 'Ends today'
-                  return 'Past end date'
-                })()}
-              </div>
-
-              <div className="w-px h-4 bg-gray-300"></div>
-
-              <div className="flex items-center gap-3">
-                <span className="text-muted font-medium">Completion: {activeSprint.completionPct ?? dynamicCompletionPct}%</span>
-                <div className="w-48 bg-surface-strong rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-primary h-full rounded-full" style={{ width: `${activeSprint.completionPct ?? dynamicCompletionPct}%` }}></div>
+            }
+            meta={
+              <>
+                <div className="flex items-center gap-1.5" title={activeSprint.endsAt ? formatDate(activeSprint.endsAt, { dateStyle: 'medium' }) : undefined}>
+                  <Clock size={14} className="text-caption shrink-0" />
+                  <span>
+                    Time Remaining: {(() => {
+                      if (!activeSprint.endsAt) return 'TBD'
+                      const days = Math.ceil((new Date(activeSprint.endsAt).getTime() - Date.now()) / 86400000)
+                      if (days > 0) return `${days} ${days === 1 ? 'day' : 'days'} left`
+                      if (days === 0) return 'Ends today'
+                      return 'Past end date'
+                    })()}
+                  </span>
                 </div>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-4">
+                <div className="hidden sm:block w-px h-3.5 bg-border-default/60 shrink-0" />
+
+                <div className="flex items-center gap-2">
+                  <span>Completion: {activeSprint.completionPct ?? dynamicCompletionPct}%</span>
+                  <div className="w-24 sm:w-36 bg-surface-strong rounded-full h-[5px] overflow-hidden shrink-0">
+                    <div
+                      className="bg-primary h-full rounded-full transition-all"
+                      style={{ width: `${activeSprint.completionPct ?? dynamicCompletionPct}%` }}
+                    />
+                  </div>
+                </div>
+              </>
+            }
+            actions={
               <button
                 type="button"
-                onClick={() => navigate('/dashboard/settings/notifications')}
-                title="Notification Settings"
-                className="text-muted hover:text-heading transition-colors cursor-pointer"
+                onClick={() => setCompleteConfirmOpen(true)}
+                disabled={!activeSprint || activeSprint.status !== 'ACTIVE' || completeSprint.isPending}
+                className="h-10 px-4 rounded-[10px] bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 shrink-0 cursor-pointer shadow-sm flex items-center justify-center whitespace-nowrap"
               >
-                <Bell size={18} />
+                {completeSprint.isPending ? 'Completing...' : 'Complete Sprint'}
               </button>
-              <div className="w-7 h-7 bg-surface-strong rounded-full border border-border-strong"></div>
-            </div>
-          </div>
+            }
+            className="bg-surface mb-4"
+          />
 
           {/* ── Main Split View ── */}
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 min-h-0 flex flex-col xl:flex-row gap-6 px-6 pb-6 overflow-hidden bg-surface">
 
             {/* Left: Issue List Area */}
-            <div className="flex-1 overflow-y-auto bg-surface p-6 space-y-6">
-              <section className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card">
-                <div className="flex items-start justify-between gap-4 mb-3">
-                  <div>
-                    <h2 className="text-sm font-bold text-heading">Sprint burndown</h2>
-                    <p className="text-xs text-muted mt-1">Remaining issues by recorded completion date</p>
-                  </div>
-                  {burndownData?.undatedCompleted > 0 && (
-                    <span className="text-xs text-muted">{burndownData.undatedCompleted} completed without a date</span>
-                  )}
-                </div>
-                {burndownLoading ? (
-                  <div className="h-44 flex items-center justify-center text-sm text-muted">Loading burndown…</div>
-                ) : burndownError ? (
-                  <div className="h-44 flex items-center justify-center text-sm text-danger">Burndown could not be loaded.</div>
-                ) : !burndownData?.startDate ? (
-                  <div className="h-44 flex items-center justify-center text-sm text-muted">Sprint start date is unknown, so no historical line is shown.</div>
-                ) : burndownData.points.length === 0 ? (
-                  <div className="h-44 flex items-center justify-center text-sm text-muted">No issue history is available for this sprint yet.</div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={176}>
-                    <LineChart data={burndownData.points} margin={{ top: 8, right: 12, bottom: 0, left: -18 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
-                      <XAxis dataKey="date" tickFormatter={date => date.slice(5)} tick={{ fill: 'var(--color-caption)', fontSize: 11 }} />
-                      <YAxis allowDecimals={false} domain={[0, 'dataMax']} tick={{ fill: 'var(--color-caption)', fontSize: 11 }} />
-                      <Tooltip labelFormatter={date => date} />
-                      <Line type="monotone" dataKey="remaining" name="Remaining" stroke="var(--color-primary)" strokeWidth={2} dot={false} />
-                      <Line type="linear" dataKey="ideal" name="Ideal" stroke="var(--color-caption)" strokeDasharray="4 4" dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                )}
-              </section>
+            <div className="flex-1 min-w-0 h-full overflow-y-auto pr-1 scrollbar-soft">
 
+              {/* a. Burndown: one 44px white strip when empty, 180px chart when points exist */}
+              <div className="mb-4">
+                {burndownLoading ? (
+                  <div className="h-11 min-h-[44px] px-4 flex items-center justify-center text-xs text-muted bg-surface-raised border-0 rounded-[14px] shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+                    Loading burndown…
+                  </div>
+                ) : burndownError ? (
+                  <div className="h-11 min-h-[44px] px-4 flex items-center justify-center text-xs text-danger bg-surface-raised border-0 rounded-[14px] shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+                    Burndown could not be loaded.
+                  </div>
+                ) : (!burndownData?.startDate || burndownData?.points?.length === 0) ? (
+                  <div className="h-11 min-h-[44px] px-4 flex items-center justify-between gap-4 text-xs bg-surface-raised border-0 rounded-[14px] shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+                    <span className="font-medium text-heading shrink-0">Sprint burndown</span>
+                    <span className="text-muted text-center truncate">
+                      {!burndownData?.startDate
+                        ? 'Sprint start date is unknown, so no historical line is shown.'
+                        : 'No issue history is available for this sprint yet.'}
+                    </span>
+                    {burndownData?.undatedCompleted > 0 ? (
+                      <span className="text-caption shrink-0">
+                        {burndownData.undatedCompleted} completed without a date
+                      </span>
+                    ) : (
+                      <span className="shrink-0" />
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-4 bg-surface-raised border-0 rounded-[14px] shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+                    <div className="flex items-start justify-between gap-4 mb-2">
+                      <div>
+                        <h2 className="text-sm font-medium text-heading">Sprint burndown</h2>
+                        <p className="text-xs text-muted mt-0.5">Remaining issues by recorded completion date</p>
+                      </div>
+                      {burndownData?.undatedCompleted > 0 && (
+                        <span className="text-xs text-muted shrink-0">{burndownData.undatedCompleted} completed without a date</span>
+                      )}
+                    </div>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <LineChart data={burndownData.points} margin={{ top: 8, right: 12, bottom: 0, left: -18 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
+                        <XAxis dataKey="date" tickFormatter={date => date.slice(5)} tick={{ fill: 'var(--color-caption)', fontSize: 11 }} />
+                        <YAxis allowDecimals={false} domain={[0, 'dataMax']} tick={{ fill: 'var(--color-caption)', fontSize: 11 }} />
+                        <Tooltip labelFormatter={date => date} />
+                        <Line type="monotone" dataKey="remaining" name="Remaining" stroke="var(--color-primary)" strokeWidth={2} dot={false} />
+                        <Line type="linear" dataKey="ideal" name="Ideal" stroke="var(--color-caption)" strokeDasharray="4 4" dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </div>
+
+              {/* b. Toolbar (PageToolbar) */}
+              <PageToolbar
+                className="mb-4 gap-4"
+                left={
+                  <>
+                    <div className="relative flex-1 min-w-[160px] max-w-[260px]">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
+                      <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search issues..."
+                        aria-label="Search issues"
+                        title="Search issues"
+                        className="pl-9 pr-4 h-10 text-sm border-0 rounded-[10px] bg-surface-raised text-heading placeholder:text-caption focus:outline-none focus:ring-2 focus:ring-accent shadow-[0_1px_2px_rgba(16,24,40,0.04)] w-full"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setGroupBy(prev => prev === 'status' ? 'priority' : 'status')}
+                      className="flex items-center gap-1.5 border-0 bg-surface-raised text-body px-3.5 h-10 rounded-[10px] text-xs font-medium hover:bg-surface-muted transition-colors cursor-pointer shrink-0 shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+                      aria-label={`Group by ${groupBy === 'status' ? 'Status' : 'Priority'}`}
+                    >
+                      Group: {groupBy === 'status' ? 'Status' : 'Priority'} <ChevronDown size={13} className="text-caption" />
+                    </button>
+                  </>
+                }
+                right={
+                  <button
+                    type="button"
+                    onClick={() => setIssueOpen(true)}
+                    disabled={!activeSprint || activeSprint.status !== 'ACTIVE'}
+                    className="h-10 px-4 rounded-[10px] border-0 bg-surface-raised text-body text-sm font-medium hover:bg-surface-muted transition-colors disabled:opacity-60 shrink-0 cursor-pointer shadow-[0_1px_2px_rgba(16,24,40,0.04)] flex items-center justify-center whitespace-nowrap"
+                  >
+                    New Issue
+                  </button>
+                }
+              />
+
+              {/* c. Issue list (GroupedList) */}
               {groupBy === 'priority' ? (
                 <>
-                  {/* URGENT / HIGH GROUP */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-2 h-2 rounded-full bg-danger"></div>
-                      <h3 className="text-[11px] font-bold text-muted uppercase tracking-wider">
-                        Urgent & High <span className="ml-1 text-caption font-medium">{urgentIssues.length}</span>
-                      </h3>
-                    </div>
-                    <div className="space-y-2">
-                      {urgentIssues.length === 0 ? <div className="text-sm text-muted">No urgent issues.</div> : null}
-                      {urgentIssues.map(issue => renderIssueRow(issue, issue.status === 'DONE'))}
-                    </div>
-                  </div>
+                  <GroupedList
+                    title="Urgent & High"
+                    count={urgentIssues.length}
+                    dotColor="bg-danger"
+                    isEmpty={urgentIssues.length === 0}
+                    emptyMessage="No urgent issues."
+                  >
+                    {urgentIssues.map(issue => renderIssueRow(issue, issue.status === 'DONE'))}
+                  </GroupedList>
 
-                  {/* MEDIUM GROUP */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-2 h-2 rounded-full bg-[#eab308]"></div>
-                      <h3 className="text-[11px] font-bold text-muted uppercase tracking-wider">
-                        Medium <span className="ml-1 text-caption font-medium">{mediumIssues.length}</span>
-                      </h3>
-                    </div>
-                    <div className="space-y-2">
-                      {mediumIssues.length === 0 ? <div className="text-sm text-muted">No medium priority issues.</div> : null}
-                      {mediumIssues.map(issue => renderIssueRow(issue, issue.status === 'DONE'))}
-                    </div>
-                  </div>
+                  <GroupedList
+                    title="Medium"
+                    count={mediumIssues.length}
+                    dotColor="bg-[#eab308]"
+                    isEmpty={mediumIssues.length === 0}
+                    emptyMessage="No medium priority issues."
+                  >
+                    {mediumIssues.map(issue => renderIssueRow(issue, issue.status === 'DONE'))}
+                  </GroupedList>
 
-                  {/* LOW GROUP */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                      <h3 className="text-[11px] font-bold text-muted uppercase tracking-wider">
-                        Low <span className="ml-1 text-caption font-medium">{lowIssues.length}</span>
-                      </h3>
-                    </div>
-                    <div className="space-y-2">
-                      {lowIssues.length === 0 ? <div className="text-sm text-muted">No low priority issues.</div> : null}
-                      {lowIssues.map(issue => renderIssueRow(issue, issue.status === 'DONE'))}
-                    </div>
-                  </div>
+                  <GroupedList
+                    title="Low"
+                    count={lowIssues.length}
+                    dotColor="bg-gray-400"
+                    isEmpty={lowIssues.length === 0}
+                    emptyMessage="No low priority issues."
+                  >
+                    {lowIssues.map(issue => renderIssueRow(issue, issue.status === 'DONE'))}
+                  </GroupedList>
                 </>
               ) : (
                 <>
-                  {/* TODO GROUP */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-1.5 h-1.5 rounded-full bg-transparent border-2 border-gray-400"></div>
-                      <h3 className="text-[11px] font-bold text-muted uppercase tracking-wider">
-                        Todo <span className="ml-1 text-caption font-medium">{todoIssues.length}</span>
-                      </h3>
-                    </div>
-                    <div className="space-y-2">
-                      {todoIssues.length === 0 ? <div className="text-sm text-muted">No issues in todo.</div> : null}
-                      {todoIssues.map(issue => renderIssueRow(issue, false))}
-                    </div>
-                  </div>
+                  <GroupedList
+                    title="Todo"
+                    count={todoIssues.length}
+                    dotColor="bg-gray-400"
+                    isEmpty={todoIssues.length === 0}
+                    emptyMessage="No issues in todo."
+                  >
+                    {todoIssues.map(issue => renderIssueRow(issue, false))}
+                  </GroupedList>
 
-                  {/* IN PROGRESS GROUP */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-2 h-2 rounded-full bg-[#3b82f6]"></div>
-                      <h3 className="text-[11px] font-bold text-muted uppercase tracking-wider">
-                        In Progress <span className="ml-1 text-caption font-medium">{inProgressIssues.length}</span>
-                      </h3>
-                    </div>
-                    <div className="space-y-2">
-                      {inProgressIssues.length === 0 ? <div className="text-sm text-muted">No issues in progress.</div> : null}
-                      {inProgressIssues.map(issue => renderIssueRow(issue, false))}
-                    </div>
-                  </div>
+                  <GroupedList
+                    title="In Progress"
+                    count={inProgressIssues.length}
+                    dotColor="bg-[#3b82f6]"
+                    isEmpty={inProgressIssues.length === 0}
+                    emptyMessage="No issues in progress."
+                  >
+                    {inProgressIssues.map(issue => renderIssueRow(issue, false))}
+                  </GroupedList>
 
-                  {/* IN REVIEW GROUP */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-2 h-2 rounded-full bg-[#eab308]"></div>
-                      <h3 className="text-[11px] font-bold text-muted uppercase tracking-wider">
-                        In Review <span className="ml-1 text-caption font-medium">{inReviewIssues.length}</span>
-                      </h3>
-                    </div>
-                    <div className="space-y-2">
-                      {inReviewIssues.length === 0 ? <div className="text-sm text-muted">No issues in review.</div> : null}
-                      {inReviewIssues.map(issue => renderIssueRow(issue, false))}
-                    </div>
-                  </div>
+                  <GroupedList
+                    title="In Review"
+                    count={inReviewIssues.length}
+                    dotColor="bg-[#eab308]"
+                    isEmpty={inReviewIssues.length === 0}
+                    emptyMessage="No issues in review."
+                  >
+                    {inReviewIssues.map(issue => renderIssueRow(issue, false))}
+                  </GroupedList>
 
-                  {/* DONE GROUP */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-2 h-2 rounded-full bg-success"></div>
-                      <h3 className="text-[11px] font-bold text-muted uppercase tracking-wider">
-                        Done <span className="ml-1 text-caption font-medium">{doneIssues.length}</span>
-                      </h3>
-                    </div>
-                    <div className="space-y-2">
-                      {doneIssues.length === 0 ? <div className="text-sm text-muted">No completed issues.</div> : null}
-                      {doneIssues.map(issue => renderIssueRow(issue, true))}
-                    </div>
-                  </div>
+                  <GroupedList
+                    title="Done"
+                    count={doneIssues.length}
+                    dotColor="bg-success"
+                    isEmpty={doneIssues.length === 0}
+                    emptyMessage="No completed issues."
+                  >
+                    {doneIssues.map(issue => renderIssueRow(issue, true))}
+                  </GroupedList>
                 </>
               )}
             </div>
 
-            {/* Right: Detail Panel */}
-            <div className="w-[450px] bg-surface border-l border-border-default flex flex-col flex-shrink-0">
+            {/* Right: Detail Panel (One continuous white surface, radius 14px, 20px padding, soft shadow, no border) */}
+            <div className="w-full xl:w-[clamp(340px,26vw,420px)] xl:flex-none h-full bg-surface-raised rounded-[14px] shadow-[0_1px_2px_rgba(16,24,40,0.04)] border-0 flex flex-col overflow-hidden">
 
               {selectedIssue ? (
                 <>
-                  {/* Details Scrollable Content */}
-                  <div className="flex-1 overflow-y-auto p-6">
+                  {/* Details Scrollable Content: ONE continuous surface */}
+                  <div className="flex-1 min-h-0 overflow-y-auto p-5 scrollbar-soft">
 
-                    {/* Header */}
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-sm font-semibold text-muted">{selectedIssue.key || selectedIssue.id.substring(selectedIssue.id.length - 8)}</span>
-                      <div className="flex items-center gap-2 text-caption">
-                        <button disabled className="hover:text-body transition-colors disabled:opacity-60"><MoreHorizontal size={18} /></button>
-                        <button onClick={() => setSelectedId(null)} className="hover:text-body transition-colors"><X size={18} /></button>
-                      </div>
-                    </div>
-
-                    <h1 className="text-3xl font-extrabold text-heading leading-tight tracking-tight mb-4">
-                      {selectedIssue.title}
-                    </h1>
-
-                    {/* Tags */}
-                    <div className="flex items-center gap-2 mb-8">
-                      <label className="inline-flex items-center gap-1.5 bg-[#eff6ff] text-[#3b82f6] px-2.5 py-1 rounded-full text-xs font-bold">
-                        <HalfCircleIcon className="w-3.5 h-3.5" />
-                        <select value={selectedIssue.status} disabled={issueMutation.isPending} onChange={event => issueMutation.mutate(event.target.value)} className="bg-transparent uppercase outline-none">
-                          <option value="TODO">To Do</option>
-                          <option value="IN_PROGRESS">In Progress</option>
-                          <option value="IN_REVIEW">In Review</option>
-                          <option value="DONE">Done</option>
-                        </select>
-                      </label>
-                      {selectedIssue.priority === 'HIGH' || selectedIssue.priority === 'URGENT' ? (
-                        <span className="inline-flex items-center gap-1 bg-danger-light text-danger px-2.5 py-1 rounded-full text-xs font-bold">
-                          <ChevronsUp size={14} strokeWidth={3} /> High Priority
+                    {/* Top Header Section */}
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span
+                          className="text-xs font-medium text-muted tabular-nums"
+                          title={selectedIssue.id}
+                        >
+                          {shortId(selectedIssue.id)}
                         </span>
-                      ) : null}
-                    </div>
-
-                    {/* Checklist Box */}
-                    <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card mb-6">
-                      <div className="flex items-center justify-between mb-5">
-                        <h3 className="text-sm font-bold text-heading">
-                          Checklist
-                          {selectedIssue.checklist?.length ? (
-                            <span className="ml-2 text-xs font-normal text-muted">
-                              ({selectedIssue.checklist.filter(c => c.done).length}/{selectedIssue.checklist.length})
-                            </span>
-                          ) : null}
-                        </h3>
+                        <div className="flex items-center gap-1.5 text-caption">
+                          <button disabled className="p-1 hover:text-body transition-colors disabled:opacity-60 cursor-not-allowed" aria-label="More options"><MoreHorizontal size={17} /></button>
+                          <button onClick={() => setSelectedId(null)} className="p-1 hover:text-body transition-colors cursor-pointer" aria-label="Close detail panel"><X size={17} /></button>
+                        </div>
                       </div>
 
-                      <div className="space-y-3">
+                      <h1 className="text-2xl font-medium text-heading leading-tight tracking-tight mb-3">
+                        {selectedIssue.key ? `${selectedIssue.key}: ` : ''}{selectedIssue.title}
+                      </h1>
+
+                      {/* Status & Priority Tags */}
+                      <div className="flex items-center gap-2">
+                        <label className="inline-flex items-center gap-1.5 bg-[#eff6ff] text-[#3b82f6] px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer">
+                          <HalfCircleIcon className="w-3.5 h-3.5" />
+                          <select
+                            value={selectedIssue.status}
+                            disabled={issueMutation.isPending}
+                            onChange={event => issueMutation.mutate(event.target.value)}
+                            className="bg-transparent uppercase outline-none cursor-pointer font-medium text-xs"
+                          >
+                            <option value="TODO">To Do</option>
+                            <option value="IN_PROGRESS">In Progress</option>
+                            <option value="IN_REVIEW">In Review</option>
+                            <option value="DONE">Done</option>
+                          </select>
+                        </label>
+                        {selectedIssue.priority === 'HIGH' || selectedIssue.priority === 'URGENT' ? (
+                          <span className="inline-flex items-center gap-1 bg-danger-light text-danger px-2.5 py-1 rounded-full text-xs font-medium">
+                            <ChevronsUp size={14} strokeWidth={2.5} /> High Priority
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {/* Checklist Section - separated by hairline */}
+                    <SidePanelSection
+                      title="Checklist"
+                      badge={selectedIssue.checklist?.length ? `(${selectedIssue.checklist.filter(c => c.done).length}/${selectedIssue.checklist.length})` : null}
+                    >
+                      <div className="space-y-2.5">
                         {(!selectedIssue.checklist || selectedIssue.checklist.length === 0) ? (
-                          <div className="text-sm text-muted">No checklist items yet.</div>
+                          <div className="text-[13px] text-muted">No checklist items yet.</div>
                         ) : (
                           selectedIssue.checklist.map((item) => (
                             <div key={item.id} className="flex items-center justify-between group text-sm">
-                              <label className="flex items-center gap-2.5 cursor-pointer select-none flex-1">
+                              <label className="flex items-center gap-2.5 cursor-pointer select-none flex-1 min-w-0">
                                 <input
                                   type="checkbox"
                                   checked={item.done}
                                   onChange={(e) => updateChecklistMutation.mutate({ itemId: item.id, done: e.target.checked })}
                                   className="rounded border-border-default text-accent focus:ring-accent"
                                 />
-                                <span className={item.done ? "line-through text-muted" : "text-body"}>
+                                <span className={`truncate ${item.done ? "line-through text-muted" : "text-body font-normal"}`}>
                                   {item.text}
                                 </span>
                               </label>
                               <button
                                 type="button"
                                 onClick={() => deleteChecklistMutation.mutate(item.id)}
-                                className="opacity-0 group-hover:opacity-100 text-caption hover:text-danger p-1 transition-opacity"
+                                className="opacity-0 group-hover:opacity-100 text-caption hover:text-danger p-1 transition-opacity cursor-pointer"
                                 title="Delete item"
                               >
                                 <X size={14} />
@@ -569,7 +598,7 @@ export default function ActiveSprints() {
                           ))
                         )}
 
-                        {/* Inline Add Checklist Item */}
+                        {/* Inline Add Checklist Item (40px, rounded-[10px]) */}
                         <form
                           onSubmit={(e) => {
                             e.preventDefault();
@@ -584,47 +613,45 @@ export default function ActiveSprints() {
                             value={newChecklistText}
                             onChange={(e) => setNewChecklistText(e.target.value)}
                             placeholder="Add item..."
-                            className="flex-1 bg-surface border border-border-default rounded-input px-3 py-1.5 text-xs text-body focus:outline-none focus:ring-1 focus:ring-accent"
+                            className="flex-1 bg-surface-muted/50 border-0 rounded-[10px] px-3.5 h-10 text-xs text-body focus:outline-none focus:ring-2 focus:ring-accent"
                           />
                           <button
                             type="submit"
                             disabled={!newChecklistText.trim() || createChecklistMutation.isPending}
-                            className="px-2.5 py-1.5 bg-accent text-white rounded-button text-xs font-medium hover:bg-accent/90 disabled:opacity-50"
+                            className="px-4 h-10 bg-accent text-white rounded-[10px] text-xs font-medium hover:bg-accent/90 disabled:opacity-50 cursor-pointer shrink-0 transition-colors"
                           >
                             Add
                           </button>
                         </form>
                       </div>
-                    </div>
+                    </SidePanelSection>
 
-                    {/* Activity Feed Box */}
-                    <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card">
-                      <h3 className="text-sm font-bold text-heading mb-6">Activity</h3>
-
-                      <div className="relative pl-4 space-y-6">
+                    {/* Activity Section - separated by hairline */}
+                    <SidePanelSection title="Activity">
+                      <div className="relative pl-1 space-y-3">
                         {(!selectedIssue.comments || selectedIssue.comments.length === 0) ? (
-                          <div className="text-sm text-muted">No recent activity.</div>
+                          <div className="text-[13px] text-muted">No recent activity.</div>
                         ) : (
                           selectedIssue.comments.map((comment) => (
                             <div key={comment.id} className="relative text-sm">
                               <div className="flex items-center justify-between mb-1">
-                                <span className="font-semibold text-heading text-xs">
+                                <span className="font-medium text-heading text-xs">
                                   {comment.authorName || 'Team Member'}
                                 </span>
-                                <span className="text-[11px] text-caption">
+                                <span className="text-[11px] text-caption font-normal">
                                   {formatDate(comment.createdAt)}
                                 </span>
                               </div>
-                              <p className="text-body text-xs whitespace-pre-wrap">{comment.body}</p>
+                              <p className="text-body text-xs whitespace-pre-wrap font-normal">{comment.body}</p>
                             </div>
                           ))
                         )}
                       </div>
-                    </div>
+                    </SidePanelSection>
 
                   </div>
 
-                  {/* Comment Footer (Sticky) */}
+                  {/* Comment Footer (Pinned with hairline above, 40px input, rounded-[10px]) */}
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
@@ -632,7 +659,7 @@ export default function ActiveSprints() {
                         createCommentMutation.mutate(commentText.trim());
                       }
                     }}
-                    className="p-6 bg-surface border-t border-border-default"
+                    className="p-4 bg-surface-raised border-t border-border-subtle/50 shrink-0"
                   >
                     <div className="relative">
                       <input
@@ -647,30 +674,32 @@ export default function ActiveSprints() {
                             }
                           }
                         }}
-                        placeholder="Add a comment... ⌘+Enter"
-                        className="w-full bg-[#f1f5f9] border border-border-default rounded-button pl-4 pr-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:bg-surface-raised transition-colors placeholder-gray-400"
+                        placeholder="Write a comment..."
+                        className="w-full bg-surface-muted/50 border-0 rounded-[10px] pl-3.5 pr-10 h-10 text-xs text-body focus:outline-none focus:ring-2 focus:ring-accent placeholder:text-caption"
                       />
                       <button
                         type="submit"
                         disabled={!commentText.trim() || createCommentMutation.isPending}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-caption hover:text-black transition-colors disabled:opacity-40"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-accent disabled:text-caption hover:opacity-80 transition-opacity p-1 cursor-pointer disabled:cursor-not-allowed"
+                        title="Send comment (⌘+Enter)"
+                        aria-label="Send comment"
                       >
-                        <Send size={16} />
+                        {createCommentMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                       </button>
                     </div>
                   </form>
                 </>
               ) : (
-                <div className="flex h-full items-center justify-center text-muted">
-                  Select an issue to view details.
+                <div className="h-full flex items-center justify-center p-6 text-center text-muted">
+                  Select an issue from the list to view details
                 </div>
               )}
             </div>
           </div>
         </>
       ) : (
-        <div className="flex h-full items-center justify-center bg-surface-raised text-muted">
-          No active sprints found.
+        <div className="flex-1 flex items-center justify-center p-8 text-center text-muted">
+          {isLoading ? 'Loading active sprint…' : isError ? 'Could not load sprint.' : 'No active sprint found.'}
         </div>
       )}
       <FormDialog open={issueOpen} onClose={() => setIssueOpen(false)} title="New issue" subtitle={activeSprint?.name} busy={createIssue.isPending} onConfirm={() => createIssue.mutate()} confirmLabel="Create issue">

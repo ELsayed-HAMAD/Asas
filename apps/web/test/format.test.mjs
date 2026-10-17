@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { listCurrencies } from '@asas/domain/money';
-import { formatMoney, formatCompactMoney, formatDate, getFormatDefaults, moneyToMajor, setFormatDefaults } from '../src/lib/format.js';
+import { formatMoney, formatCompactMoney, formatCompactTableMoney, formatDate, getFormatDefaults, moneyToMajor, setFormatDefaults } from '../src/lib/format.js';
 
 test('every currency uses the same minor-unit exponent as the backend', () => {
   for (const currency of listCurrencies()) {
@@ -32,6 +32,12 @@ test('preserves major-unit salary strings and caller display options', () => {
 test('compact formatting understands money wire objects rather than returning fake or missing values', () => {
   assert.equal(formatCompactMoney({ amount: 125000, currency: 'USD' }), '$1.3K');
   assert.equal(formatMoney({ amount: 125000, currency: 'USD' }, { compact: true }), '$1.3K');
+  assert.equal(formatCompactTableMoney({ amount: 125000, currency: 'USD' }), '$1.3K');
+  assert.equal(formatCompactTableMoney('25.99'), '$25.99');
+  assert.equal(formatCompactTableMoney('1250000'), '$1.3M');
+  assert.equal(formatCompactTableMoney('-1250000'), '-$1.3M');
+  assert.equal(formatCompactTableMoney('1250.50', { currency: 'EUR' }), '€1.3K');
+  assert.equal(formatCompactTableMoney(null), '—');
 });
 
 test('wire currency takes precedence over the workspace display default', () => {

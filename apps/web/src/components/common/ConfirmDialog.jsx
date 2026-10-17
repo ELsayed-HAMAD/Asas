@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
 import { Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import useDialogAccessibility from './useDialogAccessibility'
 
 /**
  * Confirmation dialog for destructive actions. The legacy `common/ConfirmDialog.jsx` was a
@@ -33,21 +33,7 @@ export default function ConfirmDialog({
   error,
 }) {
   const isDialogOpen = open ?? isOpen
-
-  // Close on Escape (when not busy) and lock background scroll while open.
-  useEffect(() => {
-    if (!isDialogOpen) return
-    function onKeyDown(event) {
-      if (event.key === 'Escape' && !busy) onClose()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = previousOverflow
-    }
-  }, [isDialogOpen, busy, onClose])
+  const dialogRef = useDialogAccessibility({ open: isDialogOpen, onClose, busy })
 
   return (
     <AnimatePresence>
@@ -65,7 +51,9 @@ export default function ConfirmDialog({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.97 }}
             transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+            ref={dialogRef}
             role="dialog"
+            tabIndex={-1}
             aria-modal="true"
             aria-labelledby="confirm-dialog-title"
             className="relative w-full max-w-md bg-surface-raised rounded-card border border-border-default shadow-elevated p-6"

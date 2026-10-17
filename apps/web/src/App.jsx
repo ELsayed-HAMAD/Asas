@@ -14,6 +14,10 @@ import GuestGuard   from './guards/GuestGuard'
 import Landing from './pages/marketing/Landing'
 const Terms = lazy(() => import('./pages/marketing/Terms'))
 const Privacy = lazy(() => import('./pages/marketing/Privacy'))
+const Solutions = lazy(() => import('./pages/marketing/Solutions'))
+const Pricing = lazy(() => import('./pages/marketing/Pricing'))
+const Documentation = lazy(() => import('./pages/marketing/Documentation'))
+const Status = lazy(() => import('./pages/marketing/Status'))
 
 // ── Auth ───────────────────────────────────────────────────
 import Login    from './pages/auth/Login'
@@ -114,6 +118,10 @@ export default function App() {
       {/* ── Marketing ── */}
       <Route element={<Suspense fallback={<div className="flex h-screen items-center justify-center text-muted">Loading…</div>}><MarketingLayout /></Suspense>}>
         <Route path="/" element={<Landing />} />
+        <Route path="/solutions" element={<Solutions />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/documentation" element={<Documentation />} />
+        <Route path="/status" element={<Status />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
       </Route>

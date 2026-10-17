@@ -9,7 +9,7 @@ import {
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { AppError } from '../../utils/errors.js'
-import { requireAuthContext, requireRole } from '../../middlewares/rbac.js'
+import { requireAuthContext } from '../../middlewares/rbac.js'
 import { requirePermission } from '../../middlewares/permissions.js'
 import { recordAuditLog } from '../../services/auditLog.js'
 import { processStripeWebhookEvent } from '../../services/stripeBilling.js'
@@ -32,8 +32,8 @@ export async function stripeBillingRoutes(app: FastifyInstance): Promise<void> {
 
   const server = app.withTypeProvider<ZodTypeProvider>()
 
+  // Prices and plan limits are public catalog data used by the marketing pricing page.
   server.get('/plans', {
-    preHandler: requireRole('MEMBER'),
     schema: { response: { 200: envelope(billingPlansResponseSchema), ...errorResponses } },
   }, async request => {
     const provider = request.server.stripeBilling

@@ -48,7 +48,7 @@ export default function SettingsBilling() {
   return (
     <div className="flex h-full min-w-0 flex-col overflow-hidden bg-surface">
       <TopBarActions>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {plansQuery.data?.enabled && billingQuery.data?.stripePortalAvailable && (
             <button
               type="button"
@@ -66,7 +66,7 @@ export default function SettingsBilling() {
 
       <SettingsTabs />
 
-      <main className="flex-1 overflow-y-auto p-5 md:p-8">
+      <section className="flex-1 overflow-y-auto p-5 md:p-8">
         <div className="mx-auto max-w-6xl space-y-7">
           <header>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Workspace billing</p>
@@ -139,7 +139,7 @@ export default function SettingsBilling() {
               : <p className="text-sm text-body-light">Invoices from Stripe will appear here after billing is connected.</p>}
           </section>
         </div>
-      </main>
+      </section>
     </div>
   )
 }

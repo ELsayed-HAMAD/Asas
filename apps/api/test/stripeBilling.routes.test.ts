@@ -9,7 +9,7 @@ import type { StripeBillingProvider } from '../src/services/stripeBilling.js'
 
 const apps: Awaited<ReturnType<typeof makeApp>>[] = []
 
-async function makeApp(role: 'ADMIN' | 'MEMBER', provider: StripeBillingProvider | null) {
+async function makeApp(role: 'ADMIN' | 'MEMBER', provider: StripeBillingProvider | null, authenticated = true) {
   const app = Fastify({ logger: false }).withTypeProvider()
   app.setValidatorCompiler(validatorCompiler)
   app.setSerializerCompiler(serializerCompiler)
@@ -22,7 +22,7 @@ async function makeApp(role: 'ADMIN' | 'MEMBER', provider: StripeBillingProvider
     subscription: { findFirst: vi.fn(async () => null) },
     user: { findUnique: vi.fn(async () => ({ email: 'owner@example.com' })) },
   }
-  const auth = { api: { getSession: vi.fn(async () => ({ user: { id: 'user_1' }, session: { activeOrganizationId: 'tenant_1' } })) } }
+  const auth = { api: { getSession: vi.fn(async () => authenticated ? ({ user: { id: 'user_1' }, session: { activeOrganizationId: 'tenant_1' } }) : null) } }
   app.decorate('prisma', prisma as unknown as PrismaClient)
   app.decorate('auth', auth as never)
   app.decorate('stripeBilling', provider)
@@ -51,13 +51,16 @@ afterEach(async () => {
 })
 
 describe('Stripe billing routes', () => {
-  it('returns configured prices only to authenticated workspace members', async () => {
+  it('publishes configured plan prices without exposing checkout access', async () => {
     const stripe = provider()
-    const { app } = await makeApp('MEMBER', stripe)
+    const { app } = await makeApp('MEMBER', stripe, false)
     apps.push({ app } as Awaited<ReturnType<typeof makeApp>>)
     const response = await app.inject({ method: 'GET', url: '/api/v1/billing/plans' })
     expect(response.statusCode).toBe(200)
     expect(response.json().data).toMatchObject({ enabled: true, items: [{ priceId: 'price_basic', amount: '10.00' }] })
+    const checkout = await app.inject({ method: 'POST', url: '/api/v1/billing/checkout', payload: { priceId: 'price_basic' } })
+    expect(checkout.statusCode).toBe(401)
+    expect(stripe.createCheckout).not.toHaveBeenCalled()
   })
 
   it('creates hosted checkout for admins with server-owned tenant and return URL values', async () => {

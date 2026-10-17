@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Search,
-  Bell,
-  Sun,
   LayoutGrid,
   Filter,
   X,
@@ -17,8 +15,9 @@ import {
 import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { inventoryApi } from '../../../lib/api/inventory';
 import { queryKeys } from '../../../lib/queryKeys';
-import { formatMoney, formatDate } from '../../../lib/format';
+import { formatCompactNumber, formatCompactTableMoney, formatMoney, formatDate } from '../../../lib/format';
 import { useActiveMemberRole } from '../../../lib/authClient';
+import { getMemberRoleName } from '../../../lib/memberRole';
 import { useDebouncedValue } from '../../../lib/useDebouncedValue';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
@@ -43,6 +42,13 @@ export default function Inventory() {
   const [purchaseQuantity, setPurchaseQuantity] = useState('1');
   const [purchaseOrderError, setPurchaseOrderError] = useState('');
   const [createdOrder, setCreatedOrder] = useState(null);
+
+  useEffect(() => {
+    if (!createdOrder) return;
+    const timer = setTimeout(() => setCreatedOrder(null), 5000);
+    return () => clearTimeout(timer);
+  }, [createdOrder]);
+
 
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.inventory.products.list({ page: productPage, search: search || undefined, status: stockFilter || undefined, archived: showArchived, limit: 25 }),
@@ -100,7 +106,7 @@ export default function Inventory() {
   const { data: activeMemberRole } = useActiveMemberRole();
   // Server requires ADMIN for every write (MEMBER gets 403). Gate the write controls so a
   // MEMBER sees them disabled rather than learning the rule from a rejected request.
-  const canWrite = activeMemberRole === 'OWNER' || activeMemberRole === 'ADMIN';
+  const canWrite = ['OWNER', 'ADMIN'].includes(getMemberRoleName(activeMemberRole));
   const noRoleTitle = 'Requires the ADMIN role';
 
   // ── Create / edit product dialog ─────────────────────────────────────────
@@ -360,271 +366,331 @@ export default function Inventory() {
   };
 
   return (
-    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
+    <div className="flex-1 min-h-0 flex flex-col bg-surface overflow-hidden min-w-0">
 
       <TopBarActions>
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search..."
-              className="pl-9 pr-12 py-1.5 text-sm border border-border-default rounded-input bg-surface-raised w-72 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard/settings/notifications')}
-            title="Notification Settings"
-            className="text-muted hover:text-heading transition-colors cursor-pointer"
-          >
-            <Bell size={18} />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const isDark = document.documentElement.classList.toggle('dark');
-              localStorage.setItem('theme', isDark ? 'dark' : 'light');
-            }}
-            title="Toggle theme"
-            className="text-muted hover:text-heading transition-colors cursor-pointer"
-          >
-            <Sun size={18} />
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard/inventory/movements')}
-            title="Stock Movements"
-            className="text-muted hover:text-heading transition-colors cursor-pointer"
-          >
-            <LayoutGrid size={18} />
-          </button>
-
-          <button
-            onClick={openCreateDialog}
-            disabled={!canWrite}
-            title={canWrite ? undefined : noRoleTitle}
-            className="bg-primary text-white px-4 py-1.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
-          >
-            New Product
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={openCreateDialog}
+          disabled={!canWrite}
+          title={canWrite ? undefined : noRoleTitle}
+          className="h-9 px-4 rounded-input bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 whitespace-nowrap flex items-center justify-center shrink-0 cursor-pointer shadow-sm"
+        >
+          New Product
+        </button>
       </TopBarActions>
 
       {/* ── Main Split View ── */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 min-h-0 grid grid-cols-1 min-[1100px]:grid-cols-[1fr_400px] gap-4 p-4 min-[1100px]:p-6 min-[1100px]:overflow-hidden overflow-y-auto items-stretch">
 
-        {/* Left: Product Catalog Area */}
-        <div className="flex-1 overflow-y-auto p-8 flex flex-col">
+        {/* Left: Product Catalog List Pane */}
+        <div data-testid="product-list-pane" className="flex-1 min-w-0 flex flex-col min-h-0">
 
-          {/* Section Header */}
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold text-heading">Product Catalog</h1>
-            <div className="flex items-center gap-3">
-            <select value={showArchived ? 'archived' : 'active'} onChange={event => setShowArchived(event.target.value === 'archived')} aria-label="Show active or archived products" className="border border-border-default bg-surface-raised text-body px-3 py-2 rounded-input text-sm font-medium shadow-card">
+          {/* List Pane Header (Toolbar row, directly above the table) */}
+          <div data-testid="product-list-header" className="flex flex-wrap min-[900px]:flex-nowrap items-center gap-2 mb-4 shrink-0 min-h-[36px]">
+            <h1 className="sr-only">Product Catalog</h1>
+
+            <div className="relative w-full min-[900px]:w-auto min-[900px]:flex-1 min-w-[200px] shrink-0">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search..."
+                aria-label="Search products"
+                className="w-full h-9 pl-9 pr-3 text-sm border border-border-default rounded-input bg-surface-raised text-heading placeholder:text-caption focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent shadow-card"
+              />
+            </div>
+
+            <select
+              value={showArchived ? 'archived' : 'active'}
+              onChange={(event) => setShowArchived(event.target.value === 'archived')}
+              aria-label="Show active or archived products"
+              className="w-[150px] h-9 border border-border-default bg-surface-raised text-body px-3 rounded-input text-sm font-medium shadow-card focus:outline-none focus:ring-2 focus:ring-accent shrink-0 cursor-pointer"
+            >
               <option value="active">Active products</option>
               <option value="archived">Archived products</option>
             </select>
-            <div className="relative">
-              <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
-              <select value={stockFilter} onChange={event => setStockFilter(event.target.value)} aria-label="Filter products by stock status" className="appearance-none border border-border-default bg-surface-raised text-body pl-9 pr-4 py-2 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors shadow-card">
+
+            <div className="relative w-[110px] shrink-0">
+              <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+              <select
+                value={stockFilter}
+                onChange={(event) => setStockFilter(event.target.value)}
+                aria-label="Filter products by stock status"
+                className="w-full h-9 appearance-none border border-border-default bg-surface-raised text-body pl-8 pr-3 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors shadow-card focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
+              >
                 <option value="">All Stock</option>
                 <option value="IN_STOCK">In Stock</option>
                 <option value="LOW_STOCK">Low Stock</option>
                 <option value="OUT_OF_STOCK">Out of Stock</option>
               </select>
             </div>
-            </div>
+
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard/inventory/movements')}
+              title="Stock Movements"
+              aria-label="Stock Movements"
+              className="w-9 h-9 flex items-center justify-center border border-border-default rounded-input bg-surface-raised text-muted hover:text-heading hover:bg-surface-muted transition-colors shadow-card shrink-0 cursor-pointer"
+            >
+              <LayoutGrid size={16} />
+            </button>
           </div>
 
-          {/* Catalog Table */}
-          <div className="bg-surface-raised border border-border-default rounded-button shadow-card overflow-hidden">
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-surface-muted/80 border-b border-border-default">
-                <tr>
-                  <th className="px-6 py-4 text-[10px] font-bold text-muted uppercase tracking-wider">Product</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-muted uppercase tracking-wider">SKU</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Price</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-subtle">
-                {products.length === 0 ? (
-                  <tr>
-                    <td colSpan="4" className="px-6 py-8 text-center text-sm text-muted">
-                      No products found.
-                    </td>
+          {/* Table Card (fills the list pane height) */}
+          <div data-testid="product-table-card" className="flex-1 min-h-0 bg-surface-raised border border-border-default rounded-card shadow-card flex flex-col overflow-hidden">
+            {/* Rows area: flex: 1; min-height: 0; overflow-y: auto */}
+            <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-width:thin]">
+              <table className="w-full table-fixed border-collapse">
+                <colgroup>
+                  <col className="min-w-[220px]" />
+                  <col style={{ width: '120px' }} />
+                  <col style={{ width: '100px' }} />
+                  <col style={{ width: '140px' }} />
+                </colgroup>
+                <thead className="sticky top-0 z-10 bg-surface-muted/95 backdrop-blur-xs border-b border-border-default">
+                  <tr className="h-10">
+                    <th className="h-10 ps-5 pe-3 text-start text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">Product</th>
+                    <th className="h-10 px-3 text-start text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">SKU</th>
+                    <th className="h-10 px-3 text-end text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">Price</th>
+                    <th className="h-10 ps-3 pe-5 text-end text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">Status</th>
                   </tr>
-                ) : (
-                  products.map(product => {
-                    const isSelected = selectedId === product.id;
-                    const isLowStock = product.status === 'LOW_STOCK' || product.status === 'OUT_OF_STOCK';
+                </thead>
+                <tbody className="divide-y divide-border-subtle">
+                  {products.length === 0 ? (
+                    <tr className="h-32">
+                      <td colSpan={4} className="px-6 py-8 text-center text-sm text-muted">
+                        No products found.
+                      </td>
+                    </tr>
+                  ) : (
+                    products.map(product => {
+                      const isSelected = selectedId === product.id;
+                      const isLowStock = product.status === 'LOW_STOCK' || product.status === 'OUT_OF_STOCK';
 
-                    return (
-                      <tr
-                        key={product.id}
-                        onClick={() => selectProduct(product.id)}
-                        className={`cursor-pointer transition-colors ${
-                          isSelected ? 'bg-accent-light/30 border-l-2 border-l-blue-600' : 'bg-surface-raised hover:bg-surface-muted border-l-2 border-l-transparent'
-                        }`}
-                      >
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded border border-border-default bg-surface-muted flex items-center justify-center shrink-0">
-                              <Box size={18} className="text-body-light" />
+                      return (
+                        <tr
+                          key={product.id}
+                          onClick={() => selectProduct(product.id)}
+                          className={`relative h-14 cursor-pointer transition-colors ${
+                            isSelected
+                              ? 'bg-accent-light/30'
+                              : 'bg-surface-raised hover:bg-surface-muted/60'
+                          }`}
+                        >
+                          <td className="relative ps-5 pe-3 py-0 align-middle">
+                            {isSelected && (
+                              <span className="absolute inset-y-0 start-0 w-[3px] bg-primary pointer-events-none" aria-hidden="true" />
+                            )}
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 rounded border border-border-default bg-surface-muted flex items-center justify-center shrink-0">
+                                <Box size={16} className="text-body-light" />
+                              </div>
+                              <span className="text-sm font-medium text-heading truncate whitespace-nowrap" title={product.name}>
+                                {product.name}
+                              </span>
                             </div>
-                            <span className="text-sm font-semibold text-heading">{product.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-body-light">
-                          {product.sku}
-                        </td>
-                        <td className="px-6 py-4 text-sm font-medium text-heading tabular-nums text-right">
-                          {formatMoney(product.price)}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <span className={`inline-flex px-2.5 py-1 rounded text-xs font-semibold ${
-                            isLowStock
-                              ? 'bg-danger-light text-danger border border-danger-border'
-                              : 'bg-success-light text-success-text border border-[#bbf7d0]'
-                          }`}>
-                            {product.stock} {product.status.replaceAll('_', ' ')}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-          {data?.pagination && <div className="flex items-center justify-between border-t border-border-default px-2 py-3 text-xs text-muted">
-            <span>Showing {data.pagination.total === 0 ? 0 : (productPage - 1) * data.pagination.limit + 1}–{Math.min(productPage * data.pagination.limit, data.pagination.total)} of {data.pagination.total} products</span>
-            <div className="flex items-center gap-2">
-              <button type="button" disabled={productPage <= 1} onClick={() => setProductPage(current => current - 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Previous</button>
-              <span>Page {data.pagination.pages === 0 ? 0 : productPage} of {data.pagination.pages}</span>
-              <button type="button" disabled={productPage >= data.pagination.pages} onClick={() => setProductPage(current => current + 1)} className="rounded border border-border-default px-2 py-1 disabled:opacity-40">Next</button>
+                          </td>
+                          <td className="px-3 py-0 align-middle text-[13px] text-body-light whitespace-nowrap">
+                            {product.sku}
+                          </td>
+                          <td className="px-3 py-0 align-middle text-sm font-semibold text-heading tabular-nums text-end whitespace-nowrap" title={formatMoney(product.price)}>
+                            {formatCompactTableMoney(product.price)}
+                          </td>
+                          <td className="ps-3 pe-5 py-0 align-middle text-end whitespace-nowrap">
+                            <span
+                              className={`inline-flex items-center justify-center h-[22px] min-w-[96px] px-2.5 rounded text-xs font-semibold whitespace-nowrap text-center ${
+                                isLowStock
+                                  ? 'bg-danger-light text-danger border border-danger-border'
+                                  : 'bg-success-light text-success-text border border-[#bbf7d0]'
+                              }`}
+                            >
+                              {product.stock} {product.status.replaceAll('_', ' ')}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
-          </div>}
-        </div>
 
-        {/* Right: Detail Panel */}
-        <div className="w-[420px] bg-surface-raised border-l border-border-default flex flex-col flex-shrink-0">
-
-          {selectedProduct ? (
-            <>
-              {/* Detail Header */}
-              <div className="p-6 border-b border-border-default">
-                <div className="flex items-start justify-between mb-8">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-surface-active rounded-button flex items-center justify-center border border-border-default">
-                      <Box size={24} className="text-body-light" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-bold text-heading">{selectedProduct.name}</h2>
-                      <p className="text-sm text-muted mt-0.5">SKU: {selectedProduct.sku}</p>
-                    </div>
-                  </div>
+            {/* Pagination Footer (Pinned at bottom of card, 44px, 1px top border) */}
+            {data?.pagination && (
+              <div className="h-11 shrink-0 border-t border-border-default px-4 flex items-center justify-between text-[13px] text-muted bg-surface-raised">
+                <span className="whitespace-nowrap">
+                  Showing {data.pagination.total === 0 ? 0 : (productPage - 1) * data.pagination.limit + 1}–{Math.min(productPage * data.pagination.limit, data.pagination.total)} of {data.pagination.total} products
+                </span>
+                <div className="flex items-center gap-2 shrink-0">
                   <button
-                    onClick={() => { setSelectedId(null); setManualDeselect(true); }}
-                    className="text-caption hover:text-body transition-colors"
+                    type="button"
+                    disabled={productPage <= 1}
+                    onClick={() => setProductPage(current => current - 1)}
+                    className="h-7 px-2 rounded border border-border-default text-xs font-medium text-body hover:bg-surface-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    <X size={20} />
+                    Previous
                   </button>
-                </div>
-                {selectedProduct.archivedAt && <p className="mb-4 rounded-button bg-surface-muted px-3 py-2 text-xs font-semibold text-muted">Archived {formatDate(selectedProduct.archivedAt)}</p>}
-
-                {/* Tabs */}
-                <div className="flex items-center gap-6">
+                  <span className="text-xs whitespace-nowrap">
+                    Page {data.pagination.pages === 0 ? 0 : productPage} of {data.pagination.pages}
+                  </span>
                   <button
-                    onClick={() => setActiveTab('overview')}
-                    className={`pb-2 text-sm transition-colors ${
-                      activeTab === 'overview'
-                        ? 'font-bold text-heading border-b-2 border-black'
-                        : 'font-medium text-muted hover:text-heading'
-                    }`}
+                    type="button"
+                    disabled={productPage >= data.pagination.pages}
+                    onClick={() => setProductPage(current => current + 1)}
+                    className="h-7 px-2 rounded border border-border-default text-xs font-medium text-body hover:bg-surface-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    Overview
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('suppliers')}
-                    className={`pb-2 text-sm transition-colors ${activeTab === 'suppliers' ? 'font-bold text-heading border-b-2 border-black' : 'font-medium text-muted hover:text-heading'}`}
-                  >
-                    Suppliers
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('history')}
-                    className={`pb-2 text-sm transition-colors ${
-                      activeTab === 'history'
-                        ? 'font-bold text-heading border-b-2 border-black'
-                        : 'font-medium text-muted hover:text-heading'
-                    }`}
-                  >
-                    History
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('orders')}
-                    className={`pb-2 text-sm transition-colors ${
-                      activeTab === 'orders'
-                        ? 'font-bold text-heading border-b-2 border-black'
-                        : 'font-medium text-muted hover:text-heading'
-                    }`}
-                  >
-                    Orders
+                    Next
                   </button>
                 </div>
               </div>
+            )}
+          </div>
+        </div>
 
-              {/* Detail Content Area */}
+        {/* Right: Detail Panel */}
+        <aside
+          data-testid="product-detail-panel"
+          aria-label="Product details"
+          className="w-full min-[1100px]:w-[400px] shrink-0 bg-surface-raised border border-border-default rounded-card shadow-card flex flex-col overflow-hidden min-h-0"
+        >
+          {selectedProduct ? (
+            <>
+              {/* Detail Header (Fixed 20px padding) */}
+              <div className="p-5 border-b border-border-default shrink-0">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div className="w-12 h-12 rounded-[12px] bg-surface-active flex items-center justify-center border border-border-default shrink-0">
+                      <Box size={22} className="text-body-light" />
+                    </div>
+                    <div className="min-w-0">
+                      <h2 className="text-base font-semibold text-heading truncate" title={selectedProduct.name}>
+                        {selectedProduct.name}
+                      </h2>
+                      <p className="text-[13px] text-muted mt-0.5 truncate">
+                        SKU: {selectedProduct.sku}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedId(null); setManualDeselect(true); }}
+                    className="w-9 h-9 flex items-center justify-center rounded-input text-caption hover:text-body hover:bg-surface-muted transition-colors shrink-0 cursor-pointer"
+                    aria-label="Close details"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                {selectedProduct.archivedAt && (
+                  <p className="mt-3 rounded-button bg-surface-muted px-3 py-1.5 text-xs font-semibold text-muted">
+                    Archived {formatDate(selectedProduct.archivedAt)}
+                  </p>
+                )}
+              </div>
+
+              {/* Tabs (Fixed 44px high, 20px gap, px-5, 1px bottom border) */}
+              <div className="h-11 px-5 border-b border-border-default flex items-center gap-5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('overview')}
+                  className={`h-full flex items-center text-sm transition-colors border-b-2 cursor-pointer ${
+                    activeTab === 'overview'
+                      ? 'font-semibold text-heading border-black dark:border-white'
+                      : 'font-medium text-muted hover:text-heading border-transparent'
+                  }`}
+                >
+                  Overview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('suppliers')}
+                  className={`h-full flex items-center text-sm transition-colors border-b-2 cursor-pointer ${
+                    activeTab === 'suppliers'
+                      ? 'font-semibold text-heading border-black dark:border-white'
+                      : 'font-medium text-muted hover:text-heading border-transparent'
+                  }`}
+                >
+                  Suppliers
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('history')}
+                  className={`h-full flex items-center text-sm transition-colors border-b-2 cursor-pointer ${
+                    activeTab === 'history'
+                      ? 'font-semibold text-heading border-black dark:border-white'
+                      : 'font-medium text-muted hover:text-heading border-transparent'
+                  }`}
+                >
+                  History
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('orders')}
+                  className={`h-full flex items-center text-sm transition-colors border-b-2 cursor-pointer ${
+                    activeTab === 'orders'
+                      ? 'font-semibold text-heading border-black dark:border-white'
+                      : 'font-medium text-muted hover:text-heading border-transparent'
+                  }`}
+                >
+                  Orders
+                </button>
+              </div>
+
+              {/* Content Area (flex: 1; min-height: 0; padding 20px) */}
               {activeTab === 'overview' ? (
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
 
                   {/* Stock Alert */}
                   {(selectedProduct.status === 'LOW_STOCK' || selectedProduct.status === 'OUT_OF_STOCK') && (
-                    <div className="bg-danger-light border border-danger-border rounded-button p-4">
+                    <div className="bg-danger-light border border-danger-border rounded-button p-3.5">
                       <div className="flex items-center gap-2 mb-1">
-                        <AlertTriangle size={16} className="text-danger" />
+                        <AlertTriangle size={15} className="text-danger" />
                         <h3 className="text-xs font-bold text-danger-hover uppercase tracking-wide">Stock Alert</h3>
                       </div>
-                      <p className="text-sm text-[#991b1b] ml-6 leading-relaxed">
+                      <p className="text-sm text-[#991b1b] ps-6 leading-relaxed">
                         Current stock ({selectedProduct.stock}) is {selectedProduct.stock === 0 ? 'empty' : `below minimum threshold (${selectedProduct.minThreshold})`}. Action required.
                       </p>
                     </div>
                   )}
 
-                  {/* Form Fields (Read Only styling) */}
-                  <div className="space-y-4">
+                  {/* Unit Price and Location: 2-column grid, gap 12px */}
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-muted mb-1.5">Unit Price</label>
-                      <div className="w-full bg-surface-muted border border-border-default rounded-input px-3 py-2.5 text-sm font-medium text-heading">
+                      <label className="block text-xs font-medium text-muted mb-1">Unit Price</label>
+                      <div className="w-full h-9 bg-surface-muted border border-border-default rounded-input px-3 flex items-center text-sm font-medium text-heading">
                         {formatMoney(selectedProduct.price)}
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-muted mb-1.5">Location</label>
-                      <div className="w-full bg-surface-muted border border-border-default rounded-input px-3 py-2.5 text-sm font-medium text-heading">
+                      <label className="block text-xs font-medium text-muted mb-1">Location</label>
+                      <div
+                        className="w-full h-9 bg-surface-muted border border-border-default rounded-input px-3 flex items-center text-sm font-medium text-heading truncate whitespace-nowrap"
+                        title={selectedProduct.warehouse ? `${selectedProduct.warehouse} - Aisle ${selectedProduct.aisle || 'N/A'}, Bin ${selectedProduct.bin || 'N/A'}` : 'Location Not Set'}
+                      >
                         {selectedProduct.warehouse ? `${selectedProduct.warehouse} - Aisle ${selectedProduct.aisle || 'N/A'}, Bin ${selectedProduct.bin || 'N/A'}` : 'Location Not Set'}
                       </div>
                     </div>
                   </div>
 
-                  {/* Metrics */}
-                  <div className="grid grid-cols-2 gap-4 pt-2">
-                    <div className="border border-border-default rounded-button p-4 bg-surface-raised">
-                      <p className="text-[11px] font-medium text-muted mb-1">Avg. Monthly Usage</p>
-                      <p className="text-lg font-bold text-heading">{selectedProduct.avgMonthlyUsage == null ? '—' : `${selectedProduct.avgMonthlyUsage} Units`}</p>
+                  {/* Stat Cards: 2-column grid, gap 12px, padding 12px, equal heights */}
+                  <div className="grid grid-cols-2 gap-3 items-stretch">
+                    <div className="border border-border-default rounded-card-sm p-3 bg-surface-raised flex flex-col justify-between">
+                      <p className="text-xs font-medium text-muted mb-1">Avg. Monthly Usage</p>
+                      <p className="text-lg font-semibold text-heading leading-tight">
+                        {selectedProduct.avgMonthlyUsage == null ? '—' : `${selectedProduct.avgMonthlyUsage} Units`}
+                      </p>
                     </div>
-                    <div className="border border-border-default rounded-button p-4 bg-surface-raised">
-                      <p className="text-[11px] font-medium text-muted mb-1">Lead Time</p>
-                      <p className="text-lg font-bold text-heading">{selectedProduct.leadTimeDays == null ? '—' : `${selectedProduct.leadTimeDays} Days`}</p>
+                    <div className="border border-border-default rounded-card-sm p-3 bg-surface-raised flex flex-col justify-between">
+                      <p className="text-xs font-medium text-muted mb-1">Lead Time</p>
+                      <p className="text-lg font-semibold text-heading leading-tight">
+                        {selectedProduct.leadTimeDays == null ? '—' : `${selectedProduct.leadTimeDays} Days`}
+                      </p>
                     </div>
                   </div>
                 </div>
               ) : activeTab === 'suppliers' ? (
-                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-bold text-muted uppercase tracking-wider">Product Suppliers</p>
                   </div>
@@ -691,7 +757,7 @@ export default function Inventory() {
                   )}
                 </div>
               ) : activeTab === 'orders' ? (
-                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-bold text-muted uppercase tracking-wider">Purchase Orders</p>
                     <button
@@ -738,8 +804,8 @@ export default function Inventory() {
                                 <td className="px-4 py-3 text-xs text-muted">
                                   {formatDate(po.createdAt)}
                                 </td>
-                                <td className="px-4 py-3 text-xs font-semibold text-heading tabular-nums text-right">
-                                  {po.quantity}
+                                <td className="px-4 py-3 text-xs font-semibold text-heading tabular-nums text-right" title={po.quantity?.toLocaleString()}>
+                                  {formatCompactNumber(po.quantity)}
                                 </td>
                                 <td className="px-4 py-3">
                                   <span
@@ -790,7 +856,7 @@ export default function Inventory() {
                   )}
                 </div>
               ) : (
-                <div className="flex-1 overflow-y-auto p-6">
+                <div className="flex-1 min-h-0 overflow-y-auto p-5">
                   {/* History: real stock movements for this product */}
                   {isMovementsLoading ? (
                     <div className="flex h-full items-center justify-center">
@@ -837,8 +903,8 @@ export default function Inventory() {
                                     {isIn ? 'IN' : 'OUT'}
                                   </span>
                                 </td>
-                                <td className={`px-4 py-3 text-xs font-semibold tabular-nums text-right ${isIn ? 'text-success-text' : 'text-danger'}`}>
-                                  {isIn ? '+' : '−'}{Math.abs(movement.delta)}
+                                <td className={`px-4 py-3 text-xs font-semibold tabular-nums text-right ${isIn ? 'text-success-text' : 'text-danger'}`} title={Math.abs(movement.delta).toLocaleString()}>
+                                  {isIn ? '+' : '−'}{formatCompactNumber(Math.abs(movement.delta))}
                                 </td>
                               </tr>
                             );
@@ -858,22 +924,23 @@ export default function Inventory() {
                 </div>
               )}
 
-              {/* Sticky Footer */}
-              <div className="p-6 border-t border-border-default bg-surface-raised mt-auto">
+              {/* Actions Footer (Fixed at the bottom of the panel, always visible: padding 16px 20px, 1px top border, gap 8px) */}
+              <div className="p-4 px-5 border-t border-border-default bg-surface-raised shrink-0 mt-auto flex flex-col gap-2">
                 {/* Transient confirmation: shows the server's post-movement count until the
                     refetch has synced the list (at which point it equals the displayed stock). */}
                 {freshStock != null && freshStock !== selectedProduct.stock && (
-                  <div className="flex items-center justify-center gap-1.5 mb-3 text-xs font-semibold text-success-text">
+                  <div className="flex items-center justify-center gap-1.5 mb-1 text-xs font-semibold text-success-text">
                     <Check size={14} /> On hand: {freshStock} units
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-3 mb-3">
+                {/* Row 1: Edit and Adjust Stock, a 2-column grid, equal width */}
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => openEditDialog(selectedProduct)}
                     disabled={!canWrite}
                     title={canWrite ? undefined : noRoleTitle}
-                    className="flex items-center justify-center gap-2 border border-border-default bg-surface-raised text-body px-4 py-2.5 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors shadow-card disabled:opacity-60"
+                    className="h-9 flex items-center justify-center gap-2 border border-border-default bg-surface-raised text-body px-3 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors shadow-card disabled:opacity-60 whitespace-nowrap cursor-pointer"
                   >
                     <Pencil size={15} /> Edit
                   </button>
@@ -882,33 +949,39 @@ export default function Inventory() {
                     onClick={openAdjustDialog}
                     disabled={!canWrite || Boolean(selectedProduct.archivedAt)}
                     title={selectedProduct.archivedAt ? 'Restore this product before adjusting stock' : canWrite ? undefined : noRoleTitle}
-                    className="flex items-center justify-center gap-2 bg-primary text-white px-4 py-2.5 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
+                    className="h-9 flex items-center justify-center gap-2 bg-primary text-white px-3 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 whitespace-nowrap cursor-pointer"
                   >
                     <ArrowDownUp size={15} /> Adjust Stock
                   </button>
                 </div>
+                {/* Row 2: Create Purchase Order, full width */}
                 <button
                   type="button"
                   onClick={() => { setPurchaseQuantity('1'); setPurchaseOrderError(''); setPurchaseOrderOpen(true); }}
                   disabled={!canWrite || Boolean(selectedProduct.archivedAt)}
                   title={selectedProduct.archivedAt ? 'Restore this product before creating an order' : canWrite ? undefined : noRoleTitle}
-                  className="w-full flex items-center justify-center gap-2 bg-primary text-white py-3 rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60"
+                  className="w-full h-9 flex items-center justify-center gap-2 bg-primary text-white rounded-input text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 whitespace-nowrap cursor-pointer"
                 >
-                  <ShoppingCart size={16} />
-                  Create Purchase Order
+                  <ShoppingCart size={15} /> Create Purchase Order
                 </button>
-                <button type="button" onClick={() => setArchiveDialogOpen(true)} disabled={!canWrite || archiveMutation.isPending} title={canWrite ? undefined : noRoleTitle} className="mt-3 w-full rounded-input border border-border-default py-2 text-sm font-semibold text-body hover:bg-surface-muted disabled:opacity-60">
+                {/* Row 3: Archive Product, full width */}
+                <button
+                  type="button"
+                  onClick={() => setArchiveDialogOpen(true)}
+                  disabled={!canWrite || archiveMutation.isPending}
+                  title={canWrite ? undefined : noRoleTitle}
+                  className="w-full h-9 rounded-input border border-border-default text-sm font-medium text-body hover:bg-surface-muted transition-colors disabled:opacity-60 whitespace-nowrap cursor-pointer"
+                >
                   {showArchived ? 'Restore Product' : 'Archive Product'}
                 </button>
               </div>
             </>
           ) : (
-            <div className="flex h-full items-center justify-center text-muted">
+            <div className="flex-1 flex items-center justify-center text-sm text-muted p-6">
               Select a product to view details.
             </div>
           )}
-
-        </div>
+        </aside>
 
         {/* ── New / Edit Product dialog ── */}
         <FormDialog
@@ -1012,7 +1085,14 @@ export default function Inventory() {
           {purchaseOrderError && <p role="alert" className="mt-3 text-sm text-danger">{purchaseOrderError}</p>}
         </FormDialog>
         <ConfirmDialog open={archiveDialogOpen} onClose={() => !archiveMutation.isPending && setArchiveDialogOpen(false)} onConfirm={() => archiveMutation.mutate()} title={showArchived ? 'Restore product?' : 'Archive product?'} description={showArchived ? `Restore ${selectedProduct?.name || 'this product'} to the active catalog?` : `Archive ${selectedProduct?.name || 'this product'}? Its stock history and purchase order records will be retained.`} confirmLabel={showArchived ? 'Restore product' : 'Archive product'} busy={archiveMutation.isPending} />
-        {createdOrder && <div role="status" className="fixed bottom-4 right-4 z-40 rounded-button border border-success-border bg-success-light px-4 py-3 text-sm text-success-text shadow-card">Draft purchase order created for {createdOrder.quantity} × {createdOrder.productName}.</div>}
+        {createdOrder && (
+          <div role="status" className="fixed bottom-4 right-4 z-40 flex items-center gap-3 rounded-button border border-success-border bg-success-light px-4 py-3 text-sm text-success-text shadow-card">
+            <span>Draft purchase order created for {createdOrder.quantity} × {createdOrder.productName}.</span>
+            <button type="button" onClick={() => setCreatedOrder(null)} className="cursor-pointer text-success-text hover:opacity-80" aria-label="Dismiss notification">
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
         {/* ── Adjust Stock (movement) dialog ── */}
         <FormDialog

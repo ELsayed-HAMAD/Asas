@@ -21,6 +21,7 @@ import { onboardingApi } from '../../../lib/api/onboarding'
 import { settingsApi } from '../../../lib/api/settings'
 import { queryKeys } from '../../../lib/queryKeys'
 import { useActiveMemberRole, useActiveOrganization } from '../../../lib/authClient'
+import { getMemberRoleName } from '../../../lib/memberRole'
 
 const AVAILABLE_TIMEZONES = typeof Intl.supportedValuesOf === 'function'
   ? Intl.supportedValuesOf('timeZone')
@@ -32,7 +33,7 @@ export default function SettingsGeneral() {
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   const { data: memberRole } = useActiveMemberRole()
-  const isOwner = memberRole?.role === 'OWNER'
+  const isOwner = getMemberRoleName(memberRole) === 'OWNER'
   const { data: activeOrg } = useActiveOrganization()
 
   const { data: settings, isLoading, isError } = useQuery({
@@ -165,10 +166,10 @@ export default function SettingsGeneral() {
   const setField = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }))
 
   return (
-    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
+    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
 
       <TopBarActions>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
             <input
@@ -195,10 +196,10 @@ export default function SettingsGeneral() {
       <SettingsTabs />
 
       {/* ── Main Split View ── */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden">
 
         {/* Left: Settings Content Area */}
-        <div className="flex-1 overflow-y-auto p-8 space-y-6">
+        <div className="flex-1 min-w-0 min-h-[320px] overflow-y-auto p-4 sm:p-8 space-y-6">
 
           <TwoFactorSettings />
 
@@ -351,7 +352,7 @@ export default function SettingsGeneral() {
           <div className="bg-surface-raised border border-border-default rounded-card-sm p-card shadow-card">
             <h2 className="text-lg font-bold text-heading mb-1">Exchange Rates</h2>
             <p className="text-sm text-muted mb-5">Enter how many {settings.currency} one unit of foreign currency is worth. Rates are timestamped and retained for audit; adding a quote does not revalue existing records.</p>
-            <form className="grid grid-cols-5 gap-3 items-end mb-5" onSubmit={(event) => { event.preventDefault(); rateMutation.mutate() }}>
+            <form className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 items-end mb-5" onSubmit={(event) => { event.preventDefault(); rateMutation.mutate() }}>
               <div>
                 <label className="block text-xs font-bold text-heading mb-1.5">Currency</label>
                 <select required value={rateForm.currency || listCurrencies().find(({ code }) => code !== settings.currency)?.code || ''} onChange={(event) => setRateForm((current) => ({ ...current, currency: event.target.value }))} className="w-full border border-border-strong rounded-input px-3 py-2 text-sm bg-surface-raised">
@@ -427,7 +428,7 @@ export default function SettingsGeneral() {
         </div>
 
         {/* Right: Subscription Inspector Panel */}
-        <div className="w-[360px] bg-surface-raised border-l border-border-default flex flex-col flex-shrink-0 shadow-panel z-10">
+        <div className="w-full xl:w-[360px] xl:flex-shrink-0 bg-surface-raised border-t xl:border-t-0 xl:border-l border-border-default flex flex-col max-h-[65vh] xl:max-h-none shadow-panel z-10">
 
           <div className="flex-1 overflow-y-auto p-8">
             <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-6">Subscription Inspector</h3>

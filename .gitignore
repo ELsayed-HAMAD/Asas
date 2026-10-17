@@ -14,12 +14,10 @@ lerna-debug.log*
 # =========================
 node_modules/
 jspm_packages/
-.npm/
-.yarn/
-# Python dependencies
-venv/
-env/
-.venv/
+# Monorepo strictly uses pnpm (pnpm-lock.yaml)
+package-lock.json
+yarn.lock
+
 
 # =========================
 # Environment Variables & Secrets
@@ -168,6 +166,7 @@ $RECYCLE.BIN/
 # =========================
 # Local audit/planning notes are intentionally kept out of the public source tree.
 AUDIT.md
+UI_UX_REVIEW.md
 filter.py
 rebase.ps1
 filter-msg.*

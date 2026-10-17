@@ -16,13 +16,14 @@ import FormDialog from '../../../components/common/FormDialog'
 import ConfirmDialog from '../../../components/common/ConfirmDialog'
 import QueryState from '../../../components/common/QueryState'
 import { authClient, useSession, useActiveMemberRole } from '../../../lib/authClient'
+import { getMemberRoleName } from '../../../lib/memberRole'
 import { queryKeys } from '../../../lib/queryKeys'
 
 export default function MembersRoles() {
   const queryClient = useQueryClient()
   const { data: session } = useSession()
   const { data: memberRole } = useActiveMemberRole()
-  const currentUserRole = memberRole?.role || 'MEMBER'
+  const currentUserRole = getMemberRoleName(memberRole) || 'MEMBER'
   const isOwner = currentUserRole === 'OWNER'
   const isAdmin = currentUserRole === 'ADMIN' || isOwner
 
@@ -143,9 +144,9 @@ export default function MembersRoles() {
   })
 
   return (
-    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-[1000px]">
+    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
       <TopBarActions>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption" />
             <input
@@ -176,9 +177,9 @@ export default function MembersRoles() {
 
       <SettingsTabs />
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden">
         {/* Left: Members List & Pending Invites */}
-        <div className="flex-1 overflow-y-auto p-8 space-y-8">
+        <div className="flex-1 min-w-0 min-h-[320px] overflow-y-auto p-4 sm:p-8 space-y-6 sm:space-y-8">
           <QueryState
             isLoading={isLoading}
             isError={isError}
@@ -371,7 +372,7 @@ export default function MembersRoles() {
         </div>
 
         {/* Right: Roles Overview Reference */}
-        <div className="w-[340px] bg-surface-muted border-l border-border-default p-8 flex flex-col flex-shrink-0 space-y-6">
+        <div className="w-full xl:w-[340px] xl:flex-shrink-0 bg-surface-muted border-t xl:border-t-0 xl:border-l border-border-default p-8 flex flex-col space-y-6">
           <div>
             <h3 className="text-[10px] font-bold text-caption uppercase tracking-widest mb-4">
               Roles & Permissions

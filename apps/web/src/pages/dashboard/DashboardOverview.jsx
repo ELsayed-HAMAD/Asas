@@ -117,40 +117,41 @@ export default function DashboardOverview() {
   const sprintItems = sprints.data?.items ?? []
   const activeSprintCount = countActiveSprints(sprintItems)
   const completedSprintCount = sprintItems.filter(s => s.status === 'COMPLETED').length
-  const sprintChangeText = activeSprintCount > 0
-    ? `${activeSprintCount} active · ${completedSprintCount} completed across portfolio`
-    : completedSprintCount > 0
-    ? `No active sprint · ${completedSprintCount} completed`
-    : 'No sprints planned'
 
   const stats = [
     {
       label: 'Headcount',
       value: headcount.toString(),
-      change: `${hiredThisMonth} hired MTD (${hiresDelta > 0 ? '+' : ''}${hiresDelta} vs same period last month)${onLeaveCount > 0 ? ` · ${onLeaveCount} on leave` : ''}`,
-      trend: 'neutral',
+      change: `${hiredThisMonth} hired MTD`,
+      subtitle: `${hiresDelta > 0 ? `+${hiresDelta}` : hiresDelta < 0 ? `${hiresDelta}` : '0'} vs last month${onLeaveCount > 0 ? ` · ${onLeaveCount} on leave` : ''}`,
+      trend: hiresDelta > 0 ? 'up' : hiresDelta < 0 ? 'down' : 'neutral',
       icon: Users,
     },
     {
       label: 'Open Pipeline Value',
       value: crm.isLoading ? '…' : crm.isError ? '—' : formatMoney(openTotal, { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-      change: openCountDelta == null
-        ? `${openCount} open deals · no historical comparison yet`
-        : `${openCount} open deals · ${openCountDelta > 0 ? '+' : ''}${openCountDelta} vs prior-month snapshot${openValueDelta == null ? '' : ` · ${formatMoney(openValueDelta)} value change`}`,
-      trend: 'neutral',
+      change: `${openCount} open deals`,
+      subtitle: openCountDelta == null
+        ? 'No historical comparison yet'
+        : `${openCountDelta > 0 ? `+${openCountDelta}` : `${openCountDelta}`} deals vs prior month${openValueDelta == null ? '' : ` · ${formatMoney(openValueDelta)}`}`,
+      trend: openCountDelta > 0 ? 'up' : openCountDelta < 0 ? 'down' : 'neutral',
       icon: TrendingUp,
     },
     {
       label: 'Payables Outstanding',
       value: finance.isLoading ? '…' : finance.isError ? '—' : formatMoney(payableOutstanding, { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
       change: payablesChangeText,
+      subtitle: payables.data?.summary?.pendingApprovalCount > 0
+        ? `${payables.data.summary.pendingApprovalCount} pending approval`
+        : 'Across all vendor accounts',
       trend: 'neutral',
       icon: CreditCard,
     },
     {
       label: 'Active Sprints',
       value: sprints.isLoading ? '…' : sprints.isError ? '—' : activeSprintCount.toString(),
-      change: sprintChangeText,
+      change: activeSprintCount > 0 ? `${activeSprintCount} active` : 'No active sprint',
+      subtitle: `${completedSprintCount} completed across portfolio`,
       trend: 'neutral',
       icon: Rocket,
     },
@@ -242,64 +243,87 @@ export default function DashboardOverview() {
       </TopBarActions>
 
       {/* ── KPI Grid ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-grid-lg">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-5">
         {stats.map((stat) => (
-          <StatCard key={stat.label} {...stat} />
+          <div key={stat.label} className="lg:col-span-3">
+            <StatCard {...stat} />
+          </div>
         ))}
       </div>
 
       {/* ── Main Bento Grid ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-grid-lg">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
-        {/* Left Column (Charts & Sprints) - Spans 2 cols */}
-        <div className="lg:col-span-2 space-y-4 md:space-y-section">
+        {/* Left Column (Charts & Sprints) - Spans 9 cols, aligning right edge with 3rd KPI card */}
+        <div className="lg:col-span-9 space-y-5">
 
           {/* Revenue Chart Box */}
-          <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card p-4">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-lg font-semibold text-heading">Cash Flow Analysis</h2>
-                <p className="text-xs text-muted mt-1">Calendar year {selectedYear}</p>
+          <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card p-4 sm:p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <TrendingUp size={16} className="text-accent" />
+                <div>
+                  <h2 className="text-base font-semibold text-heading">Cash Flow Analysis</h2>
+                  <p className="text-xs text-muted mt-0.5">Calendar year {selectedYear}</p>
+                </div>
               </div>
-              <select aria-label="Cash flow calendar year" value={selectedYear} onChange={event => setSelectedYear(event.target.value)} className="bg-surface-muted border border-border-default text-xs font-medium text-body rounded-input px-3 py-1.5 focus:outline-none">
+              <select
+                aria-label="Cash flow calendar year"
+                value={selectedYear}
+                onChange={event => setSelectedYear(event.target.value)}
+                className="bg-surface-muted border border-border-default text-xs font-medium text-body rounded-input py-1 px-2.5 focus:outline-none"
+              >
                 {availableYears.map(year => <option key={year} value={year}>Year {year}</option>)}
               </select>
             </div>
 
             {/* Recharts Area Chart */}
-            <div className="h-64 w-full">
-              {finance.isLoading || finance.isError ? <div className="flex h-full items-center justify-center text-sm text-muted">{finance.isLoading ? 'Loading cash flow…' : 'Cash flow could not be loaded.'}</div> : <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={cashFlowData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="cashFlowGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-chart-primary)" stopOpacity={0.15} />
-                      <stop offset="95%" stopColor="var(--color-chart-primary)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-caption)', fontWeight: 500 }} dy={8} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-caption)', fontWeight: 500 }} tickFormatter={(v) => formatCompactMoney(v, finance.data?.cashFlow?.[0]?.net?.currency || 'USD')} dx={-4} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: 'var(--radius-button)', border: '1px solid var(--color-border-default)', boxShadow: 'var(--shadow-card-hover)', fontSize: 13 }}
-                    formatter={(value) => [formatCompactMoney(value, finance.data?.cashFlow?.[0]?.net?.currency || 'USD'), 'Net Cash Flow']}
-                    labelStyle={{ fontWeight: 600, color: 'var(--color-heading)' }}
-                  />
-                  <Area type="monotone" dataKey="value" stroke="var(--color-chart-primary)" strokeWidth={3} fill="url(#cashFlowGrad)" dot={false} activeDot={{ r: 5, fill: 'var(--color-chart-primary)', strokeWidth: 2, stroke: '#fff' }} animationDuration={1200} />
-                </AreaChart>
-              </ResponsiveContainer>}
+            <div className={cashFlowData.length === 0 || finance.isLoading || finance.isError ? "h-56 w-full" : "h-64 sm:h-72 w-full"}>
+              {finance.isLoading || finance.isError ? (
+                <div className="flex h-full items-center justify-center text-sm text-muted">
+                  {finance.isLoading ? 'Loading cash flow…' : 'Cash flow could not be loaded.'}
+                </div>
+              ) : cashFlowData.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-sm text-muted">
+                  No cash flow data is available for {selectedYear}.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={cashFlowData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="cashFlowGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--color-chart-primary)" stopOpacity={0.15} />
+                        <stop offset="95%" stopColor="var(--color-chart-primary)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
+                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-caption)', fontWeight: 500 }} dy={8} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-caption)', fontWeight: 500 }} tickFormatter={(v) => formatCompactMoney(v, finance.data?.cashFlow?.[0]?.net?.currency || 'USD')} dx={-4} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: 'var(--radius-button)', border: '1px solid var(--color-border-default)', boxShadow: 'var(--shadow-card-hover)', fontSize: 13 }}
+                      formatter={(value) => [formatCompactMoney(value, finance.data?.cashFlow?.[0]?.net?.currency || 'USD'), 'Net Cash Flow']}
+                      labelStyle={{ fontWeight: 600, color: 'var(--color-heading)' }}
+                    />
+                    <Area type="monotone" dataKey="value" stroke="var(--color-chart-primary)" strokeWidth={3} fill="url(#cashFlowGrad)" dot={false} activeDot={{ r: 5, fill: 'var(--color-chart-primary)', strokeWidth: 2, stroke: '#fff' }} animationDuration={1200} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
 
           {/* Active Sprints Box */}
-          <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card p-4">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-heading">Active Sprints</h2>
+          <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card p-4 sm:p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Rocket size={16} className="text-accent" />
+                <h2 className="text-base font-semibold text-heading">Active Sprints</h2>
+              </div>
               <Link to="/dashboard/projects" className="text-xs font-medium text-accent hover:text-accent-hover">
                 View Board &rarr;
               </Link>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {sprints.isLoading ? (
                 <p className="text-sm text-muted">Loading sprints…</p>
               ) : sprints.isError ? (
@@ -307,32 +331,51 @@ export default function DashboardOverview() {
               ) : sprintItems.filter(sprint => sprint.status === 'ACTIVE').length === 0 ? (
                 <p className="text-sm text-muted">No active sprints found.</p>
               ) : (
-                sprintItems.filter(sprint => sprint.status === 'ACTIVE').map((sprint, i) => (
-                  <Link to="/dashboard/projects" key={sprint.id} className={`p-4 rounded-card-sm border border-border-subtle flex items-center justify-between gap-4 hover:border-border-default transition-colors cursor-pointer${i % 2 === 0 ? ' bg-surface-muted' : ''}`}>
-                    <div className="flex items-center gap-3">
-                      <div className={`w-2 h-2 rounded-full ${sprint.completionPct === 100 ? 'bg-success-dot' : 'bg-info-dot'}`} />
-                      <div>
-                        <p className="text-sm font-semibold text-heading">{sprint.name}</p>
-                        <p className="text-xs text-muted mt-0.5">{sprintSubtitle(sprint)}</p>
+                sprintItems
+                  .filter(sprint => sprint.status === 'ACTIVE')
+                  .slice()
+                  .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' }))
+                  .map((sprint) => (
+                    <Link
+                      to="/dashboard/projects"
+                      key={sprint.id}
+                      className="py-2.5 px-4 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted/60 hover:border-border-default transition-all flex items-center justify-between gap-4 cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${sprint.completionPct === 100 ? 'bg-success-dot' : 'bg-info-dot'}`} />
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-heading group-hover:text-accent transition-colors truncate">{sprint.name}</p>
+                          <p className="text-xs text-muted mt-0.5 truncate">{sprintSubtitle(sprint)}</p>
+                        </div>
                       </div>
-                    </div>
-                  </Link>
-                ))
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="hidden sm:block w-36 sm:w-48 md:w-52 bg-surface-strong rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="bg-accent h-full rounded-full transition-all duration-300"
+                            style={{ width: `${Math.min(100, Math.max(0, sprint.completionPct))}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-semibold text-heading min-w-[36px] text-right">
+                          {sprint.completionPct}%
+                        </span>
+                      </div>
+                    </Link>
+                  ))
               )}
             </div>
           </div>
 
         </div>
 
-        {/* Right Column (Actions & Activity) - Spans 1 col */}
-        <div className="space-y-4 md:space-y-section">
+        {/* Right Column (Actions & Activity) - Spans 3 cols */}
+        <div className="lg:col-span-3 space-y-5 flex flex-col">
 
           {/* Requires Attention */}
-          <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card p-4">
-            <div className="flex items-center justify-between mb-5">
+          <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card p-4 sm:p-5">
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <AlertCircle size={16} className="text-warning" />
-                <h2 className="text-lg font-semibold text-heading">Requires Attention</h2>
+                <h2 className="text-base font-semibold text-heading">Requires Attention</h2>
               </div>
             </div>
 
@@ -341,21 +384,23 @@ export default function DashboardOverview() {
             ) : [receivables, products, payroll, attendance].some(query => query.isError) && attentionItems.length === 0 ? (
               <p className="text-sm text-muted">Attention indicators could not be loaded.</p>
             ) : attentionItems.length === 0 ? (
-              <p className="text-sm text-muted">Nothing needs attention right now.</p>
+              <div className="py-6 text-center">
+                <p className="text-sm text-muted">Nothing needs attention right now.</p>
+              </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3.5">
                 {[receivables, products, payroll, attendance].some(query => query.isError) && <p role="status" className="text-xs text-warning">Some attention indicators could not be loaded.</p>}
                 {attentionItems.map((item) => (
-                  <div key={item.id} className="group flex items-start justify-between gap-3 border-b border-border-faint pb-4 last:border-0 last:pb-0">
-                    <div>
-                      <p className="text-sm font-semibold text-heading group-hover:text-accent transition-colors cursor-pointer">
+                  <div key={item.id} className="group flex items-start justify-between gap-3 border-b border-border-faint pb-3.5 last:border-0 last:pb-0">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-heading group-hover:text-accent transition-colors cursor-pointer truncate">
                         {item.title}
                       </p>
                       <p className="text-[11px] text-muted mt-0.5 leading-tight">
                         {item.subtitle}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <p className="text-xs font-semibold text-heading">{item.amount}</p>
                       <Link to={item.to} className="inline-block text-[10px] font-medium text-accent hover:text-accent-hover mt-1">
                         Action
@@ -368,35 +413,39 @@ export default function DashboardOverview() {
           </div>
 
           {/* Activity Feed */}
-          <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card p-4">
-            <div className="flex items-center gap-2 mb-6">
-              <Clock size={16} className="text-caption" />
-              <h2 className="text-lg font-semibold text-heading">Activity Feed</h2>
+          <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card p-4 sm:p-5 flex-1 flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Clock size={16} className="text-caption" />
+                <h2 className="text-base font-semibold text-heading">Activity Feed</h2>
+              </div>
             </div>
 
             {auditLogs.isLoading ? (
-              <div className="space-y-5">
+              <div className="space-y-4 flex-1">
                 <p className="text-sm text-muted">Loading activity...</p>
               </div>
             ) : auditLogs.isError ? (
-              <div className="space-y-5">
+              <div className="space-y-4 flex-1">
                 <p className="text-sm text-warning">Could not load activity.</p>
               </div>
             ) : auditLogs.data?.items?.length > 0 ? (
-              <div className="space-y-5">
+              <div className="space-y-4 flex-1">
                 {auditLogs.data.items.map((log) => (
                   <div key={log.id} className="relative pl-4 border-l-2 border-border-faint">
                     <div className="absolute w-2 h-2 rounded-full bg-accent -left-[5px] top-1.5" />
-                    <p className="text-sm text-heading">{log.action}</p>
-                    <p className="text-[11px] text-muted mt-1">
+                    <p className="text-sm text-heading font-medium">{log.action}</p>
+                    <p className="text-[11px] text-muted mt-0.5">
                       {log.actorName} • {new Date(log.createdAt).toLocaleDateString()}
                     </p>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="space-y-5">
-                <p className="text-sm text-muted">No recent activity</p>
+              <div className="py-8 flex-1 flex flex-col items-center justify-center text-center">
+                <Clock size={24} className="text-muted/40 mb-2" />
+                <p className="text-sm font-medium text-muted">No recent activity</p>
+                <p className="text-xs text-caption mt-0.5">New audits will display here in real time</p>
               </div>
             )}
           </div>
