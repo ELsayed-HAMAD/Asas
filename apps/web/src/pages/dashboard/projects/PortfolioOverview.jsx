@@ -20,11 +20,10 @@ import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 const getBadgeStyle = (status) => {
-  if (status === 'ACTIVE' || status === 'ON_TRACK') return "bg-success-light text-success-text border border-success-border";
-  if (status === 'COMPLETED') return "bg-green-100 text-green-700 border border-green-200";
-  if (status === 'PLANNING') return "bg-blue-100 text-blue-700 border border-blue-200";
-  if (status === 'AT_RISK') return "bg-yellow-100 text-yellow-700 border border-yellow-200";
-  if (status === 'DELAYED' || status === 'CANCELLED') return "bg-danger-light text-danger border border-danger-border";
+  if (status === 'ACTIVE' || status === 'ON_TRACK' || status === 'COMPLETED') return "bg-success-light text-success-text border border-success-border";
+  if (status === 'PLANNING') return "bg-info-light text-info border border-info-border";
+  if (status === 'AT_RISK') return "bg-warning-light text-warning-text border border-warning/30";
+  if (status === 'DELAYED' || status === 'CANCELLED') return "bg-danger-light text-danger-text border border-danger-border";
   return "bg-surface-strong text-body border border-border-default";
 };
 

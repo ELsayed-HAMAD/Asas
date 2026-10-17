@@ -193,11 +193,11 @@ export default function ActiveSprints() {
           {isDone ? (
             <CheckSquare size={16} className="text-success shrink-0" />
           ) : issue.status === 'IN_PROGRESS' ? (
-            <HalfCircleIcon className="w-4 h-4 text-[#3b82f6] shrink-0" />
+            <HalfCircleIcon className="w-4 h-4 text-info shrink-0" />
           ) : issue.status === 'IN_REVIEW' ? (
-            <Eye size={16} className="text-[#eab308] shrink-0" />
+            <Eye size={16} className="text-warning shrink-0" />
           ) : (
-            <Circle size={16} className="text-faint shrink-0" />
+            <Circle size={16} className="text-caption shrink-0" />
           )}
           <span
             className="text-xs font-medium text-muted shrink-0 tabular-nums"
@@ -372,7 +372,7 @@ export default function ActiveSprints() {
                     )}
                   </div>
                 ) : (
-                  <div className="p-4 bg-surface-raised border-0 rounded-[14px] shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+                  <section className="p-4 bg-surface-raised border-0 rounded-[14px] shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
                     <div className="flex items-start justify-between gap-4 mb-2">
                       <div>
                         <h2 className="text-sm font-medium text-heading">Sprint burndown</h2>
@@ -392,7 +392,7 @@ export default function ActiveSprints() {
                         <Line type="linear" dataKey="ideal" name="Ideal" stroke="var(--color-caption)" strokeDasharray="4 4" dot={false} />
                       </LineChart>
                     </ResponsiveContainer>
-                  </div>
+                  </section>
                 )}
               </div>
 
@@ -452,7 +452,7 @@ export default function ActiveSprints() {
                   <GroupedList
                     title="Medium"
                     count={mediumIssues.length}
-                    dotColor="bg-[#eab308]"
+                    dotColor="bg-warning"
                     isEmpty={mediumIssues.length === 0}
                     emptyMessage="No medium priority issues."
                   >
@@ -462,7 +462,7 @@ export default function ActiveSprints() {
                   <GroupedList
                     title="Low"
                     count={lowIssues.length}
-                    dotColor="bg-gray-400"
+                    dotColor="bg-caption"
                     isEmpty={lowIssues.length === 0}
                     emptyMessage="No low priority issues."
                   >
@@ -474,7 +474,7 @@ export default function ActiveSprints() {
                   <GroupedList
                     title="Todo"
                     count={todoIssues.length}
-                    dotColor="bg-gray-400"
+                    dotColor="bg-caption"
                     isEmpty={todoIssues.length === 0}
                     emptyMessage="No issues in todo."
                   >
@@ -484,7 +484,7 @@ export default function ActiveSprints() {
                   <GroupedList
                     title="In Progress"
                     count={inProgressIssues.length}
-                    dotColor="bg-[#3b82f6]"
+                    dotColor="bg-info"
                     isEmpty={inProgressIssues.length === 0}
                     emptyMessage="No issues in progress."
                   >
@@ -494,7 +494,7 @@ export default function ActiveSprints() {
                   <GroupedList
                     title="In Review"
                     count={inReviewIssues.length}
-                    dotColor="bg-[#eab308]"
+                    dotColor="bg-warning"
                     isEmpty={inReviewIssues.length === 0}
                     emptyMessage="No issues in review."
                   >
@@ -543,22 +543,45 @@ export default function ActiveSprints() {
 
                       {/* Status & Priority Tags */}
                       <div className="flex items-center gap-2">
-                        <label className="inline-flex items-center gap-1.5 bg-[#eff6ff] text-[#3b82f6] px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer">
-                          <HalfCircleIcon className="w-3.5 h-3.5" />
-                          <select
-                            value={selectedIssue.status}
-                            disabled={issueMutation.isPending}
-                            onChange={event => issueMutation.mutate(event.target.value)}
-                            className="bg-transparent uppercase outline-none cursor-pointer font-medium text-xs"
-                          >
-                            <option value="TODO">To Do</option>
-                            <option value="IN_PROGRESS">In Progress</option>
-                            <option value="IN_REVIEW">In Review</option>
-                            <option value="DONE">Done</option>
-                          </select>
-                        </label>
+                        {(() => {
+                          const statusConfig = {
+                            DONE: {
+                              bg: 'bg-success-light text-success-text',
+                              icon: <CheckSquare size={14} className="text-success shrink-0" />,
+                            },
+                            IN_PROGRESS: {
+                              bg: 'bg-info-light text-info',
+                              icon: <HalfCircleIcon className="w-3.5 h-3.5 text-info shrink-0" />,
+                            },
+                            IN_REVIEW: {
+                              bg: 'bg-warning-light text-warning-text',
+                              icon: <Eye size={14} className="text-warning shrink-0" />,
+                            },
+                            TODO: {
+                              bg: 'bg-surface-active text-body',
+                              icon: <Circle size={14} className="text-caption shrink-0" />,
+                            },
+                          };
+                          const currentConfig = statusConfig[selectedIssue.status] || statusConfig.TODO;
+                          return (
+                            <label className={`inline-flex items-center gap-1.5 ${currentConfig.bg} px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer`}>
+                              {currentConfig.icon}
+                              <select
+                                value={selectedIssue.status}
+                                disabled={issueMutation.isPending}
+                                onChange={event => issueMutation.mutate(event.target.value)}
+                                className="bg-transparent uppercase outline-none cursor-pointer font-medium text-xs"
+                              >
+                                <option value="TODO" className="bg-surface-raised text-heading">To Do</option>
+                                <option value="IN_PROGRESS" className="bg-surface-raised text-heading">In Progress</option>
+                                <option value="IN_REVIEW" className="bg-surface-raised text-heading">In Review</option>
+                                <option value="DONE" className="bg-surface-raised text-heading">Done</option>
+                              </select>
+                            </label>
+                          );
+                        })()}
                         {selectedIssue.priority === 'HIGH' || selectedIssue.priority === 'URGENT' ? (
-                          <span className="inline-flex items-center gap-1 bg-danger-light text-danger px-2.5 py-1 rounded-full text-xs font-medium">
+                          <span className="inline-flex items-center gap-1 bg-danger-light text-danger-text px-2.5 py-1 rounded-full text-xs font-medium">
                             <ChevronsUp size={14} strokeWidth={2.5} /> High Priority
                           </span>
                         ) : null}
@@ -619,7 +642,7 @@ export default function ActiveSprints() {
                           <button
                             type="submit"
                             disabled={!newChecklistText.trim() || createChecklistMutation.isPending}
-                            className="px-4 h-10 bg-accent text-white rounded-[10px] text-xs font-medium hover:bg-accent/90 disabled:opacity-50 cursor-pointer shrink-0 transition-colors"
+                            className="px-4 h-10 bg-accent text-white rounded-[10px] text-xs font-medium hover:bg-accent-hover disabled:opacity-50 cursor-pointer shrink-0 transition-colors"
                           >
                             Add
                           </button>
