@@ -103,25 +103,9 @@ export default function PortfolioOverview() {
     },
   })
 
-  if (isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center bg-surface">
-        <Loader2 className="animate-spin text-muted" size={24} />
-      </div>
-    );
-  }
-
-  if (isError || !responseData) {
-    return (
-      <div className="flex h-full items-center justify-center bg-surface text-danger">
-        Failed to load portfolio overview.
-      </div>
-    );
-  }
-
-  const summary = responseData.summary;
+  const summary = responseData?.summary;
   // Utilization rows use `projectId`; normalize to `id` so the rest of the (old) page body is unchanged.
-  const projects = (responseData.items || []).map(r => ({ ...r, id: r.projectId }));
+  const projects = (responseData?.items || []).map(r => ({ ...r, id: r.projectId }));
   const sprints = sprintsData?.items || [];
 
   const visibleProjects = projects.filter(p => {
@@ -138,6 +122,23 @@ export default function PortfolioOverview() {
       setSelectedId(null);
     }
   }, [visibleProjects, selectedId]);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-surface">
+        <Loader2 className="animate-spin text-muted" size={24} />
+      </div>
+    );
+  }
+
+  if (isError || !responseData) {
+    return (
+      <div className="flex h-full items-center justify-center bg-surface text-danger">
+        Failed to load portfolio overview.
+      </div>
+    );
+  }
+
 
 
   const selectedProject = projects.find(p => p.id === selectedId);

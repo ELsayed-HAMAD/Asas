@@ -122,6 +122,21 @@ export default function ActiveSprints() {
   });
 
 
+  const allIssues = issuesData?.items || [];
+  const issues = search.trim()
+    ? allIssues.filter(i => (i.title || '').toLowerCase().includes(search.toLowerCase()) || (i.key || '').toLowerCase().includes(search.toLowerCase()))
+    : allIssues;
+
+  // Auto-select first issue if none selected
+  useEffect(() => {
+    if (!selectedId && issues.length > 0) {
+      const firstActive = issues.find(i => i.status !== 'DONE');
+      setSelectedId(firstActive ? firstActive.id : issues[0].id);
+    } else if (issues.length === 0 && selectedId !== null) {
+      setSelectedId(null);
+    }
+  }, [issues, selectedId]);
+
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised">
@@ -138,11 +153,6 @@ export default function ActiveSprints() {
     );
   }
 
-  const allIssues = issuesData?.items || [];
-  const issues = search.trim()
-    ? allIssues.filter(i => (i.title || '').toLowerCase().includes(search.toLowerCase()) || (i.key || '').toLowerCase().includes(search.toLowerCase()))
-    : allIssues;
-
   const todoIssues = issues.filter(i => i.status === 'TODO');
   const inProgressIssues = issues.filter(i => i.status === 'IN_PROGRESS');
   const inReviewIssues = issues.filter(i => i.status === 'IN_REVIEW');
@@ -154,15 +164,6 @@ export default function ActiveSprints() {
 
   const dynamicCompletionPct = issues.length > 0 ? Math.round((doneIssues.length / issues.length) * 100) : 0;
 
-  // Auto-select first issue if none selected
-  useEffect(() => {
-    if (!selectedId && issues.length > 0) {
-      const firstActive = issues.find(i => i.status !== 'DONE');
-      setSelectedId(firstActive ? firstActive.id : issues[0].id);
-    } else if (issues.length === 0 && selectedId !== null) {
-      setSelectedId(null);
-    }
-  }, [issues, selectedId]);
 
 
   const selectedIssue = issues.find(i => i.id === selectedId);
