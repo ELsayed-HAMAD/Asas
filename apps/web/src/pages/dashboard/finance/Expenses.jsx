@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Search,
   ChevronDown,
+  Check,
   AlertTriangle,
   Sparkles,
   CheckCircle2,
@@ -44,6 +45,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../../components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '../../../components/ui/dropdown-menu';
 
 const metricFontSize = (money) => {
   const label = formatMoney(money)
@@ -65,9 +72,8 @@ export default function Expenses() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [createOpen, setCreateOpen] = useState(false);
   const [employeeSearchInput, setEmployeeSearchInput] = useState('')
-  const employeeSearch = useDebouncedValue(employeeSearchInput)
-  const [employeePage, setEmployeePage] = useState(1)
   const [selectedEmployeeName, setSelectedEmployeeName] = useState('')
+  const [employeeDropdownOpen, setEmployeeDropdownOpen] = useState(false)
   const [createForm, setCreateForm] = useState({
     name: '',
     category: 'OFFICE',
@@ -89,17 +95,23 @@ export default function Expenses() {
   }, [searchParams, setSearchParams]);
 
   const { data: employeesData } = useQuery({
-    queryKey: queryKeys.hr.employees.list({ page: employeePage, limit: 25, search: employeeSearch || undefined }),
-    queryFn: () => hrApi.listEmployees({ page: employeePage, limit: 25, search: employeeSearch || undefined }),
+    queryKey: queryKeys.hr.employees.list({ limit: 100 }),
+    queryFn: () => hrApi.listEmployees({ limit: 100 }),
     enabled: isAdmin && createOpen,
     placeholderData: keepPreviousData,
   });
-  useEffect(() => {
-    const pages = employeesData?.pagination?.pages
-    if (pages === undefined) return
-    if (pages === 0 && employeePage !== 1) setEmployeePage(1)
-    else if (pages > 0 && employeePage > pages) setEmployeePage(pages)
-  }, [employeesData?.pagination?.pages, employeePage])
+
+  const allEmployees = employeesData?.items ?? []
+  const filteredEmployees = allEmployees.filter(emp => {
+    if (!employeeSearchInput.trim()) return true
+    const q = employeeSearchInput.toLowerCase().trim()
+    return (
+      emp.name?.toLowerCase().includes(q) ||
+      emp.title?.toLowerCase().includes(q) ||
+      emp.email?.toLowerCase().includes(q)
+    )
+  })
+  const selectedEmployee = allEmployees.find(emp => emp.id === createForm.employeeId)
 
   const createExpenseMutation = useMutation({
     mutationFn: () => {
@@ -131,7 +143,7 @@ export default function Expenses() {
       });
       setSelectedEmployeeName('')
       setEmployeeSearchInput('')
-      setEmployeePage(1)
+      setEmployeeDropdownOpen(false)
       setCreateError('');
     },
     onError: (err) => {
@@ -760,46 +772,92 @@ export default function Expenses() {
             {isAdmin && (
               <div>
                 <label className="block text-xs font-bold text-heading mb-1.5">Employee (Optional)</label>
-                <Input
-                  type="search"
-                  aria-label="Search employees"
-                  placeholder="Search by name, title, or email"
-                  value={employeeSearchInput}
-                  onChange={event => { setEmployeeSearchInput(event.target.value); setEmployeePage(1) }}
-                  className="mb-2 w-full text-sm"
-                />
-                <Select
-                  value={createForm.employeeId || '__none__'}
-                  onValueChange={(val) => {
-                    const nextId = val === '__none__' ? '' : val
-                    const employee = (employeesData?.items ?? []).find(item => item.id === nextId)
-                    setCreateForm(current => ({ ...current, employeeId: nextId }))
-                    setSelectedEmployeeName(employee?.name ?? '')
-                  }}
-                >
-                  <SelectTrigger aria-label="Expense employee" className="w-full bg-surface-raised">
-                    <SelectValue placeholder="Select employee..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">None (unassigned)</SelectItem>
-                    {createForm.employeeId && !(employeesData?.items ?? []).some(employee => employee.id === createForm.employeeId) && (
-                      <SelectItem value={createForm.employeeId}>{selectedEmployeeName || 'Selected employee'}</SelectItem>
-                    )}
-                    {(employeesData?.items ?? []).map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id}>
-                        {emp.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {employeesData?.pagination && <div className="mt-2 flex items-center justify-between text-[11px] text-muted">
-                  <span>Showing {employeesData.pagination.total === 0 ? 0 : (employeePage - 1) * employeesData.pagination.limit + 1}–{Math.min(employeePage * employeesData.pagination.limit, employeesData.pagination.total)} of {employeesData.pagination.total}</span>
-                  <div className="flex items-center gap-2">
-                    <Button type="button" variant="outline" size="sm" disabled={employeePage <= 1} onClick={() => setEmployeePage(current => current - 1)} className="h-6 px-2 text-xs">Previous</Button>
-                    <span>Page {employeesData.pagination.pages === 0 ? 0 : employeePage} of {employeesData.pagination.pages}</span>
-                    <Button type="button" variant="outline" size="sm" disabled={employeePage >= employeesData.pagination.pages} onClick={() => setEmployeePage(current => current + 1)} className="h-6 px-2 text-xs">Next</Button>
-                  </div>
-                </div>}
+                <DropdownMenu open={employeeDropdownOpen} onOpenChange={setEmployeeDropdownOpen}>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Expense employee"
+                      className="flex h-9 w-full items-center justify-between rounded-input border border-border-default bg-surface-raised px-3 py-2 text-sm text-heading shadow-card ring-offset-background placeholder:text-caption focus:outline-none focus:ring-2 focus:ring-accent transition-colors hover:bg-surface-muted/50 text-left cursor-pointer"
+                    >
+                      <span className="truncate flex items-center gap-2 min-w-0">
+                        {selectedEmployee ? (
+                          <>
+                            <span className="w-5 h-5 rounded-full bg-accent/15 text-accent flex items-center justify-center text-[10px] font-bold shrink-0">
+                              {selectedEmployee.name.charAt(0).toUpperCase()}
+                            </span>
+                            <span className="font-medium truncate">{selectedEmployee.name}</span>
+                            {selectedEmployee.title && (
+                              <span className="text-caption text-xs truncate">· {selectedEmployee.title}</span>
+                            )}
+                          </>
+                        ) : selectedEmployeeName ? (
+                          <span className="font-medium truncate">{selectedEmployeeName}</span>
+                        ) : (
+                          <span className="text-muted">None (unassigned)</span>
+                        )}
+                      </span>
+                      <ChevronDown className="h-4 w-4 text-caption shrink-0 ml-2" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    className="z-[60] w-[280px] p-2 bg-surface-raised border border-border-default shadow-elevated rounded-card-sm"
+                  >
+                    <div className="relative mb-2 px-1">
+                      <Search className="absolute left-3.5 top-2.5 h-3.5 w-3.5 text-muted pointer-events-none" />
+                      <input
+                        type="search"
+                        placeholder="Search employee..."
+                        value={employeeSearchInput}
+                        onChange={(e) => setEmployeeSearchInput(e.target.value)}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-surface-muted rounded-input border border-border-subtle focus:outline-none focus:ring-1 focus:ring-accent text-heading placeholder:text-muted"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="max-h-52 overflow-y-auto space-y-0.5 no-scrollbar">
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setCreateForm(current => ({ ...current, employeeId: '' }))
+                          setSelectedEmployeeName('')
+                          setEmployeeSearchInput('')
+                        }}
+                        className={`justify-between text-xs ${!createForm.employeeId ? 'bg-accent/10 text-accent font-semibold' : ''}`}
+                      >
+                        <span className="text-muted italic">None (unassigned)</span>
+                        {!createForm.employeeId && <Check className="h-3.5 w-3.5 text-accent shrink-0 ml-2" />}
+                      </DropdownMenuItem>
+                      {filteredEmployees.map((emp) => {
+                        const isSelected = createForm.employeeId === emp.id
+                        return (
+                          <DropdownMenuItem
+                            key={emp.id}
+                            onSelect={() => {
+                              setCreateForm(current => ({ ...current, employeeId: emp.id }))
+                              setSelectedEmployeeName(emp.name)
+                              setEmployeeSearchInput('')
+                            }}
+                            className={`justify-between text-xs ${isSelected ? 'bg-accent/10 text-accent font-semibold' : ''}`}
+                          >
+                            <div className="flex items-center gap-2 truncate min-w-0">
+                              <span className="w-5 h-5 rounded-full bg-accent/15 text-accent flex items-center justify-center text-[10px] font-bold shrink-0">
+                                {emp.name.charAt(0).toUpperCase()}
+                              </span>
+                              <div className="truncate min-w-0">
+                                <span className="text-heading truncate font-medium block leading-tight">{emp.name}</span>
+                                {emp.title && <span className="text-caption text-[10px] block truncate leading-tight mt-0.5">{emp.title}</span>}
+                              </div>
+                            </div>
+                            {isSelected && <Check className="h-3.5 w-3.5 text-accent shrink-0 ml-2" />}
+                          </DropdownMenuItem>
+                        )
+                      })}
+                      {filteredEmployees.length === 0 && (
+                        <p className="py-4 text-center text-xs text-muted">No employees found</p>
+                      )}
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             )}
           </div>
