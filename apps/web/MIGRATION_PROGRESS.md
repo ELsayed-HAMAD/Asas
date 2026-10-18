@@ -96,7 +96,21 @@
 
 ## Phase 5 — Settings Tabs + Small Surfaces
 
-### Status: NOT STARTED
+### Status: ✅ COMPLETE (2026-10-18)
+
+| Component / Scope | Status | Notes |
+|---|---|---|
+| `SettingsTabs.jsx` | ✅ Done | Migrated to route-driven `ui/tabs` (`Tabs value={activeTab} onValueChange={navigate}`), styled transparent list with bottom border and active underline indicator |
+| `Onboarding.jsx` | ✅ Done | Adopted `ui/radio-group` (`RadioGroup` + `RadioGroupItem`), preserving exact visual styling and touch target; untouched `finish()` API logic |
+| `MarketingPageFrame.jsx` | ✅ Done | Migrated header CTA to `ui/button` (`Button asChild size="sm"`) |
+| `Landing.jsx` | ✅ Done | Migrated navbar CTA, hero CTAs, hero badge, and dark pre-footer CTA to `ui/button` & `ui/badge` |
+| `Pricing.jsx` | ✅ Done | Migrated plan card CTA, empty state CTA, and error alert to `ui/button` & `ui/alert` |
+| `Solutions.jsx` | ✅ Done | Migrated documentation guide CTA to `ui/button` |
+| `Documentation.jsx` | ✅ Done | Migrated guide navigation links and security section link to `ui/button` (`Button asChild variant="outline" size="sm"`) |
+| `Status.jsx` | ✅ Done | Migrated support center CTA to `ui/button` |
+| `Terms.jsx` & `Privacy.jsx` | ✅ Done | Migrated navbar get started button to `ui/button` |
+| `App.jsx` (NotFound) | ✅ Done | Migrated 404 back link to `Button asChild variant="link"` |
+| Verification gate | ✅ Done | `pnpm test`: web 44/44 pass · `pnpm build`: clean build in 16.63s |
 
 ---
 

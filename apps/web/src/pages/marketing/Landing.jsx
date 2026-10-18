@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, ChevronRight } from 'lucide-react'
 import { useSession } from '../../lib/authClient'
+import { Button } from '../../components/ui/button'
+import { Badge } from '../../components/ui/badge'
 
 const NAV_LINKS = [
   { label: 'Features', to: '/#features' },
@@ -240,19 +242,13 @@ export default function Landing() {
 
           {/* CTA */}
           {session?.user ? (
-            <Link
-              to="/dashboard"
-              className="order-2 ml-auto bg-primary text-white text-sm font-medium px-4 py-2 rounded-button hover:bg-primary-hover transition-colors md:order-3"
-            >
-              Go to Workspace
-            </Link>
+            <Button asChild size="sm" className="order-2 ml-auto md:order-3">
+              <Link to="/dashboard">Go to Workspace</Link>
+            </Button>
           ) : (
-            <Link
-              to="/register"
-              className="order-2 ml-auto bg-primary text-white text-sm font-medium px-4 py-2 rounded-button hover:bg-primary-hover transition-colors md:order-3"
-            >
-              Book a Demo
-            </Link>
+            <Button asChild size="sm" className="order-2 ml-auto md:order-3">
+              <Link to="/register">Book a Demo</Link>
+            </Button>
           )}
         </div>
       </header>
@@ -260,11 +256,11 @@ export default function Landing() {
       {/* ── Hero ── */}
       <section className="max-w-4xl mx-auto px-6 pt-20 pb-16 text-center">
         {/* Badge */}
-        <div className="inline-flex items-center gap-2 bg-surface-muted border border-border-default rounded-full px-3 py-1.5 text-xs text-body-light mb-8">
+        <Badge variant="outline" className="inline-flex items-center gap-2 bg-surface-muted border-border-default rounded-full px-3 py-1.5 text-xs text-body-light mb-8 font-normal">
           <span className="w-1.5 h-1.5 rounded-full bg-accent-light0 animate-pulse" />
           Asas OS v2.0 is now available
           <ChevronRight size={12} className="text-caption" />
-        </div>
+        </Badge>
 
         {/* Headline */}
         <h1 className="text-5xl md:text-6xl font-extrabold text-heading leading-[1.08] tracking-tight mb-6">
@@ -282,35 +278,31 @@ export default function Landing() {
         <div className="flex items-center justify-center gap-3 flex-wrap">
           {session?.user ? (
             <>
-              <Link
-                to="/dashboard"
-                className="inline-flex items-center gap-2 bg-primary text-white text-sm font-semibold px-5 py-2.5 rounded-button hover:bg-primary-hover transition-colors"
-              >
-                Go to Workspace
-                <ArrowRight size={15} />
-              </Link>
-              <Link
-                to="/register"
-                className="inline-flex items-center gap-2 border border-border-default text-body text-sm font-medium px-5 py-2.5 rounded-button hover:bg-surface-muted transition-colors"
-              >
-                Switch Account
-              </Link>
+              <Button asChild className="gap-2 px-5 py-2.5 h-auto text-sm font-semibold">
+                <Link to="/dashboard">
+                  Go to Workspace
+                  <ArrowRight size={15} />
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="gap-2 px-5 py-2.5 h-auto text-sm font-medium">
+                <Link to="/register">
+                  Switch Account
+                </Link>
+              </Button>
             </>
           ) : (
             <>
-              <Link
-                to="/register"
-                className="inline-flex items-center gap-2 bg-primary text-white text-sm font-semibold px-5 py-2.5 rounded-button hover:bg-primary-hover transition-colors"
-              >
-                Start Free Trial
-                <ArrowRight size={15} />
-              </Link>
-              <Link
-                to="/login"
-                className="inline-flex items-center gap-2 border border-border-default text-body text-sm font-medium px-5 py-2.5 rounded-button hover:bg-surface-muted transition-colors"
-              >
-                Explore the Platform
-              </Link>
+              <Button asChild className="gap-2 px-5 py-2.5 h-auto text-sm font-semibold">
+                <Link to="/register">
+                  Start Free Trial
+                  <ArrowRight size={15} />
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="gap-2 px-5 py-2.5 h-auto text-sm font-medium">
+                <Link to="/login">
+                  Explore the Platform
+                </Link>
+              </Button>
             </>
           )}
         </div>
@@ -373,12 +365,11 @@ export default function Landing() {
             Join forward-thinking teams operating at the highest level of efficiency.
             Deployment takes minutes, not months.
           </p>
-          <Link
-            to={session?.user ? "/dashboard" : "/register"}
-            className="inline-flex items-center gap-2 bg-surface-raised text-heading text-sm font-semibold px-6 py-3 rounded-button hover:bg-surface-active transition-colors"
-          >
-            {session?.user ? "Go to Workspace" : "Deploy Asas Today"}
-          </Link>
+          <Button asChild variant="secondary" className="gap-2 bg-surface-raised text-heading text-sm font-semibold px-6 py-3 h-auto rounded-button hover:bg-surface-active">
+            <Link to={session?.user ? "/dashboard" : "/register"}>
+              {session?.user ? "Go to Workspace" : "Deploy Asas Today"}
+            </Link>
+          </Button>
           <p className="text-body-light text-xs mt-4">No credit card required for 14-day trial</p>
         </div>
       </section>

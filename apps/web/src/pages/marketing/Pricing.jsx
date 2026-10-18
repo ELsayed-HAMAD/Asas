@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, Check, Loader2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import MarketingPageFrame from '../../components/marketing/MarketingPageFrame'
+import { Button } from '../../components/ui/button'
+import { Alert, AlertDescription } from '../../components/ui/alert'
 import { http } from '../../lib/api/http'
 
 function formatPrice(amount, currency) {
@@ -27,12 +29,16 @@ export default function Pricing() {
       {plansQuery.isLoading ? (
         <div role="status" className="flex min-h-48 items-center justify-center gap-3 text-sm text-muted"><Loader2 size={18} className="animate-spin" />Loading current plans…</div>
       ) : plansQuery.isError ? (
-        <div role="alert" className="rounded-card border border-danger/30 bg-danger/5 p-5 text-sm text-danger">Current plans could not be loaded. Please try again later.</div>
+        <Alert variant="destructive" className="mb-6">
+          <AlertDescription>Current plans could not be loaded. Please try again later.</AlertDescription>
+        </Alert>
       ) : !catalog?.enabled ? (
         <div className="rounded-card border border-border-default bg-surface-muted p-6">
           <h2 className="text-lg font-bold text-heading">Online plans are not configured</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">There are no published plan prices for this environment yet. Once monthly plans are configured, their current prices and limits will appear here.</p>
-          <Link to="/register" className="mt-5 inline-flex items-center gap-2 rounded-button bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover">Create an account <ArrowRight size={15} /></Link>
+          <Button asChild className="mt-5 gap-2">
+            <Link to="/register">Create an account <ArrowRight size={15} /></Link>
+          </Button>
         </div>
       ) : catalog.items.length === 0 ? (
         <div className="rounded-card border border-border-default bg-surface-muted p-6">
@@ -56,7 +62,9 @@ export default function Pricing() {
                   <li className="flex items-start gap-2"><Check size={16} className="mt-0.5 shrink-0 text-accent" />{plan.storageLimitGb} GB workspace storage</li>
                   <li className="flex items-start gap-2"><Check size={16} className="mt-0.5 shrink-0 text-accent" />Monthly subscription, billed through Stripe</li>
                 </ul>
-                <Link to="/register" className="mt-7 inline-flex items-center justify-center gap-2 rounded-button bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover">Get started <ArrowRight size={15} /></Link>
+                <Button asChild className="mt-7 w-full gap-2">
+                  <Link to="/register">Get started <ArrowRight size={15} /></Link>
+                </Button>
               </article>
             ))}
           </div>
