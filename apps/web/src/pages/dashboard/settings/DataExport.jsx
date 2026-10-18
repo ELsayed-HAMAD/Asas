@@ -13,6 +13,13 @@ import SettingsTabs from './SettingsTabs';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
 import { exportsApi } from '../../../lib/api/exports';
 import { queryKeys } from '../../../lib/queryKeys';
 import { settingsApi } from '../../../lib/api/settings';
@@ -142,44 +149,46 @@ export default function SettingsDataExport() {
               {/* Row 1: Scope & Format */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-bold text-muted mb-1.5">Data Scope</label>
-                  <div className="relative">
-                    <select
-                      value={scope}
-                      onChange={(e) => setScope(e.target.value)}
-                      className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised cursor-pointer hover:border-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
-                    >
-                      <option>Full Workspace</option>
-                      <option>Specific Projects</option>
-                      <option>Financial Ledgers</option>
-                    </select>
-                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-                  </div>
+                  <label htmlFor="data-scope" className="block text-xs font-bold text-muted mb-1.5">Data Scope</label>
+                  <Select value={scope} onValueChange={setScope}>
+                    <SelectTrigger id="data-scope" className="w-full text-sm bg-surface-raised">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Full Workspace">Full Workspace</SelectItem>
+                      <SelectItem value="Specific Projects">Specific Projects</SelectItem>
+                      <SelectItem value="Financial Ledgers">Financial Ledgers</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-muted mb-1.5">Format</label>
-                  <div className="relative">
-                    <select className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised cursor-pointer hover:border-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary">
-                      <option>JSON & CSV</option>
-                      <option>PDF Reports</option>
-                      <option>SQL Dump</option>
-                    </select>
-                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-                  </div>
+                  <label htmlFor="data-format" className="block text-xs font-bold text-muted mb-1.5">Format</label>
+                  <Select defaultValue="JSON & CSV">
+                    <SelectTrigger id="data-format" className="w-full text-sm bg-surface-raised">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="JSON & CSV">JSON & CSV</SelectItem>
+                      <SelectItem value="PDF Reports">PDF Reports</SelectItem>
+                      <SelectItem value="SQL Dump">SQL Dump</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
               {/* Row 2: Date Range */}
               <div>
-                <label className="block text-xs font-bold text-muted mb-1.5">Date Range</label>
-                <div className="relative">
-                  <select className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised cursor-pointer hover:border-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary">
-                    <option>All Time</option>
-                    <option>Last 30 Days</option>
-                    <option>Year to Date</option>
-                  </select>
-                  <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-                </div>
+                <label htmlFor="date-range" className="block text-xs font-bold text-muted mb-1.5">Date Range</label>
+                <Select defaultValue="All Time">
+                  <SelectTrigger id="date-range" className="w-full text-sm bg-surface-raised">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All Time">All Time</SelectItem>
+                    <SelectItem value="Last 30 Days">Last 30 Days</SelectItem>
+                    <SelectItem value="Year to Date">Year to Date</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Submit Button */}
@@ -207,7 +216,7 @@ export default function SettingsDataExport() {
             <h2 className="text-lg font-bold text-heading mb-6">Scheduled Backups</h2>
 
             <div className="space-y-6">
-              {backupsQuery.data?.items?.length ? backupsQuery.data.items.map(backup => <div key={backup.id} className="flex items-center justify-between border border-border-subtle rounded-button p-4"><div><p className="text-sm font-semibold text-heading">{backup.name}</p><p className="text-xs text-muted">{backup.schedule} · {backup.enabled ? 'Enabled' : 'Disabled'}</p></div><button type="button" onClick={() => settingsApi.updateBackup(backup.id, { enabled: !backup.enabled }).then(() => queryClient.invalidateQueries({ queryKey: queryKeys.settings.backups() }))} className="text-xs font-semibold text-accent">{backup.enabled ? 'Disable' : 'Enable'}</button></div>) : <div className="flex flex-col items-center justify-center text-sm text-muted py-8 text-center"><Calendar size={32} className="opacity-20 mb-3" />No scheduled backups configured.</div>}
+              {backupsQuery.data?.items?.length ? backupsQuery.data.items.map(backup => <div key={backup.id} className="flex items-center justify-between border border-border-subtle rounded-button p-4"><div><p className="text-sm font-semibold text-heading">{backup.name}</p><p className="text-xs text-muted">{backup.schedule} · {backup.enabled ? 'Enabled' : 'Disabled'}</p></div><Button variant="link" size="sm" type="button" onClick={() => settingsApi.updateBackup(backup.id, { enabled: !backup.enabled }).then(() => queryClient.invalidateQueries({ queryKey: queryKeys.settings.backups() }))} className="h-auto p-0 text-xs font-semibold text-accent hover:underline">{backup.enabled ? 'Disable' : 'Enable'}</Button></div>) : <div className="flex flex-col items-center justify-center text-sm text-muted py-8 text-center"><Calendar size={32} className="opacity-20 mb-3" />No scheduled backups configured.</div>}
               <Button type="button" onClick={() => backupMutation.mutate()} disabled={backupMutation.isPending}>{backupMutation.isPending ? 'Creating...' : 'Create weekly backup'}</Button>
             </div>
           </div>
@@ -220,7 +229,7 @@ export default function SettingsDataExport() {
           <div className="flex-1 overflow-y-auto p-8 space-y-6">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-lg font-bold text-heading">{showHistory ? 'Export History' : 'Recent Exports'}</h2>
-              {showHistory && <button onClick={() => setShowHistory(false)} className="text-xs font-semibold text-accent hover:text-accent-hover">Recent</button>}
+              {showHistory && <Button variant="link" size="sm" type="button" onClick={() => setShowHistory(false)} className="h-auto p-0 text-xs font-semibold text-accent hover:text-accent-hover">Recent</Button>}
             </div>
 
             {showHistory ? (
@@ -234,13 +243,13 @@ export default function SettingsDataExport() {
                         <span className="text-[11px] text-muted">{job.kind} · {new Date(job.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>
-                    {job.status === 'DONE' && <button type="button" onClick={() => handleDownload(job)} className="text-[11px] font-semibold text-accent hover:text-accent-hover">Download</button>}
+                    {job.status === 'DONE' && <Button variant="link" size="sm" type="button" onClick={() => handleDownload(job)} className="h-auto p-0 text-[11px] font-semibold text-accent hover:text-accent-hover">Download</Button>}
                   </div>
                 )) : <p className="text-xs text-muted">No matching export jobs.</p>}
                 <div className="flex items-center justify-between pt-2 text-xs text-muted">
-                  <button disabled={historyPage <= 1} onClick={() => setHistoryPage(page => Math.max(1, page - 1))} className="disabled:opacity-40 hover:text-heading">Previous</button>
+                  <Button variant="ghost" size="sm" type="button" disabled={historyPage <= 1} onClick={() => setHistoryPage(page => Math.max(1, page - 1))} className="h-7 px-2 text-xs disabled:opacity-40 hover:text-heading">Previous</Button>
                   <span>Page {data.pagination.page} of {Math.max(1, data.pagination.pages)}</span>
-                  <button disabled={historyPage >= data.pagination.pages} onClick={() => setHistoryPage(page => page + 1)} className="disabled:opacity-40 hover:text-heading">Next</button>
+                  <Button variant="ghost" size="sm" type="button" disabled={historyPage >= data.pagination.pages} onClick={() => setHistoryPage(page => page + 1)} className="h-7 px-2 text-xs disabled:opacity-40 hover:text-heading">Next</Button>
                 </div>
               </div>
             ) : <>
@@ -284,13 +293,15 @@ export default function SettingsDataExport() {
                           {dl.filename || 'Export.zip'}
                         </span>
                       </div>
-                      <button
+                      <Button
+                        variant="link"
+                        size="sm"
                         type="button"
                         onClick={() => handleDownload(dl)}
-                        className="text-[11px] font-semibold text-accent hover:text-accent-hover transition-colors shrink-0"
+                        className="h-auto p-0 text-[11px] font-semibold text-accent hover:text-accent-hover transition-colors shrink-0"
                       >
                         Download
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )) : (

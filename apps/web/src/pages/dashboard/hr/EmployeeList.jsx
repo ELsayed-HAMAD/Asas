@@ -31,6 +31,13 @@ import {
   TableHead,
   TableCell,
 } from '../../../components/ui/table'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select'
 
 function initials(name = '') {
   return name
@@ -268,15 +275,22 @@ export default function EmployeeDirectory() {
                 className="pl-9 pr-4 py-2 text-sm w-[280px] bg-surface-muted/50"
               />
             </div>
-            <select
-              value={departmentId}
-              onChange={event => { setDepartmentId(event.target.value); setPage(1) }}
-              aria-label="Filter by department"
-              className="flex items-center gap-2 border border-border-default text-body px-3.5 py-2 rounded-input text-sm hover:bg-surface-muted transition-colors bg-surface-raised"
+            <Select
+              value={departmentId || '__all__'}
+              onValueChange={val => { setDepartmentId(val === '__all__' ? '' : val); setPage(1) }}
             >
-              <option value="">Department: All</option>
-              {(departmentsData?.items ?? departmentsData ?? []).map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
-            </select>
+              <SelectTrigger aria-label="Filter by department" className="w-auto min-w-[160px] h-9 text-sm bg-surface-raised border border-border-default">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__" className="text-sm">Department: All</SelectItem>
+                {(departmentsData?.items ?? departmentsData ?? []).map(department => (
+                  <SelectItem key={department.id} value={department.id} className="text-sm">
+                    {department.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               variant="outline"
               type="button"
@@ -347,13 +361,14 @@ export default function EmployeeDirectory() {
             {selectedIds.length > 0 && (
               <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-accent-light/40 border-b border-accent-light text-xs font-medium text-heading">
                 <span>{selectedIds.length} employee{selectedIds.length === 1 ? '' : 's'} selected</span>
-                <button
+                <Button
                   type="button"
+                  variant="link"
                   onClick={exportSelected}
-                  className="inline-flex items-center gap-1 text-accent font-semibold hover:underline cursor-pointer"
+                  className="inline-flex items-center gap-1 text-accent font-semibold hover:underline p-0 h-auto text-xs"
                 >
                   <Download size={13} /> Export Selected ({selectedIds.length})
-                </button>
+                </Button>
               </div>
             )}
 
@@ -380,15 +395,17 @@ export default function EmployeeDirectory() {
                           </div>
                         </TableHead>
                         <TableHead className="px-4 py-3 bg-surface-muted">
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => { setSortAscending(val => !val); setPage(1) }}
                             aria-label={`Sort employee names ${sortAscending ? 'descending' : 'ascending'}`}
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-muted hover:text-heading uppercase tracking-wider transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-muted hover:text-heading uppercase tracking-wider h-auto p-0 hover:bg-transparent"
                           >
                             <span>Employee</span>
                             <span className="text-xs">{sortAscending ? '↑' : '↓'}</span>
-                          </button>
+                          </Button>
                         </TableHead>
                         <TableHead className="px-4 py-3 bg-surface-muted">Role</TableHead>
                         <TableHead className="px-4 py-3 bg-surface-muted">Department</TableHead>
@@ -474,8 +491,10 @@ export default function EmployeeDirectory() {
                 <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card p-4 relative">
                   <div className="absolute top-3.5 right-3.5 flex gap-1.5">
                     {canEditEmployee && (
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="icon"
                         onClick={() => {
                           setEditForm({
                             name: selected.name || '',
@@ -494,22 +513,24 @@ export default function EmployeeDirectory() {
                           })
                           setEditOpen(true)
                         }}
-                        className="p-1.5 border border-border-default rounded-input text-caption hover:text-body-light hover:bg-surface-muted transition-colors"
+                        className="h-7 w-7 text-caption hover:text-body-light hover:bg-surface-muted"
                         aria-label="Edit profile"
                       >
                         <Pencil size={13} />
-                      </button>
+                      </Button>
                     )}
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="icon"
                       disabled={!canDelete}
                       title={canDelete ? 'Delete employee' : 'Requires the ADMIN role'}
                       onClick={() => setDeleteOpen(true)}
-                      className="p-1.5 border border-border-default rounded-input text-danger hover:bg-danger-light transition-colors disabled:opacity-40"
+                      className="h-7 w-7 text-danger hover:bg-danger-light disabled:opacity-40"
                       aria-label="Delete employee"
                     >
                       <Trash2 size={13} />
-                    </button>
+                    </Button>
                   </div>
 
                   <div className="flex flex-col items-center text-center">
@@ -678,7 +699,22 @@ export default function EmployeeDirectory() {
           {['name', 'title', 'email', 'location'].map(field => <label key={field} className="block text-sm font-medium text-body"><span className="mb-1 block capitalize">{field}</span><Input value={editForm[field]} onChange={event => setEditForm(current => ({ ...current, [field]: event.target.value }))} /></label>)}
           <div className="grid grid-cols-2 gap-4">
             <label className="block text-sm font-medium text-body"><span className="mb-1 block">Salary</span><Input type="number" min="0" step="0.01" value={editForm.salary} onChange={event => setEditForm(current => ({ ...current, salary: event.target.value }))} /></label>
-            <label className="block text-sm font-medium text-body"><span className="mb-1 block">Salary basis</span><select value={editForm.salaryBasis} onChange={event => setEditForm(current => ({ ...current, salaryBasis: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2 bg-surface-raised"><option value="">None</option><option value="ANNUAL">Annual</option><option value="MONTHLY">Monthly</option></select></label>
+            <div>
+              <label className="block text-sm font-medium text-body mb-1">Salary basis</label>
+              <Select
+                value={editForm.salaryBasis || '__none__'}
+                onValueChange={val => setEditForm(current => ({ ...current, salaryBasis: val === '__none__' ? '' : val }))}
+              >
+                <SelectTrigger className="w-full bg-surface-raised">
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  <SelectItem value="ANNUAL">Annual</SelectItem>
+                  <SelectItem value="MONTHLY">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <label className="block text-sm font-medium text-body"><span className="mb-1 block">Salary effective from</span><Input type="date" required={!!editForm.salary} value={editForm.salaryEffectiveFrom} onChange={event => setEditForm(current => ({ ...current, salaryEffectiveFrom: event.target.value }))} /></label>
             <p className="self-center text-xs text-muted">Set a new date when changing salary or basis. Existing payroll history is preserved.</p>
             <label className="block text-sm font-medium text-body"><span className="mb-1 block">Employment end date</span><Input type="date" min={editForm.hiredAt || undefined} value={editForm.employmentEndDate} onChange={event => setEditForm(current => ({ ...current, employmentEndDate: event.target.value }))} /></label>
@@ -690,21 +726,47 @@ export default function EmployeeDirectory() {
       <FormDialog open={createOpen} onClose={() => setCreateOpen(false)} title="Add employee" subtitle="Create an employee profile." busy={createMutation.isPending} onConfirm={() => createMutation.mutate()} confirmLabel="Add employee">
         <div className="space-y-4">
           {['name', 'title', 'email'].map(field => <label key={field} className="block text-sm font-medium text-body"><span className="mb-1 block capitalize">{field}</span><Input type={field === 'email' ? 'email' : 'text'} required={field !== 'email'} value={createForm[field]} onChange={event => setCreateForm(current => ({ ...current, [field]: event.target.value }))} /></label>)}
-          <label className="block text-sm font-medium text-body"><span className="mb-1 block">Department</span><select value={createForm.departmentId} onChange={event => setCreateForm(current => ({ ...current, departmentId: event.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2 bg-surface-raised"><option value="">No department</option>{(departmentsData?.items ?? departmentsData ?? []).map(department => <option key={department.id} value={department.id}>{department.name}</option>)}</select></label>
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Department</label>
+            <Select
+              value={createForm.departmentId || '__none__'}
+              onValueChange={val => setCreateForm(current => ({ ...current, departmentId: val === '__none__' ? '' : val }))}
+            >
+              <SelectTrigger className="w-full bg-surface-raised">
+                <SelectValue placeholder="No department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">No department</SelectItem>
+                {(departmentsData?.items ?? departmentsData ?? []).map(department => (
+                  <SelectItem key={department.id} value={department.id}>
+                    {department.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <label className="block text-sm font-medium text-body">
               <span className="mb-1 block">Salary</span>
               <Input type="number" step="0.01" value={createForm.salary} onChange={e => setCreateForm(c => ({ ...c, salary: e.target.value }))} />
             </label>
-            <label className="block text-sm font-medium text-body">
-              <span className="mb-1 block">Basis</span>
-              <select value={createForm.salaryBasis} onChange={e => setCreateForm(c => ({ ...c, salaryBasis: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2 bg-surface-raised">
-                <option value="">None</option>
-                <option value="ANNUAL">Annual</option>
-                <option value="MONTHLY">Monthly</option>
-              </select>
-            </label>
+            <div>
+              <label className="block text-sm font-medium text-body mb-1">Basis</label>
+              <Select
+                value={createForm.salaryBasis || '__none__'}
+                onValueChange={val => setCreateForm(c => ({ ...c, salaryBasis: val === '__none__' ? '' : val }))}
+              >
+                <SelectTrigger className="w-full bg-surface-raised">
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  <SelectItem value="ANNUAL">Annual</SelectItem>
+                  <SelectItem value="MONTHLY">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <label className="block text-sm font-medium text-body">
               <span className="mb-1 block">Salary effective from</span>
               <Input type="date" required={!!createForm.salary} value={createForm.salaryEffectiveFrom} onChange={e => setCreateForm(c => ({ ...c, salaryEffectiveFrom: e.target.value }))} />
@@ -717,14 +779,22 @@ export default function EmployeeDirectory() {
               <span className="mb-1 block">Employment end date</span>
               <Input type="date" min={createForm.hiredAt || undefined} value={createForm.employmentEndDate} onChange={e => setCreateForm(c => ({ ...c, employmentEndDate: e.target.value }))} />
             </label>
-            <label className="block text-sm font-medium text-body">
-              <span className="mb-1 block">Status</span>
-              <select value={createForm.status} onChange={e => setCreateForm(c => ({ ...c, status: e.target.value }))} className="w-full rounded-input border border-border-default px-3 py-2 bg-surface-raised">
-                <option value="ACTIVE">Active</option>
-                <option value="ON_LEAVE">On Leave</option>
-                <option value="ARCHIVED">Archived</option>
-              </select>
-            </label>
+            <div>
+              <label className="block text-sm font-medium text-body mb-1">Status</label>
+              <Select
+                value={createForm.status || 'ACTIVE'}
+                onValueChange={val => setCreateForm(c => ({ ...c, status: val }))}
+              >
+                <SelectTrigger className="w-full bg-surface-raised">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="ON_LEAVE">On Leave</SelectItem>
+                  <SelectItem value="ARCHIVED">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <label className="block text-sm font-medium text-body">
               <span className="mb-1 block">Band</span>
               <Input type="text" value={createForm.band} onChange={e => setCreateForm(c => ({ ...c, band: e.target.value }))} />
@@ -746,13 +816,15 @@ export default function EmployeeDirectory() {
                 <h3 className="text-lg font-bold text-heading">Departments</h3>
                 <p className="text-xs text-muted mt-0.5">Manage departments for employee organization.</p>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => { setDeptModalOpen(false); setEditingDeptId(null); setDeptError('') }}
-                className="p-1 rounded-input hover:bg-surface-muted text-muted hover:text-body transition-colors"
+                className="h-7 w-7 text-muted hover:text-body"
               >
                 <X size={18} />
-              </button>
+              </Button>
             </div>
 
             {deptError && (
@@ -808,50 +880,58 @@ export default function EmployeeDirectory() {
                           className="flex-1 h-8 text-sm"
                           autoFocus
                         />
-                        <button
+                        <Button
                           type="submit"
+                          variant="ghost"
+                          size="icon"
                           disabled={!editingDeptName.trim() || updateDeptMutation.isPending}
-                          className="p-1.5 text-success-text hover:bg-success-light rounded-input transition-colors disabled:opacity-50 cursor-pointer"
+                          className="h-7 w-7 text-success-text hover:bg-success-light disabled:opacity-50"
                           title="Save"
                         >
                           <Check size={16} />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="icon"
                           onClick={() => setEditingDeptId(null)}
-                          className="p-1.5 text-muted hover:bg-surface-muted rounded-input transition-colors cursor-pointer"
+                          className="h-7 w-7 text-muted hover:bg-surface-muted"
                           title="Cancel"
                         >
                           <X size={16} />
-                        </button>
+                        </Button>
                       </form>
                     ) : (
                       <>
                         <span className="text-sm font-medium text-body">{dept.name}</span>
                         <div className="flex items-center gap-1">
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="icon"
                             onClick={() => {
                               setEditingDeptId(dept.id)
                               setEditingDeptName(dept.name)
                               setDeptError('')
                             }}
-                            className="p-1.5 text-muted hover:text-body hover:bg-surface-muted rounded-input transition-colors cursor-pointer"
+                            className="h-7 w-7 text-muted hover:text-body"
                             title="Rename"
                           >
                             <Pencil size={14} />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="icon"
                             onClick={() => {
                               setDeptError('')
                               setDeletingDept(dept)
                             }}
-                            className="p-1.5 text-muted hover:text-danger hover:bg-danger-light rounded-input transition-colors cursor-pointer"
+                            className="h-7 w-7 text-muted hover:text-danger hover:bg-danger-light"
                             title="Delete"
                           >
                             <Trash2 size={14} />
-                          </button>
+                          </Button>
                         </div>
                       </>
                     )}

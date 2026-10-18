@@ -24,6 +24,13 @@ import {
   TableHead,
   TableCell,
 } from '../../../components/ui/table'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select'
 
 function initials(name = '') {
   return name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase()).join('') || '?'
@@ -86,23 +93,27 @@ function CandidateInspector({ candidate, interviews = [], onClose, canWrite, can
         <h3 className="text-sm font-bold text-heading">Candidate Profile</h3>
         <div className="flex items-center gap-2">
           {canWrite && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={onEdit}
               title="Edit Candidate"
-              className="text-caption hover:text-body transition-colors p-1 rounded hover:bg-surface-muted cursor-pointer"
+              className="h-7 w-7 text-caption hover:text-body"
             >
               <Pencil size={14} />
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={onClose}
             title="Close"
-            className="text-caption hover:text-body transition-colors p-1 rounded hover:bg-surface-muted cursor-pointer"
+            className="h-7 w-7 text-caption hover:text-body"
           >
             <X size={15} />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -186,9 +197,14 @@ function CandidateInspector({ candidate, interviews = [], onClose, canWrite, can
                         {interview.notes && <p className="text-body-light mt-1 whitespace-pre-wrap text-[11px]">{interview.notes}</p>}
                       </div>
                       {interview.status === 'SCHEDULED' && canWrite && (
-                        <button type="button" onClick={() => onCancelInterview(interview.id)} className="text-danger hover:underline text-xs shrink-0 cursor-pointer">
+                        <Button
+                          type="button"
+                          variant="link"
+                          onClick={() => onCancelInterview(interview.id)}
+                          className="text-danger hover:underline text-xs shrink-0 p-0 h-auto font-normal"
+                        >
                           Cancel
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -334,8 +350,10 @@ function CvSection({ candidate, hasCv, canWrite }) {
         onChange={handleFileChange}
       />
       {cvError && <p className="text-[11px] text-danger">{cvError}</p>}
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
         disabled={!canWrite || uploadMutation.isPending}
         title={canWrite ? undefined : 'Requires the ADMIN role'}
         onClick={() => fileInputRef.current?.click()}
@@ -347,7 +365,7 @@ function CvSection({ candidate, hasCv, canWrite }) {
           <Upload size={14} />
         )}
         Upload CV
-      </button>
+      </Button>
     </div>
   )
 }
@@ -592,20 +610,23 @@ export default function RecruitmentPipeline() {
               className="pl-9 pr-4 py-2 text-xs w-72 max-w-full"
             />
           </div>
-          <div className="relative flex items-center">
-            <Filter size={14} className="absolute left-3 pointer-events-none text-muted" />
-            <select
-              aria-label="Filter by candidate role"
-              value={roleFilter}
-              onChange={event => { setRoleFilter(event.target.value); setPage(1) }}
-              className="appearance-none bg-surface-raised border border-border-default text-body text-xs pl-8 pr-7 py-2 rounded-input hover:bg-surface-muted transition-colors cursor-pointer outline-none shadow-card"
-            >
-              <option value="ALL">Role: All</option>
+          <Select
+            value={roleFilter}
+            onValueChange={val => { setRoleFilter(val); setPage(1) }}
+          >
+            <SelectTrigger aria-label="Filter by candidate role" className="h-9 w-auto min-w-[130px] pl-3 pr-3 text-xs bg-surface-raised border border-border-default shadow-card">
+              <Filter size={14} className="text-muted shrink-0 mr-1.5" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL" className="text-xs">Role: All</SelectItem>
               {availableRoles.map(role => (
-                <option key={role} value={role}>{role}</option>
+                <SelectItem key={role} value={role} className="text-xs">
+                  {role}
+                </SelectItem>
               ))}
-            </select>
-          </div>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Right group */}
@@ -861,14 +882,41 @@ export default function RecruitmentPipeline() {
       </FormDialog>
 
       <FormDialog open={stageOpen} onClose={() => setStageOpen(false)} title="Move candidate stage" subtitle={selectedCandidate?.name} confirmLabel="Save stage" busy={moveStageMutation.isPending} onConfirm={() => moveStageMutation.mutate()}>
-        <label className="block text-sm font-medium text-body">Stage<select value={nextStage} onChange={event => setNextStage(event.target.value)} className="mt-1 w-full rounded-input border border-border-default px-3 py-2 bg-surface-raised">{(NEXT_STAGES[selectedCandidate?.stage] || []).map(stage => <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>)}</select></label>
+        <div>
+          <label className="block text-sm font-medium text-body mb-1">Stage</label>
+          <Select value={nextStage} onValueChange={setNextStage}>
+            <SelectTrigger className="w-full bg-surface-raised">
+              <SelectValue placeholder="Select stage" />
+            </SelectTrigger>
+            <SelectContent>
+              {(NEXT_STAGES[selectedCandidate?.stage] || []).map(stage => (
+                <SelectItem key={stage} value={stage}>{STAGE_LABELS[stage]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </FormDialog>
 
       <FormDialog open={scheduleOpen} onClose={() => setScheduleOpen(false)} title="Schedule interview" subtitle={selectedCandidate?.name} confirmLabel="Schedule interview" busy={scheduleInterviewMutation.isPending} onConfirm={submitInterview}>
         <div className="space-y-3">
           <label className="block text-sm font-medium text-body">Date and time (your device time)<Input type="datetime-local" value={interviewForm.startsAt} onChange={event => setInterviewForm(f => ({ ...f, startsAt: event.target.value }))} className="mt-1" /></label>
           <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm font-medium text-body">Interview stage<select value={interviewForm.stage} onChange={event => setInterviewForm(f => ({ ...f, stage: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2 bg-surface-raised">{['SCREENING', 'TECH_INTERVIEW', 'FINAL_INTERVIEW'].map(stage => <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>)}</select></label>
+            <div>
+              <label className="block text-sm font-medium text-body mb-1">Interview stage</label>
+              <Select
+                value={interviewForm.stage}
+                onValueChange={val => setInterviewForm(f => ({ ...f, stage: val }))}
+              >
+                <SelectTrigger className="w-full bg-surface-raised">
+                  <SelectValue placeholder="Select interview stage" />
+                </SelectTrigger>
+                <SelectContent>
+                  {['SCREENING', 'TECH_INTERVIEW', 'FINAL_INTERVIEW'].map(stage => (
+                    <SelectItem key={stage} value={stage}>{STAGE_LABELS[stage]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <label className="block text-sm font-medium text-body">Duration (minutes)<Input type="number" min="15" max="480" step="15" value={interviewForm.durationMin} onChange={event => setInterviewForm(f => ({ ...f, durationMin: event.target.value }))} className="mt-1" /></label>
           </div>
           <label className="block text-sm font-medium text-body">Interviewer<Input value={interviewForm.interviewer} onChange={event => setInterviewForm(f => ({ ...f, interviewer: event.target.value }))} maxLength={160} className="mt-1" /></label>

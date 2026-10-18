@@ -129,13 +129,14 @@ export default function TwoFactorVerify() {
       </form>
 
       <div className="mt-5 text-center">
-        <button
+        <Button
           type="button"
+          variant="link"
           onClick={() => { setUseBackupCode(value => !value); setCode(''); setError('') }}
           className="text-sm font-medium text-accent hover:underline cursor-pointer"
         >
           {useBackupCode ? 'Use an authenticator code' : 'Use a recovery code'}
-        </button>
+        </Button>
       </div>
       <p className="mt-6 text-center text-sm text-muted">
         <Link to="/login" onClick={() => sessionStorage.removeItem(REDIRECT_KEY)} className="font-medium text-heading hover:underline">

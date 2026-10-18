@@ -19,6 +19,13 @@ import TwoFactorSettings from './TwoFactorSettings'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
 import { Badge } from '../../../components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select'
 import { http } from '../../../lib/api/http'
 import { onboardingApi } from '../../../lib/api/onboarding'
 import { settingsApi } from '../../../lib/api/settings'
@@ -281,59 +288,69 @@ export default function SettingsGeneral() {
 
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-xs font-bold text-heading mb-1.5">Timezone</label>
-                <div className="relative">
-                  <select
-                    className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary"
-                    value={form.timezone || localTimezone}
-                    onChange={setField('timezone')}
-                  >
-                    <option value="UTC">UTC (Universal Coordinated Time)</option>
+                <label htmlFor="settings-timezone" className="block text-xs font-bold text-heading mb-1.5">Timezone</label>
+                <Select
+                  value={form.timezone || localTimezone}
+                  onValueChange={val => setForm(current => ({ ...current, timezone: val }))}
+                >
+                  <SelectTrigger id="settings-timezone" className="w-full text-sm bg-surface-raised">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="UTC">UTC (Universal Coordinated Time)</SelectItem>
                     {localTimezone && localTimezone !== 'UTC' && (
-                      <option value={localTimezone}>Local System Timezone ({localTimezone})</option>
+                      <SelectItem value={localTimezone}>Local System Timezone ({localTimezone})</SelectItem>
                     )}
                     {AVAILABLE_TIMEZONES.filter(tz => tz !== 'UTC' && tz !== localTimezone).map(tz => (
-                      <option key={tz} value={tz}>
+                      <SelectItem key={tz} value={tz}>
                         {tz.replaceAll('_', ' ')}
-                      </option>
+                      </SelectItem>
                     ))}
-                  </select>
-                  <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-                </div>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-heading mb-1.5">Currency</label>
-                <div className="relative">
-                  <select
-                    className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary"
-                    value={form.currency || 'USD'}
-                    onChange={setField('currency')}
-                    disabled={Boolean(settings.currencyLockedAt)}
+                <label htmlFor="settings-currency" className="block text-xs font-bold text-heading mb-1.5">Currency</label>
+                <Select
+                  value={form.currency || 'USD'}
+                  onValueChange={val => setForm(current => ({ ...current, currency: val }))}
+                  disabled={Boolean(settings.currencyLockedAt)}
+                >
+                  <SelectTrigger
+                    id="settings-currency"
+                    className="w-full text-sm bg-surface-raised disabled:opacity-60"
                     title={settings.currencyLockedAt ? 'Base currency is fixed once monetary data exists; relabeling is not FX conversion.' : 'Choose the base currency before entering monetary data.'}
                   >
-                    {listCurrencies().map(({ code }) => <option key={code} value={code}>{code === 'USD' ? 'USD ($)' : code === 'EUR' ? 'EUR (€)' : code}</option>)}
-                  </select>
-                  <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-                </div>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {listCurrencies().map(({ code }) => (
+                      <SelectItem key={code} value={code}>
+                        {code === 'USD' ? 'USD ($)' : code === 'EUR' ? 'EUR (€)' : code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <p className="mt-1.5 text-xs text-muted">{settings.currencyLockedAt ? 'Base currency is fixed to protect existing monetary records. Currency conversion requires an explicit FX workflow.' : 'Choose your base currency before adding salaries, invoices, products or budgets.'}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-heading mb-1.5">Date Format</label>
-                <div className="relative">
-                <select
-                  className="w-full appearance-none border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary"
+                <label htmlFor="settings-date-format" className="block text-xs font-bold text-heading mb-1.5">Date Format</label>
+                <Select
                   value={form.dateFormat || 'MMM d, yyyy'}
-                  onChange={setField('dateFormat')}
+                  onValueChange={val => setForm(current => ({ ...current, dateFormat: val }))}
                 >
-                  <option value="MMM d, yyyy">{format1}</option>
-                  <option value="yyyy-MM-dd">{format2}</option>
-                  <option value="dd/MM/yyyy">{format3}</option>
-                </select>
-                <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-                </div>
+                  <SelectTrigger id="settings-date-format" className="w-full text-sm bg-surface-raised">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MMM d, yyyy">{format1}</SelectItem>
+                    <SelectItem value="yyyy-MM-dd">{format2}</SelectItem>
+                    <SelectItem value="dd/MM/yyyy">{format3}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="block text-xs font-bold text-heading mb-1.5">Overtime After (Hours per Day)</label>
@@ -357,10 +374,20 @@ export default function SettingsGeneral() {
             <p className="text-sm text-muted mb-5">Enter how many {settings.currency} one unit of foreign currency is worth. Rates are timestamped and retained for audit; adding a quote does not revalue existing records.</p>
             <form className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 items-end mb-5" onSubmit={(event) => { event.preventDefault(); rateMutation.mutate() }}>
               <div>
-                <label className="block text-xs font-bold text-heading mb-1.5">Currency</label>
-                <select required value={rateForm.currency || listCurrencies().find(({ code }) => code !== settings.currency)?.code || ''} onChange={(event) => setRateForm((current) => ({ ...current, currency: event.target.value }))} className="w-full border border-border-strong rounded-input px-3 py-2 text-sm bg-surface-raised">
-                  {listCurrencies().filter(({ code }) => code !== settings.currency).map(({ code }) => <option key={code} value={code}>{code}</option>)}
-                </select>
+                <label htmlFor="rate-currency" className="block text-xs font-bold text-heading mb-1.5">Currency</label>
+                <Select
+                  value={rateForm.currency || listCurrencies().find(({ code }) => code !== settings.currency)?.code || ''}
+                  onValueChange={val => setRateForm((current) => ({ ...current, currency: val }))}
+                >
+                  <SelectTrigger id="rate-currency" className="w-full text-sm bg-surface-raised">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {listCurrencies().filter(({ code }) => code !== settings.currency).map(({ code }) => (
+                      <SelectItem key={code} value={code}>{code}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="block text-xs font-bold text-heading mb-1.5">Rate to {settings.currency}</label>

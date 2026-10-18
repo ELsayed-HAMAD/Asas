@@ -39,6 +39,13 @@ import {
 import { Textarea } from '../../../components/ui/textarea';
 import { Badge } from '../../../components/ui/badge';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
 
 const metricFontSize = (money) => {
   const label = formatMoney(money)
@@ -286,15 +293,15 @@ export default function AccountsPayable() {
               className="pl-9 pr-4 text-xs bg-surface-raised w-72 max-w-full shadow-card h-9"
             />
           </div>
-          <select
-            aria-label="Payables view"
-            value={statusGroup}
-            onChange={event => setStatusGroup(event.target.value)}
-            className="border border-border-default text-body text-xs px-3 py-2 rounded-input bg-surface-raised hover:bg-surface-muted transition-colors cursor-pointer outline-none shadow-card h-9"
-          >
-            <option value="OPEN">Open bills</option>
-            <option value="HISTORY">History</option>
-          </select>
+          <Select value={statusGroup} onValueChange={setStatusGroup}>
+            <SelectTrigger aria-label="Payables view" className="text-xs bg-surface-raised hover:bg-surface-muted shadow-card h-9 w-[130px]">
+              <SelectValue placeholder="Payables view" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="OPEN">Open bills</SelectItem>
+              <SelectItem value="HISTORY">History</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             type="button"
             variant="outline"
@@ -751,13 +758,15 @@ export default function AccountsPayable() {
                       ) : pdfError ? (
                         <div className="space-y-2">
                           <p className="text-xs text-danger-light">Invoice preview could not be loaded.</p>
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={() => setInvoicePreviewOpen(true)}
-                            className="px-2.5 py-1 bg-surface-raised text-heading text-xs rounded border border-border-default hover:bg-surface-muted transition-colors cursor-pointer"
+                            className="h-7 px-2.5 bg-surface-raised text-heading text-xs"
                           >
                             View details
-                          </button>
+                          </Button>
                         </div>
                       ) : (
                         <p className="text-xs text-white/70">Invoice preview unavailable.</p>
@@ -777,18 +786,48 @@ export default function AccountsPayable() {
       </div>
       <FormDialog open={billOpen} onClose={() => { setBillOpen(false); setSelectedProject(null); createBill.reset() }} title="New bill" subtitle="Add a vendor invoice to accounts payable." busy={createBill.isPending} error={createBill.isError ? createBill.error?.message || 'Could not create the bill.' : undefined} onConfirm={() => createBill.mutate()} confirmLabel="Create bill">
         <div className="space-y-4">
-          <label className="block text-sm font-medium text-body">Vendor
-            <select required value={billForm.vendorId} onChange={event => setBillForm(current => ({ ...current, vendorId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2 bg-surface-raised text-body text-xs focus:outline-none">
-              <option value="">Select a vendor</option>
-              {(vendorsData?.items ?? []).map(vendor => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}
-            </select>
-          </label>
-          <label className="block text-sm font-medium text-body">Project
-            <Input type="search" aria-label="Search projects" value={projectSearchInput} onChange={event => setProjectSearchInput(event.target.value)} placeholder="Search projects..." className="mt-1 text-xs" />
-            <select aria-label="Project" value={billForm.projectId} onChange={event => { const project = projectOptions.find(item => item.id === event.target.value) ?? null; setSelectedProject(project); setBillForm(current => ({ ...current, projectId: event.target.value })) }} className="mt-1 w-full rounded-input border border-border-default px-3 py-2 bg-surface-raised text-body text-xs focus:outline-none">
-              <option value="">Unassigned</option>
-              {projectOptions.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
-            </select>
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Vendor</label>
+            <Select
+              value={billForm.vendorId}
+              onValueChange={val => setBillForm(current => ({ ...current, vendorId: val }))}
+            >
+              <SelectTrigger className="w-full bg-surface-raised text-xs">
+                <SelectValue placeholder="Select a vendor" />
+              </SelectTrigger>
+              <SelectContent>
+                {(vendorsData?.items ?? []).map(vendor => (
+                  <SelectItem key={vendor.id} value={vendor.id} className="text-xs">
+                    {vendor.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Project</label>
+            <Input type="search" aria-label="Search projects" value={projectSearchInput} onChange={event => setProjectSearchInput(event.target.value)} placeholder="Search projects..." className="text-xs mb-1" />
+            <Select
+              value={billForm.projectId || '__unassigned__'}
+              onValueChange={val => {
+                const nextId = val === '__unassigned__' ? '' : val
+                const project = projectOptions.find(item => item.id === nextId) ?? null
+                setSelectedProject(project)
+                setBillForm(current => ({ ...current, projectId: nextId }))
+              }}
+            >
+              <SelectTrigger aria-label="Project" className="w-full bg-surface-raised text-xs">
+                <SelectValue placeholder="Unassigned" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__unassigned__" className="text-xs">Unassigned</SelectItem>
+                {projectOptions.map(project => (
+                  <SelectItem key={project.id} value={project.id} className="text-xs">
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {projectsData?.pagination?.pages > 1 && (
               <div className="mt-2 flex items-center justify-between text-xs text-muted">
                 <span>{projectsData.pagination.total.toLocaleString()} projects · page {projectPage} of {projectsData.pagination.pages}</span>
@@ -798,7 +837,7 @@ export default function AccountsPayable() {
                 </div>
               </div>
             )}
-          </label>
+          </div>
           <label className="block text-sm font-medium text-body">Invoice number
             <Input value={billForm.invoiceNumber} onChange={event => setBillForm(current => ({ ...current, invoiceNumber: event.target.value }))} className="mt-1 text-xs" />
           </label>

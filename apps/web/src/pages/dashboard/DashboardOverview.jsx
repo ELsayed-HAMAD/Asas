@@ -9,6 +9,13 @@ import { useQuery } from '@tanstack/react-query'
 import TopBarActions from '../../components/TopBarActions'
 import StatCard from '../../components/common/StatCard'
 import { Button } from '../../components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/ui/select'
 import { dashboardApi } from '../../lib/api/dashboard'
 import { auditLogApi } from '../../lib/api/auditLog'
 import { queryKeys } from '../../lib/queryKeys'
@@ -268,14 +275,14 @@ export default function DashboardOverview() {
                   <p className="text-xs text-muted mt-0.5">Calendar year {selectedYear}</p>
                 </div>
               </div>
-              <select
-                aria-label="Cash flow calendar year"
-                value={selectedYear}
-                onChange={event => setSelectedYear(event.target.value)}
-                className="bg-surface-muted border border-border-default text-xs font-medium text-body rounded-input py-1 px-2.5 focus:outline-none"
-              >
-                {availableYears.map(year => <option key={year} value={year}>Year {year}</option>)}
-              </select>
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger aria-label="Cash flow calendar year" className="bg-surface-muted border-border-default text-xs font-medium text-body h-7 w-[100px] py-1 px-2.5">
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableYears.map(year => <SelectItem key={year} value={year}>Year {year}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Recharts Area Chart */}

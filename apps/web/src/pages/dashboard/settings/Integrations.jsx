@@ -262,13 +262,14 @@ export default function SettingsIntegrations() {
                           {selected.credential?.configured ? `Configured (${selected.credential.masked})` : 'Not configured'}
                         </span>
                       </div>
-                      <button
+                      <Button
                         type="button"
+                        variant="link"
                         onClick={() => { setCredentialInput(''); setShowCredentialModal(true); }}
                         className="text-xs font-semibold text-accent hover:text-accent-hover"
                       >
                         {selected.credential?.configured ? 'Update Key' : 'Add Key'}
-                      </button>
+                      </Button>
                     </div>
 
                   </div>
@@ -278,17 +279,25 @@ export default function SettingsIntegrations() {
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest">Webhook Logs</h3>
                     <div className="flex items-center gap-2">
-                      <button
+                      <Button
                         type="button"
+                        variant="link"
                         disabled={!selected || testPingMutation.isPending}
                         onClick={() => selected && testPingMutation.mutate(selected.id)}
                         className="text-[11px] font-bold text-accent hover:text-accent-hover transition-colors disabled:opacity-50"
                         title="Dispatch a test ping to verify webhook logging"
                       >
                         {testPingMutation.isPending ? 'Pinging…' : 'Send Test Ping'}
-                      </button>
+                      </Button>
                       <span className="text-muted text-[10px]">·</span>
-                      <button type="button" onClick={() => setShowAllLogs(current => !current)} className="text-[11px] font-bold text-accent hover:text-accent-hover transition-colors">{showAllLogs ? 'Show Recent' : 'View All'}</button>
+                      <Button
+                        type="button"
+                        variant="link"
+                        onClick={() => setShowAllLogs(current => !current)}
+                        className="text-[11px] font-bold text-accent hover:text-accent-hover transition-colors"
+                      >
+                        {showAllLogs ? 'Show Recent' : 'View All'}
+                      </Button>
                     </div>
                   </div>
 

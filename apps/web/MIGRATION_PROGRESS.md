@@ -78,7 +78,19 @@
 
 ## Phase 4 — Form Controls
 
-### Status: NOT STARTED
+### Status: ✅ COMPLETE (2026-10-18)
+
+| Module / Scope | Status | Notes |
+|---|---|---|
+| Auth (`Login`, `TwoFactorVerify`, `VerifyEmail`) | ✅ Done | Raw inputs and submit buttons migrated to `ui/input` & `ui/button` |
+| CRM (`CRMOverview`, `DealsPipeline`, `RevenueForecast`, `SalesPerformance`) | ✅ Done | Native selects and action/filter buttons migrated to `ui/select` & `ui/button` |
+| Finance (`AccountsPayable`, `AccountsReceivable`, `BankReconciliation`, `Expenses`, `FinanceOverview`, `TrialBalance`) | ✅ Done | Native selects, filter dropdowns, and buttons migrated to `ui/select` & `ui/button` |
+| HR (`EmployeeList`, `Payroll`, `RecruitmentPipeline`, `StatutoryTaxCalculator`, `TimeAttendance`) | ✅ Done | All selects (14 in TimeAttendance, 12 in Payroll, 9 in EmployeeList) and action buttons migrated to `ui/select` & `ui/button` |
+| Inventory (`ProductCatalog`, `StockMovements`) | ✅ Done | Product type, tracking mode, stock movement selects, action buttons migrated to `ui/select` & `ui/button` |
+| Projects (`ActiveSprints`, `PortfolioOverview`, `Roadmap`) | ✅ Done | Sprint, phase, department, status filter selects and buttons migrated to `ui/select` & `ui/button` |
+| Settings (`DataExport`, `Integrations`, `MembersRoles`, `SettingsGeneral`) | ✅ Done | Export entity/format/range, invite role, timezone, currency, date format, FX rate selects migrated to `ui/select` & `ui/button` |
+| Dashboard Overview (`DashboardOverview.jsx`) | ✅ Done | Cash flow calendar year select migrated to `ui/select` |
+| Verification gate | ✅ Done | `pnpm test`: web 44/44 pass · `pnpm build`: clean build · grep audit: 0 raw `<select>` in `apps/web/src/` (complete migration) |
 
 ---
 

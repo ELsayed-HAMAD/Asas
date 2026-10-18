@@ -22,6 +22,13 @@ import {
   TableHead,
   TableCell,
 } from '../../../components/ui/table'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select'
 
 
 const EMPTY_OPENING_LINES = [
@@ -198,8 +205,39 @@ export default function TrialBalance() {
               <label className="text-xs font-medium text-muted">Account name
                 <Input aria-label={`Account name ${index + 1}`} value={line.name} onChange={event => setOpeningLines(current => current.map((item, row) => row === index ? { ...item, name: event.target.value } : item))} className="mt-1 text-sm" maxLength={80} />
               </label>
-              <label className="text-xs font-medium text-muted">Type<select aria-label={`Account type ${index + 1}`} value={line.kind} onChange={event => setOpeningLines(current => current.map((item, row) => row === index ? { ...item, kind: event.target.value } : item))} className="mt-1 w-full rounded-input border border-border-default bg-surface-raised px-2 py-2 text-sm text-body">{['ASSET', 'LIABILITY', 'EQUITY', 'EXPENSE', 'INCOME'].map(kind => <option key={kind} value={kind}>{kind.toLowerCase()}</option>)}</select></label>
-              <label className="text-xs font-medium text-muted">Side<select aria-label={`Account side ${index + 1}`} value={line.side} onChange={event => setOpeningLines(current => current.map((item, row) => row === index ? { ...item, side: event.target.value } : item))} className="mt-1 w-full rounded-input border border-border-default bg-surface-raised px-2 py-2 text-sm text-body"><option value="DEBIT">Debit</option><option value="CREDIT">Credit</option></select></label>
+              <div>
+                <label className="text-xs font-medium text-muted block mb-1">Type</label>
+                <Select
+                  value={line.kind}
+                  onValueChange={val => setOpeningLines(current => current.map((item, row) => row === index ? { ...item, kind: val } : item))}
+                >
+                  <SelectTrigger aria-label={`Account type ${index + 1}`} className="w-full h-9 bg-surface-raised text-sm text-body">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {['ASSET', 'LIABILITY', 'EQUITY', 'EXPENSE', 'INCOME'].map(kind => (
+                      <SelectItem key={kind} value={kind} className="text-sm">
+                        {kind.toLowerCase()}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted block mb-1">Side</label>
+                <Select
+                  value={line.side}
+                  onValueChange={val => setOpeningLines(current => current.map((item, row) => row === index ? { ...item, side: val } : item))}
+                >
+                  <SelectTrigger aria-label={`Account side ${index + 1}`} className="w-full h-9 bg-surface-raised text-sm text-body">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DEBIT" className="text-sm">Debit</SelectItem>
+                    <SelectItem value="CREDIT" className="text-sm">Credit</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <label className="text-xs font-medium text-muted">Amount ({data?.baseCurrency})
                 <Input aria-label={`Opening amount ${index + 1}`} inputMode="decimal" value={line.amount} onChange={event => setOpeningLines(current => current.map((item, row) => row === index ? { ...item, amount: event.target.value } : item))} className="mt-1 text-sm" placeholder="0.00" />
               </label>

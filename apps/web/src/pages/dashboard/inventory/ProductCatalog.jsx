@@ -35,6 +35,13 @@ import {
   TableHead,
   TableCell,
 } from '../../../components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
 
 export default function Inventory() {
   const navigate = useNavigate();
@@ -414,30 +421,36 @@ export default function Inventory() {
               />
             </div>
 
-            <select
+            <Select
               value={showArchived ? 'archived' : 'active'}
-              onChange={(event) => setShowArchived(event.target.value === 'archived')}
-              aria-label="Show active or archived products"
-              className="w-[150px] h-9 border border-border-default bg-surface-raised text-body px-3 rounded-input text-sm font-medium shadow-card focus:outline-none focus:ring-2 focus:ring-accent shrink-0 cursor-pointer"
+              onValueChange={(val) => setShowArchived(val === 'archived')}
             >
-              <option value="active">Active products</option>
-              <option value="archived">Archived products</option>
-            </select>
+              <SelectTrigger aria-label="Show active or archived products" className="w-[150px] h-9 text-sm font-medium bg-surface-raised shadow-card shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active products</SelectItem>
+                <SelectItem value="archived">Archived products</SelectItem>
+              </SelectContent>
+            </Select>
 
-            <div className="relative w-[110px] shrink-0">
-              <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
-              <select
-                value={stockFilter}
-                onChange={(event) => setStockFilter(event.target.value)}
-                aria-label="Filter products by stock status"
-                className="w-full h-9 appearance-none border border-border-default bg-surface-raised text-body pl-8 pr-3 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors shadow-card focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
-              >
-                <option value="">All Stock</option>
-                <option value="IN_STOCK">In Stock</option>
-                <option value="LOW_STOCK">Low Stock</option>
-                <option value="OUT_OF_STOCK">Out of Stock</option>
-              </select>
-            </div>
+            <Select
+              value={stockFilter || '__all__'}
+              onValueChange={(val) => setStockFilter(val === '__all__' ? '' : val)}
+            >
+              <SelectTrigger aria-label="Filter products by stock status" className="w-[125px] h-9 text-sm font-medium bg-surface-raised shadow-card shrink-0">
+                <div className="flex items-center gap-1.5 truncate">
+                  <Filter size={14} className="text-muted shrink-0" />
+                  <SelectValue placeholder="All Stock" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Stock</SelectItem>
+                <SelectItem value="IN_STOCK">In Stock</SelectItem>
+                <SelectItem value="LOW_STOCK">Low Stock</SelectItem>
+                <SelectItem value="OUT_OF_STOCK">Out of Stock</SelectItem>
+              </SelectContent>
+            </Select>
 
             <Button
               type="button"
@@ -1128,9 +1141,16 @@ export default function Inventory() {
         {createdOrder && (
           <div role="status" className="fixed bottom-4 right-4 z-40 flex items-center gap-3 rounded-button border border-success-border bg-success-light px-4 py-3 text-sm text-success-text shadow-card">
             <span>Draft purchase order created for {createdOrder.quantity} × {createdOrder.productName}.</span>
-            <button type="button" onClick={() => setCreatedOrder(null)} className="cursor-pointer text-success-text hover:opacity-80" aria-label="Dismiss notification">
+            <Button
+              variant="ghost"
+              size="icon"
+              type="button"
+              onClick={() => setCreatedOrder(null)}
+              className="h-6 w-6 p-0 text-success-text hover:bg-success-border/30"
+              aria-label="Dismiss notification"
+            >
               <X size={14} />
-            </button>
+            </Button>
           </div>
         )}
 

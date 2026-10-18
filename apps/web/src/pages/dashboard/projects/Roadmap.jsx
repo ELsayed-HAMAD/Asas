@@ -21,6 +21,13 @@ import FormDialog from '../../../components/common/FormDialog';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
 
 export default function Roadmap() {
   const queryClient = useQueryClient()
@@ -215,7 +222,9 @@ export default function Roadmap() {
                       {phase.tasks?.length || 0} Tasks
                     </Badge>
                   </div>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     type="button"
                     disabled={deletePhase.isPending}
                     onClick={() => {
@@ -223,12 +232,12 @@ export default function Roadmap() {
                         deletePhase.mutate(phase.id);
                       }
                     }}
-                    className="opacity-40 group-hover/phase:opacity-100 group-focus-within/phase:opacity-100 reveal-on-hover text-caption hover:text-danger p-1 rounded transition-opacity text-xs disabled:opacity-50 cursor-pointer"
+                    className="opacity-40 group-hover/phase:opacity-100 group-focus-within/phase:opacity-100 reveal-on-hover text-caption hover:text-danger h-7 w-7 p-0 transition-opacity disabled:opacity-50"
                     title="Delete phase"
                     aria-label={`Delete phase ${phase.title}`}
                   >
                     <Trash2 size={14} />
-                  </button>
+                  </Button>
                 </div>
 
                 {/* Task List: One white rounded container per phase */}
@@ -455,12 +464,24 @@ export default function Roadmap() {
             Task name
             <Input required value={taskForm.title} onChange={event => setTaskForm(current => ({ ...current, title: event.target.value }))} className="mt-1 w-full" />
           </label>
-          <label className="block text-sm font-medium text-body">
-            Phase
-            <select value={taskForm.phaseId || phases[0]?.id || ''} onChange={event => setTaskForm(current => ({ ...current, phaseId: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default px-3 py-2 bg-surface">
-              {phases.map(phase => <option key={phase.id} value={phase.id}>{phase.title}</option>)}
-            </select>
-          </label>
+          <div>
+            <label htmlFor="task-phase-id" className="block text-sm font-medium text-body mb-1">
+              Phase
+            </label>
+            <Select
+              value={taskForm.phaseId || phases[0]?.id || ''}
+              onValueChange={val => setTaskForm(current => ({ ...current, phaseId: val }))}
+            >
+              <SelectTrigger id="task-phase-id" className="h-9 w-full text-sm bg-surface">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {phases.map(phase => (
+                  <SelectItem key={phase.id} value={phase.id}>{phase.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </FormDialog>
       <FormDialog open={timelineOpen} onClose={() => setTimelineOpen(false)} title="Edit task timeline" subtitle={selectedTask?.title} busy={updateTimeline.isPending} onConfirm={() => updateTimeline.mutate()} confirmLabel="Save timeline">

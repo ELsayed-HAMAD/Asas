@@ -21,6 +21,13 @@ import { Input } from '../../../components/ui/input';
 import { Checkbox } from '../../../components/ui/checkbox';
 import { Badge } from '../../../components/ui/badge';
 import { Progress } from '../../../components/ui/progress';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
 
 // Chart-only number formatters (axis ticks / tooltips). Money arrives as
 // { amount: minor units, currency } — reduce to a major-unit number for the scale.
@@ -85,13 +92,14 @@ export default function CRMOverview() {
     return (
       <div className="flex flex-col h-full items-center justify-center gap-2 bg-surface text-danger">
         <p className="text-sm font-medium">{error?.message || 'Failed to load CRM overview.'}</p>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => refetch()}
-          className="text-xs text-body hover:text-heading underline"
         >
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -517,15 +525,19 @@ export default function CRMOverview() {
           </div>
           <div>
             <label className="block text-sm font-medium text-body mb-1">Stage</label>
-            <select
+            <Select
               value={dealForm.stage}
-              onChange={event => setDealForm(current => ({ ...current, stage: event.target.value }))}
-              className="w-full h-9 px-3 py-1.5 rounded-input border border-border-default bg-surface-muted text-sm text-body"
+              onValueChange={val => setDealForm(current => ({ ...current, stage: val }))}
             >
-              <option value="LEADS">Leads</option>
-              <option value="PROPOSAL">Proposal</option>
-              <option value="NEGOTIATION">Negotiation</option>
-            </select>
+              <SelectTrigger className="w-full bg-surface-muted">
+                <SelectValue placeholder="Select stage" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="LEADS">Leads</SelectItem>
+                <SelectItem value="PROPOSAL">Proposal</SelectItem>
+                <SelectItem value="NEGOTIATION">Negotiation</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <label className="block text-sm font-medium text-body mb-1">Expected close date</label>

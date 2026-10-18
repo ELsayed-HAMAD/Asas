@@ -42,6 +42,13 @@ import {
   TableHead,
   TableCell,
 } from '../../../components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
 
 const toMajor = (money) => (money == null ? 0 : moneyToMajor(money));
 
@@ -199,13 +206,16 @@ export default function RevenueForecast() {
 
           <div className="h-6 w-px bg-gray-200 mx-1"></div>
 
-          <label className="relative flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium bg-white">
-            <span className="sr-only">Forecast calendar year</span>
-            <select value={selectedYear} onChange={event => setSelectedYear(event.target.value)} className="appearance-none bg-transparent pr-5 outline-none cursor-pointer">
-              {availableYears.map(year => <option key={year} value={year}>Year {year}</option>)}
-            </select>
-            <ChevronDown size={14} className="pointer-events-none absolute right-2 text-gray-400" />
-          </label>
+          <Select value={String(selectedYear)} onValueChange={val => setSelectedYear(val)}>
+            <SelectTrigger aria-label="Forecast calendar year" className="h-9 w-auto gap-2 bg-white text-gray-700 border-gray-200 text-sm font-medium">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableYears.map(year => (
+                <SelectItem key={year} value={String(year)}>Year {year}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           <Button
             variant="ghost"
@@ -480,7 +490,14 @@ export default function RevenueForecast() {
           <div className="max-h-40 space-y-2 overflow-y-auto border-b border-gray-200 pb-3">
             <p className="text-xs font-semibold uppercase text-gray-500">Existing quotas</p>
             {quotas.length === 0 ? <p className="text-sm text-gray-500">No quotas recorded for this year.</p> : quotas.map(quota => <div key={quota.id} className="flex items-center justify-between gap-3 text-sm">
-              <button type="button" onClick={() => selectQuota(quota.id)} className="min-w-0 flex-1 truncate text-left text-blue-700 hover:underline">{quota.repName} · {quota.period} · {quota.quota ? formatCompactMoney(toMajor(quota.quota), quota.quota.currency) : 'Currency unknown'}</button>
+              <Button
+                type="button"
+                variant="link"
+                onClick={() => selectQuota(quota.id)}
+                className="min-w-0 flex-1 justify-start h-auto p-0 truncate text-left text-blue-700 hover:underline font-normal"
+              >
+                {quota.repName} · {quota.period} · {quota.quota ? formatCompactMoney(toMajor(quota.quota), quota.quota.currency) : 'Currency unknown'}
+              </Button>
               <Button type="button" variant="ghost" size="icon" onClick={() => setQuotaToDelete(quota)} aria-label={`Delete quota for ${quota.repName}`} className="h-6 w-6 text-gray-500 hover:bg-gray-100 hover:text-red-600"><Trash2 size={14} /></Button>
             </div>)}
           </div>

@@ -26,6 +26,13 @@ import {
   TableHead,
   TableCell,
 } from '../../../components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
 
 function formatShortDate(dateStr) {
   if (!dateStr) return '—'
@@ -216,77 +223,78 @@ export default function TimeAttendance() {
       <div className="flex items-center justify-between gap-2 w-full mb-2.5">
         {/* Left group: DEPT All Departments, < 1 / N > pager, STATUS All, RANGE 30 days */}
         <div className="flex items-center gap-2 flex-nowrap shrink-0">
-          <label className="flex items-center gap-1.5 border border-border-default text-body px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card cursor-pointer shrink-0">
-            <span className="text-muted text-[11px] font-semibold uppercase">Dept</span>
-            <select
-              aria-label="Department"
-              value={departmentId}
-              onChange={event => setDepartmentId(event.target.value)}
-              className="bg-transparent text-xs font-medium outline-none cursor-pointer"
-            >
-              <option value="ALL">All Departments</option>
+          <Select value={departmentId} onValueChange={setDepartmentId}>
+            <SelectTrigger aria-label="Department" className="h-8 text-xs font-medium w-auto min-w-[140px] bg-surface-raised shadow-card">
+              <span className="text-muted text-[11px] font-semibold uppercase mr-1">Dept</span>
+              <SelectValue placeholder="All Departments" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Departments</SelectItem>
               {(departmentData?.items ?? []).map(department => (
-                <option key={department.id} value={department.id}>{department.name}</option>
+                <SelectItem key={department.id} value={department.id}>{department.name}</SelectItem>
               ))}
-            </select>
-            <ChevronDown size={12} className="text-muted" />
-          </label>
+            </SelectContent>
+          </Select>
 
           {/* < 1/N > Timesheets Page Pagination */}
           <div className="flex items-center border border-border-default rounded-input text-xs bg-surface-raised shadow-card shrink-0">
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               type="button"
               disabled={timesheetPage <= 1}
               onClick={() => setTimesheetPage(p => p - 1)}
               aria-label="Previous timesheet page"
-              className="px-2 py-1.5 hover:bg-surface-muted disabled:opacity-40 transition-colors text-muted hover:text-heading cursor-pointer"
+              className="h-7 px-2 text-xs text-muted hover:text-heading"
             >
               ‹
-            </button>
+            </Button>
             <span className="px-2 py-1 text-[11px] font-medium text-muted tabular-nums border-x border-border-default">
               {timesheetPage} / {timesheetPages}
             </span>
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               type="button"
               disabled={timesheetPage >= timesheetPages}
               onClick={() => setTimesheetPage(p => p + 1)}
               aria-label="Next timesheet page"
-              className="px-2 py-1.5 hover:bg-surface-muted disabled:opacity-40 transition-colors text-muted hover:text-heading cursor-pointer"
+              className="h-7 px-2 text-xs text-muted hover:text-heading"
             >
               ›
-            </button>
+            </Button>
           </div>
 
           {/* Status: All ⌄ */}
-          <label className="flex items-center gap-1.5 border border-border-default text-body px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card cursor-pointer shrink-0">
-            <span className="text-muted text-[11px] font-semibold uppercase">Status</span>
-            <select
-              aria-label="Status filter"
-              value={needsActionOnly ? 'NEEDS_ACTION' : 'ALL'}
-              onChange={e => setNeedsActionOnly(e.target.value === 'NEEDS_ACTION')}
-              className="bg-transparent text-xs font-medium outline-none cursor-pointer"
-            >
-              <option value="ALL">All</option>
-              <option value="NEEDS_ACTION">Needs Action</option>
-            </select>
-            <ChevronDown size={12} className="text-muted" />
-          </label>
+          <Select
+            value={needsActionOnly ? 'NEEDS_ACTION' : 'ALL'}
+            onValueChange={v => setNeedsActionOnly(v === 'NEEDS_ACTION')}
+          >
+            <SelectTrigger aria-label="Status filter" className="h-8 text-xs font-medium w-auto min-w-[100px] bg-surface-raised shadow-card">
+              <span className="text-muted text-[11px] font-semibold uppercase mr-1">Status</span>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All</SelectItem>
+              <SelectItem value="NEEDS_ACTION">Needs Action</SelectItem>
+            </SelectContent>
+          </Select>
 
           {/* Range: 30 days ⌄ */}
-          <label className="flex items-center gap-1.5 border border-border-default text-body px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card cursor-pointer shrink-0">
-            <span className="text-muted text-[11px] font-semibold uppercase">Range</span>
-            <select
-              aria-label="Punch completion range"
-              value={attendanceRangeDays}
-              onChange={event => setAttendanceRangeDays(Number(event.target.value))}
-              className="bg-transparent text-xs font-medium outline-none cursor-pointer"
-            >
-              <option value={7}>7 days</option>
-              <option value={30}>30 days</option>
-              <option value={90}>90 days</option>
-            </select>
-            <ChevronDown size={12} className="text-muted" />
-          </label>
+          <Select
+            value={String(attendanceRangeDays)}
+            onValueChange={v => setAttendanceRangeDays(Number(v))}
+          >
+            <SelectTrigger aria-label="Punch completion range" className="h-8 text-xs font-medium w-auto min-w-[110px] bg-surface-raised shadow-card">
+              <span className="text-muted text-[11px] font-semibold uppercase mr-1">Range</span>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">7 days</SelectItem>
+              <SelectItem value="30">30 days</SelectItem>
+              <SelectItem value="90">90 days</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Right group: Request Time Off, Export, Approve All Valid aligned flush with right edge */}
@@ -337,21 +345,21 @@ export default function TimeAttendance() {
 
       {/* Row 2 (flex items-center justify-start gap-3 w-full mb-5): Left Overtime Controls */}
       <div className="flex items-center justify-start gap-3 w-full mb-5">
-        <label className="flex items-center gap-1.5 border border-border-default text-body px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card cursor-pointer shrink-0">
-          <span className="text-muted text-[11px] font-semibold uppercase">Overtime threshold</span>
-          <select
-            aria-label="Overtime threshold"
-            value={overtimeThreshold}
-            onChange={e => setOvertimeThreshold(Number(e.target.value))}
-            className="bg-transparent text-xs font-medium outline-none cursor-pointer"
-          >
-            <option value={40}>40 hrs/wk</option>
-            <option value={35}>35 hrs/wk</option>
-            <option value={45}>45 hrs/wk</option>
-            <option value={48}>48 hrs/wk</option>
-          </select>
-          <ChevronDown size={12} className="text-muted" />
-        </label>
+        <Select
+          value={String(overtimeThreshold)}
+          onValueChange={e => setOvertimeThreshold(Number(e))}
+        >
+          <SelectTrigger aria-label="Overtime threshold" className="h-8 text-xs font-medium w-auto min-w-[160px] bg-surface-raised shadow-card">
+            <span className="text-muted text-[11px] font-semibold uppercase mr-1">Overtime threshold</span>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="40">40 hrs/wk</SelectItem>
+            <SelectItem value="35">35 hrs/wk</SelectItem>
+            <SelectItem value="45">45 hrs/wk</SelectItem>
+            <SelectItem value="48">48 hrs/wk</SelectItem>
+          </SelectContent>
+        </Select>
 
         {/* Auto-Flag Overtime toggle */}
         <div className="flex items-center gap-2 border border-border-default px-2.5 py-1.5 rounded-input text-xs font-medium bg-surface-raised shadow-card shrink-0">
@@ -542,14 +550,16 @@ export default function TimeAttendance() {
                   <h2 className="text-sm font-bold text-heading">Time Off Requests</h2>
                   <span className="text-xs text-muted font-medium">({visibleLeaveRequests.length} items)</span>
                 </div>
-                <button
+                <Button
+                  variant="link"
+                  size="sm"
                   type="button"
                   onClick={() => setLeaveDialogOpen(true)}
                   disabled={!data?.selfClock}
-                  className="text-xs font-semibold text-accent hover:underline disabled:opacity-50 cursor-pointer"
+                  className="h-auto p-0 text-xs font-semibold text-accent hover:underline disabled:opacity-50"
                 >
                   + Request Time Off
-                </button>
+                </Button>
               </div>
 
               <div className="divide-y divide-border-subtle max-h-[240px] overflow-y-auto">
@@ -591,24 +601,27 @@ export default function TimeAttendance() {
                         </span>
                         {isAdmin && item.status === 'PENDING' && (
                           <div className="flex items-center gap-1.5 ml-2" onClick={e => e.stopPropagation()}>
-                            <button
+                            <Button
+                              size="sm"
                               type="button"
                               disabled={leaveDecisionMutation.isPending}
                               onClick={() => leaveDecisionMutation.mutate({ id: item.id, decision: 'APPROVED' })}
-                              className="px-2 py-1 text-xs font-semibold rounded bg-primary text-white hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer"
+                              className="h-6 px-2 text-xs font-semibold"
                               title="Approve leave"
                             >
                               Approve
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
                               type="button"
                               disabled={leaveDecisionMutation.isPending}
                               onClick={() => leaveDecisionMutation.mutate({ id: item.id, decision: 'REJECTED' })}
-                              className="px-2 py-1 text-xs font-medium rounded border border-border-default text-body hover:bg-surface-muted transition-colors disabled:opacity-60 cursor-pointer"
+                              className="h-6 px-2 text-xs font-medium"
                               title="Reject leave"
                             >
                               Reject
-                            </button>
+                            </Button>
                           </div>
                         )}
                       </div>
@@ -652,19 +665,19 @@ export default function TimeAttendance() {
                       <div className="mt-3 pt-3 border-t border-border-subtle">
                         <p className="font-semibold text-heading mb-2">Manage annual leave policies</p>
                         <div className="flex flex-wrap items-end gap-2.5">
-                          <label className="text-xs text-muted">
-                            Type
-                            <select
-                              aria-label="Policy leave type"
-                              value={policyType}
-                              onChange={event => setPolicyType(event.target.value)}
-                              className="mt-1 block rounded-input border border-border-default bg-surface-raised px-2 py-1 text-body text-xs"
-                            >
-                              {Object.entries(LEAVE_TYPE_LABELS).map(([type, label]) => (
-                                <option key={type} value={type}>{label}</option>
-                              ))}
-                            </select>
-                          </label>
+                          <div>
+                            <label htmlFor="policy-leave-type" className="text-xs text-muted block mb-1">Type</label>
+                            <Select value={policyType} onValueChange={setPolicyType}>
+                              <SelectTrigger id="policy-leave-type" aria-label="Policy leave type" className="h-7 text-xs w-36">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(LEAVE_TYPE_LABELS).map(([type, label]) => (
+                                  <SelectItem key={type} value={type}>{label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                           <label className="text-xs text-muted">
                             Allowance (days)
                             <input
@@ -686,14 +699,15 @@ export default function TimeAttendance() {
                             />
                             Weekdays only
                           </label>
-                          <button
+                          <Button
+                            size="sm"
                             type="button"
                             disabled={policyMutation.isPending || policyDraft.annualAllowanceDays === ''}
                             onClick={() => policyMutation.mutate({ type: policyType, body: { annualAllowanceDays: Number(policyDraft.annualAllowanceDays), weekdaysOnly: policyDraft.weekdaysOnly } })}
-                            className="rounded-input bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-hover transition-colors disabled:opacity-60 cursor-pointer"
+                            className="h-7 px-3 text-xs font-semibold"
                           >
                             {policyMutation.isPending ? 'Saving…' : 'Save policy'}
-                          </button>
+                          </Button>
                           {policyMutation.isError && <span role="alert" className="text-xs text-danger">{policyMutation.error?.message || 'Could not save leave policy.'}</span>}
                         </div>
                       </div>
@@ -719,13 +733,15 @@ export default function TimeAttendance() {
                     <p className="text-xs text-muted truncate">{selectedTimesheet?.departmentName || 'General'} · Daily Breakdown</p>
                   </div>
                 </div>
-                <button
+                <Button
+                  size="sm"
+                  type="button"
                   disabled={!ts || Boolean(ts.approvedAt) || approveMutation.isPending}
                   onClick={() => ts && approveMutation.mutate(ts.id)}
-                  className="bg-primary text-white px-3 py-1.5 rounded-input text-xs font-semibold hover:bg-primary-hover transition-colors shadow-card disabled:opacity-60 shrink-0 cursor-pointer whitespace-nowrap"
+                  className="shadow-card text-xs font-semibold shrink-0 whitespace-nowrap"
                 >
                   {approveMutation.isPending ? 'Approving…' : ts?.approvedAt ? 'Week Approved' : 'Approve Week'}
-                </button>
+                </Button>
               </div>
 
               {/* Daily Timesheet Days Table */}
@@ -750,7 +766,9 @@ export default function TimeAttendance() {
                           <TableCell className="px-2.5 py-2 text-body text-right rtl:text-left tabular-nums whitespace-nowrap">{day.totalHours || '0'}h</TableCell>
                           <TableCell className="px-1.5 py-2 text-right rtl:text-left">
                             {isAdmin && !ts?.approvedAt && /^\d{4}-\d{2}-\d{2}$/.test(day.dayLabel) && (
-                              <button
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 type="button"
                                 aria-label={`Correct punches for ${day.dayLabel}`}
                                 onClick={() => {
@@ -762,10 +780,10 @@ export default function TimeAttendance() {
                                     clockOutTime: day.clockOut || '',
                                   });
                                 }}
-                                className="rounded p-1 text-muted hover:bg-surface-muted hover:text-heading cursor-pointer"
+                                className="h-6 w-6 p-0 text-muted hover:text-heading"
                               >
                                 <Pencil size={13} />
-                              </button>
+                              </Button>
                             )}
                           </TableCell>
                         </TableRow>
@@ -809,14 +827,15 @@ export default function TimeAttendance() {
                       </p>
                     </div>
                     {isAdmin && selectedException.alert && (
-                      <button
+                      <Button
+                        size="sm"
                         type="button"
                         disabled={resolveExceptionMutation.isPending}
                         onClick={() => resolveExceptionMutation.mutate(selectedException.id)}
-                        className="px-2 py-1 rounded bg-primary text-white text-xs font-medium hover:bg-primary-hover disabled:opacity-60 shrink-0 cursor-pointer"
+                        className="h-6 px-2 text-xs font-medium shrink-0"
                       >
                         Resolve
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -837,22 +856,25 @@ export default function TimeAttendance() {
                     </div>
                     {isAdmin && selectedLeave.status === 'PENDING' && (
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <button
+                        <Button
+                          size="sm"
                           type="button"
                           disabled={leaveDecisionMutation.isPending}
                           onClick={() => leaveDecisionMutation.mutate({ id: selectedLeave.id, decision: 'APPROVED' })}
-                          className="px-2 py-1 rounded bg-primary text-white text-xs font-medium hover:bg-primary-hover disabled:opacity-60 cursor-pointer"
+                          className="h-6 px-2 text-xs font-medium"
                         >
                           Approve
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           type="button"
                           disabled={leaveDecisionMutation.isPending}
                           onClick={() => leaveDecisionMutation.mutate({ id: selectedLeave.id, decision: 'REJECTED' })}
-                          className="px-2 py-1 rounded border border-border-default text-xs text-body hover:bg-surface-muted disabled:opacity-60 cursor-pointer"
+                          className="h-6 px-2 text-xs"
                         >
                           Reject
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -868,13 +890,15 @@ export default function TimeAttendance() {
                   <h2 className="text-sm font-semibold text-heading shrink-0">Attendance Exceptions</h2>
                   <span className="text-xs text-muted font-medium shrink-0">({visibleExceptions.length})</span>
                 </div>
-                <button
+                <Button
+                  variant="link"
+                  size="sm"
                   type="button"
                   onClick={() => setNeedsActionOnly(c => !c)}
-                  className="text-xs text-accent hover:underline cursor-pointer shrink-0 whitespace-nowrap"
+                  className="h-auto p-0 text-xs text-accent hover:underline shrink-0 whitespace-nowrap"
                 >
                   {needsActionOnly ? 'Show All' : 'Action Only'}
-                </button>
+                </Button>
               </div>
 
               <div className="divide-y divide-border-subtle max-h-[260px] overflow-y-auto pr-1">
@@ -906,18 +930,19 @@ export default function TimeAttendance() {
                       </div>
                       <div className="shrink-0 ml-2">
                         {isAdmin && item.alert ? (
-                          <button
+                          <Button
+                            size="sm"
                             type="button"
                             disabled={resolveExceptionMutation.isPending}
                             onClick={e => {
                               e.stopPropagation();
                               resolveExceptionMutation.mutate(item.id);
                             }}
-                            className="px-2.5 py-1 text-xs font-semibold rounded bg-primary text-white hover:bg-primary-hover transition-colors disabled:opacity-60 shadow-sm cursor-pointer"
+                            className="h-6 px-2.5 text-xs font-semibold shadow-sm"
                             title="Resolve exception"
                           >
                             Resolve
-                          </button>
+                          </Button>
                         ) : (
                           <span className="text-xs text-muted font-medium">Resolved</span>
                         )}
@@ -950,11 +975,19 @@ export default function TimeAttendance() {
         }}
       >
         <div className="space-y-4">
-          <label className="block text-sm font-medium text-body">Leave type
-            <select value={leaveForm.type} onChange={event => setLeaveForm(current => ({ ...current, type: event.target.value }))} className="mt-1 w-full rounded-input border border-border-default bg-surface-raised px-3 py-2 text-sm text-body">
-              <option value="VACATION">Vacation</option><option value="SICK">Sick leave</option><option value="PERSONAL">Personal</option>
-            </select>
-          </label>
+          <div>
+            <label htmlFor="leave-type" className="block text-sm font-medium text-body mb-1">Leave type</label>
+            <Select value={leaveForm.type} onValueChange={type => setLeaveForm(current => ({ ...current, type }))}>
+              <SelectTrigger id="leave-type" className="h-9 w-full text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="VACATION">Vacation</SelectItem>
+                <SelectItem value="SICK">Sick leave</SelectItem>
+                <SelectItem value="PERSONAL">Personal</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <label className="block text-sm font-medium text-body">Start date
             <Input type="date" required value={leaveForm.startDate} onChange={event => setLeaveForm(current => ({ ...current, startDate: event.target.value }))} className="mt-1" />
           </label>

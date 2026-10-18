@@ -30,6 +30,13 @@ import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
 
 export default function ActiveSprints() {
   const queryClient = useQueryClient();
@@ -279,18 +286,21 @@ export default function ActiveSprints() {
               <div className="flex items-center gap-2">
                 <Rocket size={18} className="text-body shrink-0" />
                 {sprints.length > 1 ? (
-                  <select
+                  <Select
                     value={activeSprint.id}
-                    onChange={(e) => setSelectedSprintId(e.target.value)}
-                    className="bg-transparent font-medium text-heading border-none focus:outline-none cursor-pointer pr-1 text-lg"
-                    aria-label="Select sprint"
+                    onValueChange={(val) => setSelectedSprintId(val)}
                   >
-                    {sprints.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.status})
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger aria-label="Select sprint" className="h-8 border-none bg-transparent font-medium text-heading text-lg focus:ring-0 shadow-none px-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sprints.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name} ({s.status})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 ) : (
                   <span>{activeSprint.name}</span>
                 )}
@@ -569,20 +579,25 @@ export default function ActiveSprints() {
                           };
                           const currentConfig = statusConfig[selectedIssue.status] || statusConfig.TODO;
                           return (
-                            <label className={`inline-flex items-center gap-1.5 ${currentConfig.bg} px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer`}>
-                              {currentConfig.icon}
-                              <select
-                                value={selectedIssue.status}
-                                disabled={issueMutation.isPending}
-                                onChange={event => issueMutation.mutate(event.target.value)}
-                                className="bg-transparent uppercase outline-none cursor-pointer font-medium text-xs"
+                            <Select
+                              value={selectedIssue.status}
+                              disabled={issueMutation.isPending}
+                              onValueChange={val => issueMutation.mutate(val)}
+                            >
+                              <SelectTrigger
+                                aria-label="Issue status"
+                                className={`h-7 w-auto inline-flex items-center gap-1.5 ${currentConfig.bg} px-2.5 py-1 rounded-full text-xs font-medium border-0 shadow-none focus:ring-1 focus:ring-accent`}
                               >
-                                <option value="TODO" className="bg-surface-raised text-heading">To Do</option>
-                                <option value="IN_PROGRESS" className="bg-surface-raised text-heading">In Progress</option>
-                                <option value="IN_REVIEW" className="bg-surface-raised text-heading">In Review</option>
-                                <option value="DONE" className="bg-surface-raised text-heading">Done</option>
-                              </select>
-                            </label>
+                                {currentConfig.icon}
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="TODO">To Do</SelectItem>
+                                <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                                <SelectItem value="IN_REVIEW">In Review</SelectItem>
+                                <SelectItem value="DONE">Done</SelectItem>
+                              </SelectContent>
+                            </Select>
                           );
                         })()}
                         {selectedIssue.priority === 'HIGH' || selectedIssue.priority === 'URGENT' ? (
@@ -706,15 +721,17 @@ export default function ActiveSprints() {
                         placeholder="Write a comment..."
                         className="w-full bg-surface-muted/50 border-0 rounded-[10px] pl-3.5 pr-10 h-10 text-xs text-body placeholder:text-caption"
                       />
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         type="submit"
                         disabled={!commentText.trim() || createCommentMutation.isPending}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-accent disabled:text-caption hover:opacity-80 transition-opacity p-1 cursor-pointer disabled:cursor-not-allowed"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 text-accent disabled:text-caption hover:opacity-80 p-0"
                         title="Send comment (⌘+Enter)"
                         aria-label="Send comment"
                       >
                         {createCommentMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                      </button>
+                      </Button>
                     </div>
                   </form>
                 </>
