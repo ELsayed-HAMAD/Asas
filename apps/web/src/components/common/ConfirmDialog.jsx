@@ -48,7 +48,7 @@ export default function ConfirmDialog({
 
   return (
     <Root open={isDialogOpen} onOpenChange={(val) => { if (!val && !busy) onClose?.() }}>
-      <Content className="relative w-full max-w-md bg-surface-raised rounded-card border border-border-default shadow-elevated p-6">
+      <Content className="w-full max-w-md bg-surface-raised rounded-card border border-border-default shadow-elevated p-6">
         <Header className="text-left rtl:text-right">
           <Title id="confirm-dialog-title" className="text-lg font-bold text-heading">
             {title}
