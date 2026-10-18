@@ -7,7 +7,7 @@ import { errorHandler } from '../src/middlewares/errorHandler.js'
 import { auditLogRoutes } from '../src/modules/auditLog/auditLog.routes.js'
 
 const logId = 'claaaaaaaaaaaaaaaaaaaaaaa'
-const actorId = 'clbbbbbbbbbbbbbbbbbbbbbbb'
+const actorId = 'ZsXXnkTqoyuvRM1dgrgqy5TqzZ3jOfSK'
 const targetId = 'clccccccccccccccccccccccc'
 
 async function setup(options: { role?: string; logs?: any[]; total?: number } = {}) {

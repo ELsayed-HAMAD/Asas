@@ -12,7 +12,7 @@ export const auditLogItemSchema = z.object({
   actorName: z.string().nullable().optional(),
   actor: z
     .object({
-      id: idSchema,
+      id: z.string(),
       name: z.string().nullable(),
       email: z.string(),
     })
