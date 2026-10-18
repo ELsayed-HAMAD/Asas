@@ -3,7 +3,7 @@ import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-d
 import {
   LayoutDashboard, Users, CreditCard, Briefcase,
   Package, FolderKanban, Settings, HelpCircle,
-  ChevronDown, Plus, LogOut, Menu,
+  ChevronDown, ChevronLeft, ChevronRight, Plus, LogOut, Menu,
   Check, User, Moon, Download, Search, Bell, Globe, Mail
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -37,6 +37,12 @@ import {
   BreadcrumbSeparator,
 } from '../components/ui/breadcrumb'
 import { Kbd } from '../components/ui/kbd'
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from '../components/ui/tooltip'
 
 // ── Navigation config ──────────────────────────────────────
 const NAV = [
@@ -213,11 +219,72 @@ function isParentActive(item, pathname) {
 }
 
 // ── NavItem component ──────────────────────────────────────
-function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t }) {
+function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t, isCollapsed }) {
   const hasChildren = Boolean(item.children)
   const isOpen      = openSections[item.id]
   const parentActive = isParentActive(item, pathname)
   const itemLabel   = item.i18nKey && t ? t(item.i18nKey, item.label) : item.label
+
+  if (isCollapsed) {
+    if (hasChildren) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Link
+              to={item.children[0].path}
+              onClick={onNavigate}
+              data-active={parentActive ? "true" : undefined}
+              aria-label={itemLabel}
+              className={`relative flex items-center justify-center h-10 min-h-[40px] max-h-[40px] rounded-button text-sm transition-colors ${
+                parentActive
+                  ? 'bg-surface-active text-heading font-medium'
+                  : 'text-muted hover:text-heading hover:bg-surface-muted'
+              }`}
+            >
+              {parentActive && (
+                <div
+                  className="absolute start-0 top-2 bottom-2 w-[3px] bg-primary rounded-e-full"
+                />
+              )}
+              <item.icon size={18} />
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            {itemLabel}
+          </TooltipContent>
+        </Tooltip>
+      )
+    }
+
+    const isActive = pathname === item.path
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Link
+            to={item.path}
+            onClick={onNavigate}
+            data-active={isActive ? "true" : undefined}
+            aria-label={itemLabel}
+            className={`relative flex items-center justify-center h-10 min-h-[40px] max-h-[40px] rounded-button text-sm transition-colors ${
+              isActive
+                ? 'bg-surface-active text-heading font-medium'
+                : 'text-muted hover:text-heading hover:bg-surface-muted'
+            }`}
+          >
+            {isActive && (
+              <div
+                className="absolute start-0 top-2 bottom-2 w-[3px] bg-primary rounded-e-full"
+              />
+            )}
+            <item.icon size={18} />
+          </Link>
+        </TooltipTrigger>
+        <TooltipContent side="right">
+          {itemLabel}
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
 
   if (hasChildren) {
     return (
@@ -297,7 +364,7 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t })
 }
 
 // ── Sidebar Content Component ────────────────────────────────
-function SidebarContent({ navProps, navigate }) {
+function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollapse }) {
   const { t, i18n } = useTranslation()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const navRef = useRef(null)
@@ -501,45 +568,78 @@ function SidebarContent({ navProps, navigate }) {
     <div className="flex flex-col h-full min-h-0 relative">
 
       {/* Brand */}
-      <div className="px-4 py-3.5 flex items-center gap-3 border-b border-border-subtle flex-shrink-0">
-        <div className="w-8 h-8 rounded-button bg-primary text-on-primary flex items-center justify-center text-sm font-bold flex-shrink-0">
-          A
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold text-heading leading-tight">Asas</p>
-            {activeOrganization?.onboardingStatus === 'SAMPLE_LOADED' && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/20">
-                {t('common.sampleData', 'Sample')}
-              </span>
-            )}
+      <div className={`px-4 py-3.5 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} border-b border-border-subtle flex-shrink-0`}>
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 rounded-button bg-primary text-on-primary flex items-center justify-center text-sm font-bold flex-shrink-0">
+            A
           </div>
-          <p className="text-[11px] text-caption truncate">{tenantName}</p>
+          {!isCollapsed && (
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-heading leading-tight">Asas</p>
+                {activeOrganization?.onboardingStatus === 'SAMPLE_LOADED' && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/20">
+                    {t('common.sampleData', 'Sample')}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-caption truncate">{tenantName}</p>
+            </div>
+          )}
         </div>
+        {toggleCollapse && (
+          <button
+            type="button"
+            onClick={toggleCollapse}
+            className="hidden md:flex text-muted hover:text-heading p-1 rounded hover:bg-surface-muted transition-colors cursor-pointer"
+            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {isCollapsed ? <ChevronRight size={14} className="rtl:rotate-180" /> : <ChevronLeft size={14} className="rtl:rotate-180" />}
+          </button>
+        )}
       </div>
 
       {/* Quick action */}
       <div className="px-3 py-2 flex-shrink-0">
-        <Button
-          type="button"
-          onClick={() => setQuickEntryOpen(true)}
-          className="w-full h-9 flex items-center justify-center gap-2 cursor-pointer font-medium"
-        >
-          <Plus size={14} />
-          {t('common.newEntry', 'New Entry')}
-        </Button>
+        {isCollapsed ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                onClick={() => setQuickEntryOpen(true)}
+                className="w-full h-9 flex items-center justify-center p-0 cursor-pointer font-medium"
+                aria-label={t('common.newEntry', 'New Entry')}
+              >
+                <Plus size={16} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              {t('common.newEntry', 'New Entry')}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Button
+            type="button"
+            onClick={() => setQuickEntryOpen(true)}
+            className="w-full h-9 flex items-center justify-center gap-2 cursor-pointer font-medium"
+          >
+            <Plus size={14} />
+            {t('common.newEntry', 'New Entry')}
+          </Button>
+        )}
       </div>
 
       {/* Main navigation - independently scrollable containing all sections */}
       <nav ref={navRef} className="flex-1 min-h-0 px-2 space-y-0.5 overflow-y-auto no-scrollbar scrollbar-soft">
         {NAV.map(item => (
-          <NavItem key={item.id} item={item} {...navProps} t={t} />
+          <NavItem key={item.id} item={item} {...navProps} t={t} isCollapsed={isCollapsed} />
         ))}
 
         {/* Settings, Support, Help, Data Export moved into scrollable nav */}
         <div className="pt-2 mt-2 border-t border-border-subtle/60 space-y-0.5">
           {BOTTOM_NAV.map(item => (
-            <NavItem key={item.id} item={item} {...navProps} t={t} />
+            <NavItem key={item.id} item={item} {...navProps} t={t} isCollapsed={isCollapsed} />
           ))}
         </div>
       </nav>
@@ -553,15 +653,17 @@ function SidebarContent({ navProps, navigate }) {
               data-testid="user-menu-button"
               aria-label="User profile menu"
               aria-expanded={userMenuOpen}
-              className="w-full flex items-center gap-2.5 hover:bg-surface-muted p-2 -mx-2 rounded-lg transition-colors text-left rtl:text-right cursor-pointer"
+              className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5'} hover:bg-surface-muted p-2 -mx-2 rounded-lg transition-colors text-left rtl:text-right cursor-pointer`}
             >
               <div className="w-8 h-8 rounded-full bg-surface-strong flex items-center justify-center text-xs font-bold text-body flex-shrink-0">
                 {initials}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-heading truncate">{displayName}</p>
-                <p className="text-[11px] font-medium text-caption truncate">{roleLabel}</p>
-              </div>
+              {!isCollapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-heading truncate">{displayName}</p>
+                  <p className="text-[11px] font-medium text-caption truncate">{roleLabel}</p>
+                </div>
+              )}
             </button>
           </DropdownMenuTrigger>
 
@@ -993,15 +1095,20 @@ export default function DashboardLayout() {
     return i18nKey ? t(i18nKey, { defaultValue: BREADCRUMB_LABELS[seg] || seg }) : (BREADCRUMB_LABELS[seg] || (seg.charAt(0).toUpperCase() + seg.slice(1)))
   })
 
-  const navProps = { pathname, openSections, toggleSection, onNavigate: () => setMobileSidebarOpen(false) }
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const toggleCollapse = () => setSidebarCollapsed(prev => !prev)
+
+  const navProps = { pathname, openSections, toggleSection, onNavigate: () => setMobileSidebarOpen(false), isCollapsed: sidebarCollapsed }
 
   return (
     <div className="flex h-screen bg-surface overflow-hidden">
 
       {/* ── Desktop sidebar ── */}
-      <aside className="hidden md:flex w-55 min-w-55 h-screen max-h-screen bg-surface-raised border-e border-border-subtle flex-col relative z-30">
-        <SidebarContent navProps={navProps} navigate={navigate} />
-      </aside>
+      <TooltipProvider delayDuration={150}>
+        <aside className={`hidden md:flex ${sidebarCollapsed ? 'w-16 min-w-16' : 'w-55 min-w-55'} h-screen max-h-screen bg-surface-raised border-e border-border-subtle flex-col relative z-30 transition-all duration-200`}>
+          <SidebarContent navProps={navProps} navigate={navigate} isCollapsed={sidebarCollapsed} toggleCollapse={toggleCollapse} />
+        </aside>
+      </TooltipProvider>
 
       {/* ── Mobile sidebar overlay ── */}
       {mobileSidebarOpen && (
@@ -1015,7 +1122,7 @@ export default function DashboardLayout() {
           />
           {/* Drawer */}
           <aside id="mobile-navigation-drawer" aria-label="Main navigation" className="relative z-10 w-55 h-full max-h-screen bg-surface-raised border-e border-border-subtle flex flex-col">
-            <SidebarContent navProps={navProps} navigate={navigate} />
+            <SidebarContent navProps={{ ...navProps, isCollapsed: false }} navigate={navigate} isCollapsed={false} />
           </aside>
         </div>
       )}

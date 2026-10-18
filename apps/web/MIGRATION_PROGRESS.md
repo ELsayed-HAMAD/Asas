@@ -116,7 +116,13 @@
 
 ## Phase 6 — Approved Tweaks
 
-### Status: NOT STARTED
+### Status: ✅ COMPLETE (2026-10-18)
+
+| Tweak / Scope | Status | Notes |
+|---|---|---|
+| Sidebar-icon tooltips (collapsed state) | ✅ Done | Wired `ui/tooltip` (`Tooltip`, `TooltipTrigger`, `TooltipContent`, `TooltipProvider`) to sidebar icons, quick action button, and profile in `DashboardLayout.jsx`; desktop sidebar collapse toggle with smooth transition and icon centering |
+| Destructive `ConfirmDialog` call-sites | ✅ Done | Verified all destructive confirmation dialogs (delete employee, delete department, delete deal, delete quota, delete vendor, delete customer, delete project, remove member, reset sample data, and product archive) route through `danger` branch to `ui/alert-dialog` |
+| Verification gate | ✅ Done | `pnpm test`: web 44/44 pass · `pnpm build`: clean build in 30.93s |
 
 ---
 
