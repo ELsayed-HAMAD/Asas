@@ -23,6 +23,34 @@ const ROLE_RANK: Record<UserRole, number> = {
 }
 
 /**
+ * Short-lived cache of resolved auth contexts, keyed by raw session token. Every guarded
+ * request otherwise pays for `getSession()` plus one or two `Member` lookups (REVIEW.md
+ * finding F4); a 30 s TTL cuts that to one resolution per token per half-minute.
+ *
+ * Only successful resolutions are cached: a `null` (no session, no membership) is cheap to
+ * produce and must never stick around, so sign-out takes effect immediately. The accepted
+ * staleness window also covers role changes and organization switches — both become visible
+ * within the TTL. The cache is process-local by design; replicas do not share it, and a
+ * per-replica miss costs exactly what every request cost before this existed.
+ */
+const AUTH_CONTEXT_TTL_MS = 30_000
+const AUTH_CONTEXT_CACHE_MAX = 1_000
+const authContextCache = new Map<string, { context: AuthContext; expiresAt: number }>()
+
+/** Test seam: drop every cached resolution so a suite starts from a cold cache. */
+export function clearAuthContextCache(): void {
+  authContextCache.clear()
+}
+
+/** Extract better-auth's session token from the request's `cookie` header, if present. */
+function sessionTokenFromHeaders(headers: FastifyRequest['headers']): string | null {
+  const cookie = headers.cookie
+  if (typeof cookie !== 'string') return null
+  const match = cookie.match(/(?:^|;\s*)better-auth\.session_token=([^;]+)/)
+  return match?.[1] ?? null
+}
+
+/**
  * Pure role comparison, kept separate from session/database lookups so it is testable without
  * either. `role` is currently signed into nothing and checked nowhere in the legacy API (see
  * the rebuild plan, Phase 1 \u00a75) \u2014 this is the one place that decision is made in the new stack.
@@ -44,6 +72,12 @@ export async function resolveAuthContext(
   prisma: PrismaClient,
   headers: FastifyRequest['headers'],
 ): Promise<AuthContext | null> {
+  const sessionToken = sessionTokenFromHeaders(headers)
+  if (sessionToken) {
+    const cached = authContextCache.get(sessionToken)
+    if (cached && cached.expiresAt > Date.now()) return cached.context
+    authContextCache.delete(sessionToken)
+  }
   const sessionData = await auth.api.getSession({ headers: fromNodeHeaders(headers) })
   if (!sessionData) return null
   const session = sessionData.session as (typeof sessionData.session & {
@@ -52,6 +86,10 @@ export async function resolveAuthContext(
   let tenantId = session?.activeOrganizationId
   if (!tenantId) {
     const members = await prisma.member.findMany({ where: { userId: sessionData.user.id } })
+    // Convenience fallback only when it is unambiguous: exactly one membership. When the user
+    // belongs to two or more workspaces but has no active organization, we cannot know which
+    // tenant this request targets, so refuse (return null → 401) instead of guessing — the
+    // client must resolve the workspace picker first. (REVIEW.md finding F4.)
     if (members.length === 1) {
       tenantId = members[0]?.tenantId
     }
@@ -63,12 +101,19 @@ export async function resolveAuthContext(
   })
   if (!member) return null
 
-  return {
+  const context: AuthContext = {
     userId: sessionData.user.id,
     tenantId,
     role: member.role,
     employeeId: member.employeeId,
   }
+  if (sessionToken) {
+    // A hard size cap with a full clear keeps the map bounded without an LRU dependency;
+    // an evicted entry simply costs one fresh resolution.
+    if (authContextCache.size >= AUTH_CONTEXT_CACHE_MAX) authContextCache.clear()
+    authContextCache.set(sessionToken, { context, expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS })
+  }
+  return context
 }
 
 /**

@@ -342,6 +342,7 @@ export async function listProducts(
 
   const [rows, countRow] = await Promise.all([
     prisma.$queryRaw<RawProductRow[]>`
+      -- tenant-filter: buildProductWhere — the composed WHERE always starts with "tenantId" = tenantId
       SELECT "id","name","sku","price","stock","warehouse","aisle","bin","archivedAt",
              "avgMonthlyUsage","leadTimeDays","minThreshold","createdAt","updatedAt"
       FROM "Product"
@@ -350,6 +351,7 @@ export async function listProducts(
       LIMIT ${take} OFFSET ${skip}
     `,
     prisma.$queryRaw<{ count: bigint }[]>`
+      -- tenant-filter: buildProductWhere — the composed WHERE always starts with "tenantId" = tenantId
       SELECT count(*) AS count FROM "Product" WHERE ${whereClause}
     `,
   ])
@@ -609,6 +611,7 @@ export async function listStockMovements(
     prisma.stockMovement.aggregate({ where: { AND: [where, { delta: { gt: 0 } }] }, _sum: { delta: true } }),
     prisma.stockMovement.aggregate({ where: { AND: [where, { delta: { lt: 0 } }] }, _sum: { delta: true } }),
     prisma.$queryRaw<Array<{ currentIn: bigint; currentOut: bigint; previousIn: bigint; previousOut: bigint }>>`
+      -- tenant-filter: movementFilters — the joined filter list always starts with movement."tenantId" = tenantId
       WITH bounds AS (
         SELECT
           (${periods.current.startDate}::date::timestamp AT TIME ZONE ${tenant.timezone}) AS current_start,

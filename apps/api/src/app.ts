@@ -388,7 +388,10 @@ export async function buildApp(
       const uptime = process.uptime()
       if (options.prisma) {
         try {
-          await options.prisma.$queryRaw`SELECT 1`
+          await options.prisma.$queryRaw`
+            -- tenant-scope: all — connectivity probe, touches no tenant data
+            SELECT 1
+          `
           return {
             data: {
               status: 'ok' as const,

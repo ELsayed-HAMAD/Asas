@@ -167,6 +167,7 @@ $RECYCLE.BIN/
 # Local audit/planning notes are intentionally kept out of the public source tree.
 AUDIT.md
 UI_UX_REVIEW.md
+REVIEW.md
 filter.py
 rebase.ps1
 filter-msg.*
