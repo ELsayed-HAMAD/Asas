@@ -138,3 +138,11 @@
 | RTL & Arabic typography | ✅ Done | Cairo font binding on `html[dir="rtl"]`, logical properties and start/end borders preserved across layout, tables, and dialogs |
 | Primitives inventory | ✅ Done | All 26 primitives intact in `src/components/ui/`; zero deleted files |
 | Final verification gate | ✅ Done | `pnpm test`: web 44 pass / 0 fail · `pnpm build`: clean production build in 20.56s (3024 modules) |
+
+---
+
+## Post-Migration Fixes & Hardening
+
+| Component | Status | Notes |
+|---|---|---|
+| `FormDialog.jsx` & `ConfirmDialog.jsx` modal positioning | ✅ Fixed | Removed redundant `relative` from dialog content `className`. In Tailwind v4, `twMerge` dropped the default `fixed` positioning when `relative` was passed, causing modals to render at the bottom of the document flow rather than centered in the viewport. Both dialogs now center reliably (`fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]`). |
