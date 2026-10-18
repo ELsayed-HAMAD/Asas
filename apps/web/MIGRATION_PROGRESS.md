@@ -146,3 +146,4 @@
 | Component | Status | Notes |
 |---|---|---|
 | `FormDialog.jsx` & `ConfirmDialog.jsx` modal positioning | ✅ Fixed | Removed redundant `relative` from dialog content `className`. In Tailwind v4, `twMerge` dropped the default `fixed` positioning when `relative` was passed, causing modals to render at the bottom of the document flow rather than centered in the viewport. Both dialogs now center reliably (`fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]`). |
+| `Expenses.jsx` New Expense employee selector | ✅ Upgraded | Replaced the cramped multi-control employee section (stacked search input, dropdown, and raw pagination bar) with a modern single-height searchable combobox dropdown. Features instant in-dropdown search, employee avatar initial badges, titles, and checkmark selection while keeping the form grid balanced. |
