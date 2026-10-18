@@ -3,7 +3,7 @@ import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-d
 import {
   LayoutDashboard, Users, CreditCard, Briefcase,
   Package, FolderKanban, Settings, HelpCircle,
-  ChevronDown, ChevronRight, Plus, LogOut, Menu,
+  ChevronDown, Plus, LogOut, Menu,
   Check, User, Moon, Download, Search, Bell, Globe, Mail
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -28,6 +28,15 @@ import {
   Dialog,
   DialogContent,
 } from '../components/ui/dialog'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '../components/ui/breadcrumb'
+import { Kbd } from '../components/ui/kbd'
 
 // ── Navigation config ──────────────────────────────────────
 const NAV = [
@@ -1033,31 +1042,33 @@ export default function DashboardLayout() {
             </button>
 
             {/* Breadcrumb */}
-            <nav className="flex items-center gap-1 text-sm min-w-0 whitespace-nowrap flex-1" aria-label="Breadcrumb">
-              {breadcrumbs.map((crumb, i) => {
-                const isLast = i === breadcrumbs.length - 1
-                const crumbPath = '/' + pathname.split('/').filter(Boolean).slice(0, i + 1).join('/')
-                return (
-                  <span key={i} className={`flex items-center gap-1 min-w-0 whitespace-nowrap ${isLast ? 'flex-shrink-0' : 'shrink'}`}>
-                    {i > 0 && (
-                      <ChevronRight size={13} className="text-faint flex-shrink-0 rtl:rotate-180" />
-                    )}
-                    {isLast ? (
-                      <span className="font-semibold text-heading truncate" aria-current="page" title={typeof crumb === 'string' ? crumb : undefined}>
-                        {crumb}
-                      </span>
-                    ) : (
-                      <Link
-                        to={crumbPath}
-                        className="truncate max-w-[140px] text-caption hover:text-heading transition-colors"
-                      >
-                        {crumb}
-                      </Link>
-                    )}
-                  </span>
-                )
-              })}
-            </nav>
+            <Breadcrumb aria-label="Breadcrumb" className="min-w-0 whitespace-nowrap flex-1">
+              <BreadcrumbList className="flex-nowrap gap-1 sm:gap-1">
+                {breadcrumbs.map((crumb, i) => {
+                  const isLast = i === breadcrumbs.length - 1
+                  const crumbPath = '/' + pathname.split('/').filter(Boolean).slice(0, i + 1).join('/')
+                  return (
+                    <BreadcrumbItem key={i} className={`min-w-0 whitespace-nowrap gap-1 sm:gap-1 ${isLast ? 'flex-shrink-0' : 'shrink'}`}>
+                      {i > 0 && (
+                        <BreadcrumbSeparator className="text-faint [&>svg]:size-[13px] [&>svg]:flex-shrink-0" />
+                      )}
+                      {isLast ? (
+                        <BreadcrumbPage
+                          className="font-semibold truncate"
+                          title={typeof crumb === 'string' ? crumb : undefined}
+                        >
+                          {crumb}
+                        </BreadcrumbPage>
+                      ) : (
+                        <BreadcrumbLink asChild className="truncate max-w-[140px] text-caption">
+                          <Link to={crumbPath}>{crumb}</Link>
+                        </BreadcrumbLink>
+                      )}
+                    </BreadcrumbItem>
+                  )
+                })}
+              </BreadcrumbList>
+            </Breadcrumb>
           </div>
 
           {/* Spacer: flex: 1 so the left and right groups never touch */}
@@ -1078,9 +1089,7 @@ export default function DashboardLayout() {
                   <Search size={14} className="text-caption flex-shrink-0" />
                   <span className="truncate text-body-light">{t('common.searchJump', 'Search or jump to...')}</span>
                 </div>
-                <kbd className="px-1.5 py-0.5 text-[10px] bg-surface-raised border border-border-default rounded text-caption font-mono font-semibold flex-shrink-0">
-                  ⌘K
-                </kbd>
+                <Kbd>⌘K</Kbd>
               </Button>
               <Button
                 variant="ghost"

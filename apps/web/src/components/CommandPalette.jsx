@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Search,
@@ -26,6 +26,17 @@ import {
   PlusCircle,
   ArrowRight,
 } from 'lucide-react'
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from './ui/dialog'
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandSeparator,
+} from './ui/command'
+import { Kbd } from './ui/kbd'
 
 const COMMAND_ITEMS = [
   // ── Navigation ───────────────────────────────────────────────────────────
@@ -294,19 +305,21 @@ const COMMAND_ITEMS = [
   },
 ]
 
+// Deterministic substring matching — cmdk's default filter is fuzzy; the palette
+// has always matched with String.includes against title/subtitle/category/keywords.
+const substringFilter = (value, search, keywords) => {
+  const q = search.toLowerCase()
+  if (value.toLowerCase().includes(q)) return 1
+  if (keywords?.some((k) => k.toLowerCase().includes(q))) return 1
+  return 0
+}
+
 export default function CommandPalette({ isOpen, onClose }) {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
-  const [selectedIndex, setSelectedIndex] = useState(0)
-  const inputRef = useRef(null)
-  const listRef = useRef(null)
 
   useEffect(() => {
-    if (isOpen) {
-      setQuery('')
-      setSelectedIndex(0)
-      setTimeout(() => inputRef.current?.focus(), 50)
-    }
+    if (isOpen) setQuery('')
   }, [isOpen])
 
   const filteredItems = useMemo(() => {
@@ -321,45 +334,11 @@ export default function CommandPalette({ isOpen, onClose }) {
     })
   }, [query])
 
-  useEffect(() => {
-    setSelectedIndex(0)
-  }, [query])
-
   const executeItem = (item) => {
     if (!item) return
     navigate(item.path)
     onClose()
   }
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setSelectedIndex((prev) => (prev + 1 < filteredItems.length ? prev + 1 : 0))
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setSelectedIndex((prev) => (prev - 1 >= 0 ? prev - 1 : filteredItems.length - 1))
-    } else if (e.key === 'Enter') {
-      e.preventDefault()
-      if (filteredItems[selectedIndex]) {
-        executeItem(filteredItems[selectedIndex])
-      }
-    } else if (e.key === 'Escape') {
-      e.preventDefault()
-      onClose()
-    }
-  }
-
-  // Auto-scroll selected item into view
-  useEffect(() => {
-    if (listRef.current) {
-      const activeEl = listRef.current.querySelector(`[data-index="${selectedIndex}"]`)
-      if (activeEl) {
-        activeEl.scrollIntoView({ block: 'nearest' })
-      }
-    }
-  }, [selectedIndex])
-
-  if (!isOpen) return null
 
   // Group filtered items by category
   const categories = ['Quick Actions', 'Navigation']
@@ -370,127 +349,92 @@ export default function CommandPalette({ isOpen, onClose }) {
     }))
     .filter((g) => g.items.length > 0)
 
-  let globalIndexCounter = 0
-
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 sm:px-6">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-overlay backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      />
-
-      {/* Palette Container */}
-      <div
-        className="relative w-full max-w-xl bg-surface-raised border border-border-default rounded-card-sm shadow-2xl overflow-hidden z-10 flex flex-col max-h-[75vh]"
-        onKeyDown={handleKeyDown}
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent
+        hideCloseButton
+        className="overflow-hidden p-0 gap-0 max-w-xl max-h-[75vh] border-border-default bg-surface-raised shadow-2xl"
       >
-        {/* Search Input Bar */}
-        <div className="flex items-center px-4 py-3.5 border-b border-border-default gap-3 bg-surface">
-          <Search size={18} className="text-muted flex-shrink-0" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Type a command, page, or search term..."
-            className="flex-1 bg-transparent text-sm text-heading placeholder-muted focus:outline-none"
-          />
-          <kbd
-            onClick={onClose}
-            className="cursor-pointer text-[10px] font-mono px-2 py-0.5 rounded border border-border-default bg-surface-muted text-caption hover:bg-surface-strong transition-colors"
-          >
-            ESC
-          </kbd>
-        </div>
+        <DialogTitle className="sr-only">Global search</DialogTitle>
+        <DialogDescription className="sr-only">
+          Search pages and quick actions, then press Enter to navigate.
+        </DialogDescription>
 
-        {/* Results List */}
-        <div ref={listRef} className="flex-1 overflow-y-auto p-2 divide-y divide-border-subtle">
-          {filteredItems.length === 0 ? (
-            <div className="p-8 text-center text-muted">
+        <Command
+          filter={substringFilter}
+          className="flex-1 min-h-0 flex flex-col [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:text-caption [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-item]]:px-3 [&_[cmdk-item]]:py-2.5 [&_[cmdk-item]]:rounded-card-sm"
+        >
+          <CommandInput
+            value={query}
+            onValueChange={setQuery}
+            placeholder="Type a command, page, or search term..."
+          >
+            <Kbd
+              onClick={onClose}
+              title="Close"
+              className="cursor-pointer px-2 rounded bg-surface-muted hover:bg-surface-strong transition-colors"
+            >
+              ESC
+            </Kbd>
+          </CommandInput>
+
+          <CommandList className="max-h-[60vh]">
+            <CommandEmpty>
               <Search size={24} className="mx-auto mb-2 opacity-40" />
               <p className="text-sm font-medium text-heading">No matching commands</p>
               <p className="text-xs text-body-light mt-1">
                 Try searching for pages like "payroll", "invoices", or actions like "create deal".
               </p>
-            </div>
-          ) : (
-            grouped.map((group) => (
-              <div key={group.category} className="py-2 first:pt-0 last:pb-0">
-                <div className="px-3 py-1.5 text-[10px] font-bold text-caption uppercase tracking-wider">
-                  {group.category}
-                </div>
-                <div className="space-y-0.5 mt-0.5">
+            </CommandEmpty>
+            {grouped.map((group, idx) => (
+              <Fragment key={group.category}>
+                {idx > 0 && <CommandSeparator />}
+                <CommandGroup heading={group.category}>
                   {group.items.map((item) => {
-                    const currentIndex = globalIndexCounter++
-                    const isSelected = selectedIndex === currentIndex
                     const Icon = item.icon
-
                     return (
-                      <div
+                      <CommandItem
                         key={item.id}
-                        data-index={currentIndex}
-                        onClick={() => executeItem(item)}
-                        onMouseEnter={() => setSelectedIndex(currentIndex)}
-                        className={`px-3 py-2.5 rounded-card-sm flex items-center justify-between cursor-pointer transition-colors ${
-                          isSelected
-                            ? 'bg-primary/10 text-primary'
-                            : 'hover:bg-surface-muted text-body'
-                        }`}
+                        value={item.title}
+                        keywords={[item.subtitle, group.category, ...item.keywords]}
+                        onSelect={() => executeItem(item)}
+                        className="group justify-between gap-3"
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <div
-                            className={`p-1.5 rounded flex items-center justify-center flex-shrink-0 ${
-                              isSelected
-                                ? 'bg-primary text-on-primary'
-                                : 'bg-surface-muted text-muted'
-                            }`}
-                          >
+                          <div className="p-1.5 rounded flex items-center justify-center flex-shrink-0 bg-surface-muted text-muted group-data-[selected=true]:bg-primary group-data-[selected=true]:text-on-primary">
                             <Icon size={16} />
                           </div>
                           <div className="min-w-0">
-                            <p
-                              className={`text-sm font-semibold truncate ${
-                                isSelected ? 'text-primary' : 'text-heading'
-                              }`}
-                            >
+                            <p className="text-sm font-semibold truncate text-heading group-data-[selected=true]:text-primary">
                               {item.title}
                             </p>
                             <p className="text-xs text-body-light truncate">{item.subtitle}</p>
                           </div>
                         </div>
 
-                        {isSelected && (
-                          <ArrowRight size={14} className="text-primary flex-shrink-0 ml-2" />
-                        )}
-                      </div>
+                        <ArrowRight size={14} className="text-primary flex-shrink-0 ml-2 hidden group-data-[selected=true]:block" />
+                      </CommandItem>
                     )
                   })}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+                </CommandGroup>
+              </Fragment>
+            ))}
+          </CommandList>
+        </Command>
 
         {/* Footer info bar */}
         <div className="px-4 py-2 border-t border-border-subtle bg-surface-muted flex items-center justify-between text-[11px] text-caption">
           <div className="flex items-center gap-3">
             <span>
-              <kbd className="font-mono bg-surface border border-border-default px-1 py-0.5 rounded mr-1">
-                ↑↓
-              </kbd>
+              <Kbd className="bg-surface px-1 py-0.5 rounded mr-1">↑↓</Kbd>
               Navigate
             </span>
             <span>
-              <kbd className="font-mono bg-surface border border-border-default px-1 py-0.5 rounded mr-1">
-                ↵
-              </kbd>
+              <Kbd className="bg-surface px-1 py-0.5 rounded mr-1">↵</Kbd>
               Select
             </span>
             <span>
-              <kbd className="font-mono bg-surface border border-border-default px-1 py-0.5 rounded mr-1">
-                ESC
-              </kbd>
+              <Kbd className="bg-surface px-1 py-0.5 rounded mr-1">ESC</Kbd>
               Close
             </span>
           </div>
@@ -498,8 +442,7 @@ export default function CommandPalette({ isOpen, onClose }) {
             {filteredItems.length} {filteredItems.length === 1 ? 'command' : 'commands'}
           </span>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
-

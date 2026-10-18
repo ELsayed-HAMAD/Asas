@@ -16,11 +16,22 @@ const Command = React.forwardRef(({ className, ...props }, ref) => (
 ))
 Command.displayName = CommandPrimitive.displayName
 
-const CommandDialog = ({ children, ...props }) => {
+const CommandDialog = ({ children, commandClassName, contentClassName, hideCloseButton, ...props }) => {
   return (
     <Dialog {...props}>
-      <DialogContent className="overflow-hidden p-0 max-w-xl border-border-default bg-surface-raised shadow-2xl">
-        <Command className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:text-caption [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-3 [&_[cmdk-item]]:py-2.5 [&_[cmdk-item]]:rounded-card-sm">
+      <DialogContent
+        hideCloseButton={hideCloseButton}
+        className={cn(
+          'overflow-hidden p-0 max-w-xl border-border-default bg-surface-raised shadow-2xl',
+          contentClassName
+        )}
+      >
+        <Command
+          className={cn(
+            '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:text-caption [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-item]]:px-3 [&_[cmdk-item]]:py-2.5 [&_[cmdk-item]]:rounded-card-sm',
+            commandClassName
+          )}
+        >
           {children}
         </Command>
       </DialogContent>
@@ -28,17 +39,18 @@ const CommandDialog = ({ children, ...props }) => {
   )
 }
 
-const CommandInput = React.forwardRef(({ className, ...props }, ref) => (
-  <div className="flex items-center border-b border-border-default px-4 bg-surface" cmdk-input-wrapper="">
-    <Search className="mr-3 h-4 w-4 shrink-0 text-muted" />
+const CommandInput = React.forwardRef(({ className, children, ...props }, ref) => (
+  <div className="flex items-center gap-3 border-b border-border-default px-4 py-3.5 bg-surface" cmdk-input-wrapper="">
+    <Search size={18} className="text-muted flex-shrink-0" />
     <CommandPrimitive.Input
       ref={ref}
       className={cn(
-        'flex h-11 w-full rounded-md bg-transparent py-3 text-sm text-heading outline-none placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-50',
+        'flex-1 bg-transparent text-sm text-heading outline-none placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-50',
         className
       )}
       {...props}
     />
+    {children}
   </div>
 ))
 CommandInput.displayName = CommandPrimitive.Input.displayName

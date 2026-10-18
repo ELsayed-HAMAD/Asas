@@ -28,7 +28,15 @@
 
 ## Phase 1 — Layout Shell
 
-### Status: NOT STARTED
+### Status: ✅ COMPLETE (2026-10-18)
+
+| Task | Status | Notes |
+|---|---|---|
+| Breadcrumb block → `ui/breadcrumb` | ✅ Done | BREADCRUMB_LABELS/I18N, `t()`, `aria-current`, `rtl:rotate-180` separator, `truncate max-w-[140px]`, `title` attrs all preserved |
+| Inline `<kbd>` → `ui/kbd` | ✅ Done | Topbar ⌘K chip |
+| `CommandPalette` → `ui/command` + Dialog | ✅ Done | COMMAND_ITEMS registry, category grouping, footer hint bar, `isOpen`/`onClose` API, `?new=1` deep links preserved; substring `filter` override keeps `.includes()` matching; cmdk handles focus/arrows/ESC (removed `setTimeout` focus hack + manual key handlers) |
+| Supporting primitive edits | ✅ Done | `DialogContent` gains `hideCloseButton`; `CommandDialog`/`CommandInput` gain passthrough styling props (defaults unchanged) |
+| Verification gate | ✅ Done | `pnpm test`: web 44/44 (full suite green) · `pnpm build`: 4/4 OK · grep audit: no leftover raw breadcrumb/kbd/palette markup |
 
 ---
 
