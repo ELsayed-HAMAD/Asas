@@ -42,7 +42,14 @@
 
 ## Phase 2 — Common Components
 
-### Status: NOT STARTED
+### Status: ✅ COMPLETE (2026-10-18)
+
+| Task | Status | Notes |
+|---|---|---|
+| `QueryState` skeleton loading | ✅ Done | Old centered Loader2 spinner → stacked `Skeleton` lines (approved tweak); `role="status"` + `aria-label="Loading"`; error/empty branches untouched |
+| `ConfirmDialog` alert-dialog branch | ✅ Done | `danger` → `ui/alert-dialog` primitives (screen readers announce as alertdialog); non-destructive keeps `ui/dialog`; same props, busy state, error `Alert` banner in both branches; component-level Root/Content/Header/Title/Description/Footer branching |
+| `StatCard` verification | ✅ Done | Already on `ui/card` + `ui/badge` — no changes needed |
+| Verification gate | ✅ Done | `pnpm test`: web 44/44 (full suite green) · `pnpm build`: 4/4 packages OK · diagnostics clean on both edited files |
 
 ---
 
