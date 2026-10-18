@@ -18,6 +18,13 @@ import {
   TableHead,
   TableCell,
 } from '../../../components/ui/table'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select'
 
 function formatCalendarDate(value) {
   const [year, month, day] = String(value).slice(0, 10).split('-').map(Number)
@@ -113,7 +120,21 @@ export default function BankReconciliation() {
           <QueryState isLoading={importsQuery.isLoading} isError={importsQuery.isError} error={importsQuery.error} isEmpty={imports.length === 0} emptyTitle="No statement imports yet" emptyDescription="Choose a CSV statement above to begin reconciliation.">
             {imports.length > 0 && <>
               <section className="flex flex-wrap items-end justify-between gap-3 rounded-card border border-border-default bg-surface-raised p-4">
-                <label className="text-sm font-medium text-heading">Statement import<select value={currentImportId} onChange={event => setSelectedImportId(event.target.value)} className="mt-1 block min-w-64 rounded-input border border-border-default bg-surface px-3 py-2 text-sm">{imports.map(item => <option key={item.id} value={item.id}>{item.fileName} · {new Date(item.createdAt).toLocaleDateString()}</option>)}</select></label>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-heading">Statement import</label>
+                  <Select value={currentImportId} onValueChange={val => setSelectedImportId(val)}>
+                    <SelectTrigger className="min-w-64 bg-surface text-sm">
+                      <SelectValue placeholder="Select statement import" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {imports.map(item => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.fileName} · {new Date(item.createdAt).toLocaleDateString()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <p className="text-sm text-body-light">{summary.matched} of {summary.lines} rows reconciled</p>
               </section>
               <QueryState isLoading={detailQuery.isLoading} isError={detailQuery.isError} error={detailQuery.error} isEmpty={!currentImport?.lines?.length} emptyTitle="This statement has no rows" emptyDescription="Import another CSV to continue.">
@@ -133,7 +154,7 @@ export default function BankReconciliation() {
                           <TableCell className="max-w-sm px-4 py-3"><p className="font-medium text-heading">{line.description}</p><p className="mt-1 text-xs text-muted">{formatCalendarDate(line.postedAt)}{line.reference ? ` · ${line.reference}` : ''}</p></TableCell>
                           <TableCell className="px-4 py-3 font-mono text-heading tabular-nums" title={`${line.amount} ${line.currency}`}>{formatCompactTableMoney(line.amount, { currency: line.currency })}</TableCell>
                           <TableCell className="px-4 py-3">{line.matchedLedgerLine ? <div className="text-xs text-body"><Badge variant="outline" className="inline-flex items-center gap-1 font-medium text-success border-0 bg-success-light"><Check size={14} /> Reconciled</Badge><p className="mt-1">{line.matchedLedgerLine.description}</p><p className="mt-0.5 text-muted">{line.matchedLedgerLine.sourceType} · {line.matchedLedgerLine.signedAmount} {line.matchedLedgerLine.currency} · {line.matchedLedgerLine.daysApart} day(s) apart</p></div> : line.suggestedMatches.length ? <div className="space-y-2">{line.suggestedMatches.slice(0, 3).map(candidate => <div key={candidate.journalLineId} className="text-xs text-body"><p>{candidate.description}</p><p className="mt-0.5 text-muted">{candidate.sourceType} · {candidate.signedAmount} {candidate.currency} · {candidate.daysApart} day(s) apart</p></div>)}</div> : <span className="text-xs text-muted">No exact match found</span>}</TableCell>
-                          <TableCell className="px-4 py-3">{line.matchedJournalLineId ? <Button type="button" variant="outline" size="sm" onClick={() => unmatchMutation.mutate({ id: currentImport.id, lineId: line.id })} disabled={unmatchMutation.isPending} className="gap-1 h-7 px-2.5 text-xs font-medium"><RotateCcw size={13} /> Undo</Button> : line.suggestedMatches.length > 0 && <select aria-label={`Match ${line.description}`} defaultValue="" disabled={matchMutation.isPending} onChange={event => { if (event.target.value) matchMutation.mutate({ id: currentImport.id, lineId: line.id, journalLineId: event.target.value }) }} className="max-w-44 rounded-input border border-border-default bg-surface px-2 py-1.5 text-xs"><option value="">Select a candidate…</option>{line.suggestedMatches.map(candidate => <option key={candidate.journalLineId} value={candidate.journalLineId}>{candidate.signedAmount} {candidate.currency} · {candidate.daysApart}d</option>)}</select>}</TableCell>
+                          <TableCell className="px-4 py-3">{line.matchedJournalLineId ? <Button type="button" variant="outline" size="sm" onClick={() => unmatchMutation.mutate({ id: currentImport.id, lineId: line.id })} disabled={unmatchMutation.isPending} className="gap-1 h-7 px-2.5 text-xs font-medium"><RotateCcw size={13} /> Undo</Button> : line.suggestedMatches.length > 0 && <Select onValueChange={val => { if (val) matchMutation.mutate({ id: currentImport.id, lineId: line.id, journalLineId: val }) }} disabled={matchMutation.isPending}><SelectTrigger aria-label={`Match ${line.description}`} className="max-w-44 h-8 bg-surface text-xs"><SelectValue placeholder="Select candidate…" /></SelectTrigger><SelectContent>{line.suggestedMatches.map(candidate => <SelectItem key={candidate.journalLineId} value={candidate.journalLineId} className="text-xs">{candidate.signedAmount} {candidate.currency} · {candidate.daysApart}d</SelectItem>)}</SelectContent></Select>}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

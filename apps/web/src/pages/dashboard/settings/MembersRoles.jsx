@@ -18,6 +18,13 @@ import QueryState from '../../../components/common/QueryState'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
 import { Badge } from '../../../components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select'
 import { authClient, useSession, useActiveMemberRole } from '../../../lib/authClient'
 import { getMemberRoleName } from '../../../lib/memberRole'
 import { queryKeys } from '../../../lib/queryKeys'
@@ -457,18 +464,19 @@ export default function MembersRoles() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">
+            <label htmlFor="invite-role" className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">
               Role
             </label>
-            <select
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value)}
-              className="w-full border border-border-default rounded-input px-3 py-2 text-sm bg-surface-muted text-heading focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="MEMBER">Member (Standard Access)</option>
-              <option value="ADMIN">Admin (Full Operational Access)</option>
-              {isOwner && <option value="OWNER">Owner (Full Authority)</option>}
-            </select>
+            <Select value={inviteRole} onValueChange={setInviteRole}>
+              <SelectTrigger id="invite-role" className="w-full text-sm bg-surface-muted text-heading">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="MEMBER">Member (Standard Access)</SelectItem>
+                <SelectItem value="ADMIN">Admin (Full Operational Access)</SelectItem>
+                {isOwner && <SelectItem value="OWNER">Owner (Full Authority)</SelectItem>}
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </FormDialog>
@@ -491,18 +499,19 @@ export default function MembersRoles() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">
+            <label htmlFor="select-role" className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">
               Select Role
             </label>
-            <select
-              value={newRole}
-              onChange={(e) => setNewRole(e.target.value)}
-              className="w-full border border-border-default rounded-input px-3 py-2 text-sm bg-surface-muted text-heading focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="MEMBER">Member</option>
-              <option value="ADMIN">Admin</option>
-              {isOwner && <option value="OWNER">Owner</option>}
-            </select>
+            <Select value={newRole} onValueChange={setNewRole}>
+              <SelectTrigger id="select-role" className="w-full text-sm bg-surface-muted text-heading">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="MEMBER">Member</SelectItem>
+                <SelectItem value="ADMIN">Admin</SelectItem>
+                {isOwner && <SelectItem value="OWNER">Owner</SelectItem>}
+              </SelectContent>
+            </Select>
           </div>
           {selectedMember?.role === 'OWNER' && ownerCount <= 1 && (
             <p className="text-xs text-danger">

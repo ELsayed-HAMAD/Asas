@@ -32,6 +32,13 @@ import {
   TableHead,
   TableCell,
 } from '../../../components/ui/table'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select'
 
 export default function StockMovements() {
   const queryClient = useQueryClient()
@@ -279,36 +286,44 @@ export default function StockMovements() {
             {/* Warehouse Filter */}
             <div className="flex items-center gap-2">
               <Filter size={13} className="text-muted" />
-              <select
-                value={warehouseFilter}
-                onChange={(e) => {
-                  setWarehouseFilter(e.target.value)
+              <Select
+                value={warehouseFilter || '__all__'}
+                onValueChange={(val) => {
+                  setWarehouseFilter(val === '__all__' ? '' : val)
                   setPage(1)
                 }}
-                className="bg-surface-muted border border-border-default rounded-input px-3 py-1.5 text-xs text-heading focus:outline-none focus:ring-1 focus:ring-primary"
               >
-                <option value="">All Warehouses</option>
-                {warehouses.map((w) => (
-                  <option key={w.name} value={w.name}>
-                    {w.name} ({w.productCount})
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger aria-label="Warehouse filter" className="h-8 text-xs bg-surface-muted min-w-[140px]">
+                  <SelectValue placeholder="All Warehouses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Warehouses</SelectItem>
+                  {warehouses.map((w) => (
+                    <SelectItem key={w.name} value={w.name}>
+                      {w.name} ({w.productCount})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Type Filter */}
-            <select
-              value={typeFilter}
-              onChange={(e) => {
-                setTypeFilter(e.target.value)
+            <Select
+              value={typeFilter || '__all__'}
+              onValueChange={(val) => {
+                setTypeFilter(val === '__all__' ? '' : val)
                 setPage(1)
               }}
-              className="bg-surface-muted border border-border-default rounded-input px-3 py-1.5 text-xs text-heading focus:outline-none focus:ring-1 focus:ring-primary"
             >
-              <option value="">All Types</option>
-              <option value="IN">Inbound (IN)</option>
-              <option value="OUT">Outbound (OUT)</option>
-            </select>
+              <SelectTrigger aria-label="Type filter" className="h-8 text-xs bg-surface-muted min-w-[120px]">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Types</SelectItem>
+                <SelectItem value="IN">Inbound (IN)</SelectItem>
+                <SelectItem value="OUT">Outbound (OUT)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Quick Page Info */}
@@ -483,23 +498,27 @@ export default function StockMovements() {
               aria-label="Search products"
               className="mb-2 w-full text-sm bg-surface-raised"
             />
-            <select
-              value={movementForm.productId}
-              onChange={(e) => {
-                const product = productOptions.find((item) => item.id === e.target.value) ?? null
+            <Select
+              value={movementForm.productId || '__none__'}
+              onValueChange={(val) => {
+                const prodId = val === '__none__' ? '' : val
+                const product = productOptions.find((item) => item.id === prodId) ?? null
                 setSelectedProduct(product)
-                setMovementForm((f) => ({ ...f, productId: e.target.value }))
+                setMovementForm((f) => ({ ...f, productId: prodId }))
               }}
-              required
-              className="w-full border border-border-strong rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             >
-              <option value="">Select a product...</option>
-              {productOptions.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.name} ({product.sku}) — {product.stock} on hand
-                </option>
-              ))}
-            </select>
+              <SelectTrigger aria-label="Product" className="w-full text-sm bg-surface-raised">
+                <SelectValue placeholder="Select a product..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Select a product...</SelectItem>
+                {productOptions.map((product) => (
+                  <SelectItem key={product.id} value={product.id}>
+                    {product.name} ({product.sku}) — {product.stock} on hand
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {productPagination && productPagination.pages > 1 && <div className="mt-2 flex items-center justify-between text-xs text-muted">
               <span>{productPagination.total.toLocaleString()} matching products · page {productPage} of {productPagination.pages}</span>
               <div className="flex gap-2">

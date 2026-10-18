@@ -195,11 +195,12 @@ export default function VerifyEmail() {
       {/* Resend Action */}
       <div className="text-center text-xs text-muted mb-4">
         Didn't receive the email?{' '}
-        <button
+        <Button
           type="button"
+          variant="link"
           disabled={isResending || countdown > 0 || !email}
           onClick={handleResend}
-          className="font-medium text-heading hover:underline disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1"
+          className="font-medium text-heading hover:underline disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1 text-xs"
         >
           {isResending ? (
             <>
@@ -214,19 +215,20 @@ export default function VerifyEmail() {
               <span>Resend verification email</span>
             </>
           )}
-        </button>
+        </Button>
       </div>
 
       {/* Sign Out / Change Email */}
       <div className="pt-2 border-t border-border-subtle text-center text-xs text-caption">
         Wrong email address?{' '}
-        <button
+        <Button
           type="button"
+          variant="link"
           onClick={handleSignOut}
-          className="font-medium text-body hover:underline"
+          className="font-medium text-body hover:underline text-xs"
         >
           Sign out and switch account
-        </button>
+        </Button>
       </div>
     </div>
   )

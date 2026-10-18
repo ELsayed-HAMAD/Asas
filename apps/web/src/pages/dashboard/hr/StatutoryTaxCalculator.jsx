@@ -8,6 +8,14 @@ import {
 import { Calculator, X } from 'lucide-react'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
+import { Checkbox } from '../../../components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select'
 import { Alert, AlertDescription } from '../../../components/ui/alert'
 import { formatMoney } from '../../../lib/format'
 
@@ -133,35 +141,41 @@ export default function StatutoryTaxCalculator({ isOpen, onClose }) {
 
           <div>
             <label htmlFor="statutory-frequency" className="block font-medium text-body mb-1">Pay Frequency</label>
-            <select
-              id="statutory-frequency"
+            <Select
               value={frequency}
-              onChange={e => setFrequency(e.target.value)}
+              onValueChange={setFrequency}
               disabled={region === 'SA'}
-              className="w-full rounded-input border border-border-default bg-surface-muted px-3 py-2 text-sm text-heading outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
             >
-              <option value="MONTHLY">Monthly</option>
-              <option value="SEMIMONTHLY">Semi-Monthly (24/yr)</option>
-              <option value="BIWEEKLY">Biweekly (26/yr)</option>
-              <option value="WEEKLY">Weekly (52/yr)</option>
-              <option value="ANNUAL">Annual</option>
-            </select>
+              <SelectTrigger id="statutory-frequency" className="w-full bg-surface-muted">
+                <SelectValue placeholder="Select frequency" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="MONTHLY">Monthly</SelectItem>
+                <SelectItem value="SEMIMONTHLY">Semi-Monthly (24/yr)</SelectItem>
+                <SelectItem value="BIWEEKLY">Biweekly (26/yr)</SelectItem>
+                <SelectItem value="WEEKLY">Weekly (52/yr)</SelectItem>
+                <SelectItem value="ANNUAL">Annual</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {region === 'US' && (
             <>
               <div>
                 <label htmlFor="statutory-filing-status" className="block font-medium text-body mb-1">IRS W-4 Filing Status</label>
-                <select
-                  id="statutory-filing-status"
+                <Select
                   value={filingStatus}
-                  onChange={e => setFilingStatus(e.target.value)}
-                  className="w-full rounded-input border border-border-default bg-surface-muted px-3 py-2 text-sm text-heading outline-none focus:ring-1 focus:ring-accent"
+                  onValueChange={setFilingStatus}
                 >
-                  <option value="SINGLE">Single or Married Filing Separately</option>
-                  <option value="MARRIED">Married Filing Jointly</option>
-                  <option value="HEAD_OF_HOUSEHOLD">Head of Household</option>
-                </select>
+                  <SelectTrigger id="statutory-filing-status" className="w-full bg-surface-muted">
+                    <SelectValue placeholder="Select filing status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SINGLE">Single or Married Filing Separately</SelectItem>
+                    <SelectItem value="MARRIED">Married Filing Jointly</SelectItem>
+                    <SelectItem value="HEAD_OF_HOUSEHOLD">Head of Household</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label htmlFor="statutory-prior-ytd" className="block font-medium text-body mb-1">Prior YTD Gross (USD)</label>
@@ -193,12 +207,10 @@ export default function StatutoryTaxCalculator({ isOpen, onClose }) {
 
           {region === 'SA' && (
             <div className="flex items-center gap-2 pt-5">
-              <input
+              <Checkbox
                 id="saudi-national-toggle"
-                type="checkbox"
                 checked={isSaudiNational}
-                onChange={e => setIsSaudiNational(e.target.checked)}
-                className="h-4 w-4 rounded border-border-default text-accent focus:ring-accent"
+                onCheckedChange={checked => setIsSaudiNational(Boolean(checked))}
               />
               <label htmlFor="saudi-national-toggle" className="text-xs font-medium text-heading cursor-pointer">
                 Saudi National (Full GOSI vs Expat Hazard Only)

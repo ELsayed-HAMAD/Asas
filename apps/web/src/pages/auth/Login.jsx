@@ -221,18 +221,19 @@ export default function Login() {
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className="text-sm font-medium text-body">Password</label>
-            <button
+            <Button
               type="button"
+              variant="link"
               onClick={() => {
                 setForgotEmail(form.email)
                 setForgotError('')
                 setForgotSuccess('')
                 setForgotOpen(true)
               }}
-              className="text-xs text-muted hover:text-heading transition-colors cursor-pointer"
+              className="text-xs text-muted hover:text-heading no-underline hover:no-underline font-normal cursor-pointer"
             >
               Forgot password?
-            </button>
+            </Button>
           </div>
           <div className="relative">
             <Input
@@ -244,13 +245,15 @@ export default function Login() {
               autoComplete="current-password"
               className="pr-10"
             />
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => setShowPass(p => !p)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-caption hover:text-body transition-colors cursor-pointer"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-caption hover:text-body transition-colors cursor-pointer"
             >
               {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -315,12 +318,12 @@ export default function Login() {
           ) : (
             <div>
               <label className="block text-xs font-medium text-body mb-1">Email address</label>
-              <input
+              <Input
                 type="email"
                 value={forgotEmail}
                 onChange={(e) => setForgotEmail(e.target.value)}
                 placeholder="you@company.com"
-                className="w-full px-3 py-2 text-sm border border-border-default rounded-input bg-surface-raised focus:outline-none focus:border-border-strong focus:ring-2 focus:ring-border-subtle transition-all"
+                className="bg-surface-raised"
               />
             </div>
           )}

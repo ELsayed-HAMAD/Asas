@@ -25,6 +25,13 @@ import {
   TableHead,
   TableCell,
 } from '../../../components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
 
 // Display-only conversion of a wire money object ({amount: minor units, currency}) to a
 // major-unit number, used solely to feed recharts' numeric series / axis ticks. Every
@@ -182,18 +189,20 @@ export default function FinanceOverview() {
             />
           </div>
 
-          <label className="flex items-center gap-2 border border-border-default text-body px-3.5 py-2 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card cursor-pointer shrink-0">
-            <Calendar size={14} className="text-muted" />
-            <span>Year</span>
-            <select
-              aria-label="Finance calendar year"
-              value={selectedYear}
-              onChange={event => setSelectedYear(event.target.value)}
-              className="bg-transparent text-xs font-semibold text-heading focus:outline-none cursor-pointer"
-            >
-              {availableYears.map(year => <option key={year} value={year}>{year}</option>)}
-            </select>
-          </label>
+          <Select value={String(selectedYear)} onValueChange={val => setSelectedYear(val)}>
+            <SelectTrigger aria-label="Finance calendar year" className="flex items-center gap-2 border border-border-default text-body px-3.5 h-9 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card shrink-0">
+              <Calendar size={14} className="text-muted" />
+              <span>Year</span>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableYears.map(year => (
+                <SelectItem key={year} value={String(year)} className="text-xs">
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Right group */}
@@ -495,15 +504,21 @@ export default function FinanceOverview() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-body mb-1">Customer</label>
-            <select
-              required
+            <Select
               value={invoiceForm.customerId}
-              onChange={event => setInvoiceForm(current => ({ ...current, customerId: event.target.value }))}
-              className="w-full h-9 px-3 py-1.5 rounded-input border border-border-default bg-surface-muted text-sm text-body"
+              onValueChange={val => setInvoiceForm(current => ({ ...current, customerId: val }))}
             >
-              <option value="">Select a customer</option>
-              {(customersData?.items ?? []).map(customer => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
-            </select>
+              <SelectTrigger className="w-full bg-surface-muted">
+                <SelectValue placeholder="Select a customer" />
+              </SelectTrigger>
+              <SelectContent>
+                {(customersData?.items ?? []).map(customer => (
+                  <SelectItem key={customer.id} value={customer.id}>
+                    {customer.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <label className="block text-sm font-medium text-body mb-1">Invoice number</label>

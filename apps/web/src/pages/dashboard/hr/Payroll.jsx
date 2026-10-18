@@ -47,6 +47,13 @@ import {
   TableHead,
   TableCell,
 } from '../../../components/ui/table'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select'
 
 // The old page rendered deductions/taxes as a leading-minus negative; the minus only appears
 // for a positive amount (a zero rendered plain), so mirror that instead of an unconditional '-'.
@@ -616,32 +623,33 @@ export default function Payroll() {
           {/* Left: All Depts ⌄ + July 2026 · PAID ⌄ + < 1/1 > + Auto-Calculate + Subtitle */}
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
-              <label className="flex items-center border border-border-default text-body px-2.5 py-1.5 rounded-input text-xs bg-surface-raised shadow-card cursor-pointer shrink-0">
-                <select
-                  aria-label="Department"
-                  value={departmentFilter}
-                  onChange={(e) => setDepartmentFilter(e.target.value)}
-                  className="bg-transparent text-xs outline-none cursor-pointer"
-                >
-                  <option value="ALL">All Depts</option>
+              <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                <SelectTrigger aria-label="Department" className="h-8 text-xs shrink-0 w-auto min-w-[100px]">
+                  <SelectValue placeholder="All Depts" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Depts</SelectItem>
                   {departments.map((d) => (
-                    <option key={d.id} value={d.name}>{d.name}</option>
+                    <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
                   ))}
-                </select>
-              </label>
-              <div className="flex items-center border border-border-default text-body px-2.5 py-1.5 rounded-input text-xs bg-surface-raised shadow-card shrink-0">
-                <select
-                  aria-label="Payroll run"
-                  value={activeRun?.id || ''}
-                  onChange={event => { setSelectedRunId(event.target.value); setSelectedId(null) }}
-                  className="max-w-40 sm:max-w-48 bg-transparent text-xs font-normal text-heading outline-none truncate"
+                </SelectContent>
+              </Select>
+              <div className="flex items-center border border-border-default rounded-input text-xs bg-surface-raised shadow-card shrink-0 px-1 py-0.5">
+                <Select
+                  value={activeRun?.id || undefined}
+                  onValueChange={val => { setSelectedRunId(val); setSelectedId(null) }}
                 >
-                  {runs.map(item => (
-                    <option key={item.id} value={item.id}>
-                      {item.label.replace(/\s*Payroll\s*/i, ' ').trim()} · {item.status}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger aria-label="Payroll run" className="h-7 border-0 bg-transparent text-xs font-normal text-heading shadow-none focus:ring-0 max-w-40 sm:max-w-48">
+                    <SelectValue placeholder="Select payroll run" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {runs.map(item => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.label.replace(/\s*Payroll\s*/i, ' ').trim()} · {item.status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <div className="flex items-center gap-1 border-l border-border-default pl-1.5 ml-1">
                   <Button
                     variant="ghost"
@@ -684,12 +692,14 @@ export default function Payroll() {
           <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
             {/* Calculators dropdown */}
             <div className="relative shrink-0" ref={toolsMenuRef}>
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 aria-expanded={toolsMenuOpen}
                 aria-haspopup="true"
                 onClick={() => setToolsMenuOpen(prev => !prev)}
-                className="flex items-center gap-1.5 border border-border-default text-body px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card cursor-pointer shrink-0"
+                className="h-8 gap-1.5 text-xs font-medium bg-surface-raised shadow-card shrink-0"
               >
                 <Calculator size={13} />
                 <span>Calculators</span>
@@ -697,7 +707,7 @@ export default function Payroll() {
                   <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" title="Rounding review open" />
                 )}
                 <ChevronDown size={12} className={`text-muted transition-transform duration-150 ${toolsMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
+              </Button>
 
               {toolsMenuOpen && (
                 <div
@@ -751,19 +761,21 @@ export default function Payroll() {
 
             {/* Export dropdown */}
             <div className="relative shrink-0" ref={exportMenuRef}>
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 disabled={!run || records.length === 0}
                 aria-expanded={exportMenuOpen}
                 aria-haspopup="true"
                 onClick={() => setExportMenuOpen(prev => !prev)}
                 title={run ? 'Export payroll files' : 'No payroll run loaded'}
-                className="flex items-center gap-1.5 border border-border-default text-body px-2.5 py-1.5 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card disabled:opacity-60 cursor-pointer shrink-0"
+                className="h-8 gap-1.5 text-xs font-medium bg-surface-raised shadow-card disabled:opacity-60 shrink-0"
               >
                 <Download size={13} />
                 <span>Export</span>
                 <ChevronDown size={12} className={`text-muted transition-transform duration-150 ${exportMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
+              </Button>
 
               {exportMenuOpen && (
                 <div
@@ -969,15 +981,17 @@ export default function Payroll() {
                 <span>Period start year</span>
                 <input type="number" min="2000" max="2100" value={roundingYear} onChange={event => setRoundingYear(event.target.value)} className="w-24 rounded-input border border-border-default bg-surface-raised px-2 py-1 text-xs sm:text-sm" />
               </label>
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
                 type="button"
                 aria-label="Close rounding review"
                 onClick={() => setRoundingReviewOpen(false)}
-                className="text-muted hover:text-heading p-1.5 rounded-input hover:bg-surface-muted transition-colors cursor-pointer"
+                className="h-7 w-7 text-muted hover:text-heading"
                 title="Close rounding review"
               >
                 <X size={15} />
-              </button>
+              </Button>
             </div>
           </div>
           {isLoadingRoundingReview && <p className="mt-3 text-xs text-muted">Calculating rounding differences…</p>}
@@ -1240,7 +1254,7 @@ export default function Payroll() {
         <div className="space-y-5">
           {savedRetryAvailable && <div role="status" className="flex items-start justify-between gap-3 rounded-input border border-accent/30 bg-accent/5 p-3 text-xs text-body">
             <span>A previous request may have reached the server before its response was lost. Retry unchanged to reuse its request key; changing details creates a new request.</span>
-            <button type="button" onClick={discardSavedRetry} className="shrink-0 font-semibold text-accent hover:underline">Discard saved retry</button>
+            <Button variant="link" size="sm" type="button" onClick={discardSavedRetry} className="h-auto p-0 font-semibold text-accent hover:underline shrink-0">Discard saved retry</Button>
           </div>}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -1274,15 +1288,40 @@ export default function Payroll() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="payroll-salary-basis" className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Unspecified salary basis</label>
-              <select id="payroll-salary-basis" value={periodForm.salaryBasis} onChange={event => setPeriodForm(current => ({ ...current, salaryBasis: event.target.value }))} className={DIALOG_INPUT}>
-                <option value="">Confirm salary basis</option><option value="ANNUAL">Annual salary</option><option value="MONTHLY">Monthly salary</option>
-              </select>
+              <Select
+                value={periodForm.salaryBasis || '__unassigned__'}
+                onValueChange={val => setPeriodForm(current => ({ ...current, salaryBasis: val === '__unassigned__' ? '' : val }))}
+              >
+                <SelectTrigger id="payroll-salary-basis" className="h-9 w-full text-sm">
+                  <SelectValue placeholder="Confirm salary basis" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__unassigned__">Confirm salary basis</SelectItem>
+                  <SelectItem value="ANNUAL">Annual salary</SelectItem>
+                  <SelectItem value="MONTHLY">Monthly salary</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label htmlFor="payroll-frequency" className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Pay frequency</label>
-              <select id="payroll-frequency" value={periodForm.payFrequency} onChange={event => { const payFrequency = event.target.value; setPeriodForm(current => ({ ...current, payFrequency, periodsPerYear: { MONTHLY: 12, SEMIMONTHLY: 24, BIWEEKLY: 26, WEEKLY: 52 }[payFrequency] })) }} className={DIALOG_INPUT}>
-                <option value="MONTHLY">Monthly</option><option value="SEMIMONTHLY">Twice monthly</option><option value="BIWEEKLY">Every two weeks</option><option value="WEEKLY">Weekly</option>
-              </select>
+              <Select
+                value={periodForm.payFrequency}
+                onValueChange={payFrequency => setPeriodForm(current => ({
+                  ...current,
+                  payFrequency,
+                  periodsPerYear: { MONTHLY: 12, SEMIMONTHLY: 24, BIWEEKLY: 26, WEEKLY: 52 }[payFrequency]
+                }))}
+              >
+                <SelectTrigger id="payroll-frequency" className="h-9 w-full text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MONTHLY">Monthly</SelectItem>
+                  <SelectItem value="SEMIMONTHLY">Twice monthly</SelectItem>
+                  <SelectItem value="BIWEEKLY">Every two weeks</SelectItem>
+                  <SelectItem value="WEEKLY">Weekly</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label htmlFor="payroll-period-start" className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Earning period start</label>
@@ -1294,9 +1333,19 @@ export default function Payroll() {
             </div>
             <div>
               <label htmlFor="payroll-annual-periods" className="block text-xs font-bold text-muted uppercase tracking-wider mb-1.5">Periods per year</label>
-              <select id="payroll-annual-periods" value={periodForm.periodsPerYear} onChange={event => setPeriodForm(current => ({ ...current, periodsPerYear: Number(event.target.value) }))} className={DIALOG_INPUT}>
-                {({ MONTHLY: [12], SEMIMONTHLY: [24], BIWEEKLY: [26, 27], WEEKLY: [52, 53] }[periodForm.payFrequency]).map(count => <option key={count} value={count}>{count}</option>)}
-              </select>
+              <Select
+                value={String(periodForm.periodsPerYear)}
+                onValueChange={val => setPeriodForm(current => ({ ...current, periodsPerYear: Number(val) }))}
+              >
+                <SelectTrigger id="payroll-annual-periods" className="h-9 w-full text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {({ MONTHLY: [12], SEMIMONTHLY: [24], BIWEEKLY: [26, 27], WEEKLY: [52, 53] }[periodForm.payFrequency]).map(count => (
+                    <SelectItem key={count} value={String(count)}>{count}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <p className="text-xs text-muted">Equal-period pay is rounded once. Mid-period hires are prorated by inclusive calendar days; leave and other deductions remain explicit line adjustments. Choose 27/53 periods for a payroll calendar that requires them.</p>
@@ -1326,25 +1375,29 @@ export default function Payroll() {
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-caption pointer-events-none">%</span>
                   </div>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     type="button"
                     onClick={() => removeTaxRate(index)}
                     disabled={taxRates.length === 1}
                     aria-label={`Remove tax rate ${index + 1}`}
                     title={taxRates.length === 1 ? 'At least one rate is required' : 'Remove rate'}
-                    className="text-caption hover:text-danger transition-colors p-1 flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="h-8 w-8 text-caption hover:text-danger p-0 flex-shrink-0 disabled:opacity-40"
                   >
                     <Trash2 size={14} />
-                  </button>
+                  </Button>
                 </div>
               ))}
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 type="button"
                 onClick={addTaxRate}
-                className="flex items-center gap-1 text-sm font-medium text-accent hover:text-accent-hover transition-colors"
+                className="h-auto p-0 text-sm font-medium text-accent hover:text-accent-hover hover:bg-transparent"
               >
-                <Plus size={14} /> Add rate
-              </button>
+                <Plus size={14} className="mr-1" /> Add rate
+              </Button>
             </div>
           </div>
 

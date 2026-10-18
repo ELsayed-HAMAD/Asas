@@ -37,6 +37,13 @@ import {
   TableHead,
   TableCell,
 } from '../../../components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
 
 const metricFontSize = (money) => {
   const label = formatMoney(money)
@@ -301,34 +308,32 @@ export default function Expenses() {
                   className="pl-8 pr-2.5 h-7 text-xs bg-surface-raised w-40 sm:w-52"
                 />
               </div>
-              <label className="relative flex items-center border border-border-default text-body px-2.5 h-7 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised flex-shrink-0 cursor-pointer">
-                <span className="sr-only">Filter expenses by department</span>
-                <select
-                  value={departmentId}
-                  onChange={event => setDepartmentId(event.target.value)}
-                  className="appearance-none bg-transparent pr-4 text-xs outline-none cursor-pointer"
-                >
-                  <option value="">All Depts</option>
-                  {(departmentsData?.items ?? departmentsData ?? []).map(department => (
-                    <option key={department.id} value={department.id}>{department.name}</option>
-                  ))}
-                </select>
-                <ChevronDown size={13} className="pointer-events-none absolute right-1.5 text-caption" />
-              </label>
-            </div>
-            <label className="relative flex items-center border border-border-default text-body px-2.5 h-7 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised flex-shrink-0 cursor-pointer">
-              <span className="sr-only">Sort expenses</span>
-              <select
-                aria-label="Sort expenses"
-                value={sort}
-                onChange={event => setSort(event.target.value)}
-                className="appearance-none bg-transparent pr-4 text-xs outline-none cursor-pointer font-medium text-body-light hover:text-heading"
+              <Select
+                value={departmentId || '__all__'}
+                onValueChange={v => setDepartmentId(v === '__all__' ? '' : v)}
               >
-                <option value="desc">Sort: Newest First</option>
-                <option value="asc">Sort: Oldest First</option>
-              </select>
-              <ChevronDown size={13} className="pointer-events-none absolute right-1.5 text-caption" />
-            </label>
+                <SelectTrigger aria-label="Filter expenses by department" className="h-7 w-auto min-w-[95px] gap-1 px-2.5 text-xs font-medium bg-surface-raised border-border-default shrink-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__" className="text-xs">All Depts</SelectItem>
+                  {(departmentsData?.items ?? departmentsData ?? []).map(department => (
+                    <SelectItem key={department.id} value={department.id} className="text-xs">
+                      {department.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Select value={sort} onValueChange={v => setSort(v)}>
+              <SelectTrigger aria-label="Sort expenses" className="h-7 w-auto min-w-[130px] gap-1 px-2.5 text-xs font-medium bg-surface-raised border-border-default text-body-light hover:text-heading shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="desc" className="text-xs">Sort: Newest First</SelectItem>
+                <SelectItem value="asc" className="text-xs">Sort: Oldest First</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Table Card (wrapped in a card: 1px border, border-radius 12-16px, overflow hidden) */}
@@ -683,18 +688,22 @@ export default function Expenses() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-heading mb-1.5">Category</label>
-              <select
+              <Select
                 value={createForm.category}
-                onChange={(e) => setCreateForm((f) => ({ ...f, category: e.target.value }))}
-                className="w-full border border-border-default rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent"
+                onValueChange={(val) => setCreateForm((f) => ({ ...f, category: val }))}
               >
-                <option value="OFFICE">Office</option>
-                <option value="TRAVEL">Travel</option>
-                <option value="MEALS">Meals</option>
-                <option value="SOFTWARE">Software</option>
-                <option value="EQUIPMENT">Equipment</option>
-                <option value="OTHER">Other</option>
-              </select>
+                <SelectTrigger className="w-full bg-surface-raised">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="OFFICE">Office</SelectItem>
+                  <SelectItem value="TRAVEL">Travel</SelectItem>
+                  <SelectItem value="MEALS">Meals</SelectItem>
+                  <SelectItem value="SOFTWARE">Software</SelectItem>
+                  <SelectItem value="EQUIPMENT">Equipment</SelectItem>
+                  <SelectItem value="OTHER">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
@@ -759,26 +768,30 @@ export default function Expenses() {
                   onChange={event => { setEmployeeSearchInput(event.target.value); setEmployeePage(1) }}
                   className="mb-2 w-full text-sm"
                 />
-                <select
-                  aria-label="Expense employee"
-                  value={createForm.employeeId}
-                  onChange={(e) => {
-                    const employee = (employeesData?.items ?? []).find(item => item.id === e.target.value)
-                    setCreateForm(current => ({ ...current, employeeId: e.target.value }))
+                <Select
+                  value={createForm.employeeId || '__none__'}
+                  onValueChange={(val) => {
+                    const nextId = val === '__none__' ? '' : val
+                    const employee = (employeesData?.items ?? []).find(item => item.id === nextId)
+                    setCreateForm(current => ({ ...current, employeeId: nextId }))
                     setSelectedEmployeeName(employee?.name ?? '')
                   }}
-                  className="w-full border border-border-default rounded-input px-3 py-2 text-sm text-heading bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent"
                 >
-                  <option value="">Select employee...</option>
-                  {createForm.employeeId && !(employeesData?.items ?? []).some(employee => employee.id === createForm.employeeId) && (
-                    <option value={createForm.employeeId}>{selectedEmployeeName || 'Selected employee'}</option>
-                  )}
-                  {(employeesData?.items ?? []).map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger aria-label="Expense employee" className="w-full bg-surface-raised">
+                    <SelectValue placeholder="Select employee..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None (unassigned)</SelectItem>
+                    {createForm.employeeId && !(employeesData?.items ?? []).some(employee => employee.id === createForm.employeeId) && (
+                      <SelectItem value={createForm.employeeId}>{selectedEmployeeName || 'Selected employee'}</SelectItem>
+                    )}
+                    {(employeesData?.items ?? []).map((emp) => (
+                      <SelectItem key={emp.id} value={emp.id}>
+                        {emp.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {employeesData?.pagination && <div className="mt-2 flex items-center justify-between text-[11px] text-muted">
                   <span>Showing {employeesData.pagination.total === 0 ? 0 : (employeePage - 1) * employeesData.pagination.limit + 1}–{Math.min(employeePage * employeesData.pagination.limit, employeesData.pagination.total)} of {employeesData.pagination.total}</span>
                   <div className="flex items-center gap-2">

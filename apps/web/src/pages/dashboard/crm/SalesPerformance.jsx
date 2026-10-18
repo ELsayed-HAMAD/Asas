@@ -37,6 +37,13 @@ import {
   TableHead,
   TableCell,
 } from '../../../components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
 
 const REP_SPARK_COLORS = ['#10b981', '#3b82f6', '#ef4444']
 
@@ -169,19 +176,20 @@ export default function SalesPerformance() {
           </div>
 
           {/* b) Year select: width 104px, calendar icon, shows "2026" in full */}
-          <label className="flex items-center gap-1.5 h-9 w-[104px] min-w-[104px] px-2.5 border border-border-default rounded-input bg-surface-muted text-body text-xs font-medium hover:bg-surface transition-colors cursor-pointer shrink-0">
-            <Calendar size={14} className="text-muted shrink-0" />
-            <select
+          <Select value={String(year)} onValueChange={val => setYear(val)}>
+            <SelectTrigger
               aria-label="Sales performance year"
-              value={year}
-              onChange={event => setYear(event.target.value)}
-              className="bg-transparent outline-none cursor-pointer w-full text-xs text-heading font-medium"
+              className="flex items-center gap-1.5 h-9 w-[112px] min-w-[112px] px-2.5 bg-surface-muted text-heading text-xs font-medium shrink-0"
             >
+              <Calendar size={14} className="text-muted shrink-0" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
               {[...new Set([year, String(new Date().getUTCFullYear()), ...(forecast?.availableYears || []), ...Array.from({ length: 5 }, (_, index) => String(new Date().getUTCFullYear() - index))])].sort().reverse().map(value => (
-                <option key={value} value={value}>{value}</option>
+                <SelectItem key={value} value={String(value)} className="text-xs">{value}</SelectItem>
               ))}
-            </select>
-          </label>
+            </SelectContent>
+          </Select>
 
           {/* c) Month select: min-width 168px, calendar icon, shows "October 2026" in full with NO ellipsis */}
           <Button

@@ -29,6 +29,13 @@ import {
   TableHead,
   TableCell,
 } from '../../../components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
 
 const getBadgeStyle = (status) => {
   if (status === 'ACTIVE' || status === 'ON_TRACK' || status === 'COMPLETED') return "bg-success-light text-success-text border border-success-border";
@@ -179,17 +186,20 @@ export default function PortfolioOverview() {
 
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
-          <select
+          <Select
             value={departmentId}
-            onChange={(e) => setDepartmentId(e.target.value)}
-            aria-label="Filter by department"
-            className="border border-border-default text-body px-3 h-9 rounded-input text-sm font-medium hover:bg-surface-muted transition-colors bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent w-auto cursor-pointer"
+            onValueChange={(val) => setDepartmentId(val)}
           >
-            <option value="ALL">Filter: All Depts</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
+            <SelectTrigger aria-label="Filter by department" className="h-9 w-auto min-w-[150px] bg-surface-raised font-medium text-sm">
+              <SelectValue placeholder="Filter: All Depts" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Filter: All Depts</SelectItem>
+              {departments.map((d) => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
@@ -530,21 +540,26 @@ export default function PortfolioOverview() {
               className="mt-1 w-full"
             />
           </label>
-          <label className="block text-sm font-medium text-body">Status
-            <select
+          <div>
+            <label htmlFor="edit-project-status" className="block text-sm font-medium text-body mb-1">Status</label>
+            <Select
               value={editProjectForm.status}
-              onChange={event => setEditProjectForm(current => ({ ...current, status: event.target.value }))}
-              className="mt-1 w-full rounded-input border border-border-default px-3 py-2 bg-surface"
+              onValueChange={val => setEditProjectForm(current => ({ ...current, status: val }))}
             >
-              <option value="PLANNING">Planning</option>
-              <option value="ACTIVE">Active</option>
-              <option value="ON_TRACK">On Track</option>
-              <option value="AT_RISK">At Risk</option>
-              <option value="DELAYED">Delayed</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
-          </label>
+              <SelectTrigger id="edit-project-status" className="h-9 w-full text-sm bg-surface">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PLANNING">Planning</SelectItem>
+                <SelectItem value="ACTIVE">Active</SelectItem>
+                <SelectItem value="ON_TRACK">On Track</SelectItem>
+                <SelectItem value="AT_RISK">At Risk</SelectItem>
+                <SelectItem value="DELAYED">Delayed</SelectItem>
+                <SelectItem value="COMPLETED">Completed</SelectItem>
+                <SelectItem value="CANCELLED">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </FormDialog>
       <ConfirmDialog

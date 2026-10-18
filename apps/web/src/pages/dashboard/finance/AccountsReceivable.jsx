@@ -14,6 +14,14 @@ import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
+import { Checkbox } from '../../../components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
 import {
   Table,
   TableHeader,
@@ -245,25 +253,31 @@ export default function AccountsReceivable() {
               className="pl-9 pr-4 text-xs bg-surface-raised w-72 max-w-full shadow-card h-9"
             />
           </div>
-          <select
-            aria-label="Filter customers by aging status"
+          <Select
             value={ageFilter}
-            onChange={e => { setAgeFilter(e.target.value); setCustomerPage(1); }}
-            className="border border-border-default text-body text-xs px-3 py-2 rounded-input bg-surface-raised hover:bg-surface-muted transition-colors cursor-pointer outline-none shadow-card h-9"
+            onValueChange={v => { setAgeFilter(v); setCustomerPage(1); }}
           >
-            <option value="all">All</option>
-            <option value="overdue">Overdue</option>
-            <option value="current">Current</option>
-          </select>
-          <select
-            aria-label="Sort customers"
+            <SelectTrigger aria-label="Filter customers by aging status" className="h-9 w-auto min-w-[90px] text-xs bg-surface-raised border-border-default shadow-card">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">All</SelectItem>
+              <SelectItem value="overdue" className="text-xs">Overdue</SelectItem>
+              <SelectItem value="current" className="text-xs">Current</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
             value={oldestFirst ? 'oldest' : 'newest'}
-            onChange={e => { setOldestFirst(e.target.value === 'oldest'); setCustomerPage(1); }}
-            className="border border-border-default text-body text-xs px-3 py-2 rounded-input bg-surface-raised hover:bg-surface-muted transition-colors cursor-pointer outline-none shadow-card h-9"
+            onValueChange={v => { setOldestFirst(v === 'oldest'); setCustomerPage(1); }}
           >
-            <option value="oldest">Sort: Oldest First</option>
-            <option value="newest">Sort: Newest First</option>
-          </select>
+            <SelectTrigger aria-label="Sort customers" className="h-9 w-auto min-w-[140px] text-xs bg-surface-raised border-border-default shadow-card">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="oldest" className="text-xs">Sort: Oldest First</SelectItem>
+              <SelectItem value="newest" className="text-xs">Sort: Newest First</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Right group */}
@@ -362,12 +376,11 @@ export default function AccountsReceivable() {
                 <TableHeader className="bg-surface-muted/60 border-b border-border-default">
                   <TableRow className="hover:bg-transparent border-0">
                     <TableHead className="w-12 px-4 py-2.5 text-center">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         aria-label="Select all customers"
                         checked={paginatedCustomers.length > 0 && paginatedCustomers.every(c => selectedIds.has(c.id))}
-                        onChange={(e) => {
-                          if (e.target.checked) {
+                        onCheckedChange={(checked) => {
+                          if (checked) {
                             setSelectedIds(current => {
                               const next = new Set(current);
                               paginatedCustomers.forEach(c => next.add(c.id));
@@ -381,7 +394,6 @@ export default function AccountsReceivable() {
                             });
                           }
                         }}
-                        className="w-4 h-4 rounded-sm border-border-default text-primary focus:ring-primary cursor-pointer"
                       />
                     </TableHead>
                     <TableHead className="px-3 py-2.5 h-auto text-[10px] font-bold text-caption uppercase tracking-wider rtl:text-right">Customer</TableHead>
@@ -403,12 +415,10 @@ export default function AccountsReceivable() {
                     }`}
                   >
                     <TableCell className="w-12 px-4 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         aria-label={`Select ${account.name}`}
                         checked={selectedIds.has(account.id)}
-                        onChange={() => toggleSelection(account.id)}
-                        className="w-4 h-4 rounded-sm border-border-default text-primary focus:ring-primary cursor-pointer"
+                        onCheckedChange={() => toggleSelection(account.id)}
                       />
                     </TableCell>
                     <TableCell className="px-3 py-2.5">
@@ -503,18 +513,20 @@ export default function AccountsReceivable() {
               <div className="min-w-0">
                 <h2 className="text-base font-bold text-heading leading-tight truncate">{selectedRecord.name}</h2>
                 <div className="flex items-center gap-1.5 mt-1">
-                  <span className="text-[10px] font-bold text-muted uppercase tracking-wider">STATUS:</span>
-                  <select
-                    aria-label="Collection status"
+                  <Select
                     value={selectedRecord.status || 'CURRENT'}
-                    onChange={(e) => updateCustomerMutation.mutate({ id: selectedRecord.id, collectionStatus: e.target.value })}
+                    onValueChange={(val) => updateCustomerMutation.mutate({ id: selectedRecord.id, collectionStatus: val })}
                     disabled={updateCustomerMutation.isPending}
-                    className="text-xs font-semibold text-heading bg-surface-raised border border-border-default rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer"
                   >
-                    <option value="CURRENT">CURRENT</option>
-                    <option value="AT_RISK">AT RISK</option>
-                    <option value="DELINQUENT">DELINQUENT</option>
-                  </select>
+                    <SelectTrigger aria-label="Collection status" className="h-6 w-auto text-xs font-semibold text-heading bg-surface-raised border border-border-default px-2 py-0.5">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CURRENT" className="text-xs">CURRENT</SelectItem>
+                      <SelectItem value="AT_RISK" className="text-xs">AT RISK</SelectItem>
+                      <SelectItem value="DELINQUENT" className="text-xs">DELINQUENT</SelectItem>
+                    </SelectContent>
+                  </Select>
                   {updateCustomerMutation.isPending && <Loader2 size={12} className="animate-spin text-muted" />}
                 </div>
               </div>
@@ -637,8 +649,27 @@ export default function AccountsReceivable() {
                 />
                 <div className="flex items-center justify-between px-2.5 py-1.5 border-t border-border-subtle">
                   <div className="flex items-center gap-2 text-caption">
-                    <button type="button" disabled title="Attachments are not supported for collection activity notes" aria-label="Attach file (not supported)" className="hover:text-body-light transition-colors disabled:opacity-60 cursor-not-allowed"><Paperclip size={14} /></button>
-                    <button type="button" aria-label={activityType === 'Call' ? 'Log a call' : 'Add a note'} onClick={() => setActivityType(current => current === 'Note' ? 'Call' : 'Note')} className={`transition-colors cursor-pointer ${activityType === 'Call' ? 'text-accent' : 'hover:text-body-light'}`}><Phone size={14} /></button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      disabled
+                      title="Attachments are not supported for collection activity notes"
+                      aria-label="Attach file (not supported)"
+                      className="h-6 w-6 text-caption hover:text-body-light disabled:opacity-60"
+                    >
+                      <Paperclip size={14} />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={activityType === 'Call' ? 'Log a call' : 'Add a note'}
+                      onClick={() => setActivityType(current => current === 'Note' ? 'Call' : 'Note')}
+                      className={`h-6 w-6 cursor-pointer ${activityType === 'Call' ? 'text-accent hover:text-accent' : 'text-caption hover:text-body-light'}`}
+                    >
+                      <Phone size={14} />
+                    </Button>
                   </div>
                   <Button
                     type="button"

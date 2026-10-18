@@ -35,6 +35,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '../../../components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
 
 const STAGE_ORDER = ['LEADS', 'PROPOSAL', 'NEGOTIATION', 'CLOSED_WON', 'CLOSED_LOST'];
 
@@ -328,18 +335,24 @@ function DetailPanel({
           <label htmlFor="deal-stage" className="text-[11px] font-semibold text-muted uppercase tracking-wider shrink-0">
             Stage
           </label>
-          <select
-            id="deal-stage"
+          <Select
             value={deal.stage}
-            onChange={(event) => onStageChange(deal, event.target.value)}
+            onValueChange={(val) => onStageChange(deal, val)}
             disabled={!canWrite}
-            title={!canWrite ? 'Requires the ADMIN role' : undefined}
-            className="flex-1 min-h-[36px] h-9 px-3 py-1.5 text-sm font-medium text-body border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-60 cursor-pointer"
           >
-            {STAGE_ORDER.map((stage) => (
-              <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>
-            ))}
-          </select>
+            <SelectTrigger
+              id="deal-stage"
+              title={!canWrite ? 'Requires the ADMIN role' : undefined}
+              className="flex-1 min-h-[36px] h-9 bg-surface-muted text-sm font-medium text-body"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STAGE_ORDER.map((stage) => (
+                <SelectItem key={stage} value={stage}>{STAGE_LABELS[stage]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         {stageError && stageError.id === deal.id && (
           <p className="mt-2 text-xs font-medium text-danger">
@@ -934,16 +947,19 @@ export default function DealsPipeline() {
             </div>
             <div>
               <label htmlFor="new-deal-stage" className="block mb-1.5 text-[10px] font-bold text-muted uppercase tracking-wider">Stage</label>
-              <select
-                id="new-deal-stage"
+              <Select
                 value={dealForm.stage}
-                onChange={(event) => setDealForm((f) => ({ ...f, stage: event.target.value }))}
-                className="w-full h-9 px-3 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                onValueChange={(val) => setDealForm((f) => ({ ...f, stage: val }))}
               >
-                {CREATE_STAGES.map((stage) => (
-                  <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>
-                ))}
-              </select>
+                <SelectTrigger id="new-deal-stage" className="w-full bg-surface-muted">
+                  <SelectValue placeholder="Select stage" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CREATE_STAGES.map((stage) => (
+                    <SelectItem key={stage} value={stage}>{STAGE_LABELS[stage]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -975,16 +991,19 @@ export default function DealsPipeline() {
           </div>
           <div>
             <label htmlFor="new-deal-forecast-bucket" className="block mb-1.5 text-[10px] font-bold text-muted uppercase tracking-wider">Forecast category</label>
-            <select
-              id="new-deal-forecast-bucket"
+            <Select
               value={dealForm.forecastBucket}
-              onChange={(event) => setDealForm((f) => ({ ...f, forecastBucket: event.target.value }))}
-              className="w-full h-9 px-3 py-1.5 text-sm border border-border-default rounded-input bg-surface-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              onValueChange={(val) => setDealForm((f) => ({ ...f, forecastBucket: val }))}
             >
-              <option value="PIPELINE">Pipeline</option>
-              <option value="COMMIT">Commit</option>
-              <option value="BEST_CASE">Best case</option>
-            </select>
+              <SelectTrigger id="new-deal-forecast-bucket" className="w-full bg-surface-muted">
+                <SelectValue placeholder="Select forecast category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PIPELINE">Pipeline</SelectItem>
+                <SelectItem value="COMMIT">Commit</SelectItem>
+                <SelectItem value="BEST_CASE">Best case</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -1027,13 +1046,19 @@ export default function DealsPipeline() {
           </div>
           <div>
             <label className="block text-sm font-medium text-body mb-1">Stage</label>
-            <select
+            <Select
               value={editForm.stage}
-              onChange={event => setEditForm(current => ({ ...current, stage: event.target.value }))}
-              className="w-full h-9 px-3 py-1.5 rounded-input border border-border-default bg-surface-muted text-sm text-body"
+              onValueChange={val => setEditForm(current => ({ ...current, stage: val }))}
             >
-              {STAGE_ORDER.map(stage => <option key={stage} value={stage}>{STAGE_LABELS[stage]}</option>)}
-            </select>
+              <SelectTrigger className="w-full bg-surface-muted">
+                <SelectValue placeholder="Select stage" />
+              </SelectTrigger>
+              <SelectContent>
+                {STAGE_ORDER.map(stage => (
+                  <SelectItem key={stage} value={stage}>{STAGE_LABELS[stage]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <label className="block text-sm font-medium text-body mb-1">Close date</label>
@@ -1057,18 +1082,22 @@ export default function DealsPipeline() {
           </div>
           <div>
             <label className="block text-sm font-medium text-body mb-1">Forecast category</label>
-            <select
-              value={editForm.forecastBucket || ''}
-              onChange={event => setEditForm(current => ({ ...current, forecastBucket: event.target.value }))}
-              className="w-full h-9 px-3 py-1.5 rounded-input border border-border-default bg-surface-muted text-sm text-body"
+            <Select
+              value={editForm.forecastBucket || 'PIPELINE'}
+              onValueChange={val => setEditForm(current => ({ ...current, forecastBucket: val }))}
             >
-              <option value="PIPELINE">Pipeline</option>
-              <option value="COMMIT">Commit</option>
-              <option value="BEST_CASE">Best case</option>
-              {editForm.forecastBucket && !['PIPELINE', 'COMMIT', 'BEST_CASE'].includes(editForm.forecastBucket.toUpperCase()) && (
-                <option value={editForm.forecastBucket}>Legacy: {editForm.forecastBucket}</option>
-              )}
-            </select>
+              <SelectTrigger className="w-full bg-surface-muted">
+                <SelectValue placeholder="Select forecast category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PIPELINE">Pipeline</SelectItem>
+                <SelectItem value="COMMIT">Commit</SelectItem>
+                <SelectItem value="BEST_CASE">Best case</SelectItem>
+                {editForm.forecastBucket && !['PIPELINE', 'COMMIT', 'BEST_CASE'].includes(editForm.forecastBucket.toUpperCase()) && (
+                  <SelectItem value={editForm.forecastBucket}>Legacy: {editForm.forecastBucket}</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </FormDialog>
