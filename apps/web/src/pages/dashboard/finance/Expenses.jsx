@@ -235,7 +235,7 @@ export default function Expenses() {
           <Button
             type="button"
             size="sm"
-            onClick={() => { setCreateError(''); setEmployeeSearchInput(''); setEmployeePage(1); setCreateOpen(true); }}
+            onClick={() => { setCreateError(''); setEmployeeSearchInput(''); setCreateOpen(true); }}
             className="gap-2 h-9 px-4 font-semibold shadow-card"
           >
             <Plus size={14} /> New Expense
