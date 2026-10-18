@@ -18,6 +18,14 @@ import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
 import { Switch } from '../../../components/ui/switch';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '../../../components/ui/table';
 
 function formatShortDate(dateStr) {
   if (!dateStr) return '—'
@@ -432,31 +440,31 @@ export default function TimeAttendance() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
-                    <tr>
-                      <th className="px-4 py-2.5 text-left bg-surface-muted">Employee Name</th>
-                      <th className="px-4 py-2.5 text-left bg-surface-muted">Week</th>
-                      <th className="px-4 py-2.5 text-right bg-surface-muted">Hours</th>
-                      <th className="px-4 py-2.5 text-center bg-surface-muted w-28">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-subtle">
+                <Table className="w-full text-left border-collapse">
+                  <TableHeader className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
+                    <TableRow className="hover:bg-transparent border-0">
+                      <TableHead className="px-4 py-2.5 text-left rtl:text-right bg-surface-muted">Employee Name</TableHead>
+                      <TableHead className="px-4 py-2.5 text-left rtl:text-right bg-surface-muted">Week</TableHead>
+                      <TableHead className="px-4 py-2.5 text-right rtl:text-left bg-surface-muted">Hours</TableHead>
+                      <TableHead className="px-4 py-2.5 text-center bg-surface-muted w-28">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="divide-y divide-border-subtle">
                     {paginatedTimesheets.map(sheet => {
                       const isSelected = selectedTimesheetId === sheet.id || (activeEmployeeId === sheet.employeeId && !selectedException && !selectedLeave);
                       return (
-                        <tr
+                        <TableRow
                           key={sheet.id}
                           onClick={() => {
                             setSelectedId(sheet.id);
                             setSelectedTimesheetId(sheet.id);
                             setSelectedEmployeeId(sheet.employeeId);
                           }}
-                          className={`cursor-pointer transition-colors ${
+                          className={`cursor-pointer transition-colors border-0 ${
                             isSelected ? 'bg-accent-light/50' : 'bg-surface-raised hover:bg-surface-muted/60'
                           }`}
                         >
-                          <td className="px-4 py-3">
+                          <TableCell className="px-4 py-3">
                             <div className="flex items-center gap-2.5 min-w-0">
                               <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-subtle flex items-center justify-center text-xs font-bold text-heading shrink-0 overflow-hidden">
                                 {(sheet.employeeName || '?').charAt(0)}
@@ -466,33 +474,33 @@ export default function TimeAttendance() {
                                 <p className="text-[11px] text-muted truncate">{sheet.departmentName || 'General'}</p>
                               </div>
                             </div>
-                          </td>
-                          <td className="px-4 py-3 text-xs sm:text-sm text-body whitespace-nowrap">
+                          </TableCell>
+                          <TableCell className="px-4 py-3 text-xs sm:text-sm text-body whitespace-nowrap">
                             {sheet.weekStart ? `Week of ${formatShortDate(sheet.weekStart)}` : '—'}
-                          </td>
-                          <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
+                          </TableCell>
+                          <TableCell className="px-4 py-3 text-right rtl:text-left tabular-nums whitespace-nowrap">
                             <span className="text-sm font-semibold text-heading">{sheet.totalHours || 0}h</span>
                             {sheet.overtimeHours > 0 && (
                               <span className="text-[11px] text-warning font-medium ml-1">({sheet.overtimeHours}h OT)</span>
                             )}
-                          </td>
-                          <td className="px-4 py-3 text-center whitespace-nowrap">
+                          </TableCell>
+                          <TableCell className="px-4 py-3 text-center whitespace-nowrap">
                             <Badge variant={sheet.approvedAt ? 'success' : 'warning'}>
                               {sheet.approvedAt ? 'Approved' : 'Pending'}
                             </Badge>
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       );
                     })}
                     {paginatedTimesheets.length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="p-8 text-center text-sm text-muted">
+                      <TableRow className="hover:bg-transparent border-0">
+                        <TableCell colSpan={4} className="p-8 text-center text-sm text-muted">
                           No weekly timesheets match the selected filters.
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     )}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
 
               {/* Pagination Footer (8 rows per page) */}
@@ -722,25 +730,25 @@ export default function TimeAttendance() {
 
               {/* Daily Timesheet Days Table */}
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead className="bg-surface-muted/60 border-b border-border-subtle text-[10px] font-bold text-muted uppercase tracking-wider">
-                    <tr>
-                      <th className="px-2.5 py-2 w-16 whitespace-nowrap">Day</th>
-                      <th className="px-2.5 py-2 whitespace-nowrap text-xs">In</th>
-                      <th className="px-2.5 py-2 whitespace-nowrap text-xs">Out</th>
-                      <th className="px-2.5 py-2 text-right whitespace-nowrap">Total</th>
-                      <th className="px-1.5 py-2 text-right w-8" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-subtle">
+                <Table className="w-full text-left border-collapse text-xs">
+                  <TableHeader className="bg-surface-muted/60 border-b border-border-subtle text-[10px] font-bold text-muted uppercase tracking-wider">
+                    <TableRow className="hover:bg-transparent border-0">
+                      <TableHead className="px-2.5 py-2 w-16 whitespace-nowrap text-left rtl:text-right">Day</TableHead>
+                      <TableHead className="px-2.5 py-2 whitespace-nowrap text-xs text-left rtl:text-right">In</TableHead>
+                      <TableHead className="px-2.5 py-2 whitespace-nowrap text-xs text-left rtl:text-right">Out</TableHead>
+                      <TableHead className="px-2.5 py-2 text-right rtl:text-left whitespace-nowrap">Total</TableHead>
+                      <TableHead className="px-1.5 py-2 text-right rtl:text-left w-8" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="divide-y divide-border-subtle">
                     {ts && ts.days && ts.days.length > 0 ? (
                       ts.days.map((day, idx) => (
-                        <tr key={day.id || idx} className="hover:bg-surface-muted/50 transition-colors">
-                          <td className="px-2.5 py-2 text-body font-medium whitespace-nowrap">{day.dayLabel || '—'}</td>
-                          <td className="px-2.5 py-2 font-semibold text-heading tabular-nums whitespace-nowrap text-xs">{day.clockIn || '—'}</td>
-                          <td className="px-2.5 py-2 font-semibold text-heading tabular-nums whitespace-nowrap text-xs">{day.clockOut || '—'}</td>
-                          <td className="px-2.5 py-2 text-body text-right tabular-nums whitespace-nowrap">{day.totalHours || '0'}h</td>
-                          <td className="px-1.5 py-2 text-right">
+                        <TableRow key={day.id || idx} className="hover:bg-surface-muted/50 transition-colors border-0">
+                          <TableCell className="px-2.5 py-2 text-body font-medium whitespace-nowrap">{day.dayLabel || '—'}</TableCell>
+                          <TableCell className="px-2.5 py-2 font-semibold text-heading tabular-nums whitespace-nowrap text-xs">{day.clockIn || '—'}</TableCell>
+                          <TableCell className="px-2.5 py-2 font-semibold text-heading tabular-nums whitespace-nowrap text-xs">{day.clockOut || '—'}</TableCell>
+                          <TableCell className="px-2.5 py-2 text-body text-right rtl:text-left tabular-nums whitespace-nowrap">{day.totalHours || '0'}h</TableCell>
+                          <TableCell className="px-1.5 py-2 text-right rtl:text-left">
                             {isAdmin && !ts?.approvedAt && /^\d{4}-\d{2}-\d{2}$/.test(day.dayLabel) && (
                               <button
                                 type="button"
@@ -759,18 +767,18 @@ export default function TimeAttendance() {
                                 <Pencil size={13} />
                               </button>
                             )}
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ))
                     ) : (
-                      <tr>
-                        <td colSpan={5} className="px-4 py-4 text-center text-muted text-xs">
+                      <TableRow className="hover:bg-transparent border-0">
+                        <TableCell colSpan={5} className="px-4 py-4 text-center text-muted text-xs">
                           No timesheet days recorded for this week.
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     )}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
 
               {/* Weekly Total Footer */}

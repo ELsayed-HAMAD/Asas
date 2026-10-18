@@ -29,6 +29,14 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from '../../../components/ui/dropdown-menu';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '../../../components/ui/table';
 
 const REP_SPARK_COLORS = ['#10b981', '#3b82f6', '#ef4444']
 
@@ -337,7 +345,7 @@ export default function SalesPerformance() {
               </DropdownMenu>
             </div>
 
-            <table className="w-full table-fixed border-collapse">
+            <Table className="w-full table-fixed border-collapse">
               <colgroup>
                 <col className="w-[48px]" style={{ width: '48px' }} />
                 <col className="min-w-[200px]" />
@@ -345,27 +353,27 @@ export default function SalesPerformance() {
                 <col className="w-[110px]" style={{ width: '110px' }} />
                 <col className="w-[140px]" style={{ width: '140px' }} />
               </colgroup>
-              <thead>
-                <tr className="h-10 min-h-[40px] bg-surface-muted/90 border-b border-border-default text-[11px] font-semibold text-muted uppercase tracking-[0.06em]">
-                  <th className="h-10 px-3 text-start text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap w-[48px]">Rank</th>
-                  <th className="h-10 px-3 text-start text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap min-w-[200px]">Rep</th>
-                  <th className="h-10 px-3 text-end text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap w-[96px]">Win Rate</th>
-                  <th className="h-10 px-3 text-end text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap w-[110px]">Revenue</th>
-                  <th className="h-10 px-3 pe-4 text-end text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap w-[140px]">Trend</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-subtle">
+              <TableHeader className="bg-transparent border-0">
+                <TableRow className="h-10 min-h-[40px] bg-surface-muted/90 border-b border-border-default text-[11px] font-semibold text-muted uppercase tracking-[0.06em] hover:bg-surface-muted/90">
+                  <TableHead className="h-10 px-3 text-start text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap w-[48px]">Rank</TableHead>
+                  <TableHead className="h-10 px-3 text-start text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap min-w-[200px]">Rep</TableHead>
+                  <TableHead className="h-10 px-3 text-end rtl:text-left text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap w-[96px]">Win Rate</TableHead>
+                  <TableHead className="h-10 px-3 text-end rtl:text-left text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap w-[110px]">Revenue</TableHead>
+                  <TableHead className="h-10 px-3 pe-4 text-end rtl:text-left text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap w-[140px]">Trend</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-border-subtle">
                 {filteredReps.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-3 py-10 text-center text-sm text-muted">
+                  <TableRow className="border-0 hover:bg-transparent">
+                    <TableCell colSpan={5} className="px-3 py-10 text-center text-sm text-muted">
                       No rep data yet.
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ) : (
                   filteredReps.map((rep, idx) => (
-                    <tr key={rep.ownerEmployeeId || `unassigned-${idx}`} className="h-[52px] min-h-[52px] hover:bg-surface-muted/60 transition-colors">
-                      <td className="h-[52px] px-3 text-sm text-body-light font-semibold align-middle w-[48px]">{idx + 1}</td>
-                      <td className="h-[52px] px-3 align-middle min-w-[200px]">
+                    <TableRow key={rep.ownerEmployeeId || `unassigned-${idx}`} className="h-[52px] min-h-[52px] hover:bg-surface-muted/60 transition-colors border-0">
+                      <TableCell className="h-[52px] px-3 text-sm text-body-light font-semibold align-middle w-[48px]">{idx + 1}</TableCell>
+                      <TableCell className="h-[52px] px-3 align-middle min-w-[200px]">
                         <div className="flex items-center gap-3 min-w-0">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center overflow-hidden shrink-0 text-xs font-bold tracking-wider ${AVATAR_STYLES[idx % AVATAR_STYLES.length]}`}>
                             {initials(rep.ownerName)}
@@ -374,14 +382,14 @@ export default function SalesPerformance() {
                             {rep.ownerName || 'Unassigned'}
                           </span>
                         </div>
-                      </td>
-                      <td className="h-[52px] px-3 text-end text-sm text-body-light font-medium tabular-nums align-middle w-[96px]">
+                      </TableCell>
+                      <TableCell className="h-[52px] px-3 text-end text-sm text-body-light font-medium tabular-nums align-middle w-[96px]">
                         {formatPercent(rep.winRate)}
-                      </td>
-                      <td className="h-[52px] px-3 text-end text-sm font-semibold text-heading tabular-nums align-middle w-[110px]" title={formatMoney(rep.wonValue)}>
+                      </TableCell>
+                      <TableCell className="h-[52px] px-3 text-end text-sm font-semibold text-heading tabular-nums align-middle w-[110px]" title={formatMoney(rep.wonValue)}>
                         {formatCompactTableMoney(rep.wonValue)}
-                      </td>
-                      <td className="h-[52px] px-3 pe-4 text-end align-middle w-[140px]">
+                      </TableCell>
+                      <TableCell className="h-[52px] px-3 pe-4 text-end align-middle w-[140px]">
                         <div className="w-full h-6 flex items-center justify-end">
                           <ResponsiveContainer width="100%" height={24}>
                             <AreaChart data={(rep.weeklyActivity || []).map(week => ({ v: week.active + week.won + week.lost }))} margin={{ top: 2, right: 0, left: 0, bottom: 2 }}>
@@ -389,12 +397,12 @@ export default function SalesPerformance() {
                             </AreaChart>
                           </ResponsiveContainer>
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
 
           {/* Activity Breakdown */}

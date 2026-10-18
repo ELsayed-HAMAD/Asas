@@ -21,6 +21,14 @@ import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '../../../components/ui/table';
 
 const getBadgeStyle = (status) => {
   if (status === 'ACTIVE' || status === 'ON_TRACK' || status === 'COMPLETED') return "bg-success-light text-success-text border border-success-border";
@@ -244,52 +252,52 @@ export default function PortfolioOverview() {
         {/* Left: Table Card (fills height, card container like Inventory) */}
         <div data-testid="project-table-card" className="flex-1 min-w-0 bg-surface-raised border border-border-default rounded-card shadow-card flex flex-col overflow-hidden">
           <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-width:thin]">
-            <table className="w-full table-fixed border-collapse">
+            <Table className="w-full table-fixed border-collapse">
               <colgroup>
                 <col className="min-w-[200px]" />
                 <col style={{ width: '120px' }} />
                 <col style={{ width: '110px' }} />
                 <col style={{ width: '130px' }} />
               </colgroup>
-              <thead className="sticky top-0 z-10 bg-surface-muted/95 backdrop-blur-xs border-b border-border-default">
-                <tr className="h-10">
-                  <th className="h-10 ps-5 pe-3 text-start text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">
+              <TableHeader className="sticky top-0 z-10 bg-surface-muted/95 backdrop-blur-xs border-b border-border-default">
+                <TableRow className="h-10 hover:bg-transparent border-0">
+                  <TableHead className="h-10 ps-5 pe-3 text-start rtl:text-right text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">
                     <div className="flex items-center gap-1">Project <ChevronsUpDown size={12} className="text-caption" /></div>
-                  </th>
-                  <th className="h-10 px-3 text-start text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">
+                  </TableHead>
+                  <TableHead className="h-10 px-3 text-start rtl:text-right text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">
                     <div className="flex items-center gap-1">Budget <ChevronsUpDown size={12} className="text-caption" /></div>
-                  </th>
-                  <th className="h-10 px-3 text-start text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">
+                  </TableHead>
+                  <TableHead className="h-10 px-3 text-start rtl:text-right text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">
                     <div className="flex items-center gap-1">Utilization <ChevronsUpDown size={12} className="text-caption" /></div>
-                  </th>
-                  <th className="h-10 ps-3 pe-5 text-end text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">
+                  </TableHead>
+                  <TableHead className="h-10 ps-3 pe-5 text-end rtl:text-left text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1">Status <ChevronsUpDown size={12} className="text-caption" /></div>
-                  </th>
-                </tr>
-              </thead>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
 
-              <tbody className="divide-y divide-border-subtle">
+              <TableBody className="divide-y divide-border-subtle">
                 {visibleProjects.length === 0 ? (
-                  <tr className="h-32">
-                    <td colSpan={4} className="px-6 py-8 text-center text-sm text-muted">
+                  <TableRow className="h-32 hover:bg-transparent border-0">
+                    <TableCell colSpan={4} className="px-6 py-8 text-center text-sm text-muted">
                       No projects found matching the selected filters.
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ) : (
                   visibleProjects.map(project => {
                     const isSelected = selectedId === project.id;
 
                     return (
-                      <tr
+                      <TableRow
                         key={project.id}
                         onClick={() => setSelectedId(project.id)}
-                        className={`relative h-14 cursor-pointer transition-colors ${
+                        className={`relative h-14 cursor-pointer transition-colors border-0 ${
                           isSelected
                             ? 'bg-accent-light/30'
                             : 'bg-surface-raised hover:bg-surface-muted/60'
                         }`}
                       >
-                        <td className="relative ps-5 pe-3 py-0 align-middle">
+                        <TableCell className="relative ps-5 pe-3 py-0 align-middle">
                           {isSelected && (
                             <span className="absolute inset-y-0 start-0 w-[3px] bg-primary pointer-events-none" aria-hidden="true" />
                           )}
@@ -301,27 +309,27 @@ export default function PortfolioOverview() {
                               {project.name}
                             </span>
                           </div>
-                        </td>
-                        <td className="px-3 py-0 align-middle text-sm font-semibold text-heading tabular-nums text-start whitespace-nowrap" title={formatMoney(project.budget, { maximumFractionDigits: 0 })}>
+                        </TableCell>
+                        <TableCell className="px-3 py-0 align-middle text-sm font-semibold text-heading tabular-nums text-start rtl:text-right whitespace-nowrap" title={formatMoney(project.budget, { maximumFractionDigits: 0 })}>
                           {formatCompactTableMoney(project.budget)}
-                        </td>
-                        <td className="px-3 py-0 align-middle text-sm text-body-light font-medium tabular-nums text-start whitespace-nowrap">
+                        </TableCell>
+                        <TableCell className="px-3 py-0 align-middle text-sm text-body-light font-medium tabular-nums text-start rtl:text-right whitespace-nowrap">
                           {pct(project.utilizationPct)}
-                        </td>
-                        <td className="ps-3 pe-5 py-0 align-middle text-end whitespace-nowrap">
+                        </TableCell>
+                        <TableCell className="ps-3 pe-5 py-0 align-middle text-end rtl:text-left whitespace-nowrap">
                           <Badge
                             variant="outline"
                             className={`h-[22px] min-w-[90px] px-2.5 rounded text-xs font-semibold whitespace-nowrap justify-center ${getBadgeStyle(project.status)}`}
                           >
                             {formatStatus(project.status)}
                           </Badge>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     )
                   })
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </div>
 

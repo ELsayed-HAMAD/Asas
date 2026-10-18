@@ -16,6 +16,14 @@ import { Input } from '../../../components/ui/input'
 import { Textarea } from '../../../components/ui/textarea'
 import { Badge } from '../../../components/ui/badge'
 import { Alert, AlertDescription } from '../../../components/ui/alert'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '../../../components/ui/table'
 
 function initials(name = '') {
   return name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase()).join('') || '?'
@@ -664,31 +672,31 @@ export default function RecruitmentPipeline() {
               emptyTitle="No candidates found"
               emptyDescription="Add a candidate or load the sample pack to see data."
             >
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
-                  <tr>
-                    <th className="px-5 py-3 text-left bg-surface-muted">Candidate</th>
-                    <th className="px-5 py-3 text-left bg-surface-muted whitespace-nowrap">Role</th>
-                    <th className="px-5 py-3 text-left bg-surface-muted whitespace-nowrap">Stage</th>
-                    <th className="px-5 py-3 text-right bg-surface-muted whitespace-nowrap">Time in Stage</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-subtle">
+              <Table className="w-full text-left border-collapse">
+                <TableHeader className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
+                  <TableRow className="hover:bg-transparent border-0">
+                    <TableHead className="px-5 py-3 text-left rtl:text-right bg-surface-muted">Candidate</TableHead>
+                    <TableHead className="px-5 py-3 text-left rtl:text-right bg-surface-muted whitespace-nowrap">Role</TableHead>
+                    <TableHead className="px-5 py-3 text-left rtl:text-right bg-surface-muted whitespace-nowrap">Stage</TableHead>
+                    <TableHead className="px-5 py-3 text-right rtl:text-left bg-surface-muted whitespace-nowrap">Time in Stage</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-border-subtle">
                   {visibleCandidates.map(cand => {
                     const stageLabel = STAGE_LABELS[cand.stage] || cand.stage
                     const isSelected = selectedId === cand.id
                     return (
-                      <tr
+                      <TableRow
                         key={cand.id}
                         onClick={() => {
                           hasManuallyClosedRef.current = false
                           setSelectedId(cand.id)
                         }}
-                        className={`group cursor-pointer transition-colors h-14 ${
+                        className={`group cursor-pointer transition-colors h-14 border-0 ${
                           isSelected ? 'bg-accent-light/50' : 'bg-surface-raised hover:bg-surface-muted/60'
                         }`}
                       >
-                        <td className="px-5 py-2.5">
+                        <TableCell className="px-5 py-2.5">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-strong flex items-center justify-center text-xs font-semibold text-heading overflow-hidden shrink-0">
                               {cand.avatarUrl ? (
@@ -702,21 +710,21 @@ export default function RecruitmentPipeline() {
                               <p className="text-[11px] text-muted truncate">{cand.email || '—'}</p>
                             </div>
                           </div>
-                        </td>
-                        <td className="px-5 py-2.5 text-sm text-body whitespace-nowrap">{cand.role}</td>
-                        <td className="px-5 py-2.5 whitespace-nowrap">
+                        </TableCell>
+                        <TableCell className="px-5 py-2.5 text-sm text-body whitespace-nowrap">{cand.role}</TableCell>
+                        <TableCell className="px-5 py-2.5 whitespace-nowrap">
                           <Badge variant="outline" className={STAGE_COLORS[stageLabel] || 'bg-surface-active text-body'}>
                             {stageLabel}
                           </Badge>
-                        </td>
-                        <td className="px-5 py-2.5 text-sm text-body-light text-right whitespace-nowrap">
+                        </TableCell>
+                        <TableCell className="px-5 py-2.5 text-sm text-body-light text-right rtl:text-left whitespace-nowrap">
                           {cand.timeInStage || '—'}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     )
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </QueryState>
           </div>
 

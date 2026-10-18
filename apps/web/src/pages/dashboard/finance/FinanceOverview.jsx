@@ -17,6 +17,14 @@ import FormDialog from '../../../components/common/FormDialog';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '../../../components/ui/table';
 
 // Display-only conversion of a wire money object ({amount: minor units, currency}) to a
 // major-unit number, used solely to feed recharts' numeric series / axis ticks. Every
@@ -377,24 +385,24 @@ export default function FinanceOverview() {
             </Button>
           </div>
           <div className="flex-1 overflow-auto">
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
-                <tr>
-                  <th className="px-5 py-2.5 text-[11px] font-bold text-muted uppercase tracking-wider bg-surface-muted">Date</th>
-                  <th className="px-5 py-2.5 text-[11px] font-bold text-muted uppercase tracking-wider bg-surface-muted">Description</th>
-                  <th className="px-5 py-2.5 text-[11px] font-bold text-muted uppercase tracking-wider text-right bg-surface-muted">Amount</th>
-                  <th className="px-5 py-2.5 text-[11px] font-bold text-muted uppercase tracking-wider text-right bg-surface-muted">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-subtle">
+            <Table className="w-full text-left border-collapse">
+              <TableHeader className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
+                <TableRow className="hover:bg-transparent border-0">
+                  <TableHead className="px-5 py-2.5 text-[11px] font-bold text-muted uppercase tracking-wider bg-surface-muted rtl:text-right">Date</TableHead>
+                  <TableHead className="px-5 py-2.5 text-[11px] font-bold text-muted uppercase tracking-wider bg-surface-muted rtl:text-right">Description</TableHead>
+                  <TableHead className="px-5 py-2.5 text-[11px] font-bold text-muted uppercase tracking-wider text-right rtl:text-left bg-surface-muted">Amount</TableHead>
+                  <TableHead className="px-5 py-2.5 text-[11px] font-bold text-muted uppercase tracking-wider text-right rtl:text-left bg-surface-muted">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-border-subtle">
                 {recentTransactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-surface-muted/60 transition-colors h-14">
-                    <td className="px-5 py-2.5 text-xs text-body-light font-medium whitespace-nowrap">
+                  <TableRow key={tx.id} className="hover:bg-surface-muted/60 transition-colors h-14 border-0">
+                    <TableCell className="px-5 py-2.5 text-xs text-body-light font-medium whitespace-nowrap">
                       {new Date(tx.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit' })}
-                    </td>
-                    <td className="px-5 py-2.5 text-sm font-semibold text-heading truncate max-w-xs">{tx.description}</td>
-                    <td
-                      className={`px-5 py-2.5 text-sm font-semibold text-right tabular-nums whitespace-nowrap ${
+                    </TableCell>
+                    <TableCell className="px-5 py-2.5 text-sm font-semibold text-heading truncate max-w-xs">{tx.description}</TableCell>
+                    <TableCell
+                      className={`px-5 py-2.5 text-sm font-semibold text-right rtl:text-left tabular-nums whitespace-nowrap ${
                         tx.type === 'credit' ? 'text-success' : 'text-heading'
                       }`}
                       title={formatMoney(tx.type === 'debit' && tx.amount && typeof tx.amount === 'object'
@@ -406,8 +414,8 @@ export default function FinanceOverview() {
                         ? { ...tx.amount, amount: -Math.abs(tx.amount.amount) }
                         : tx.type === 'debit' ? -Number(tx.amount) : tx.amount,
                         { forcePlus: tx.type === 'credit' })}
-                    </td>
-                    <td className="px-5 py-2.5 text-right whitespace-nowrap">
+                    </TableCell>
+                    <TableCell className="px-5 py-2.5 text-right rtl:text-left whitespace-nowrap">
                       <Badge variant="outline" className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                         tx.status === 'CLEARED'
                           ? (tx.type === 'credit'
@@ -417,20 +425,20 @@ export default function FinanceOverview() {
                       }`}>
                         {tx.status}
                       </Badge>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
                 {recentTransactions.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-5 py-8 text-center text-muted text-sm">
+                  <TableRow className="hover:bg-transparent border-0">
+                    <TableCell colSpan={4} className="px-5 py-8 text-center text-muted text-sm">
                       <div className="min-h-[220px] flex items-center justify-center">
                         No recent transactions found.
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </div>
 
