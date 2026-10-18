@@ -55,7 +55,24 @@
 
 ## Phase 3 — Tables
 
-### Status: NOT STARTED
+### Status: ✅ COMPLETE (2026-10-18)
+
+| Task / File | Status | Notes |
+|---|---|---|
+| `SalesPerformance.jsx` | ✅ Done | Rep ranking table → `ui/table` with colgroup & sticky header |
+| `RevenueForecast.jsx` | ✅ Done | Rep quota breakdown table → `ui/table` |
+| `AccountsReceivable.jsx` | ✅ Done | Customer balance table → `ui/table` with checkbox select & row select |
+| `BankReconciliation.jsx` | ✅ Done | Statement row matching table → `ui/table` |
+| `Expenses.jsx` | ✅ Done | Expense list table → `ui/table` with colgroup, sticky header & selection indicators |
+| `FinanceOverview.jsx` | ✅ Done | Recent transactions table → `ui/table` with sticky header & credit/debit styling |
+| `TrialBalance.jsx` | ✅ Done | Ledger accounts table + totals footer → `ui/table` + `TableFooter` |
+| `PortfolioOverview.jsx` | ✅ Done | Project portfolio table → `ui/table` with colgroup, sticky header & status badges |
+| `RecruitmentPipeline.jsx` | ✅ Done | Candidates table → `ui/table` with sticky header & stage badges |
+| `TimeAttendance.jsx` (×2) | ✅ Done | Timesheets list table + daily punch breakdown table → `ui/table` |
+| `Payroll.jsx` (×3) | ✅ Done | Payslips table + rounding review table + main payroll run table → `ui/table` |
+| `ProductCatalog.jsx` (×3) | ✅ Done | Products table + purchase orders table + stock movements table → `ui/table` |
+| `StockMovements.jsx` | ✅ Done | Inventory stock movements log table → `ui/table` |
+| Verification gate | ✅ Done | `pnpm test`: web 44/44 pass · `pnpm build`: clean build · grep audit: 0 raw `<table>` in `src/pages/` (only `ui/table.jsx` remains) |
 
 ---
 

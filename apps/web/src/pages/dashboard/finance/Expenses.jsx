@@ -29,6 +29,14 @@ import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '../../../components/ui/table';
 
 const metricFontSize = (money) => {
   const label = formatMoney(money)
@@ -327,7 +335,7 @@ export default function Expenses() {
           <div className="bg-surface-raised rounded-card border border-border-default shadow-card overflow-hidden flex flex-col flex-1 min-h-0">
             {/* Table Container (scrolls vertically on its own with sticky header) */}
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-surface-raised">
-              <table className="w-full table-fixed text-left border-collapse">
+              <Table className="w-full table-fixed text-left border-collapse">
                 <colgroup>
                   <col className="min-w-[170px]" />
                   <col className="w-[20%] min-w-[110px]" />
@@ -335,17 +343,17 @@ export default function Expenses() {
                   <col className="w-[100px] lg:w-[105px]" />
                   <col className="w-[100px] lg:w-[105px]" />
                 </colgroup>
-                <thead className="bg-surface-muted/60 border-b border-border-default sticky top-0 z-10 h-10">
-                  <tr className="h-10">
-                    <th className="px-3 py-0 text-left text-xs font-semibold uppercase tracking-[0.04em] text-muted">Employee</th>
-                    <th className="w-[20%] min-w-[110px] px-2.5 py-0 text-left text-xs font-semibold uppercase tracking-[0.04em] text-muted">Merchant</th>
-                    <th className="w-[85px] lg:w-[90px] px-2.5 py-0 text-left text-xs font-semibold uppercase tracking-[0.04em] text-muted">Expense Date</th>
-                    <th className="w-[100px] lg:w-[105px] px-2.5 py-0 text-center text-xs font-semibold uppercase tracking-[0.04em] text-muted">Status</th>
-                    <th className="w-[100px] lg:w-[105px] px-2.5 pr-4 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted">Amount</th>
-                  </tr>
-                </thead>
+                <TableHeader className="bg-surface-muted/60 border-b border-border-default sticky top-0 z-10 h-10">
+                  <TableRow className="h-10 hover:bg-transparent border-0">
+                    <TableHead className="px-3 py-0 text-left rtl:text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10">Employee</TableHead>
+                    <TableHead className="w-[20%] min-w-[110px] px-2.5 py-0 text-left rtl:text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10">Merchant</TableHead>
+                    <TableHead className="w-[85px] lg:w-[90px] px-2.5 py-0 text-left rtl:text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10">Expense Date</TableHead>
+                    <TableHead className="w-[100px] lg:w-[105px] px-2.5 py-0 text-center text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10">Status</TableHead>
+                    <TableHead className="w-[100px] lg:w-[105px] px-2.5 pr-4 py-0 text-right rtl:text-left text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
 
-                <tbody>
+                <TableBody>
                   {items.map(item => {
                     const isSelected = selectedId === item.id;
 
@@ -364,17 +372,17 @@ export default function Expenses() {
                     const bgClass = colors[Math.abs(hashCode(name)) % colors.length];
 
                     return (
-                      <tr
+                      <TableRow
                         key={item.id}
                         onClick={() => setSelectedId(item.id)}
-                        className={`h-[48px] cursor-pointer transition-colors ${
+                        className={`h-[48px] cursor-pointer transition-colors border-0 ${
                           isSelected
                             ? 'bg-accent-light/40'
                             : 'bg-surface-raised hover:bg-surface-muted'
                         }`}
                       >
                         {/* Employee Column (name above category, 3px accent bar when selected) */}
-                        <td className="relative px-3 py-0 align-middle border-b border-border-subtle min-w-0">
+                        <TableCell className="relative px-3 py-0 align-middle border-b border-border-subtle min-w-0">
                           {isSelected && (
                             <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-blue-600 pointer-events-none" />
                           )}
@@ -387,42 +395,42 @@ export default function Expenses() {
                               <p className="text-[10px] text-muted truncate leading-tight mt-0.5" title={item.category}>{item.category}</p>
                             </div>
                           </div>
-                        </td>
+                        </TableCell>
 
                         {/* Merchant Column */}
-                        <td className="px-2.5 py-0 align-middle border-b border-border-subtle text-xs font-medium text-body truncate" title={item.merchant || '—'}>
+                        <TableCell className="px-2.5 py-0 align-middle border-b border-border-subtle text-xs font-medium text-body truncate" title={item.merchant || '—'}>
                           {item.merchant || '—'}
-                        </td>
+                        </TableCell>
 
                         {/* Expense Date Column */}
-                        <td className="px-2.5 py-0 align-middle border-b border-border-subtle text-xs font-medium text-muted whitespace-nowrap">
+                        <TableCell className="px-2.5 py-0 align-middle border-b border-border-subtle text-xs font-medium text-muted whitespace-nowrap">
                           {new Date(item.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit' })}
-                        </td>
+                        </TableCell>
 
                         {/* Status Column */}
-                        <td className="px-2.5 py-0 align-middle border-b border-border-subtle text-center whitespace-nowrap">
+                        <TableCell className="px-2.5 py-0 align-middle border-b border-border-subtle text-center whitespace-nowrap">
                           <Badge variant="outline" className={`border-0 text-[11px] font-semibold ${badgeStyle}`}>
                             {item.status}
                           </Badge>
-                        </td>
+                        </TableCell>
 
                         {/* Amount Column */}
-                        <td className="px-2.5 pr-4 py-0 align-middle border-b border-border-subtle text-right text-xs font-semibold text-heading tabular-nums whitespace-nowrap" title={formatMoney(item.amount)}>
+                        <TableCell className="px-2.5 pr-4 py-0 align-middle border-b border-border-subtle text-right text-xs font-semibold text-heading tabular-nums whitespace-nowrap" title={formatMoney(item.amount)}>
                           {formatCompactTableMoney(item.amount)}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     );
                   })}
 
                   {items.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-muted text-xs">
+                    <TableRow className="hover:bg-transparent border-0">
+                      <TableCell colSpan={5} className="px-6 py-8 text-center text-muted text-xs">
                         No expenses found.
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
 
             {/* Table Footer (pinned to bottom of card, height 36px) */}

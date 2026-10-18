@@ -39,6 +39,14 @@ import { Input } from '../../../components/ui/input'
 import { Badge } from '../../../components/ui/badge'
 import { Checkbox } from '../../../components/ui/checkbox'
 import { Alert, AlertDescription } from '../../../components/ui/alert'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '../../../components/ui/table'
 
 // The old page rendered deductions/taxes as a leading-minus negative; the minus only appears
 // for a positive amount (a zero rendered plain), so mirror that instead of an unconditional '-'.
@@ -549,29 +557,29 @@ export default function Payroll() {
         {/* Payslips Table */}
         <div className="flex-1 overflow-y-auto px-8 py-6">
           <div className="border border-border-default rounded-card-sm overflow-x-auto bg-surface-raised shadow-card">
-            <table className="w-full min-w-[900px] text-left border-collapse">
-              <thead className="bg-surface-muted border-b border-border-default">
-                <tr>
-                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider">Payroll Period</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider">Pay Date</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Base Salary</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Gross Pay</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Deductions</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Net Pay</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-center">Status</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Download</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-subtle">
+            <Table className="w-full min-w-[900px] text-left border-collapse">
+              <TableHeader className="bg-surface-muted border-b border-border-default">
+                <TableRow className="hover:bg-transparent border-0">
+                  <TableHead className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-left rtl:text-right">Payroll Period</TableHead>
+                  <TableHead className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-left rtl:text-right">Pay Date</TableHead>
+                  <TableHead className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right rtl:text-left">Base Salary</TableHead>
+                  <TableHead className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right rtl:text-left">Gross Pay</TableHead>
+                  <TableHead className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right rtl:text-left">Deductions</TableHead>
+                  <TableHead className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right rtl:text-left">Net Pay</TableHead>
+                  <TableHead className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-center">Status</TableHead>
+                  <TableHead className="px-6 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right rtl:text-left">Download</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-border-subtle">
                 {payslipsList.map(item => (
-                  <tr key={item.id} className="hover:bg-surface-muted transition-colors">
-                    <td className="px-6 py-4 font-semibold text-sm text-heading">{item.runLabel}</td>
-                    <td className="px-6 py-4 text-sm text-body">{item.payDate ? formatDate(item.payDate) : (item.periodEnd ? formatDate(item.periodEnd) : '—')}</td>
-                    <td className="px-6 py-4 text-sm text-heading text-right tabular-nums" title={formatMoney(item.baseSalary, { currency: item.currency })}>{formatCompactTableMoney(item.baseSalary, { currency: item.currency })}</td>
-                    <td className="px-6 py-4 text-sm text-heading text-right tabular-nums" title={formatMoney(item.gross, { currency: item.currency })}>{formatCompactTableMoney(item.gross, { currency: item.currency })}</td>
-                    <td className="px-6 py-4 text-sm text-body text-right tabular-nums" title={`-${formatMoney(item.deductions, { currency: item.currency })}`}>-{formatCompactTableMoney(item.deductions, { currency: item.currency })}</td>
-                    <td className="px-6 py-4 text-sm font-bold text-heading text-right tabular-nums" title={formatMoney(item.net, { currency: item.currency })}>{formatCompactTableMoney(item.net, { currency: item.currency })}</td>
-                    <td className="px-6 py-4 text-center">
+                  <TableRow key={item.id} className="hover:bg-surface-muted transition-colors border-0">
+                    <TableCell className="px-6 py-4 font-semibold text-sm text-heading">{item.runLabel}</TableCell>
+                    <TableCell className="px-6 py-4 text-sm text-body">{item.payDate ? formatDate(item.payDate) : (item.periodEnd ? formatDate(item.periodEnd) : '—')}</TableCell>
+                    <TableCell className="px-6 py-4 text-sm text-heading text-right rtl:text-left tabular-nums" title={formatMoney(item.baseSalary, { currency: item.currency })}>{formatCompactTableMoney(item.baseSalary, { currency: item.currency })}</TableCell>
+                    <TableCell className="px-6 py-4 text-sm text-heading text-right rtl:text-left tabular-nums" title={formatMoney(item.gross, { currency: item.currency })}>{formatCompactTableMoney(item.gross, { currency: item.currency })}</TableCell>
+                    <TableCell className="px-6 py-4 text-sm text-body text-right rtl:text-left tabular-nums" title={`-${formatMoney(item.deductions, { currency: item.currency })}`}>-{formatCompactTableMoney(item.deductions, { currency: item.currency })}</TableCell>
+                    <TableCell className="px-6 py-4 text-sm font-bold text-heading text-right rtl:text-left tabular-nums" title={formatMoney(item.net, { currency: item.currency })}>{formatCompactTableMoney(item.net, { currency: item.currency })}</TableCell>
+                    <TableCell className="px-6 py-4 text-center">
                       <Badge variant={
                         item.status === 'PAID' ? 'success' :
                         item.status === 'APPROVED' ? 'warning' :
@@ -579,21 +587,21 @@ export default function Payroll() {
                       }>
                         {item.status}
                       </Badge>
-                    </td>
-                    <td className="px-6 py-4 text-right">
+                    </TableCell>
+                    <TableCell className="px-6 py-4 text-right rtl:text-left">
                       <PayslipButton runId={item.payrollRunId} lineId={item.id} />
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
                 {payslipsList.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-muted text-sm">
+                  <TableRow className="hover:bg-transparent border-0">
+                    <TableCell colSpan={8} className="px-6 py-12 text-center text-muted text-sm">
                       No payslips available yet for your account.
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </div>
       </div>
@@ -983,17 +991,24 @@ export default function Payroll() {
                   <p className="mt-2 text-xs text-body">No rounding-only differences were found for {roundingReview.year} paid earning periods.</p>
                 ) : (
                   <div className="mt-2 overflow-x-auto rounded-button border border-border-default bg-surface-raised">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-surface-muted text-muted"><tr>
-                        <th className="px-3 py-2">Employee / rate schedule</th><th className="px-3 py-2">Paid lines</th><th className="px-3 py-2">Gross</th><th className="px-3 py-2">Recorded deductions</th><th className="px-3 py-2">Aggregate-rounded</th><th className="px-3 py-2">Variance</th>
-                      </tr></thead>
-                      <tbody className="divide-y divide-border-subtle">{differences.map((group, index) => (
-                        <tr key={`${group.employeeId}-${index}`}>
-                          <td className="px-3 py-2"><p className="font-medium text-heading">{group.employeeName}</p><p className="mt-0.5 text-muted">{group.taxRates.map(rate => `${rate.label} ${rate.rate}%`).join(' · ')} · {group.currency}</p><details className="mt-1"><summary className="cursor-pointer text-muted">Tax-line detail</summary><ul className="mt-1 space-y-1">{group.taxLines.map(line => <li key={line.label}>{line.label}: {formatMoney(line.recorded, { currency: group.currency })} recorded · {formatMoney(line.aggregateRounded, { currency: group.currency })} aggregate · variance {formatMoney(line.variance, { currency: group.currency })}</li>)}</ul></details></td>
-                          <td className="px-3 py-2 text-body">{group.paidLineCount}</td><td className="px-3 py-2 text-body tabular-nums" title={formatMoney(group.grossTotal, { currency: group.currency })}>{formatCompactTableMoney(group.grossTotal, { currency: group.currency })}</td><td className="px-3 py-2 text-body tabular-nums" title={formatMoney(group.recordedDeductions, { currency: group.currency })}>{formatCompactTableMoney(group.recordedDeductions, { currency: group.currency })}</td><td className="px-3 py-2 text-body tabular-nums" title={formatMoney(group.aggregateRoundedDeductions, { currency: group.currency })}>{formatCompactTableMoney(group.aggregateRoundedDeductions, { currency: group.currency })}</td><td className="px-3 py-2 font-semibold text-heading tabular-nums" title={formatMoney(group.variance, { currency: group.currency })}>{formatCompactTableMoney(group.variance, { currency: group.currency })}</td>
-                        </tr>
-                      ))}</tbody>
-                    </table>
+                    <Table className="w-full text-left text-xs">
+                      <TableHeader className="bg-surface-muted text-muted">
+                        <TableRow className="hover:bg-transparent border-0">
+                          <TableHead className="px-3 py-2 text-left rtl:text-right">Employee / rate schedule</TableHead>
+                          <TableHead className="px-3 py-2 text-left rtl:text-right">Paid lines</TableHead>
+                          <TableHead className="px-3 py-2 text-left rtl:text-right">Gross</TableHead>
+                          <TableHead className="px-3 py-2 text-left rtl:text-right">Recorded deductions</TableHead>
+                          <TableHead className="px-3 py-2 text-left rtl:text-right">Aggregate-rounded</TableHead>
+                          <TableHead className="px-3 py-2 text-left rtl:text-right">Variance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody className="divide-y divide-border-subtle">{differences.map((group, index) => (
+                        <TableRow key={`${group.employeeId}-${index}`} className="border-0">
+                          <TableCell className="px-3 py-2"><p className="font-medium text-heading">{group.employeeName}</p><p className="mt-0.5 text-muted">{group.taxRates.map(rate => `${rate.label} ${rate.rate}%`).join(' · ')} · {group.currency}</p><details className="mt-1"><summary className="cursor-pointer text-muted">Tax-line detail</summary><ul className="mt-1 space-y-1">{group.taxLines.map(line => <li key={line.label}>{line.label}: {formatMoney(line.recorded, { currency: group.currency })} recorded · {formatMoney(line.aggregateRounded, { currency: group.currency })} aggregate · variance {formatMoney(line.variance, { currency: group.currency })}</li>)}</ul></details></TableCell>
+                          <TableCell className="px-3 py-2 text-body">{group.paidLineCount}</TableCell><TableCell className="px-3 py-2 text-body tabular-nums" title={formatMoney(group.grossTotal, { currency: group.currency })}>{formatCompactTableMoney(group.grossTotal, { currency: group.currency })}</TableCell><TableCell className="px-3 py-2 text-body tabular-nums" title={formatMoney(group.recordedDeductions, { currency: group.currency })}>{formatCompactTableMoney(group.recordedDeductions, { currency: group.currency })}</TableCell><TableCell className="px-3 py-2 text-body tabular-nums" title={formatMoney(group.aggregateRoundedDeductions, { currency: group.currency })}>{formatCompactTableMoney(group.aggregateRoundedDeductions, { currency: group.currency })}</TableCell><TableCell className="px-3 py-2 font-semibold text-heading tabular-nums" title={formatMoney(group.variance, { currency: group.currency })}>{formatCompactTableMoney(group.variance, { currency: group.currency })}</TableCell>
+                        </TableRow>
+                      ))}</TableBody>
+                    </Table>
                   </div>
                 )}
               </>
@@ -1024,7 +1039,7 @@ export default function Payroll() {
                 </div>
               )}
               {!isLoading && records.length > 0 && (
-                <table className="w-full table-fixed text-left border-collapse">
+                <Table className="w-full table-fixed text-left border-collapse">
                   <colgroup>
                     <col className="w-[35%]" />
                     <col className="w-[18%]" />
@@ -1032,30 +1047,30 @@ export default function Payroll() {
                     <col className="w-[16%]" />
                     <col className="w-[13%] min-w-[85px]" />
                   </colgroup>
-                  <thead className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
-                    <tr>
-                      <th className="px-4 py-2.5 text-left bg-surface-muted">Employee</th>
-                      <th className="px-4 py-2.5 text-right bg-surface-muted">Gross</th>
-                      <th className="px-4 py-2.5 text-right bg-surface-muted">Deductions</th>
-                      <th className="px-4 py-2.5 text-right bg-surface-muted">Net</th>
-                      <th className="px-4 py-2.5 bg-surface-muted text-right" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-subtle">
+                  <TableHeader className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
+                    <TableRow className="hover:bg-transparent border-0">
+                      <TableHead className="px-4 py-2.5 text-left rtl:text-right bg-surface-muted">Employee</TableHead>
+                      <TableHead className="px-4 py-2.5 text-right rtl:text-left bg-surface-muted">Gross</TableHead>
+                      <TableHead className="px-4 py-2.5 text-right rtl:text-left bg-surface-muted">Deductions</TableHead>
+                      <TableHead className="px-4 py-2.5 text-right rtl:text-left bg-surface-muted">Net</TableHead>
+                      <TableHead className="px-4 py-2.5 bg-surface-muted text-right rtl:text-left" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="divide-y divide-border-subtle">
                     {records.map(record => {
                       const isSelected = selectedId === record.id
                       return (
-                        <tr
+                        <TableRow
                           key={record.id}
                           onClick={() => {
                             setSelectedId(record.id)
                             setPayslipError(null)
                           }}
-                          className={`cursor-pointer transition-colors ${
+                          className={`cursor-pointer transition-colors border-0 ${
                             isSelected ? 'bg-accent-light/50' : 'bg-surface-raised hover:bg-surface-muted/60'
                           }`}
                         >
-                          <td className="px-4 py-3.5">
+                          <TableCell className="px-4 py-3.5">
                             <div className="flex items-center gap-2.5 min-w-0">
                               <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-subtle flex items-center justify-center text-xs font-bold text-heading shrink-0">
                                 {(record.employee?.name || '?').charAt(0)}
@@ -1065,11 +1080,11 @@ export default function Payroll() {
                                 <p className="text-[11px] text-muted truncate">{record.employee?.title || '—'}</p>
                               </div>
                             </div>
-                          </td>
-                          <td className="px-4 py-3.5 text-xs sm:text-sm text-body text-right tabular-nums truncate" title={money(record.gross)}>{compactMoney(record.gross)}</td>
-                          <td className="px-4 py-3.5 text-xs sm:text-sm text-body text-right tabular-nums truncate" title={formatNegativeDeduction(record.deductions, run?.currency)}>{formatCompactNegativeDeduction(record.deductions, run?.currency)}</td>
-                          <td className="px-4 py-3.5 text-xs sm:text-sm font-semibold text-heading text-right tabular-nums truncate" title={money(record.net)}>{compactMoney(record.net)}</td>
-                          <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                          </TableCell>
+                          <TableCell className="px-4 py-3.5 text-xs sm:text-sm text-body text-right rtl:text-left tabular-nums truncate" title={money(record.gross)}>{compactMoney(record.gross)}</TableCell>
+                          <TableCell className="px-4 py-3.5 text-xs sm:text-sm text-body text-right rtl:text-left tabular-nums truncate" title={formatNegativeDeduction(record.deductions, run?.currency)}>{formatCompactNegativeDeduction(record.deductions, run?.currency)}</TableCell>
+                          <TableCell className="px-4 py-3.5 text-xs sm:text-sm font-semibold text-heading text-right rtl:text-left tabular-nums truncate" title={money(record.net)}>{compactMoney(record.net)}</TableCell>
+                          <TableCell className="px-4 py-3.5 text-right rtl:text-left whitespace-nowrap">
                             <div className="flex items-center justify-end whitespace-nowrap">
                               <PayslipButton
                                 runId={activeRunId}
@@ -1078,12 +1093,12 @@ export default function Payroll() {
                                 onNotifyError={setPayslipError}
                               />
                             </div>
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       )
                     })}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               )}
             </div>
           </div>

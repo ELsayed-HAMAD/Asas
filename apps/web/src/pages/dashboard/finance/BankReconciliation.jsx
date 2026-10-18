@@ -10,6 +10,14 @@ import { formatCompactTableMoney } from '../../../lib/format'
 import { Button } from '../../../components/ui/button'
 import { Badge } from '../../../components/ui/badge'
 import { Alert, AlertDescription } from '../../../components/ui/alert'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '../../../components/ui/table'
 
 function formatCalendarDate(value) {
   const [year, month, day] = String(value).slice(0, 10).split('-').map(Number)
@@ -110,15 +118,26 @@ export default function BankReconciliation() {
               </section>
               <QueryState isLoading={detailQuery.isLoading} isError={detailQuery.isError} error={detailQuery.error} isEmpty={!currentImport?.lines?.length} emptyTitle="This statement has no rows" emptyDescription="Import another CSV to continue.">
                 {currentImport?.lines?.length > 0 && <section className="overflow-x-auto rounded-card border border-border-default bg-surface-raised shadow-card">
-                  <table className="w-full min-w-[900px] border-collapse text-left text-sm">
-                    <thead className="bg-surface-muted text-xs uppercase text-muted"><tr><th className="px-4 py-3">Statement row</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Suggested ledger match</th><th className="px-4 py-3">Action</th></tr></thead>
-                    <tbody className="divide-y divide-border-default">{currentImport.lines.map(line => <tr key={line.id}>
-                      <td className="max-w-sm px-4 py-3"><p className="font-medium text-heading">{line.description}</p><p className="mt-1 text-xs text-muted">{formatCalendarDate(line.postedAt)}{line.reference ? ` · ${line.reference}` : ''}</p></td>
-                      <td className="px-4 py-3 font-mono text-heading tabular-nums" title={`${line.amount} ${line.currency}`}>{formatCompactTableMoney(line.amount, { currency: line.currency })}</td>
-                      <td className="px-4 py-3">{line.matchedLedgerLine ? <div className="text-xs text-body"><Badge variant="outline" className="inline-flex items-center gap-1 font-medium text-success border-0 bg-success-light"><Check size={14} /> Reconciled</Badge><p className="mt-1">{line.matchedLedgerLine.description}</p><p className="mt-0.5 text-muted">{line.matchedLedgerLine.sourceType} · {line.matchedLedgerLine.signedAmount} {line.matchedLedgerLine.currency} · {line.matchedLedgerLine.daysApart} day(s) apart</p></div> : line.suggestedMatches.length ? <div className="space-y-2">{line.suggestedMatches.slice(0, 3).map(candidate => <div key={candidate.journalLineId} className="text-xs text-body"><p>{candidate.description}</p><p className="mt-0.5 text-muted">{candidate.sourceType} · {candidate.signedAmount} {candidate.currency} · {candidate.daysApart} day(s) apart</p></div>)}</div> : <span className="text-xs text-muted">No exact match found</span>}</td>
-                      <td className="px-4 py-3">{line.matchedJournalLineId ? <Button type="button" variant="outline" size="sm" onClick={() => unmatchMutation.mutate({ id: currentImport.id, lineId: line.id })} disabled={unmatchMutation.isPending} className="gap-1 h-7 px-2.5 text-xs font-medium"><RotateCcw size={13} /> Undo</Button> : line.suggestedMatches.length > 0 && <select aria-label={`Match ${line.description}`} defaultValue="" disabled={matchMutation.isPending} onChange={event => { if (event.target.value) matchMutation.mutate({ id: currentImport.id, lineId: line.id, journalLineId: event.target.value }) }} className="max-w-44 rounded-input border border-border-default bg-surface px-2 py-1.5 text-xs"><option value="">Select a candidate…</option>{line.suggestedMatches.map(candidate => <option key={candidate.journalLineId} value={candidate.journalLineId}>{candidate.signedAmount} {candidate.currency} · {candidate.daysApart}d</option>)}</select>}</td>
-                    </tr>)}</tbody>
-                  </table>
+                  <Table className="w-full min-w-[900px] border-collapse text-left text-sm">
+                    <TableHeader className="bg-surface-muted text-xs uppercase text-muted">
+                      <TableRow className="hover:bg-transparent border-0">
+                        <TableHead className="px-4 py-3 text-left rtl:text-right">Statement row</TableHead>
+                        <TableHead className="px-4 py-3 text-left rtl:text-right">Amount</TableHead>
+                        <TableHead className="px-4 py-3 text-left rtl:text-right">Suggested ledger match</TableHead>
+                        <TableHead className="px-4 py-3 text-left rtl:text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody className="divide-y divide-border-default">
+                      {currentImport.lines.map(line => (
+                        <TableRow key={line.id}>
+                          <TableCell className="max-w-sm px-4 py-3"><p className="font-medium text-heading">{line.description}</p><p className="mt-1 text-xs text-muted">{formatCalendarDate(line.postedAt)}{line.reference ? ` · ${line.reference}` : ''}</p></TableCell>
+                          <TableCell className="px-4 py-3 font-mono text-heading tabular-nums" title={`${line.amount} ${line.currency}`}>{formatCompactTableMoney(line.amount, { currency: line.currency })}</TableCell>
+                          <TableCell className="px-4 py-3">{line.matchedLedgerLine ? <div className="text-xs text-body"><Badge variant="outline" className="inline-flex items-center gap-1 font-medium text-success border-0 bg-success-light"><Check size={14} /> Reconciled</Badge><p className="mt-1">{line.matchedLedgerLine.description}</p><p className="mt-0.5 text-muted">{line.matchedLedgerLine.sourceType} · {line.matchedLedgerLine.signedAmount} {line.matchedLedgerLine.currency} · {line.matchedLedgerLine.daysApart} day(s) apart</p></div> : line.suggestedMatches.length ? <div className="space-y-2">{line.suggestedMatches.slice(0, 3).map(candidate => <div key={candidate.journalLineId} className="text-xs text-body"><p>{candidate.description}</p><p className="mt-0.5 text-muted">{candidate.sourceType} · {candidate.signedAmount} {candidate.currency} · {candidate.daysApart} day(s) apart</p></div>)}</div> : <span className="text-xs text-muted">No exact match found</span>}</TableCell>
+                          <TableCell className="px-4 py-3">{line.matchedJournalLineId ? <Button type="button" variant="outline" size="sm" onClick={() => unmatchMutation.mutate({ id: currentImport.id, lineId: line.id })} disabled={unmatchMutation.isPending} className="gap-1 h-7 px-2.5 text-xs font-medium"><RotateCcw size={13} /> Undo</Button> : line.suggestedMatches.length > 0 && <select aria-label={`Match ${line.description}`} defaultValue="" disabled={matchMutation.isPending} onChange={event => { if (event.target.value) matchMutation.mutate({ id: currentImport.id, lineId: line.id, journalLineId: event.target.value }) }} className="max-w-44 rounded-input border border-border-default bg-surface px-2 py-1.5 text-xs"><option value="">Select a candidate…</option>{line.suggestedMatches.map(candidate => <option key={candidate.journalLineId} value={candidate.journalLineId}>{candidate.signedAmount} {candidate.currency} · {candidate.daysApart}d</option>)}</select>}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </section>}
               </QueryState>
             </>}

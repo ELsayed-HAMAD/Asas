@@ -34,6 +34,14 @@ import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
 import { Progress } from '../../../components/ui/progress';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '../../../components/ui/table';
 
 const toMajor = (money) => (money == null ? 0 : moneyToMajor(money));
 
@@ -373,42 +381,42 @@ export default function RevenueForecast() {
                 {showAllReps ? 'Show Top 5' : `View All (${visibleReps.length})`}
               </Button>
             </div>
-            <table className="w-full min-w-[650px] text-left border-collapse">
-              <thead className="bg-white">
-                <tr>
-                  <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200">Rep</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 text-right">Closed</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 text-right">Commit</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 text-right">Best Case</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 text-right w-32">To Quota</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
+            <Table className="w-full min-w-[650px] text-left border-collapse">
+              <TableHeader className="bg-white border-0">
+                <TableRow className="border-0 hover:bg-transparent">
+                  <TableHead className="px-6 py-3 h-auto text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 rtl:text-left">Rep</TableHead>
+                  <TableHead className="px-6 py-3 h-auto text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 text-right">Closed</TableHead>
+                  <TableHead className="px-6 py-3 h-auto text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 text-right">Commit</TableHead>
+                  <TableHead className="px-6 py-3 h-auto text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 text-right">Best Case</TableHead>
+                  <TableHead className="px-6 py-3 h-auto text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 text-right w-32">To Quota</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-gray-100">
                 {displayedReps.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-10 text-center text-sm text-gray-400">
+                  <TableRow className="border-0 hover:bg-transparent">
+                    <TableCell colSpan={5} className="px-6 py-10 text-center text-sm text-gray-400">
                       No forecast snapshots recorded yet.
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ) : (
                   displayedReps.map((rep) => {
                     const quotaRow = quotas.find(q => q.repName === rep.repName && q.period === rep.period && q.quota?.currency === currency);
                     const quotaVal = quotaRow ? toMajor(quotaRow.quota) : null;
                     const repQuotaPct = rep.quotaPct != null ? rep.quotaPct : (quotaVal && toMajor(rep.closed) > 0 ? Math.min(100, (toMajor(rep.closed) / quotaVal) * 100) : null);
                     return (
-                      <tr key={rep.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 flex items-center gap-3">
+                      <TableRow key={rep.id} className="hover:bg-gray-50 border-0">
+                        <TableCell className="px-6 py-4 flex items-center gap-3">
                           <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden shrink-0 border border-gray-200">
                             <span className="text-[10px] font-bold text-gray-500">
                               {rep.repName.split(/\s+/).filter(Boolean).map((p) => p[0]).slice(0, 2).join('').toUpperCase()}
                             </span>
                           </div>
                           <span className="text-sm font-semibold text-gray-900">{rep.repName}</span>
-                        </td>
-                        <td className="px-6 py-4 text-right text-sm font-bold text-gray-900 tabular-nums" title={formatExactCurrency(toMajor(rep.closed))}>{formatCurrency(toMajor(rep.closed))}</td>
-                        <td className="px-6 py-4 text-right text-sm text-gray-600 font-medium tabular-nums" title={formatExactCurrency(toMajor(rep.commit))}>{formatCurrency(toMajor(rep.commit))}</td>
-                        <td className="px-6 py-4 text-right text-sm text-gray-600 font-medium tabular-nums" title={formatExactCurrency(toMajor(rep.bestCase))}>{formatCurrency(toMajor(rep.bestCase))}</td>
-                        <td className="px-6 py-4">
+                        </TableCell>
+                        <TableCell className="px-6 py-4 text-right text-sm font-bold text-gray-900 tabular-nums" title={formatExactCurrency(toMajor(rep.closed))}>{formatCurrency(toMajor(rep.closed))}</TableCell>
+                        <TableCell className="px-6 py-4 text-right text-sm text-gray-600 font-medium tabular-nums" title={formatExactCurrency(toMajor(rep.commit))}>{formatCurrency(toMajor(rep.commit))}</TableCell>
+                        <TableCell className="px-6 py-4 text-right text-sm text-gray-600 font-medium tabular-nums" title={formatExactCurrency(toMajor(rep.bestCase))}>{formatCurrency(toMajor(rep.bestCase))}</TableCell>
+                        <TableCell className="px-6 py-4">
                           <div className="flex items-center justify-end gap-2">
                             <Progress
                               value={repQuotaPct == null ? 0 : Math.min(100, repQuotaPct)}
@@ -417,13 +425,13 @@ export default function RevenueForecast() {
                             />
                             <span className="text-xs font-semibold text-gray-600 w-8 text-right">{repQuotaPct == null ? '—' : `${Math.round(repQuotaPct)}%`}</span>
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     );
                   })
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
 
           {/* Alerts & Shortfall */}

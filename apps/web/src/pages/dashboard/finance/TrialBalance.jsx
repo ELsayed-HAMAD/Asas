@@ -13,6 +13,15 @@ import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
 import { Badge } from '../../../components/ui/badge'
 import { Alert, AlertDescription } from '../../../components/ui/alert'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableFooter,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '../../../components/ui/table'
 
 
 const EMPTY_OPENING_LINES = [
@@ -122,30 +131,48 @@ export default function TrialBalance() {
           </div>
         </section>
         <div className="overflow-x-auto rounded-xl border border-border-default bg-surface-raised">
-          <table className="w-full min-w-[1050px] text-left text-sm">
-            <thead className="border-b border-border-default bg-surface-muted text-xs uppercase tracking-wide text-muted">
-              <tr><th className="px-4 py-3">Account</th><th className="px-4 py-3">Kind</th><th className="px-4 py-3">Native</th><th className="px-4 py-3 text-right">Debit</th><th className="px-4 py-3 text-right">Credit</th><th className="px-4 py-3 text-right">Net debit ({data.baseCurrency})</th><th className="px-4 py-3 text-right">Net credit ({data.baseCurrency})</th></tr>
-            </thead>
-            <tbody className="divide-y divide-border-default">
-              {data.rows.map(row => <tr key={row.accountId}>
-                <td className="px-4 py-3"><span className="font-mono text-xs text-muted">{row.accountCode}</span><span className="ml-2 font-medium text-body">{row.accountName}</span></td>
-                <td className="px-4 py-3 text-body">
-                  <Badge variant="outline" className="text-xs capitalize font-normal border-border-default">
-                    {row.accountKind.toLowerCase()}
-                  </Badge>
-                </td>
-                <td className="px-4 py-3 text-body">{row.currency}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-body" title={formatMoney(row.debit)}>{formatCompactTableMoney(row.debit)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-body" title={formatMoney(row.credit)}>{formatCompactTableMoney(row.credit)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-body" title={formatMoney(row.netDebitBase)}>{formatCompactTableMoney(row.netDebitBase)}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-body" title={formatMoney(row.netCreditBase)}>{formatCompactTableMoney(row.netCreditBase)}</td>
-              </tr>)}
-              {data.rows.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-muted">No ledger accounts have been recorded.</td></tr>}
-            </tbody>
-            <tfoot className="border-t border-border-default bg-surface-muted font-semibold text-heading">
-              <tr><td colSpan={5} className="px-4 py-3">Base currency totals</td><td className="px-4 py-3 text-right tabular-nums" title={formatMoney(data.totalDebitBase)}>{formatCompactTableMoney(data.totalDebitBase)}</td><td className="px-4 py-3 text-right tabular-nums" title={formatMoney(data.totalCreditBase)}>{formatCompactTableMoney(data.totalCreditBase)}</td></tr>
-            </tfoot>
-          </table>
+          <Table className="w-full min-w-[1050px] text-left text-sm">
+            <TableHeader className="border-b border-border-default bg-surface-muted text-xs uppercase tracking-wide text-muted">
+              <TableRow className="hover:bg-transparent border-0">
+                <TableHead className="px-4 py-3 text-left rtl:text-right">Account</TableHead>
+                <TableHead className="px-4 py-3 text-left rtl:text-right">Kind</TableHead>
+                <TableHead className="px-4 py-3 text-left rtl:text-right">Native</TableHead>
+                <TableHead className="px-4 py-3 text-right rtl:text-left">Debit</TableHead>
+                <TableHead className="px-4 py-3 text-right rtl:text-left">Credit</TableHead>
+                <TableHead className="px-4 py-3 text-right rtl:text-left">Net debit ({data.baseCurrency})</TableHead>
+                <TableHead className="px-4 py-3 text-right rtl:text-left">Net credit ({data.baseCurrency})</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-border-default">
+              {data.rows.map(row => (
+                <TableRow key={row.accountId}>
+                  <TableCell className="px-4 py-3"><span className="font-mono text-xs text-muted">{row.accountCode}</span><span className="ml-2 font-medium text-body">{row.accountName}</span></TableCell>
+                  <TableCell className="px-4 py-3 text-body">
+                    <Badge variant="outline" className="text-xs capitalize font-normal border-border-default">
+                      {row.accountKind.toLowerCase()}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-body">{row.currency}</TableCell>
+                  <TableCell className="px-4 py-3 text-right rtl:text-left tabular-nums text-body" title={formatMoney(row.debit)}>{formatCompactTableMoney(row.debit)}</TableCell>
+                  <TableCell className="px-4 py-3 text-right rtl:text-left tabular-nums text-body" title={formatMoney(row.credit)}>{formatCompactTableMoney(row.credit)}</TableCell>
+                  <TableCell className="px-4 py-3 text-right rtl:text-left tabular-nums text-body" title={formatMoney(row.netDebitBase)}>{formatCompactTableMoney(row.netDebitBase)}</TableCell>
+                  <TableCell className="px-4 py-3 text-right rtl:text-left tabular-nums text-body" title={formatMoney(row.netCreditBase)}>{formatCompactTableMoney(row.netCreditBase)}</TableCell>
+                </TableRow>
+              ))}
+              {data.rows.length === 0 && (
+                <TableRow className="hover:bg-transparent border-0">
+                  <TableCell colSpan={7} className="px-4 py-12 text-center text-muted">No ledger accounts have been recorded.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+            <TableFooter className="border-t border-border-default bg-surface-muted font-semibold text-heading">
+              <TableRow className="hover:bg-transparent border-0">
+                <TableCell colSpan={5} className="px-4 py-3">Base currency totals</TableCell>
+                <TableCell className="px-4 py-3 text-right rtl:text-left tabular-nums" title={formatMoney(data.totalDebitBase)}>{formatCompactTableMoney(data.totalDebitBase)}</TableCell>
+                <TableCell className="px-4 py-3 text-right rtl:text-left tabular-nums" title={formatMoney(data.totalCreditBase)}>{formatCompactTableMoney(data.totalCreditBase)}</TableCell>
+              </TableRow>
+            </TableFooter>
+          </Table>
         </div>
       </>}
       <FormDialog open={openingOpen} onClose={() => setOpeningOpen(false)} title="Record opening balances" subtitle={`Enter the prior balances as of the ledger cutover date. All amounts must use ${data?.baseCurrency || 'workspace base currency'}, and total debits must equal total credits.`} width="max-w-5xl" busy={openingMutation.isPending} confirmLabel="Post opening balances" onConfirm={() => openingMutation.mutate({

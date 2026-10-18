@@ -24,6 +24,14 @@ import TopBarActions from '../../../components/TopBarActions'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
 import { Badge } from '../../../components/ui/badge'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '../../../components/ui/table'
 
 export default function StockMovements() {
   const queryClient = useQueryClient()
@@ -344,41 +352,41 @@ export default function StockMovements() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-surface-muted border-b border-border-default">
-                  <tr>
-                    <th className="px-5 py-3 text-[11px] font-bold text-muted uppercase tracking-wider">
+              <Table className="w-full text-left border-collapse">
+                <TableHeader className="bg-surface-muted border-b border-border-default">
+                  <TableRow className="hover:bg-transparent border-0">
+                    <TableHead className="px-5 py-3 text-[11px] font-bold text-muted uppercase tracking-wider text-left rtl:text-right">
                       Timestamp
-                    </th>
-                    <th className="px-5 py-3 text-[11px] font-bold text-muted uppercase tracking-wider">
+                    </TableHead>
+                    <TableHead className="px-5 py-3 text-[11px] font-bold text-muted uppercase tracking-wider text-left rtl:text-right">
                       Product
-                    </th>
-                    <th className="px-5 py-3 text-[11px] font-bold text-muted uppercase tracking-wider">
+                    </TableHead>
+                    <TableHead className="px-5 py-3 text-[11px] font-bold text-muted uppercase tracking-wider text-left rtl:text-right">
                       Warehouse
-                    </th>
-                    <th className="px-5 py-3 text-[11px] font-bold text-muted uppercase tracking-wider">
+                    </TableHead>
+                    <TableHead className="px-5 py-3 text-[11px] font-bold text-muted uppercase tracking-wider text-left rtl:text-right">
                       Type
-                    </th>
-                    <th className="px-5 py-3 text-[11px] font-bold text-muted uppercase tracking-wider text-right">
+                    </TableHead>
+                    <TableHead className="px-5 py-3 text-[11px] font-bold text-muted uppercase tracking-wider text-right rtl:text-left">
                       Quantity
-                    </th>
-                    <th className="px-5 py-3 text-[11px] font-bold text-muted uppercase tracking-wider">
+                    </TableHead>
+                    <TableHead className="px-5 py-3 text-[11px] font-bold text-muted uppercase tracking-wider text-left rtl:text-right">
                       Note / Reference
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-subtle">
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-border-subtle">
                   {movements.map((movement) => {
                     const isIn = movement.delta > 0
                     return (
-                      <tr key={movement.id} className="hover:bg-surface-muted/50 transition-colors">
-                        <td className="px-5 py-3.5 text-xs text-body whitespace-nowrap">
+                      <TableRow key={movement.id} className="hover:bg-surface-muted/50 transition-colors border-0">
+                        <TableCell className="px-5 py-3.5 text-xs text-body whitespace-nowrap">
                           {formatDate(movement.createdAt, { includeTime: true })}
-                        </td>
-                        <td className="px-5 py-3.5 text-xs font-semibold text-heading">
+                        </TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs font-semibold text-heading">
                           {movement.productName}
-                        </td>
-                        <td className="px-5 py-3.5 text-xs text-body">
+                        </TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs text-body">
                           {movement.warehouse ? (
                             <Badge variant="outline" className="px-2 py-0.5 rounded text-[11px] font-medium bg-surface-muted text-heading border-border-default">
                               {movement.warehouse}
@@ -386,8 +394,8 @@ export default function StockMovements() {
                           ) : (
                             <span className="text-muted">—</span>
                           )}
-                        </td>
-                        <td className="px-5 py-3.5 whitespace-nowrap">
+                        </TableCell>
+                        <TableCell className="px-5 py-3.5 whitespace-nowrap">
                           <Badge
                             variant="outline"
                             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -399,23 +407,23 @@ export default function StockMovements() {
                             {isIn ? <ArrowDownLeft size={10} /> : <ArrowUpRight size={10} />}
                             {movement.type || (isIn ? 'IN' : 'OUT')}
                           </Badge>
-                        </td>
-                        <td
-                          className={`px-5 py-3.5 text-xs font-bold tabular-nums text-right ${
+                        </TableCell>
+                        <TableCell
+                          className={`px-5 py-3.5 text-xs font-bold tabular-nums text-right rtl:text-left ${
                             isIn ? 'text-success-text' : 'text-danger'
                           }`}
                         >
                           {isIn ? '+' : '−'}
                           {Math.abs(movement.delta).toLocaleString()}
-                        </td>
-                        <td className="px-5 py-3.5 text-xs text-body max-w-xs truncate" title={movement.note || ''}>
+                        </TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs text-body max-w-xs truncate" title={movement.note || ''}>
                           {movement.note || <span className="text-muted">—</span>}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     )
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
 

@@ -14,6 +14,14 @@ import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '../../../components/ui/table';
 
 // The old page rendered receivable money with no forced decimals (e.g. $320,000) — keep that.
 const money = (v) => formatMoney(v, { minimumFractionDigits: 0 });
@@ -350,10 +358,10 @@ export default function AccountsReceivable() {
         <div className="col-span-12 lg:col-span-8">
           <div className="bg-surface-raised rounded-card border border-border-default shadow-card overflow-hidden flex flex-col">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[560px] text-left border-collapse">
-                <thead className="bg-surface-muted/60 border-b border-border-default">
-                  <tr>
-                    <th className="w-12 px-4 py-2.5 text-center">
+              <Table className="w-full min-w-[560px] text-left border-collapse">
+                <TableHeader className="bg-surface-muted/60 border-b border-border-default">
+                  <TableRow className="hover:bg-transparent border-0">
+                    <TableHead className="w-12 px-4 py-2.5 text-center">
                       <input
                         type="checkbox"
                         aria-label="Select all customers"
@@ -375,26 +383,26 @@ export default function AccountsReceivable() {
                         }}
                         className="w-4 h-4 rounded-sm border-border-default text-primary focus:ring-primary cursor-pointer"
                       />
-                    </th>
-                    <th className="px-3 py-2.5 text-[10px] font-bold text-caption uppercase tracking-wider">Customer</th>
-                    <th className="px-4 py-2.5 text-[10px] font-bold text-caption uppercase tracking-wider text-center">Oldest</th>
-                    <th className="px-4 py-2.5 text-[10px] font-bold text-caption uppercase tracking-wider text-right">Outstanding</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-subtle">
+                    </TableHead>
+                    <TableHead className="px-3 py-2.5 h-auto text-[10px] font-bold text-caption uppercase tracking-wider rtl:text-right">Customer</TableHead>
+                    <TableHead className="px-4 py-2.5 h-auto text-[10px] font-bold text-caption uppercase tracking-wider text-center">Oldest</TableHead>
+                    <TableHead className="px-4 py-2.5 h-auto text-[10px] font-bold text-caption uppercase tracking-wider text-right rtl:text-left">Outstanding</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-border-subtle">
               {paginatedCustomers.map(account => {
                 const isSelected = selectedId === account.id;
                 const isSeverelyOverdue = account.oldest > 60;
 
                 return (
-                  <tr
+                  <TableRow
                     key={account.id}
                     onClick={() => setSelectedId(account.id)}
                     className={`cursor-pointer transition-colors ${
                       isSelected ? 'bg-accent-light/40 border-l-4 border-l-blue-600' : 'bg-surface-raised hover:bg-surface-muted border-l-4 border-l-transparent'
                     }`}
                   >
-                    <td className="w-12 px-4 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                    <TableCell className="w-12 px-4 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         aria-label={`Select ${account.name}`}
@@ -402,8 +410,8 @@ export default function AccountsReceivable() {
                         onChange={() => toggleSelection(account.id)}
                         className="w-4 h-4 rounded-sm border-border-default text-primary focus:ring-primary cursor-pointer"
                       />
-                    </td>
-                    <td className="px-3 py-2.5">
+                    </TableCell>
+                    <TableCell className="px-3 py-2.5">
                       <div className="flex items-center gap-3">
                         {account.avatar ? (
                           <img src={account.avatar} alt="Avatar" className="w-7 h-7 rounded-full shadow-card shrink-0" />
@@ -414,8 +422,8 @@ export default function AccountsReceivable() {
                         )}
                         <span className="text-sm font-semibold text-heading truncate">{account.name}</span>
                       </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-center whitespace-nowrap">
+                    </TableCell>
+                    <TableCell className="px-4 py-2.5 text-center whitespace-nowrap">
                       <Badge
                         variant="outline"
                         className={`text-xs font-semibold border-0 ${
@@ -424,23 +432,23 @@ export default function AccountsReceivable() {
                       >
                         {account.oldest} {account.oldest === 1 ? 'Day' : 'Days'}
                       </Badge>
-                    </td>
-                    <td className="px-4 py-2.5 text-right text-sm font-semibold text-heading tabular-nums whitespace-nowrap" title={money(account.openBalance)}>
+                    </TableCell>
+                    <TableCell className="px-4 py-2.5 text-right text-sm font-semibold text-heading tabular-nums whitespace-nowrap" title={money(account.openBalance)}>
                       {compactMoney(account.openBalance)}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
 
               {paginatedCustomers.length === 0 && (
-                <tr>
-                   <td colSpan={4} className="px-6 py-8 text-center text-muted text-xs">
+                <TableRow className="hover:bg-transparent border-0">
+                   <TableCell colSpan={4} className="px-6 py-8 text-center text-muted text-xs">
                      No customers found with outstanding balances.
-                   </td>
-                </tr>
+                   </TableCell>
+                </TableRow>
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
 
         {/* Pagination Footer */}

@@ -27,6 +27,14 @@ import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '../../../components/ui/table';
 
 export default function Inventory() {
   const navigate = useNavigate();
@@ -448,44 +456,44 @@ export default function Inventory() {
           <div data-testid="product-table-card" className="flex-1 min-h-0 bg-surface-raised border border-border-default rounded-card shadow-card flex flex-col overflow-hidden">
             {/* Rows area: flex: 1; min-height: 0; overflow-y: auto */}
             <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-width:thin]">
-              <table className="w-full table-fixed border-collapse">
+              <Table className="w-full table-fixed border-collapse">
                 <colgroup>
                   <col className="min-w-[220px]" />
                   <col style={{ width: '120px' }} />
                   <col style={{ width: '100px' }} />
                   <col style={{ width: '140px' }} />
                 </colgroup>
-                <thead className="sticky top-0 z-10 bg-surface-muted/95 backdrop-blur-xs border-b border-border-default">
-                  <tr className="h-10">
-                    <th className="h-10 ps-5 pe-3 text-start text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">Product</th>
-                    <th className="h-10 px-3 text-start text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">SKU</th>
-                    <th className="h-10 px-3 text-end text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">Price</th>
-                    <th className="h-10 ps-3 pe-5 text-end text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-subtle">
+                <TableHeader className="sticky top-0 z-10 bg-surface-muted/95 backdrop-blur-xs border-b border-border-default">
+                  <TableRow className="h-10 hover:bg-transparent border-0">
+                    <TableHead className="h-10 ps-5 pe-3 text-start rtl:text-right text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">Product</TableHead>
+                    <TableHead className="h-10 px-3 text-start rtl:text-right text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">SKU</TableHead>
+                    <TableHead className="h-10 px-3 text-end rtl:text-left text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">Price</TableHead>
+                    <TableHead className="h-10 ps-3 pe-5 text-end rtl:text-left text-[11px] font-semibold text-muted uppercase tracking-[0.06em] whitespace-nowrap">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-border-subtle">
                   {products.length === 0 ? (
-                    <tr className="h-32">
-                      <td colSpan={4} className="px-6 py-8 text-center text-sm text-muted">
+                    <TableRow className="h-32 hover:bg-transparent border-0">
+                      <TableCell colSpan={4} className="px-6 py-8 text-center text-sm text-muted">
                         No products found.
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : (
                     products.map(product => {
                       const isSelected = selectedId === product.id;
                       const isLowStock = product.status === 'LOW_STOCK' || product.status === 'OUT_OF_STOCK';
 
                       return (
-                        <tr
+                        <TableRow
                           key={product.id}
                           onClick={() => selectProduct(product.id)}
-                          className={`relative h-14 cursor-pointer transition-colors ${
+                          className={`relative h-14 cursor-pointer transition-colors border-0 ${
                             isSelected
                               ? 'bg-accent-light/30'
                               : 'bg-surface-raised hover:bg-surface-muted/60'
                           }`}
                         >
-                          <td className="relative ps-5 pe-3 py-0 align-middle">
+                          <TableCell className="relative ps-5 pe-3 py-0 align-middle">
                             {isSelected && (
                               <span className="absolute inset-y-0 start-0 w-[3px] bg-primary pointer-events-none" aria-hidden="true" />
                             )}
@@ -497,14 +505,14 @@ export default function Inventory() {
                                 {product.name}
                               </span>
                             </div>
-                          </td>
-                          <td className="px-3 py-0 align-middle text-[13px] text-body-light whitespace-nowrap">
+                          </TableCell>
+                          <TableCell className="px-3 py-0 align-middle text-[13px] text-body-light whitespace-nowrap">
                             {product.sku}
-                          </td>
-                          <td className="px-3 py-0 align-middle text-sm font-semibold text-heading tabular-nums text-end whitespace-nowrap" title={formatMoney(product.price)}>
+                          </TableCell>
+                          <TableCell className="px-3 py-0 align-middle text-sm font-semibold text-heading tabular-nums text-end rtl:text-left whitespace-nowrap" title={formatMoney(product.price)}>
                             {formatCompactTableMoney(product.price)}
-                          </td>
-                          <td className="ps-3 pe-5 py-0 align-middle text-end whitespace-nowrap">
+                          </TableCell>
+                          <TableCell className="ps-3 pe-5 py-0 align-middle text-end rtl:text-left whitespace-nowrap">
                             <Badge
                               variant="outline"
                               className={`h-[22px] min-w-[96px] px-2.5 rounded text-xs font-semibold whitespace-nowrap justify-center ${
@@ -515,13 +523,13 @@ export default function Inventory() {
                             >
                               {product.stock} {product.status.replaceAll('_', ' ')}
                             </Badge>
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       );
                     })
                   )}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
 
             {/* Pagination Footer (Pinned at bottom of card, 44px, 1px top border) */}
@@ -797,33 +805,33 @@ export default function Inventory() {
                     </div>
                   ) : (
                     <div className="bg-surface-raised border border-border-default rounded-button shadow-card overflow-hidden">
-                      <table className="w-full text-left border-collapse">
-                        <thead className="bg-surface-muted/80 border-b border-border-default">
-                          <tr>
-                            <th className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider">Order</th>
-                            <th className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider">Date</th>
-                            <th className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Qty</th>
-                            <th className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider">Status</th>
-                            <th className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border-default">
+                      <Table className="w-full text-left border-collapse">
+                        <TableHeader className="bg-surface-muted/80 border-b border-border-default">
+                          <TableRow className="hover:bg-transparent border-0">
+                            <TableHead className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-left rtl:text-right">Order</TableHead>
+                            <TableHead className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-left rtl:text-right">Date</TableHead>
+                            <TableHead className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right rtl:text-left">Qty</TableHead>
+                            <TableHead className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-left rtl:text-right">Status</TableHead>
+                            <TableHead className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right rtl:text-left">Action</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody className="divide-y divide-border-default">
                           {purchaseOrders.map((po) => {
                             const isDraft = po.status === 'DRAFT';
                             const isApproved = po.status === 'APPROVED';
                             const isReceived = po.status === 'RECEIVED';
                             return (
-                              <tr key={po.id} className="hover:bg-surface-muted/50 transition-colors">
-                                <td className="px-4 py-3 text-xs font-semibold text-heading">
+                              <TableRow key={po.id} className="hover:bg-surface-muted/50 transition-colors border-0">
+                                <TableCell className="px-4 py-3 text-xs font-semibold text-heading">
                                   #{po.id.slice(-6).toUpperCase()}
-                                </td>
-                                <td className="px-4 py-3 text-xs text-muted">
+                                </TableCell>
+                                <TableCell className="px-4 py-3 text-xs text-muted">
                                   {formatDate(po.createdAt)}
-                                </td>
-                                <td className="px-4 py-3 text-xs font-semibold text-heading tabular-nums text-right" title={po.quantity?.toLocaleString()}>
+                                </TableCell>
+                                <TableCell className="px-4 py-3 text-xs font-semibold text-heading tabular-nums text-right rtl:text-left" title={po.quantity?.toLocaleString()}>
                                   {formatCompactNumber(po.quantity)}
-                                </td>
-                                <td className="px-4 py-3">
+                                </TableCell>
+                                <TableCell className="px-4 py-3">
                                   <Badge
                                     variant="outline"
                                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -836,8 +844,8 @@ export default function Inventory() {
                                   >
                                     {po.status}
                                   </Badge>
-                                </td>
-                                <td className="px-4 py-3 text-right">
+                                </TableCell>
+                                <TableCell className="px-4 py-3 text-right rtl:text-left">
                                   {isDraft && (
                                     <Button
                                       type="button"
@@ -867,12 +875,12 @@ export default function Inventory() {
                                   {isReceived && (
                                     <span className="text-xs text-muted">Done</span>
                                   )}
-                                </td>
-                              </tr>
+                                </TableCell>
+                              </TableRow>
                             );
                           })}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     </div>
                   )}
                 </div>
@@ -898,24 +906,24 @@ export default function Inventory() {
                         This month: {movementSummary?.recordedThisMonth?.totalIn ?? 0} in / {movementSummary?.recordedThisMonth?.totalOut ?? 0} out
                         {' · Prior period: '}{movementSummary?.recordedThisMonthComparison?.totalIn ?? 0} in / {movementSummary?.recordedThisMonthComparison?.totalOut ?? 0} out
                       </p>
-                      <table className="w-full text-left border-collapse">
-                        <thead className="bg-surface-muted/80 border-b border-border-default">
-                          <tr>
-                            <th className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider">Date</th>
-                            <th className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider">Type</th>
-                            <th className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right">Qty</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border-subtle">
+                      <Table className="w-full text-left border-collapse">
+                        <TableHeader className="bg-surface-muted/80 border-b border-border-default">
+                          <TableRow className="hover:bg-transparent border-0">
+                            <TableHead className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-left rtl:text-right">Date</TableHead>
+                            <TableHead className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-left rtl:text-right">Type</TableHead>
+                            <TableHead className="px-4 py-3 text-[10px] font-bold text-muted uppercase tracking-wider text-right rtl:text-left">Qty</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody className="divide-y divide-border-subtle">
                           {movements.map(movement => {
                             const isIn = movement.type === 'IN';
                             return (
-                              <tr key={movement.id}>
-                                <td className="px-4 py-3 text-xs text-body-light">
+                              <TableRow key={movement.id} className="border-0">
+                                <TableCell className="px-4 py-3 text-xs text-body-light">
                                   <div className="font-medium text-heading">{formatDate(movement.createdAt)}</div>
                                   {movement.note && <div className="text-caption truncate max-w-[180px]" title={movement.note}>{movement.note}</div>}
-                                </td>
-                                <td className="px-4 py-3">
+                                </TableCell>
+                                <TableCell className="px-4 py-3">
                                   <Badge variant="outline" className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
                                     isIn
                                       ? 'bg-success-light text-success-text border-success-border'
@@ -923,15 +931,15 @@ export default function Inventory() {
                                   }`}>
                                     {isIn ? 'IN' : 'OUT'}
                                   </Badge>
-                                </td>
-                                <td className={`px-4 py-3 text-xs font-semibold tabular-nums text-right ${isIn ? 'text-success-text' : 'text-danger'}`} title={Math.abs(movement.delta).toLocaleString()}>
+                                </TableCell>
+                                <TableCell className={`px-4 py-3 text-xs font-semibold tabular-nums text-right rtl:text-left ${isIn ? 'text-success-text' : 'text-danger'}`} title={Math.abs(movement.delta).toLocaleString()}>
                                   {isIn ? '+' : '−'}{formatCompactNumber(Math.abs(movement.delta))}
-                                </td>
-                              </tr>
+                                </TableCell>
+                              </TableRow>
                             );
                           })}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                       <div className="flex items-center justify-between border-t border-border-default px-4 py-2 text-xs text-muted">
                         <span>Showing {(movementPage - 1) * (movementData?.pagination?.limit ?? 25) + 1}–{Math.min(movementPage * (movementData?.pagination?.limit ?? 25), movementData?.pagination?.total ?? 0)} of {movementData?.pagination?.total ?? 0} movements</span>
                         <div className="flex items-center gap-2">
