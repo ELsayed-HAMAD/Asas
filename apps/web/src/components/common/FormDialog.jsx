@@ -43,7 +43,7 @@ export default function FormDialog({
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={(val) => { if (!val && !busy) onClose?.() }}>
-      <DialogContent className={`relative w-full ${width} bg-surface-raised rounded-card border border-border-default shadow-elevated p-0 flex flex-col max-h-[85vh] overflow-hidden`}>
+      <DialogContent className={`w-full ${width} bg-surface-raised rounded-card border border-border-default shadow-elevated p-0 flex flex-col max-h-[85vh] overflow-hidden`}>
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 text-left rtl:text-right">
             <DialogTitle id="form-dialog-title" className="text-lg font-bold text-heading">
