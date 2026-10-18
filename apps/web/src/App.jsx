@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Link } from 'react-router-dom'
+import { Button } from './components/ui/button'
 
 // ── Layouts ────────────────────────────────────────────────
 import MarketingLayout  from './layouts/MarketingLayout'
@@ -61,9 +62,9 @@ function NotFound() {
     <div className="flex h-screen items-center justify-center flex-col gap-3">
       <p className="text-5xl font-bold text-heading">404</p>
       <p className="text-muted">Page not found</p>
-      <a href="/" className="text-sm text-accent hover:underline">
-        Go back home
-      </a>
+      <Button asChild variant="link" className="text-sm">
+        <Link to="/">Go back home</Link>
+      </Button>
     </div>
   )
 }

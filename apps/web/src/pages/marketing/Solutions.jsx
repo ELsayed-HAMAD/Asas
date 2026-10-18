@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, BriefcaseBusiness, ChartNoAxesCombined, ClipboardList, Boxes, UsersRound, ShieldCheck } from 'lucide-react'
 import MarketingPageFrame from '../../components/marketing/MarketingPageFrame'
 import { Badge } from '../../components/ui/badge'
+import { Button } from '../../components/ui/button'
 
 const solutions = [
   {
@@ -66,7 +67,9 @@ export default function Solutions() {
           <h2 className="font-bold text-heading">See how the workspace is organized</h2>
           <p className="mt-1 text-sm text-muted">The product guide explains setup and common workflows.</p>
         </div>
-        <Link to="/documentation" className="inline-flex items-center gap-2 rounded-button bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover">Read the guide <ArrowRight size={15} /></Link>
+        <Button asChild className="gap-2">
+          <Link to="/documentation">Read the guide <ArrowRight size={15} /></Link>
+        </Button>
       </div>
     </MarketingPageFrame>
   )

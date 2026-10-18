@@ -1,5 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
+import { Button } from '../../components/ui/button'
 
 export default function Privacy() {
   return (
@@ -15,12 +16,9 @@ export default function Privacy() {
             <Link to="/login" className="text-sm text-muted hover:text-heading transition-colors">
               Sign In
             </Link>
-            <Link
-              to="/register"
-              className="bg-primary text-white text-sm font-medium px-4 py-2 rounded-button hover:bg-primary-hover transition-colors"
-            >
-              Get Started
-            </Link>
+            <Button asChild size="sm">
+              <Link to="/register">Get Started</Link>
+            </Button>
           </div>
         </div>
       </header>

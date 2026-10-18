@@ -6,6 +6,7 @@ import { useActiveOrganization, useSession, authClient } from '../../lib/authCli
 import { Button } from '../../components/ui/button'
 import { Textarea } from '../../components/ui/textarea'
 import { Alert, AlertDescription } from '../../components/ui/alert'
+import { RadioGroup, RadioGroupItem } from '../../components/ui/radio-group'
 
 // The three start paths — the legacy UX, kept verbatim. The API endpoints are the
 // preserved 3-path onboarding flow under `/api/v1/onboarding` (see the API's
@@ -129,21 +130,25 @@ export default function Onboarding() {
           </Alert>
         )}
 
-        <div className="space-y-3 mb-6">
+        <RadioGroup value={selected} onValueChange={setSelected} className="space-y-3 mb-6 gap-0">
           {CHOICES.map(choice => {
             const Icon = choice.icon
             const active = selected === choice.id
             return (
-              <button
+              <label
                 key={choice.id}
-                type="button"
-                onClick={() => setSelected(choice.id)}
-                className={`w-full text-left flex gap-4 p-4 rounded-button border transition-colors cursor-pointer ${
+                htmlFor={`choice-${choice.id}`}
+                className={`w-full text-left flex gap-4 p-4 rounded-button border transition-colors cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent ${
                   active
                     ? 'border-accent bg-surface-active'
                     : 'border-border-default hover:bg-surface-muted'
                 }`}
               >
+                <RadioGroupItem
+                  value={choice.id}
+                  id={`choice-${choice.id}`}
+                  className="sr-only"
+                />
                 <div className="w-10 h-10 rounded-button bg-surface-strong flex items-center justify-center flex-shrink-0">
                   <Icon size={18} className="text-heading" />
                 </div>
@@ -151,10 +156,10 @@ export default function Onboarding() {
                   <p className="text-sm font-semibold text-heading">{choice.title}</p>
                   <p className="text-sm text-muted mt-0.5">{choice.description}</p>
                 </div>
-              </button>
+              </label>
             )
           })}
-        </div>
+        </RadioGroup>
 
         {selected === 'import' && (
           <div className="mb-6">

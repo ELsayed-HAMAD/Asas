@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { Button } from '../ui/button'
 
 const navLinks = [
   { label: 'Features', to: '/#features' },
@@ -21,7 +22,9 @@ export default function MarketingPageFrame({ eyebrow, title, description, childr
           </div>
           <div className="order-2 ml-auto flex items-center gap-4 md:order-3">
             <Link to="/login" className="text-sm text-muted transition-colors hover:text-heading">Sign in</Link>
-            <Link to="/register" className="rounded-button bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover">Get started</Link>
+            <Button asChild size="sm">
+              <Link to="/register">Get started</Link>
+            </Button>
           </div>
         </div>
       </header>

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ArrowUpRight, BookOpenCheck } from 'lucide-react'
 import MarketingPageFrame from '../../components/marketing/MarketingPageFrame'
+import { Button } from '../../components/ui/button'
 
 const guides = [
   {
@@ -60,14 +61,20 @@ export default function Documentation() {
               <h2 className="text-lg font-bold text-heading">{guide.title}</h2>
               <p className="mt-3 text-sm leading-6 text-body-light">{guide.text}</p>
               <div className="mt-5 flex flex-wrap gap-2">
-                {guide.links.map(link => <Link key={link.to} to={link.to} className="inline-flex items-center gap-1.5 rounded-input border border-border-default px-3 py-2 text-xs font-semibold text-body transition-colors hover:bg-surface-muted">{link.label}<ArrowUpRight size={13} /></Link>)}
+                {guide.links.map(link => (
+                  <Button asChild key={link.to} variant="outline" size="sm" className="gap-1.5 text-xs font-semibold">
+                    <Link to={link.to}>{link.label}<ArrowUpRight size={13} /></Link>
+                  </Button>
+                ))}
               </div>
             </section>
           ))}
           <section id="security" className="scroll-mt-28 rounded-card border border-border-subtle bg-surface-raised p-6 shadow-card">
             <h2 className="text-lg font-bold text-heading">Security and access</h2>
             <p className="mt-3 text-sm leading-6 text-body-light">Asas checks workspace access on the server for protected operations. Member roles control access to sensitive actions, payroll records have additional role restrictions, and important financial changes are recorded in the workspace audit log. Use Members and Roles to review who can access each workflow.</p>
-            <Link to="/dashboard/settings/members" className="mt-5 inline-flex items-center gap-1.5 rounded-input border border-border-default px-3 py-2 text-xs font-semibold text-body transition-colors hover:bg-surface-muted">Review members and roles <ArrowUpRight size={13} /></Link>
+            <Button asChild variant="outline" size="sm" className="mt-5 gap-1.5 text-xs font-semibold">
+              <Link to="/dashboard/settings/members">Review members and roles <ArrowUpRight size={13} /></Link>
+            </Button>
           </section>
           <p className="px-1 text-xs leading-5 text-muted">Dashboard links require sign-in and are subject to your workspace permissions. Financial and payroll reports show recorded values; historical data without enough provenance is not estimated.</p>
         </div>
