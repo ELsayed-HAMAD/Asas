@@ -128,4 +128,13 @@
 
 ## Phase 7 — Final Sweep
 
-### Status: NOT STARTED
+### Status: ✅ COMPLETE (2026-10-18)
+
+| Item / Audit | Status | Notes |
+|---|---|---|
+| Grep audit: raw `<select>` | ✅ Done | 0 raw `<select>` tags in `apps/web/src/` (complete conversion across all 70+ sites) |
+| Grep audit: raw `<table>` | ✅ Done | 0 raw `<table>` tags in `apps/web/src/pages/` (all 18 dashboard tables on `ui/table`) |
+| Dark-mode audit | ✅ Done | Complete CSS-first dual-token inheritance in `src/index.css`; dark mode switches through tokens; 0 `dark:` utility leaks |
+| RTL & Arabic typography | ✅ Done | Cairo font binding on `html[dir="rtl"]`, logical properties and start/end borders preserved across layout, tables, and dialogs |
+| Primitives inventory | ✅ Done | All 26 primitives intact in `src/components/ui/`; zero deleted files |
+| Final verification gate | ✅ Done | `pnpm test`: web 44 pass / 0 fail · `pnpm build`: clean production build in 20.56s (3024 modules) |
