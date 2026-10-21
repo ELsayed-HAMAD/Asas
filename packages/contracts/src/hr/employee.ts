@@ -47,6 +47,11 @@ export const employeeSchema = z.object({
   location: z.string().nullable(),
   employeeNumber: z.string().nullable(),
   email: z.string().nullable(),
+  bankRoutingNumber: z.string().nullable().optional(),
+  bankAccountNumber: z.string().nullable().optional(),
+  bankAccountType: z.string().nullable().optional(),
+  bankIban: z.string().nullable().optional(),
+  bankBic: z.string().nullable().optional(),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 })
@@ -99,6 +104,11 @@ const employeeWriteFields = {
   location: boundedText(200).optional().nullable(),
   employeeNumber: boundedText(64).optional().nullable(),
   email: z.email().optional().nullable(),
+  bankRoutingNumber: boundedText(32).optional().nullable(),
+  bankAccountNumber: boundedText(64).optional().nullable(),
+  bankAccountType: z.enum(['CHECKING', 'SAVINGS']).optional().nullable(),
+  bankIban: boundedText(64).optional().nullable(),
+  bankBic: boundedText(32).optional().nullable(),
 }
 
 export const employeeWriteSchema = z.object(employeeWriteFields).superRefine((value, context) => {

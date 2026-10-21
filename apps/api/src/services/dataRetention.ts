@@ -23,17 +23,26 @@ export async function executeDataRetentionCleanup(
   const categories = options.categories ?? ['EXPIRED_TOKENS', 'OLD_SESSIONS', 'EXPIRED_EXPORTS']
 
   if (categories.includes('EXPIRED_TOKENS')) {
-    const res = await prisma.verification.deleteMany({
-      where: {
-        expiresAt: { lt: now },
-      },
+    const members = await prisma.member.findMany({
+      where: { tenantId },
+      select: { user: { select: { email: true } } },
     })
-    expiredTokensCount = res.count
+    const memberEmails = members.map(m => m.user?.email).filter((email): email is string => Boolean(email))
+    if (memberEmails.length > 0) {
+      const res = await prisma.verification.deleteMany({
+        where: {
+          identifier: { in: memberEmails },
+          expiresAt: { lt: now },
+        },
+      })
+      expiredTokensCount = res.count
+    }
   }
 
   if (categories.includes('OLD_SESSIONS')) {
     const res = await prisma.session.deleteMany({
       where: {
+        activeOrganizationId: tenantId,
         expiresAt: { lt: cutoffDate },
       },
     })

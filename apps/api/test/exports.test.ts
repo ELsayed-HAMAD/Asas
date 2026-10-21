@@ -4,7 +4,7 @@ import { registerExportHandlers } from '../src/modules/exports/exports.routes.js
 import { renderProjectsXlsx } from '../src/services/export.js'
 
 describe('exports', () => {
-  it('registers employees, ledger, and projects handlers', () => {
+  it('registers employees, ledger, projects, and workspace handlers', () => {
     const handlers: Record<string, Function> = {}
     const queue = {
       register: vi.fn((kind, handler) => {
@@ -18,6 +18,7 @@ describe('exports', () => {
     expect(queue.register).toHaveBeenCalledWith('employees', expect.any(Function))
     expect(queue.register).toHaveBeenCalledWith('ledger', expect.any(Function))
     expect(queue.register).toHaveBeenCalledWith('projects', expect.any(Function))
+    expect(queue.register).toHaveBeenCalledWith('workspace', expect.any(Function))
   })
 
   it('renders projects xlsx buffer deterministically', async () => {

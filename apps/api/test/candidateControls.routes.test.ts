@@ -165,7 +165,7 @@ describe('candidate scheduling and export routes', () => {
       expect(grantResponse.statusCode).toBe(200)
       const grant = grantResponse.json().data
       expect(grant).toMatchObject({ uploadUrl: 'https://objects.example.test/signed-put', uploadTarget: 'object', method: 'PUT', maxBytes: 5 * 1024 * 1024 })
-      expect(objectStorage.presignPut).toHaveBeenCalledWith(`staging/resumes/tenant_1/${candidateId}/${grant.uploadId}.pdf`, 'application/pdf', 600)
+      expect(objectStorage.presignPut).toHaveBeenCalledWith(`staging/resumes/tenant_1/${candidateId}/${grant.uploadId}.pdf`, 'application/pdf', 600, 5 * 1024 * 1024)
 
       const completion = await app.inject({
         method: 'POST',
@@ -217,6 +217,25 @@ describe('candidate scheduling and export routes', () => {
       })
       expect(response.statusCode).toBe(403)
       expect(member.tx.candidate.update).not.toHaveBeenCalled()
+    } finally {
+      await member.app.close()
+    }
+  })
+
+  it('rejects candidate reads and resume downloads from MEMBER role without candidate.read permission (Finding 25)', async () => {
+    const member = await setup('MEMBER')
+    try {
+      const listResponse = await member.app.inject({
+        method: 'GET',
+        url: '/hr/candidates',
+      })
+      expect(listResponse.statusCode).toBe(403)
+
+      const resumeResponse = await member.app.inject({
+        method: 'GET',
+        url: `/hr/candidates/${candidateId}/resume`,
+      })
+      expect(resumeResponse.statusCode).toBe(403)
     } finally {
       await member.app.close()
     }

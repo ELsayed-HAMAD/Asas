@@ -33,7 +33,7 @@ const ROLE_RANK: Record<UserRole, number> = {
  * within the TTL. The cache is process-local by design; replicas do not share it, and a
  * per-replica miss costs exactly what every request cost before this existed.
  */
-const AUTH_CONTEXT_TTL_MS = 30_000
+const AUTH_CONTEXT_TTL_MS = 5_000
 const AUTH_CONTEXT_CACHE_MAX = 1_000
 const authContextCache = new Map<string, { context: AuthContext; expiresAt: number }>()
 
@@ -42,11 +42,30 @@ export function clearAuthContextCache(): void {
   authContextCache.clear()
 }
 
-/** Extract better-auth's session token from the request's `cookie` header, if present. */
-function sessionTokenFromHeaders(headers: FastifyRequest['headers']): string | null {
+/** Invalidate cached auth context for an explicit session token. */
+export function invalidateAuthCacheForToken(sessionToken: string): void {
+  authContextCache.delete(sessionToken)
+}
+
+/** Invalidate cached auth contexts for a specific user across all tokens. */
+export function invalidateAuthCacheForUser(userId: string): void {
+  for (const [key, val] of authContextCache.entries()) {
+    if (val.context.userId === userId) authContextCache.delete(key)
+  }
+}
+
+/** Invalidate cached auth contexts for a specific tenant across all sessions. */
+export function invalidateAuthCacheForTenant(tenantId: string): void {
+  for (const [key, val] of authContextCache.entries()) {
+    if (val.context.tenantId === tenantId) authContextCache.delete(key)
+  }
+}
+
+/** Extract better-auth's session token from the request's `cookie` header, matching standard and __Secure- prefixes. */
+export function sessionTokenFromHeaders(headers: FastifyRequest['headers']): string | null {
   const cookie = headers.cookie
   if (typeof cookie !== 'string') return null
-  const match = cookie.match(/(?:^|;\s*)better-auth\.session_token=([^;]+)/)
+  const match = cookie.match(/(?:^|;\s*)(?:__Secure-)?better-auth\.session_token=([^;]+)/)
   return match?.[1] ?? null
 }
 

@@ -685,6 +685,18 @@ export default function Payroll() {
               <span className="shrink-0 font-medium text-heading">Pay date {activeRun?.payDate ? formatDate(activeRun.payDate) : '—'}</span>
               <span>·</span>
               <span className="truncate">Earning period {run?.periodStart && run?.periodEnd ? `${run.periodStart} – ${run.periodEnd}` : 'not recorded (legacy run)'}</span>
+              {run?.createdById && (
+                <>
+                  <span>·</span>
+                  <span className="truncate text-caption">Prepared by: {run.createdById}</span>
+                </>
+              )}
+              {run?.approvedById && (
+                <>
+                  <span>·</span>
+                  <span className="truncate text-success">Approved by: {run.approvedById} {run.approvedAt ? `(${formatDate(run.approvedAt)})` : ''}</span>
+                </>
+              )}
             </p>
           </div>
 

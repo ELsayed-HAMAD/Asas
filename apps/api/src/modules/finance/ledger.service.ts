@@ -199,8 +199,92 @@ export async function recordInvoiceRecognition(tx: Prisma.TransactionClient, inp
   return entry.id
 }
 
+/** Payroll recognition is posted upon payroll run approval (debit expense, credit payroll clearing liability). */
+export async function recordPayrollRecognition(tx: Prisma.TransactionClient, input: {
+  tenantId: string; runId: string; amount: string; currency: string; workspaceCurrency: string;
+  postedAt: Date; actorId: string | null; description: string;
+}): Promise<string> {
+  let amount: Money
+  try { amount = Money.fromDecimal(input.amount, input.currency) } catch {
+    throw new AppError(409, 'The payroll amount is not exact in its recorded currency; reconcile its precision before recognition')
+  }
+  if (!amount.isPositive()) throw new AppError(400, 'A payroll recognition amount must be positive')
+  const existing = await tx.journalEntry?.findFirst?.({
+    where: { tenantId: input.tenantId, recognizesPayrollRunId: input.runId, sourceType: 'PAYROLL_RECOGNITION', reversedBy: { is: null } },
+    select: { id: true, amount: true, currency: true, baseAmount: true },
+  })
+  if (existing) {
+    if (existing.amount.eq(amount.toDecimalString()) && existing.currency === input.currency && existing.baseAmount != null) return existing.id
+    await reverseCashSettlement(tx, {
+      tenantId: input.tenantId, sourceId: input.runId, sourceType: 'PAYROLL_RECOGNITION',
+      reason: existing.baseAmount == null ? 'Payroll recognition FX basis recorded' : 'Payroll amount corrected',
+      actorId: input.actorId, postedAt: input.postedAt,
+    })
+  }
+  const fx = await resolveFxRate(tx, input.tenantId, input.currency, input.workspaceCurrency, input.postedAt)
+  const basis = baseJournalFields(amount.toDecimalString(), input.currency, input.workspaceCurrency, fx.rate, fx.exchangeRateId)
+  const [expenseAccount, clearingAccount] = await Promise.all([
+    upsertAccount(tx, input.tenantId, input.currency, 'UNCLASSIFIED_EXPENSE'),
+    upsertAccount(tx, input.tenantId, input.currency, 'PAYROLL_CLEARING'),
+  ])
+  const decimal = amount.toDecimalString()
+  const entry = await tx.journalEntry.create({ data: {
+    tenantId: input.tenantId, currency: input.currency, amount: decimal, sourceType: 'PAYROLL_RECOGNITION', ...basis,
+    recognizesPayrollRunId: input.runId,
+    currencyProvenance: 'DOCUMENT', description: input.description, actorId: input.actorId, postedAt: input.postedAt,
+  } })
+  await tx.journalLine.createMany({ data: [
+    { tenantId: input.tenantId, entryId: entry.id, accountId: expenseAccount.id, side: 'DEBIT', amount: decimal, baseAmount: basis.baseAmount },
+    { tenantId: input.tenantId, entryId: entry.id, accountId: clearingAccount.id, side: 'CREDIT', amount: decimal, baseAmount: basis.baseAmount },
+  ] })
+  invalidateLedgerCache(input.tenantId)
+  return entry.id
+}
+
+/** Expense recognition is posted upon expense approval (debit expense, credit reimbursement clearing liability). */
+export async function recordExpenseRecognition(tx: Prisma.TransactionClient, input: {
+  tenantId: string; expenseId: string; amount: string; currency: string; workspaceCurrency: string;
+  postedAt: Date; actorId: string | null; description: string;
+}): Promise<string> {
+  let amount: Money
+  try { amount = Money.fromDecimal(input.amount, input.currency) } catch {
+    throw new AppError(409, 'The expense amount is not exact in its recorded currency; reconcile its precision before recognition')
+  }
+  if (!amount.isPositive()) throw new AppError(400, 'An expense recognition amount must be positive')
+  const existing = await tx.journalEntry?.findFirst?.({
+    where: { tenantId: input.tenantId, recognizesExpenseId: input.expenseId, sourceType: 'EXPENSE_RECOGNITION', reversedBy: { is: null } },
+    select: { id: true, amount: true, currency: true, baseAmount: true },
+  })
+  if (existing) {
+    if (existing.amount.eq(amount.toDecimalString()) && existing.currency === input.currency && existing.baseAmount != null) return existing.id
+    await reverseCashSettlement(tx, {
+      tenantId: input.tenantId, sourceId: input.expenseId, sourceType: 'EXPENSE_RECOGNITION',
+      reason: existing.baseAmount == null ? 'Expense recognition FX basis recorded' : 'Expense amount corrected',
+      actorId: input.actorId, postedAt: input.postedAt,
+    })
+  }
+  const fx = await resolveFxRate(tx, input.tenantId, input.currency, input.workspaceCurrency, input.postedAt)
+  const basis = baseJournalFields(amount.toDecimalString(), input.currency, input.workspaceCurrency, fx.rate, fx.exchangeRateId)
+  const [expenseAccount, clearingAccount] = await Promise.all([
+    upsertAccount(tx, input.tenantId, input.currency, 'UNCLASSIFIED_EXPENSE'),
+    upsertAccount(tx, input.tenantId, input.currency, 'REIMBURSEMENT_CLEARING'),
+  ])
+  const decimal = amount.toDecimalString()
+  const entry = await tx.journalEntry.create({ data: {
+    tenantId: input.tenantId, currency: input.currency, amount: decimal, sourceType: 'EXPENSE_RECOGNITION', ...basis,
+    recognizesExpenseId: input.expenseId,
+    currencyProvenance: 'DOCUMENT', description: input.description, actorId: input.actorId, postedAt: input.postedAt,
+  } })
+  await tx.journalLine.createMany({ data: [
+    { tenantId: input.tenantId, entryId: entry.id, accountId: expenseAccount.id, side: 'DEBIT', amount: decimal, baseAmount: basis.baseAmount },
+    { tenantId: input.tenantId, entryId: entry.id, accountId: clearingAccount.id, side: 'CREDIT', amount: decimal, baseAmount: basis.baseAmount },
+  ] })
+  invalidateLedgerCache(input.tenantId)
+  return entry.id
+}
+
 export async function reverseCashSettlement(tx: Prisma.TransactionClient, input: {
-  tenantId: string; sourceId: string; sourceType: 'AP_PAYMENT' | 'AR_COLLECTION' | 'PAYROLL_PAYMENT' | 'EXPENSE_REIMBURSEMENT' | 'AP_RECOGNITION' | 'AR_RECOGNITION';
+  tenantId: string; sourceId: string; sourceType: 'AP_PAYMENT' | 'AR_COLLECTION' | 'PAYROLL_PAYMENT' | 'EXPENSE_REIMBURSEMENT' | 'AP_RECOGNITION' | 'AR_RECOGNITION' | 'PAYROLL_RECOGNITION' | 'EXPENSE_RECOGNITION';
   reason: string; actorId: string | null; postedAt: Date;
 }): Promise<string> {
   const original = await tx.journalEntry.findFirst({
@@ -212,9 +296,13 @@ export async function reverseCashSettlement(tx: Prisma.TransactionClient, input:
           ? { tenantId: input.tenantId, payrollRunId: input.sourceId, sourceType: input.sourceType }
           : input.sourceType === 'EXPENSE_REIMBURSEMENT'
             ? { tenantId: input.tenantId, expenseId: input.sourceId, sourceType: input.sourceType }
-        : input.sourceType === 'AP_RECOGNITION'
-          ? { tenantId: input.tenantId, recognizesPayableInvoiceId: input.sourceId, sourceType: input.sourceType, reversedBy: { is: null } }
-          : { tenantId: input.tenantId, recognizesReceivableInvoiceId: input.sourceId, sourceType: input.sourceType, reversedBy: { is: null } },
+            : input.sourceType === 'AP_RECOGNITION'
+              ? { tenantId: input.tenantId, recognizesPayableInvoiceId: input.sourceId, sourceType: input.sourceType, reversedBy: { is: null } }
+              : input.sourceType === 'AR_RECOGNITION'
+                ? { tenantId: input.tenantId, recognizesReceivableInvoiceId: input.sourceId, sourceType: input.sourceType, reversedBy: { is: null } }
+                : input.sourceType === 'PAYROLL_RECOGNITION'
+                  ? { tenantId: input.tenantId, recognizesPayrollRunId: input.sourceId, sourceType: input.sourceType, reversedBy: { is: null } }
+                  : { tenantId: input.tenantId, recognizesExpenseId: input.sourceId, sourceType: input.sourceType, reversedBy: { is: null } },
     include: { lines: true },
   })
   if (!original || original.lines.length < 2) throw new AppError(409, 'A posted journal is required before reversing this source')
@@ -254,11 +342,39 @@ export async function reverseInvoiceRecognitionIfPresent(tx: Prisma.TransactionC
   })
 }
 
+export async function reversePayrollRecognitionIfPresent(tx: Prisma.TransactionClient, input: {
+  tenantId: string; runId: string; actorId: string | null; reason: string; postedAt: Date;
+}): Promise<string | null> {
+  const original = await tx.journalEntry?.findFirst?.({
+    where: { tenantId: input.tenantId, recognizesPayrollRunId: input.runId, sourceType: 'PAYROLL_RECOGNITION', reversedBy: { is: null } },
+    select: { id: true },
+  })
+  if (!original) return null
+  return reverseCashSettlement(tx, {
+    tenantId: input.tenantId, sourceId: input.runId, sourceType: 'PAYROLL_RECOGNITION',
+    reason: input.reason, actorId: input.actorId, postedAt: input.postedAt,
+  })
+}
+
+export async function reverseExpenseRecognitionIfPresent(tx: Prisma.TransactionClient, input: {
+  tenantId: string; expenseId: string; actorId: string | null; reason: string; postedAt: Date;
+}): Promise<string | null> {
+  const original = await tx.journalEntry?.findFirst?.({
+    where: { tenantId: input.tenantId, recognizesExpenseId: input.expenseId, sourceType: 'EXPENSE_RECOGNITION', reversedBy: { is: null } },
+    select: { id: true },
+  })
+  if (!original) return null
+  return reverseCashSettlement(tx, {
+    tenantId: input.tenantId, sourceId: input.expenseId, sourceType: 'EXPENSE_RECOGNITION',
+    reason: input.reason, actorId: input.actorId, postedAt: input.postedAt,
+  })
+}
+
 const include = { lines: { include: { account: { select: { code: true, name: true, kind: true } } }, orderBy: { id: 'asc' as const } } } as const
 function mapEntry(entry: Prisma.JournalEntryGetPayload<{ include: typeof include }>): JournalEntryContract {
   return {
     id: entry.id, sourceType: entry.sourceType as JournalEntryContract['sourceType'],
-    sourceId: entry.payableInvoiceId ?? entry.receivableInvoiceId ?? entry.payrollRunId ?? entry.expenseId ?? entry.recognizesPayableInvoiceId ?? entry.recognizesReceivableInvoiceId ?? entry.reversesJournalEntryId ?? entry.id,
+    sourceId: entry.payableInvoiceId ?? entry.receivableInvoiceId ?? entry.payrollRunId ?? entry.expenseId ?? entry.recognizesPayableInvoiceId ?? entry.recognizesReceivableInvoiceId ?? entry.recognizesPayrollRunId ?? entry.recognizesExpenseId ?? entry.reversesJournalEntryId ?? entry.id,
     currencyProvenance: entry.currencyProvenance as JournalEntryContract['currencyProvenance'],
     amount: Money.fromDecimal(entry.amount.toString(), entry.currency).toWire(),
     baseCurrency: entry.baseCurrency,

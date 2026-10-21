@@ -71,6 +71,8 @@ export type PurchaseOrderStatus = z.infer<typeof purchaseOrderStatusSchema>
 export const purchaseOrderSchema = z.object({
   id: idSchema,
   status: purchaseOrderStatusSchema,
+  approvedAt: isoDateTimeSchema.nullable().optional(),
+  receivedAt: isoDateTimeSchema.nullable().optional(),
   createdAt: isoDateTimeSchema,
   productId: idSchema,
   productName: z.string(),

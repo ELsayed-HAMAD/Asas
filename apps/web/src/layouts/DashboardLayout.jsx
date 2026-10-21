@@ -4,11 +4,12 @@ import {
   LayoutDashboard, Users, CreditCard, Briefcase,
   Package, FolderKanban, Settings, HelpCircle,
   ChevronDown, ChevronLeft, ChevronRight, Plus, LogOut, Menu,
-  Check, User, Moon, Download, Search, Bell, Globe, Mail
+  Check, User, Moon, Download, Search, Bell, Globe, Mail, Building2
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { changeLanguage } from '../lib/i18n'
+import { validatePasswordPolicy } from '../lib/passwordPolicy'
 import {
   authClient, useSession, useActiveOrganization, useActiveMemberRole,
   useListOrganizations, signOut
@@ -441,6 +442,7 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
         setSwitchingOrgId(null)
         return
       }
+      localStorage.setItem('asas.lastActiveOrgId', organizationId)
       queryClient.clear()
       window.location.assign('/dashboard')
     } catch (err) {
@@ -511,8 +513,9 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
         if (newPassword !== confirmPassword) {
           throw new Error('New passwords do not match')
         }
-        if (newPassword.length < 8) {
-          throw new Error('New password must be at least 8 characters')
+        const policyErr = validatePasswordPolicy(newPassword)
+        if (policyErr) {
+          throw new Error(policyErr)
         }
         if (!currentPassword) {
           throw new Error('Current password is required to set a new password')
@@ -733,6 +736,15 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
                 <Plus size={16} />
                 {t('common.createWorkspace', 'Create New Workspace')}
               </DropdownMenuItem>
+              {orgList.length > 1 && (
+                <DropdownMenuItem
+                  onClick={() => navigate('/choose-workspace')}
+                  className="w-full px-3 py-1.5 flex items-center gap-2.5 text-xs text-muted hover:text-heading hover:bg-surface-muted rounded-input cursor-pointer transition-colors"
+                >
+                  <Building2 size={14} />
+                  <span>Switch or View All Workspaces</span>
+                </DropdownMenuItem>
+              )}
             </div>
 
             <DropdownMenuSeparator className="my-0" />

@@ -13,6 +13,35 @@ jobs:
   ci:
     name: Lint, typecheck, test, build
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: asas_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/asas_test
+      REDIS_URL: redis://localhost:6379
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,10 +60,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # No live database is required: buildApp() never connects (see apps/api/src/app.ts),
-      # and `prisma generate` only reads the schema shape, not the datasource URL.
       - name: Generate Prisma client
         run: pnpm --filter @asas/api run prisma:generate
+
+      - name: Deploy Prisma migrations and triggers to live PostgreSQL 17
+        run: pnpm --filter @asas/api prisma migrate deploy
 
       - name: Lint
         run: pnpm run lint
@@ -58,4 +88,3 @@ jobs:
 
       - name: Build
         run: pnpm run build
-

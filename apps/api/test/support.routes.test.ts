@@ -97,8 +97,8 @@ async function setup(options: { role?: string; unauthenticated?: boolean } = {})
 }
 
 describe('Support Routes', () => {
-  it('GET /support/tickets lists all tenant support tickets for MEMBER', async () => {
-    const { app } = await setup({ role: 'MEMBER' })
+  it('GET /support/tickets scopes ticket list to createdById for standard MEMBER', async () => {
+    const { app, prisma } = await setup({ role: 'MEMBER' })
     const res = await app.inject({
       method: 'GET',
       url: '/support/tickets',
@@ -109,6 +109,24 @@ describe('Support Routes', () => {
     expect(json.data.items).toHaveLength(1)
     expect(json.data.items[0].subject).toBe('Cannot export ledger')
     expect(json.data.items[0].status).toBe('OPEN')
+    expect(prisma.supportTicket.findMany).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant_1', createdById: 'user_1' },
+      orderBy: { createdAt: 'desc' },
+    })
+  })
+
+  it('GET /support/tickets allows ADMIN to view all tenant tickets', async () => {
+    const { app, prisma } = await setup({ role: 'ADMIN' })
+    const res = await app.inject({
+      method: 'GET',
+      url: '/support/tickets',
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(prisma.supportTicket.findMany).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant_1' },
+      orderBy: { createdAt: 'desc' },
+    })
   })
 
   it('POST /support/tickets creates a ticket with audit logging and mail notification', async () => {
@@ -129,6 +147,7 @@ describe('Support Routes', () => {
     expect(prisma.supportTicket.create).toHaveBeenCalledWith({
       data: {
         tenantId: 'tenant_1',
+        createdById: 'user_1',
         subject: 'Bug in expenses report',
         channel: 'dashboard',
       },

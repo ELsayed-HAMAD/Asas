@@ -296,9 +296,27 @@ export async function applyEnterpriseSamplePack(
           location: emp.location ?? null,
           employeeNumber: emp.employeeNumber ?? null,
           email: emp.email ?? null,
+          bankRoutingNumber: '021000021',
+          bankAccountNumber: `1000${(employeeIds.size + 1).toString().padStart(6, '0')}`,
+          bankAccountType: 'CHECKING',
+          bankIban: 'DE89370400440532013000',
+          bankBic: 'DEUTDEFF',
         },
       })
-      employeeIds.set(emp.key, created.id)
+      employeeIds.set(emp.key, created?.id ?? `emp_${employeeIds.size + 1}`)
+      if (created?.salary != null && tx.employeeSalaryHistory) {
+        await tx.employeeSalaryHistory.create({
+          data: {
+            tenantId,
+            employeeId: created.id,
+            salary: created.salary,
+            salaryBasis: 'MONTHLY',
+            currency,
+            effectiveFrom: created.hiredAt ?? new Date('2026-01-01T00:00:00.000Z'),
+            createdById: null,
+          },
+        })
+      }
     }
     summary.employees = employeeIds.size
 
@@ -913,7 +931,7 @@ export async function importEmployees(
           departmentCache.set(row.department, departmentId)
         }
       }
-      await tx.employee.create({
+      const created = await tx.employee.create({
         data: {
           tenantId,
           name: row.name,
@@ -927,8 +945,26 @@ export async function importEmployees(
             : null,
           employeeNumber: row.employeeNumber ?? null,
           hiredAt: parseDate(row.hiredAt),
+          bankRoutingNumber: row.bankRoutingNumber ?? null,
+          bankAccountNumber: row.bankAccountNumber ?? null,
+          bankAccountType: row.bankAccountType ?? null,
+          bankIban: row.bankIban ?? null,
+          bankBic: row.bankBic ?? null,
         },
       })
+      if (created?.salary != null && tx.employeeSalaryHistory) {
+        await tx.employeeSalaryHistory.create({
+          data: {
+            tenantId,
+            employeeId: created.id,
+            salary: created.salary,
+            salaryBasis: 'MONTHLY',
+            currency,
+            effectiveFrom: created.hiredAt ?? new Date(),
+            createdById: null,
+          },
+        })
+      }
       count++
     }
     await tx.tenant.update({ where: { id: tenantId }, data: { onboardingStatus: 'IMPORTED' } })

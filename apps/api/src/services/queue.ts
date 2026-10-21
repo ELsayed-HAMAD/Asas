@@ -97,6 +97,7 @@ const KIND_FILENAME: Record<string, { filename: string; extension: string }> = {
   employees: { filename: 'employees.xlsx', extension: 'xlsx' },
   ledger: { filename: 'ledger.xlsx', extension: 'xlsx' },
   projects: { filename: 'projects.xlsx', extension: 'xlsx' },
+  workspace: { filename: 'workspace-archive.json', extension: 'json' },
 }
 
 export interface CreateExportQueueOptions {

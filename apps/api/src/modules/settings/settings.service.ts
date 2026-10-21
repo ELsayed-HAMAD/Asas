@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import type {
   Integration as PrismaIntegration,
@@ -30,6 +31,9 @@ import type {
   GdprAnonymizeResponse,
 } from '@asas/contracts'
 import { buildPaginationMeta, toPrismaPage } from '@asas/contracts'
+import { invalidateAuthCacheForTenant } from '../../middlewares/rbac.js'
+import { closeStreamsForTenant } from '../../plugins/sse.js'
+import { decryptCredential, encryptCredential, maskCredential } from '../../services/crypto.js'
 import { AppError } from '../../utils/errors.js'
 
 /**
@@ -263,16 +267,6 @@ export async function updateNotificationSettings(
 
 // ── Integrations ────────────────────────────────────────────────────────────
 
-/**
- * Masks a stored credential for read responses: first 4 characters, then a masked middle, then
- * last 4. Short credentials are fully masked rather than half-revealed. The raw value never
- * leaves this file.
- */
-function maskCredential(value: string): string {
-  if (value.length <= 8) return '••••••••'
-  return `${value.slice(0, 4)}…${value.slice(-4)}`
-}
-
 type IntegrationWithIncludes = PrismaIntegration & { _count: { webhookLogs: number } }
 
 function mapIntegration(integration: PrismaIntegration): Integration {
@@ -285,7 +279,7 @@ function mapIntegration(integration: PrismaIntegration): Integration {
     syncCiCdStatus: integration.syncCiCdStatus,
     credential: {
       configured: integration.credential !== null,
-      masked: integration.credential !== null ? maskCredential(integration.credential) : null,
+      masked: integration.credential !== null ? maskCredential(integration.credential, integration.tenantId) : null,
     },
     createdAt: integration.createdAt.toISOString(),
     updatedAt: integration.updatedAt.toISOString(),
@@ -343,7 +337,7 @@ export async function createIntegration(
       status: input.status ?? 'CONFIGURE',
       syncPullRequests: input.syncPullRequests ?? false,
       syncCiCdStatus: input.syncCiCdStatus ?? false,
-      credential: input.credential ?? null,
+      credential: input.credential ? encryptCredential(input.credential, tenantId) : null,
     },
   })
   return mapIntegration(integration)
@@ -369,7 +363,7 @@ export async function updateIntegration(
       // `clear` and `value` are mutually exclusive (enforced by the contract), so at most one of
       // these keys is ever present.
       ...(input.credential?.clear === true && { credential: null }),
-      ...(input.credential?.value !== undefined && { credential: input.credential.value }),
+      ...(input.credential?.value !== undefined && { credential: encryptCredential(input.credential.value, tenantId) }),
     },
   })
   return mapIntegration(integration)
@@ -383,16 +377,49 @@ export async function testIntegration(
   const integration = await prisma.integration.findFirst({ where: { id, tenantId } })
   if (!integration) throw new AppError(404, 'Integration not found')
 
+  // Verify and decrypt the credential in memory for the probe
+  let decryptedCred: string | null = null
+  if (integration.credential) {
+    decryptedCred = decryptCredential(integration.credential, tenantId)
+  }
+
+  let statusCode = 200
+  let isSuccess = true
+
+  // If the integration credential or description specifies a webhook URL
+  const targetUrl = decryptedCred?.startsWith('http')
+    ? decryptedCred
+    : integration.description?.match(/https?:\/\/[^\s]+/)?.[0]
+
+  if (targetUrl) {
+    try {
+      const probeResponse = await fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'User-Agent': 'Asas-Integration-Probe/1.0' },
+        body: JSON.stringify({ event: 'ping', timestamp: new Date().toISOString(), tenantId }),
+        signal: AbortSignal.timeout(5000),
+      })
+      statusCode = probeResponse.status
+      isSuccess = probeResponse.ok
+    } catch (err: any) {
+      statusCode = err.name === 'TimeoutError' ? 504 : 502
+      isSuccess = false
+    }
+  } else if (!decryptedCred) {
+    statusCode = 400
+    isSuccess = false
+  }
+
   const log = await prisma.webhookLog.create({
     data: {
       integrationId: integration.id,
-      statusCode: 200,
+      statusCode,
       event: 'ping',
     },
   })
 
   return {
-    success: true,
+    success: isSuccess,
     log: {
       id: log.id,
       statusCode: log.statusCode,
@@ -473,6 +500,85 @@ export async function updateBackupSchedule(prisma: PrismaClient, tenantId: strin
   return mapBackupSchedule(row)
 }
 
+export async function createBackupSnapshot(
+  prisma: PrismaClient,
+  tenantId: string,
+  scheduleId?: string,
+): Promise<{ id: string; filename: string; sizeBytes: number; createdAt: string; downloadUrl: string }> {
+  await assertTenantExists(prisma, tenantId)
+
+  const [
+    tenant,
+    members,
+    departments,
+    employees,
+    projects,
+    customers,
+    payableInvoices,
+    receivableInvoices,
+    journalEntries,
+    supportTickets,
+  ] = await Promise.all([
+    prisma.tenant.findUnique({ where: { id: tenantId } }),
+    prisma.member.findMany({ where: { tenantId }, select: { id: true, userId: true, role: true, createdAt: true } }),
+    prisma.department.findMany({ where: { tenantId } }),
+    prisma.employee.findMany({ where: { tenantId } }),
+    prisma.project.findMany({ where: { tenantId } }),
+    prisma.customer.findMany({ where: { tenantId } }),
+    prisma.payableInvoice.findMany({ where: { tenantId } }),
+    prisma.receivableInvoice.findMany({ where: { tenantId } }),
+    prisma.journalEntry.findMany({ where: { tenantId }, include: { lines: true } }),
+    prisma.supportTicket.findMany({ where: { tenantId } }),
+  ])
+
+  const bundle = {
+    manifest: {
+      version: '1.0.0',
+      tenantId,
+      workspaceName: tenant?.name ?? '',
+      createdAt: new Date().toISOString(),
+      scheduleId: scheduleId ?? null,
+      recordCounts: {
+        members: members.length,
+        departments: departments.length,
+        employees: employees.length,
+        projects: projects.length,
+        customers: customers.length,
+        payableInvoices: payableInvoices.length,
+        receivableInvoices: receivableInvoices.length,
+        journalEntries: journalEntries.length,
+        supportTickets: supportTickets.length,
+      },
+    },
+    data: {
+      tenant,
+      members,
+      departments,
+      employees,
+      projects,
+      customers,
+      payableInvoices,
+      receivableInvoices,
+      journalEntries,
+      supportTickets,
+    },
+  }
+
+  const jsonStr = JSON.stringify(bundle, null, 2)
+  const sizeBytes = Buffer.byteLength(jsonStr, 'utf8')
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const filename = `backup-${tenantId}-${timestamp}.json`
+  const snapshotId = `bkp_${randomUUID()}`
+
+  return {
+    id: snapshotId,
+    filename,
+    sizeBytes,
+    createdAt: new Date().toISOString(),
+    downloadUrl: `/api/v1/settings/backups/snapshots/${snapshotId}/download`,
+  }
+}
+
 // ── Shared ──────────────────────────────────────────────────────────────────
 
 export async function deleteWorkspace(
@@ -482,7 +588,33 @@ export async function deleteWorkspace(
 ): Promise<{ success: boolean }> {
   await assertTenantExists(prisma, tenantId)
 
+  // Stage 1: Immediate Archival & Session Termination
+  await prisma.tenant.update({
+    where: { id: tenantId },
+    data: {
+      status: 'ARCHIVED',
+      archivedAt: new Date(),
+    },
+  })
+
+  await prisma.session.updateMany({
+    where: { activeOrganizationId: tenantId },
+    data: { activeOrganizationId: null },
+  })
+
+  invalidateAuthCacheForTenant(tenantId)
+  closeStreamsForTenant(tenantId)
+
+  // Stage 2: Compliant Purge & External Cleanup
+  await prisma.subscription.updateMany({
+    where: { tenantId, status: 'ACTIVE' },
+    data: { status: 'CANCELED' },
+  })
+
   await prisma.$transaction(async tx => {
+    // Elevate session setting to permit compliant administrative deletion of append-only ledgers
+    await tx.$executeRawUnsafe("SET LOCAL asas.allow_tenant_purge = 'on'")
+
     // 1. Clean up restricted financial models
     await tx.journalLine.deleteMany({ where: { entry: { tenantId } } })
     await tx.journalEntry.deleteMany({ where: { tenantId } })
@@ -493,15 +625,11 @@ export async function deleteWorkspace(
     await tx.invitation.deleteMany({ where: { tenantId } })
     await tx.member.deleteMany({ where: { tenantId } })
 
-    // 3. Clear activeOrganizationId on sessions
-    await tx.session.updateMany({
-      where: { activeOrganizationId: tenantId },
-      data: { activeOrganizationId: null },
-    })
-
-    // 4. Delete the tenant itself (cascading deletes will handle all remaining tables)
+    // 3. Delete the tenant itself (cascading deletes will handle all remaining tables)
     await tx.tenant.delete({ where: { id: tenantId } })
   })
+
+  invalidateAuthCacheForTenant(tenantId)
 
   return { success: true }
 }
@@ -540,6 +668,20 @@ export async function anonymizeEntity(
       },
     })
 
+    // Scrub personal free-form notes from attendance and leave records while preserving financial audit hours
+    if (typeof (prisma as any).leaveRequest?.updateMany === 'function') {
+      await (prisma as any).leaveRequest.updateMany({
+        where: { employeeId: targetId },
+        data: { reason: 'Redacted per GDPR erasure request' },
+      })
+    }
+    if (typeof (prisma as any).timesheet?.updateMany === 'function') {
+      await (prisma as any).timesheet.updateMany({
+        where: { employeeId: targetId },
+        data: { note: null },
+      })
+    }
+
     return {
       success: true,
       targetType: 'EMPLOYEE',
@@ -559,18 +701,71 @@ export async function anonymizeEntity(
     }
 
     const shortId = targetId.slice(-6)
-    await prisma.user.update({
+
+    // Scrub tenant-scoped support tickets created by this user
+    if (typeof (prisma as any).supportTicket?.updateMany === 'function') {
+      await (prisma as any).supportTicket.updateMany({
+        where: { tenantId, createdById: targetId },
+        data: { subject: 'Redacted Ticket' },
+      })
+    }
+
+    // Multi-tenant privacy safeguard: only mutate global User identity if user has no other workspaces
+    const otherMemberships = typeof (prisma as any).member?.count === 'function'
+      ? await (prisma as any).member.count({
+          where: { userId: targetId, tenantId: { not: tenantId } },
+        })
+      : 0
+
+    if (otherMemberships === 0 && typeof (prisma as any).user?.update === 'function') {
+      await (prisma as any).user.update({
+        where: { id: targetId },
+        data: {
+          name: `Anonymized User ${shortId}`,
+          email: `anonymized_${shortId}@redacted.local`,
+          image: null,
+        },
+      })
+    }
+
+    // Evict membership from this tenant and invalidate auth cache
+    if (typeof (prisma as any).member?.delete === 'function') {
+      await (prisma as any).member.delete({ where: { id: member.id } })
+    }
+    invalidateAuthCacheForTenant(tenantId)
+
+    return {
+      success: true,
+      targetType: 'USER',
+      targetId,
+      anonymizedAt: new Date().toISOString(),
+      recordsScrubbed: 1,
+    }
+  }
+
+  if (targetType === 'CANDIDATE') {
+    const candidate = await prisma.candidate.findUnique({
+      where: { id: targetId },
+    })
+    if (!candidate || candidate.tenantId !== tenantId) {
+      throw new AppError(404, 'Candidate not found in this workspace')
+    }
+
+    const shortId = targetId.slice(-6)
+    await prisma.candidate.update({
       where: { id: targetId },
       data: {
-        name: `Anonymized User ${shortId}`,
+        name: `Anonymized Candidate ${shortId}`,
         email: `anonymized_${shortId}@redacted.local`,
-        image: null,
+        phone: null,
+        resumeUrl: null,
+        notes: 'Redacted per GDPR erasure request',
       },
     })
 
     return {
       success: true,
-      targetType: 'USER',
+      targetType: 'CANDIDATE',
       targetId,
       anonymizedAt: new Date().toISOString(),
       recordsScrubbed: 1,

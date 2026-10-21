@@ -3,7 +3,6 @@ import { listCurrencies } from '@asas/domain/money'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  ChevronDown,
   Search,
   Cloud,
   Loader2,
@@ -142,8 +141,9 @@ export default function SettingsGeneral() {
   const deleteMutation = useMutation({
     mutationFn: () => settingsApi.deleteWorkspace(),
     onSuccess: () => {
+      localStorage.removeItem('asas.lastActiveOrgId')
       queryClient.clear()
-      navigate('/onboarding', { replace: true })
+      navigate('/choose-workspace', { replace: true })
     },
   })
 

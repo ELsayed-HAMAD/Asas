@@ -194,17 +194,31 @@ export default function Inventory() {
       setManualDeselect(false);
     },
   });
+  const [orderActionError, setOrderActionError] = useState('');
+
   const approveOrderMutation = useMutation({
     mutationFn: (orderId) => inventoryApi.approvePurchaseOrder(orderId),
     onSuccess: () => {
+      setOrderActionError('');
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all() });
     },
+    onError: (err) => setOrderActionError(err?.message || 'Could not approve purchase order.'),
   });
   const receiveOrderMutation = useMutation({
     mutationFn: (orderId) => inventoryApi.receivePurchaseOrder(orderId),
     onSuccess: () => {
+      setOrderActionError('');
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all() });
     },
+    onError: (err) => setOrderActionError(err?.message || 'Could not receive purchase order.'),
+  });
+  const cancelOrderMutation = useMutation({
+    mutationFn: (orderId) => inventoryApi.cancelPurchaseOrder(orderId),
+    onSuccess: () => {
+      setOrderActionError('');
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all() });
+    },
+    onError: (err) => setOrderActionError(err?.message || 'Could not cancel purchase order.'),
   });
 
   const [newSupplierName, setNewSupplierName] = useState('');
@@ -231,6 +245,7 @@ export default function Inventory() {
   // Reset the transient on-hand override when a different product is inspected.
   useEffect(() => {
     setFreshStock(null);
+    setOrderActionError('');
   }, [selectedId]);
 
   const openCreateDialog = () => {
@@ -806,6 +821,9 @@ export default function Inventory() {
                       <ShoppingCart size={14} /> New Order
                     </Button>
                   </div>
+                  {orderActionError && (
+                    <p className="text-xs text-danger">{orderActionError}</p>
+                  )}
                   {isOrdersLoading ? (
                     <div className="flex h-40 items-center justify-center">
                       <Loader2 className="animate-spin text-muted" size={20} />
@@ -833,6 +851,7 @@ export default function Inventory() {
                             const isDraft = po.status === 'DRAFT';
                             const isApproved = po.status === 'APPROVED';
                             const isReceived = po.status === 'RECEIVED';
+                            const isCancelled = po.status === 'CANCELLED';
                             return (
                               <TableRow key={po.id} className="hover:bg-surface-muted/50 transition-colors border-0">
                                 <TableCell className="px-4 py-3 text-xs font-semibold text-heading">
@@ -852,6 +871,8 @@ export default function Inventory() {
                                         ? 'bg-success-light text-success-text border-success-border'
                                         : isApproved
                                         ? 'bg-blue-100 text-blue-700 border-blue-200'
+                                        : isCancelled
+                                        ? 'bg-danger-light text-danger border-danger-border'
                                         : 'bg-surface-strong text-body border-border-default'
                                     }`}
                                   >
@@ -860,33 +881,62 @@ export default function Inventory() {
                                 </TableCell>
                                 <TableCell className="px-4 py-3 text-right rtl:text-left">
                                   {isDraft && (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      disabled={!canWrite || approveOrderMutation.isPending}
-                                      onClick={() => approveOrderMutation.mutate(po.id)}
-                                      className="h-auto p-0 text-xs font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50 mr-2"
-                                      title="Approve order"
-                                    >
-                                      Approve
-                                    </Button>
+                                    <div className="inline-flex items-center gap-2">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled={!canWrite || approveOrderMutation.isPending || cancelOrderMutation.isPending}
+                                        onClick={() => approveOrderMutation.mutate(po.id)}
+                                        className="h-auto p-0 text-xs font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                                        title="Approve order"
+                                      >
+                                        {approveOrderMutation.isPending && approveOrderMutation.variables === po.id ? 'Approving…' : 'Approve'}
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled={!canWrite || approveOrderMutation.isPending || cancelOrderMutation.isPending}
+                                        onClick={() => cancelOrderMutation.mutate(po.id)}
+                                        className="h-auto p-0 text-xs font-semibold text-danger hover:text-danger-hover disabled:opacity-50"
+                                        title="Cancel order"
+                                      >
+                                        {cancelOrderMutation.isPending && cancelOrderMutation.variables === po.id ? 'Cancelling…' : 'Cancel'}
+                                      </Button>
+                                    </div>
                                   )}
-                                  {(isDraft || isApproved) && (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      disabled={!canWrite || receiveOrderMutation.isPending}
-                                      onClick={() => receiveOrderMutation.mutate(po.id)}
-                                      className="h-auto p-0 text-xs font-semibold text-success-text hover:text-green-800 disabled:opacity-50"
-                                      title="Receive items into stock"
-                                    >
-                                      Receive
-                                    </Button>
+                                  {isApproved && (
+                                    <div className="inline-flex items-center gap-2">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled={!canWrite || receiveOrderMutation.isPending || cancelOrderMutation.isPending}
+                                        onClick={() => receiveOrderMutation.mutate(po.id)}
+                                        className="h-auto p-0 text-xs font-semibold text-success-text hover:text-green-800 disabled:opacity-50"
+                                        title="Receive items into stock"
+                                      >
+                                        {receiveOrderMutation.isPending && receiveOrderMutation.variables === po.id ? 'Receiving…' : 'Receive'}
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled={!canWrite || receiveOrderMutation.isPending || cancelOrderMutation.isPending}
+                                        onClick={() => cancelOrderMutation.mutate(po.id)}
+                                        className="h-auto p-0 text-xs font-semibold text-danger hover:text-danger-hover disabled:opacity-50"
+                                        title="Cancel order"
+                                      >
+                                        {cancelOrderMutation.isPending && cancelOrderMutation.variables === po.id ? 'Cancelling…' : 'Cancel'}
+                                      </Button>
+                                    </div>
                                   )}
                                   {isReceived && (
-                                    <span className="text-xs text-muted">Done</span>
+                                    <span className="text-xs text-muted font-medium">Done</span>
+                                  )}
+                                  {isCancelled && (
+                                    <span className="text-xs text-muted font-medium">Cancelled</span>
                                   )}
                                 </TableCell>
                               </TableRow>

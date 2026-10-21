@@ -10,14 +10,14 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # =========================
-# Dependencies
+# Dependencies & Package Caches
 # =========================
 node_modules/
 jspm_packages/
 # Monorepo strictly uses pnpm (pnpm-lock.yaml)
 package-lock.json
 yarn.lock
-
+.pnpm-store/
 
 # =========================
 # Environment Variables & Secrets
@@ -25,6 +25,8 @@ yarn.lock
 # =========================
 .env
 .env.*
+*.env
+*.env.*
 !.env.example
 !.env.*.example
 *.pem
@@ -35,7 +37,17 @@ yarn.lock
 *.cer
 *.csr
 *.der
+*.secret
+*.secrets
+*.token
+*.tokens
 secrets/
+credentials/
+*.credential
+*.credentials
+id_rsa*
+id_ed25519*
+id_ecdsa*
 
 # =========================
 # Frontend Builds & Caches
@@ -95,6 +107,8 @@ obj/
 *.sqlite-journal
 *.sqlite-wal
 *.sqlite-shm
+*.rdb
+dump.rdb
 uploads/
 storage/
 tmp/
@@ -145,8 +159,9 @@ $RECYCLE.BIN/
 *.lnk
 
 # =========================
-# AI Tools & Editors
+# AI Tools, Assistants & Agent Workspaces
 # =========================
+.zwork/
 .claude/
 .agents/
 .codex/
@@ -160,22 +175,55 @@ $RECYCLE.BIN/
 .windsurf/
 .copilot/
 .v0/
+.chat/
+.cline/
+.roo/
+.devin/
+.system_generated/
+brain/
+*.scratch.*
+scratch/
+
+# =========================
+# Audit, Review, Plan & Remediation Files
+# Keep private analysis, remediation tracking, and planning notes out of git.
+# =========================
+*AUDIT*.md
+*audit*.md
+*REVIEW*.md
+*review*.md
+*PLAN*.md
+*plan*.md
+*HANDOFF*.md
+*handoff*.md
+*PROGRESS*.md
+*progress*.md
+*COMPLETION-REPORT*.md
+*remediation*.md
+*REMEDIATION*.md
+*.plan
+*.patch
+*.diff
+
+# Explicitly preserve standard public repository documentation
+!README.md
+!**/README.md
+!CHANGELOG.md
+!**/CHANGELOG.md
+!CONTRIBUTING.md
+!**/CONTRIBUTING.md
+!LICENSE.md
+!**/LICENSE.md
 
 # =========================
 # Scratch, Maintenance & Local Scripts
 # =========================
-# Local audit/planning notes are intentionally kept out of the public source tree.
-AUDIT.md
-UI_UX_REVIEW.md
-REVIEW.md
 filter.py
 rebase.ps1
 filter-msg.*
 scripts/filter-msg.*
 check_errors.cjs
 lint_output.txt
-scratch/
-*.scratch.*
 *backup*/
 *_backup_*
 .monkeyscode/

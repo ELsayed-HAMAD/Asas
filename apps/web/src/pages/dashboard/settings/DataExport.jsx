@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Search,
-  ChevronDown,
   FileText,
   Loader2,
   Cloud,
@@ -33,9 +32,10 @@ import { settingsApi } from '../../../lib/api/settings';
  * exactly as they were on the legacy page.
  */
 const SCOPE_TO_KIND = {
-  'Full Workspace': 'employees',
+  'Full Workspace': 'workspace',
   'Specific Projects': 'projects',
   'Financial Ledgers': 'ledger',
+  'Employee Directory': 'employees',
 };
 
 export default function SettingsDataExport() {
@@ -158,6 +158,7 @@ export default function SettingsDataExport() {
                       <SelectItem value="Full Workspace">Full Workspace</SelectItem>
                       <SelectItem value="Specific Projects">Specific Projects</SelectItem>
                       <SelectItem value="Financial Ledgers">Financial Ledgers</SelectItem>
+                      <SelectItem value="Employee Directory">Employee Directory</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

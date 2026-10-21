@@ -69,6 +69,11 @@ export const importEmployeeRowSchema = z.object({
   salary: decimalStringSchema.optional(),
   employeeNumber: boundedText(64).optional(),
   hiredAt: isoDateSchema.optional(),
+  bankRoutingNumber: boundedText(32).optional(),
+  bankAccountNumber: boundedText(32).optional(),
+  bankAccountType: boundedText(32).optional(),
+  bankIban: boundedText(40).optional(),
+  bankBic: boundedText(20).optional(),
 })
 
 export type ImportEmployeeRow = z.infer<typeof importEmployeeRowSchema>

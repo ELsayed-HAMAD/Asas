@@ -24,7 +24,7 @@ export interface ObjectStorage {
   sumPrefixSizes(prefix: string): Promise<number>
   copy(sourceKey: string, destinationKey: string, contentType: string): Promise<void>
   delete(key: string): Promise<void>
-  presignPut(key: string, contentType: string, expiresIn: number): Promise<string>
+  presignPut(key: string, contentType: string, expiresIn: number, maxBytes?: number): Promise<string>
   presignGet(key: string, contentType: string, disposition: string, expiresIn: number): Promise<string>
   close(): void
 }
@@ -161,7 +161,7 @@ export class LocalObjectStorage implements ObjectStorage {
     }
   }
 
-  async presignPut(): Promise<string> {
+  async presignPut(_key?: string, _contentType?: string, _expiresIn?: number, _maxBytes?: number): Promise<string> {
     throw new Error('Presigned uploads are available only when S3 object storage is configured')
   }
 
@@ -281,12 +281,17 @@ export class S3ObjectStorage implements ObjectStorage {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.config.bucket, Key: this.key(key) }))
   }
 
-  async presignPut(key: string, contentType: string, expiresIn: number): Promise<string> {
+  async presignPut(key: string, contentType: string, expiresIn: number, maxBytes?: number): Promise<string> {
+    const headers = new Set(['content-type'])
+    if (maxBytes !== undefined) {
+      headers.add('content-length')
+    }
     return getSignedUrl(this.client, new PutObjectCommand({
       Bucket: this.config.bucket,
       Key: this.key(key),
       ContentType: contentType,
-    }), { expiresIn, signableHeaders: new Set(['content-type']) })
+      ...(maxBytes !== undefined && { ContentLength: maxBytes }),
+    }), { expiresIn, signableHeaders: headers })
   }
 
   async presignGet(key: string, contentType: string, disposition: string, expiresIn: number): Promise<string> {

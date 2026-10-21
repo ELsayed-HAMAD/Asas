@@ -74,3 +74,70 @@ test('generateSepaForRun produces valid pain.001.001.03 XML with control sums', 
   assert.ok(result.xmlContent.includes('Pierre &amp; Marie'))
   assert.ok(result.xmlContent.includes('pain.001.001.03'))
 })
+
+test('generateNachaForRun uses real employee bank credentials when present', () => {
+  const run = { label: 'US Payroll', payDate: '2026-10-31', currency: 'USD' }
+  const lines = [
+    {
+      employeeId: 'emp_1',
+      employee: {
+        name: 'Ada Lovelace',
+        bankRoutingNumber: '021000021',
+        bankAccountNumber: '987654321',
+        bankAccountType: 'CHECKING',
+      },
+      net: '5000.00',
+    },
+  ]
+
+  const result = generateNachaForRun(run, lines, { name: 'Acme Inc', requireBankDetails: true })
+  assert.equal(result.entryCount, 1)
+  assert.equal(result.totalAmountCents, 500000n)
+  assert.ok(result.fileContent.includes('02100002'))
+  assert.ok(result.fileContent.includes('987654321'))
+})
+
+test('generateNachaForRun enforces requireBankDetails and throws descriptive error if missing', () => {
+  const run = { label: 'US Payroll', payDate: '2026-10-31', currency: 'USD' }
+  const lines = [
+    { employeeId: 'emp_1', employee: { name: 'Ada Lovelace' }, net: '5000.00' },
+  ]
+
+  assert.throws(
+    () => generateNachaForRun(run, lines, { requireBankDetails: true }),
+    /missing bank routing or account numbers: Ada Lovelace/,
+  )
+})
+
+test('generateSepaForRun uses real employee IBAN when present', () => {
+  const run = { label: 'Euro Payroll', payDate: '2026-10-31', currency: 'EUR' }
+  const lines = [
+    {
+      id: 'line_1',
+      employeeId: 'emp_1',
+      employee: {
+        name: 'Marie Curie',
+        bankIban: 'DE89370400440532013000',
+        bankBic: 'DEUTDEFF',
+      },
+      net: '4000.00',
+    },
+  ]
+
+  const result = generateSepaForRun(run, lines, { name: 'Acme EU', requireBankDetails: true })
+  assert.equal(result.transactionCount, 1)
+  assert.ok(result.xmlContent.includes('DE89370400440532013000'))
+  assert.ok(result.xmlContent.includes('DEUTDEFF'))
+})
+
+test('generateSepaForRun enforces requireBankDetails and throws descriptive error if missing', () => {
+  const run = { label: 'Euro Payroll', payDate: '2026-10-31', currency: 'EUR' }
+  const lines = [
+    { id: 'line_1', employeeId: 'emp_1', employee: { name: 'Marie Curie' }, net: '4000.00' },
+  ]
+
+  assert.throws(
+    () => generateSepaForRun(run, lines, { requireBankDetails: true }),
+    /missing IBAN: Marie Curie/,
+  )
+})

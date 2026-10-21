@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Search,
-  ChevronDown,
   Download,
   Share2,
   CheckCircle2,

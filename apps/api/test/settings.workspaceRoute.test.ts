@@ -24,13 +24,13 @@ async function setup(options: { role?: string; unauthenticated?: boolean } = {})
   } as unknown as Auth)
 
   const tx = {
+    $executeRawUnsafe: vi.fn().mockResolvedValue(1),
     journalLine: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     journalEntry: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     ledgerAccount: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     exchangeRate: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     invitation: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     member: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
-    session: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
     tenant: { delete: vi.fn().mockResolvedValue({ id: 'tenant_1' }) },
   }
 
@@ -40,6 +40,13 @@ async function setup(options: { role?: string; unauthenticated?: boolean } = {})
     },
     tenant: {
       findUnique: vi.fn().mockResolvedValue({ id: 'tenant_1' }),
+      update: vi.fn().mockResolvedValue({ id: 'tenant_1', status: 'ARCHIVED' }),
+    },
+    session: {
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    subscription: {
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     $transaction: vi.fn().mockImplementation(async (callback) => callback(tx)),
   } as unknown as PrismaClient

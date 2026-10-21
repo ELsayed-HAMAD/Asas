@@ -4,7 +4,11 @@ import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { createAccessControl, organization, twoFactor } from 'better-auth/plugins'
 import type { AsasEnv } from './config/env.js'
+import { invalidateAuthCacheForTenant, invalidateAuthCacheForUser } from './middlewares/rbac.js'
+import { closeStreamsForUser } from './plugins/sse.js'
+import { recordAuditLog } from './services/auditLog.js'
 import { emailVerificationHtml, invitationHtml, passwordResetHtml } from './services/authEmailTemplates.js'
+import { checkSeatEntitlement } from './services/entitlements.js'
 import { mailer } from './services/mailer.js'
 
 /**
@@ -28,6 +32,15 @@ import { mailer } from './services/mailer.js'
  * as the application's ERP permission map, while the app's RBAC preHandler continues to gate
  * business actions.
  */
+function maskEmail(email: string): string {
+  const parts = email.split('@')
+  const local = parts[0]
+  const domain = parts[1]
+  if (!local || !domain) return '***'
+  const visible = local.length > 2 ? `${local[0]}***${local.slice(-1)}` : '***'
+  return `${visible}@${domain}`
+}
+
 export function createAuth(prisma: PrismaClient, env: AsasEnv) {
   const ac = createAccessControl({
     organization: ['update', 'delete'],
@@ -59,6 +72,7 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
     database: prismaAdapter(prisma, { provider: 'postgresql' }),
     emailAndPassword: {
       enabled: true,
+      minPasswordLength: 12,
       requireEmailVerification: true,
       sendResetPassword: async (data: { user: { email: string; name?: string | null }; url: string }) => {
         try {
@@ -68,9 +82,9 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
             text: `Reset your password by visiting: ${data.url}`,
             html: passwordResetHtml(data.user.name, data.url),
           })
-          console.log(`[Auth] Password reset email sent for ${data.user.email}`)
+          console.log(`[Auth] Password reset email sent for ${maskEmail(data.user.email)}`)
         } catch (mailError) {
-          console.error(`[Auth] Failed to send password reset email for ${data.user.email}:`, mailError)
+          console.error(`[Auth] Failed to send password reset email for ${maskEmail(data.user.email)}:`, mailError)
           throw mailError
         }
       },
@@ -98,9 +112,9 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
             text: `Verify your email by visiting: ${verificationUrl}`,
             html: emailVerificationHtml(data.user.name, verificationUrl),
           })
-          console.log(`[Auth] Verification email sent for ${data.user.email}`)
+          console.log(`[Auth] Verification email sent for ${maskEmail(data.user.email)}`)
         } catch (mailError) {
-          console.error(`[Auth] Failed to send verification email for ${data.user.email}:`, mailError)
+          console.error(`[Auth] Failed to send verification email for ${maskEmail(data.user.email)}:`, mailError)
           throw mailError
         }
       },
@@ -142,7 +156,7 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
         roles: { OWNER: owner, ADMIN: admin, MEMBER: member },
         sendInvitationEmail: async (data: { id: string; email: string; role: string; organization?: { name: string } | null }) => {
           const frontendBase = (env.frontendOrigin.split(',')[0] ?? 'http://localhost:5173').trim()
-          const inviteUrl = `${frontendBase}/register?invitationId=${data.id}`
+          const inviteUrl = `${frontendBase}/accept-invitation?invitationId=${data.id}`
           const orgName = data.organization?.name || 'Workspace'
           await mailer.enqueue({
             to: data.email,
@@ -194,18 +208,58 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
         },
       },
       member: {
+        create: {
+          after: async (member: { id: string; userId: string; tenantId?: string; organizationId?: string; role: string }) => {
+            const tenantId = member.tenantId ?? member.organizationId
+            if (tenantId) {
+              try {
+                await recordAuditLog(prisma, {
+                  tenantId,
+                  actorId: member.userId,
+                  action: 'auth.member.joined',
+                  targetType: 'Member',
+                  targetId: member.id,
+                  metadata: { userId: member.userId, role: member.role },
+                })
+              } catch {
+                // Non-blocking audit
+              }
+            }
+          },
+        },
         delete: {
           before: async (member: { id?: string }) => {
             if (member?.id) {
               const existing = await prisma.member.findUnique({ where: { id: member.id } })
-              if (existing && existing.role === 'OWNER') {
-                const ownerCount = await prisma.member.count({
-                  where: { tenantId: existing.tenantId, role: 'OWNER' },
-                })
-                if (ownerCount <= 1) {
-                  throw new APIError('BAD_REQUEST', {
-                    message: 'Cannot remove the last owner of the workspace',
+              if (existing) {
+                if (existing.role === 'OWNER') {
+                  await prisma.$transaction(async (tx) => {
+                    const owners = await tx.$queryRaw<{ id: string }[]>`
+                      SELECT "id" FROM "Member"
+                      WHERE "tenantId" = ${existing.tenantId} AND "role" = 'OWNER'
+                      FOR UPDATE
+                    `
+                    if (owners.length <= 1) {
+                      throw new APIError('BAD_REQUEST', {
+                        message: 'Cannot remove the last owner of the workspace',
+                      })
+                    }
                   })
+                }
+                closeStreamsForUser(existing.userId)
+                invalidateAuthCacheForUser(existing.userId)
+                invalidateAuthCacheForTenant(existing.tenantId)
+                try {
+                  await recordAuditLog(prisma, {
+                    tenantId: existing.tenantId,
+                    actorId: existing.userId,
+                    action: 'auth.member.removed',
+                    targetType: 'Member',
+                    targetId: existing.id,
+                    metadata: { userId: existing.userId, role: existing.role },
+                  })
+                } catch {
+                  // Non-blocking audit
                 }
               }
             }
@@ -216,29 +270,92 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
           before: async (member: { id?: string; role?: string }) => {
             if (member?.id && member.role && member.role !== 'OWNER') {
               const existing = await prisma.member.findUnique({ where: { id: member.id } })
-              if (existing && existing.role === 'OWNER') {
-                const ownerCount = await prisma.member.count({
-                  where: { tenantId: existing.tenantId, role: 'OWNER' },
-                })
-                if (ownerCount <= 1) {
-                  throw new APIError('BAD_REQUEST', {
-                    message: 'Cannot demote the last owner of the workspace',
+              if (existing) {
+                if (existing.role === 'OWNER') {
+                  await prisma.$transaction(async (tx) => {
+                    const owners = await tx.$queryRaw<{ id: string }[]>`
+                      SELECT "id" FROM "Member"
+                      WHERE "tenantId" = ${existing.tenantId} AND "role" = 'OWNER'
+                      FOR UPDATE
+                    `
+                    if (owners.length <= 1) {
+                      throw new APIError('BAD_REQUEST', {
+                        message: 'Cannot demote the last owner of the workspace',
+                      })
+                    }
                   })
                 }
+                invalidateAuthCacheForUser(existing.userId)
+                invalidateAuthCacheForTenant(existing.tenantId)
               }
             }
             return { data: member }
+          },
+          after: async (member: { id: string; userId?: string; tenantId?: string; organizationId?: string; role?: string }) => {
+            const tenantId = member.tenantId ?? member.organizationId ?? (await prisma.member.findUnique({ where: { id: member.id }, select: { tenantId: true } }))?.tenantId
+            if (tenantId) {
+              try {
+                await recordAuditLog(prisma, {
+                  tenantId,
+                  actorId: member.userId ?? 'system',
+                  action: 'auth.member.role.updated',
+                  targetType: 'Member',
+                  targetId: member.id,
+                  metadata: { role: member.role },
+                })
+              } catch {
+                // Non-blocking audit
+              }
+            }
+          },
+        },
+      },
+      invitation: {
+        create: {
+          before: async (invitation: { tenantId?: string; organizationId?: string }) => {
+            const tenantId = invitation.tenantId ?? invitation.organizationId
+            if (tenantId) {
+              const seatCheck = await checkSeatEntitlement(prisma, tenantId)
+              if (!seatCheck.allowed) {
+                throw new APIError('BAD_REQUEST', {
+                  message: 'Workspace seat limit reached. Please upgrade your subscription plan to invite more members.',
+                })
+              }
+            }
+            return { data: invitation }
+          },
+          after: async (invitation: { id: string; tenantId?: string; organizationId?: string; email: string; role: string; inviterId?: string }) => {
+            const tenantId = invitation.tenantId ?? invitation.organizationId
+            if (tenantId) {
+              try {
+                await recordAuditLog(prisma, {
+                  tenantId,
+                  actorId: invitation.inviterId ?? 'system',
+                  action: 'auth.invitation.sent',
+                  targetType: 'Invitation',
+                  targetId: invitation.id,
+                  metadata: { email: invitation.email, role: invitation.role },
+                })
+              } catch {
+                // Non-blocking audit
+              }
+            }
           },
         },
       },
       tenant: {
         delete: {
           before: async (tenant: { id?: string }) => {
-            if (tenant?.id) {
-              await prisma.journalLine.deleteMany({ where: { entry: { tenantId: tenant.id } } })
-              await prisma.journalEntry.deleteMany({ where: { tenantId: tenant.id } })
-              await prisma.ledgerAccount.deleteMany({ where: { tenantId: tenant.id } })
-              await prisma.exchangeRate.deleteMany({ where: { tenantId: tenant.id } })
+            const tenantId = tenant?.id
+            if (tenantId) {
+              await prisma.$transaction(async (tx) => {
+                await tx.$executeRawUnsafe("SET LOCAL asas.allow_tenant_purge = 'on'")
+                await tx.journalLine.deleteMany({ where: { entry: { tenantId } } })
+                await tx.journalEntry.deleteMany({ where: { tenantId } })
+                await tx.ledgerAccount.deleteMany({ where: { tenantId } })
+                await tx.exchangeRate.deleteMany({ where: { tenantId } })
+              })
+              invalidateAuthCacheForTenant(tenantId)
             }
             return { data: tenant }
           },

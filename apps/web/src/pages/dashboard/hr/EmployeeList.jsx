@@ -55,7 +55,12 @@ const STATUS_LABELS = {
 
 // Stable fallback so effects/memos keyed on `employees` don't re-run every render.
 const EMPTY_EMPLOYEES = []
-const EMPTY_EMPLOYEE_FORM = { name: '', title: '', email: '', departmentId: '', salary: '', salaryBasis: '', salaryEffectiveFrom: '', hiredAt: '', employmentEndDate: '', status: 'ACTIVE', band: '', equityOptions: '' }
+const EMPTY_EMPLOYEE_FORM = {
+  name: '', title: '', email: '', departmentId: '', salary: '', salaryBasis: '',
+  salaryEffectiveFrom: '', hiredAt: '', employmentEndDate: '', status: 'ACTIVE',
+  band: '', equityOptions: '', bankRoutingNumber: '', bankAccountNumber: '',
+  bankAccountType: 'CHECKING', bankIban: '', bankBic: '',
+}
 
 // The API's Zod schemas reject empty strings for optional fields (`z.email()`, `min(1)`).
 
@@ -71,7 +76,12 @@ export default function EmployeeDirectory() {
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState(EMPTY_EMPLOYEE_FORM)
   const [editOpen, setEditOpen] = useState(false)
-  const [editForm, setEditForm] = useState({ name: '', title: '', email: '', location: '', departmentId: '', salary: '', salaryBasis: '', salaryEffectiveFrom: '', hiredAt: '', employmentEndDate: '', status: 'ACTIVE', band: '', equityOptions: '' })
+  const [editForm, setEditForm] = useState({
+    name: '', title: '', email: '', location: '', departmentId: '', salary: '',
+    salaryBasis: '', salaryEffectiveFrom: '', hiredAt: '', employmentEndDate: '',
+    status: 'ACTIVE', band: '', equityOptions: '', bankRoutingNumber: '',
+    bankAccountNumber: '', bankAccountType: 'CHECKING', bankIban: '', bankBic: '',
+  })
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deptModalOpen, setDeptModalOpen] = useState(false)
   const [newDeptName, setNewDeptName] = useState('')
@@ -136,7 +146,12 @@ export default function EmployeeDirectory() {
         employmentEndDate: form.employmentEndDate || null,
         status: form.status || 'ACTIVE',
         band: form.band || null,
-        equityOptions: form.equityOptions !== '' ? parseInt(form.equityOptions, 10) : null
+        equityOptions: form.equityOptions !== '' ? parseInt(form.equityOptions, 10) : null,
+        bankRoutingNumber: form.bankRoutingNumber || null,
+        bankAccountNumber: form.bankAccountNumber || null,
+        bankAccountType: form.bankAccountType || null,
+        bankIban: form.bankIban || null,
+        bankBic: form.bankBic || null,
       } })(createForm)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.hr.employees.all() })
@@ -159,7 +174,12 @@ export default function EmployeeDirectory() {
         employmentEndDate: form.employmentEndDate || null,
         status: form.status || 'ACTIVE',
         band: form.band || null,
-        equityOptions: form.equityOptions !== '' ? parseInt(form.equityOptions, 10) : null
+        equityOptions: form.equityOptions !== '' ? parseInt(form.equityOptions, 10) : null,
+        bankRoutingNumber: form.bankRoutingNumber || null,
+        bankAccountNumber: form.bankAccountNumber || null,
+        bankAccountType: form.bankAccountType || null,
+        bankIban: form.bankIban || null,
+        bankBic: form.bankBic || null,
       } })(editForm)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.hr.employees.all() })
@@ -510,6 +530,11 @@ export default function EmployeeDirectory() {
                             status: selected.status || 'ACTIVE',
                             band: selected.band || '',
                             equityOptions: selected.equityOptions ?? '',
+                            bankRoutingNumber: selected.bankRoutingNumber || '',
+                            bankAccountNumber: selected.bankAccountNumber || '',
+                            bankAccountType: selected.bankAccountType || 'CHECKING',
+                            bankIban: selected.bankIban || '',
+                            bankBic: selected.bankBic || '',
                           })
                           setEditOpen(true)
                         }}
@@ -721,6 +746,59 @@ export default function EmployeeDirectory() {
             <p className="self-center text-xs text-muted">Last eligible paid day. Leave blank while employment is ongoing.</p>
             <p className="col-span-2 -mt-2 text-xs text-muted">If no basis is saved, the payroll run will ask you to confirm one before pricing the run.</p>
           </div>
+          <div className="pt-2 border-t border-border-subtle">
+            <p className="text-xs font-semibold text-heading mb-2">Bank & Payment Details (Direct Deposit / SEPA)</p>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block text-xs font-medium text-body">
+                <span className="mb-1 block">ABA Routing Number</span>
+                <Input
+                  placeholder="9-digit routing"
+                  maxLength={9}
+                  value={editForm.bankRoutingNumber}
+                  onChange={e => setEditForm(c => ({ ...c, bankRoutingNumber: e.target.value }))}
+                />
+              </label>
+              <label className="block text-xs font-medium text-body">
+                <span className="mb-1 block">Account Number</span>
+                <Input
+                  placeholder="Bank account number"
+                  value={editForm.bankAccountNumber}
+                  onChange={e => setEditForm(c => ({ ...c, bankAccountNumber: e.target.value }))}
+                />
+              </label>
+              <div>
+                <label className="block text-xs font-medium text-body mb-1">Account Type</label>
+                <Select
+                  value={editForm.bankAccountType || 'CHECKING'}
+                  onValueChange={val => setEditForm(c => ({ ...c, bankAccountType: val }))}
+                >
+                  <SelectTrigger className="w-full bg-surface-raised">
+                    <SelectValue placeholder="Checking" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CHECKING">Checking</SelectItem>
+                    <SelectItem value="SAVINGS">Savings</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <label className="block text-xs font-medium text-body">
+                <span className="mb-1 block">IBAN (SEPA / International)</span>
+                <Input
+                  placeholder="e.g. DE89..."
+                  value={editForm.bankIban}
+                  onChange={e => setEditForm(c => ({ ...c, bankIban: e.target.value }))}
+                />
+              </label>
+              <label className="block text-xs font-medium text-body col-span-2">
+                <span className="mb-1 block">BIC / SWIFT</span>
+                <Input
+                  placeholder="e.g. DEUTDEFF"
+                  value={editForm.bankBic}
+                  onChange={e => setEditForm(c => ({ ...c, bankBic: e.target.value }))}
+                />
+              </label>
+            </div>
+          </div>
         </div>
       </FormDialog>
       <FormDialog open={createOpen} onClose={() => setCreateOpen(false)} title="Add employee" subtitle="Create an employee profile." busy={createMutation.isPending} onConfirm={() => createMutation.mutate()} confirmLabel="Add employee">
@@ -803,6 +881,60 @@ export default function EmployeeDirectory() {
               <span className="mb-1 block">Equity</span>
               <Input type="number" value={createForm.equityOptions} onChange={e => setCreateForm(c => ({ ...c, equityOptions: e.target.value }))} />
             </label>
+          </div>
+
+          <div className="pt-2 border-t border-border-subtle">
+            <p className="text-xs font-semibold text-heading mb-2">Bank & Payment Details (Direct Deposit / SEPA)</p>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block text-xs font-medium text-body">
+                <span className="mb-1 block">ABA Routing Number</span>
+                <Input
+                  placeholder="9-digit routing"
+                  maxLength={9}
+                  value={createForm.bankRoutingNumber}
+                  onChange={e => setCreateForm(c => ({ ...c, bankRoutingNumber: e.target.value }))}
+                />
+              </label>
+              <label className="block text-xs font-medium text-body">
+                <span className="mb-1 block">Account Number</span>
+                <Input
+                  placeholder="Bank account number"
+                  value={createForm.bankAccountNumber}
+                  onChange={e => setCreateForm(c => ({ ...c, bankAccountNumber: e.target.value }))}
+                />
+              </label>
+              <div>
+                <label className="block text-xs font-medium text-body mb-1">Account Type</label>
+                <Select
+                  value={createForm.bankAccountType || 'CHECKING'}
+                  onValueChange={val => setCreateForm(c => ({ ...c, bankAccountType: val }))}
+                >
+                  <SelectTrigger className="w-full bg-surface-raised">
+                    <SelectValue placeholder="Checking" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CHECKING">Checking</SelectItem>
+                    <SelectItem value="SAVINGS">Savings</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <label className="block text-xs font-medium text-body">
+                <span className="mb-1 block">IBAN (SEPA / International)</span>
+                <Input
+                  placeholder="e.g. DE89..."
+                  value={createForm.bankIban}
+                  onChange={e => setCreateForm(c => ({ ...c, bankIban: e.target.value }))}
+                />
+              </label>
+              <label className="block text-xs font-medium text-body col-span-2">
+                <span className="mb-1 block">BIC / SWIFT</span>
+                <Input
+                  placeholder="e.g. DEUTDEFF"
+                  value={createForm.bankBic}
+                  onChange={e => setCreateForm(c => ({ ...c, bankBic: e.target.value }))}
+                />
+              </label>
+            </div>
           </div>
 
         </div>

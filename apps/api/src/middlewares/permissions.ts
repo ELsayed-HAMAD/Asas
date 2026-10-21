@@ -30,9 +30,9 @@ export const PERMISSIONS = {
   'employee.delete': 'ADMIN',
   'department.write': 'ADMIN',
   'department.delete': 'ADMIN',
-  // Candidates — adding a candidate and moving its stage (including uploading a CV) are writes
-  // to the recruitment pipeline, gated the same as the other module writes. Reads are open to
-  // any MEMBER (requireRole in the route).
+  // Candidates — recruitment pipeline reads/writes plus the CV (resume) surface.
+  // Gated to ADMIN/OWNER to protect confidential applicant PII (Finding 25).
+  'candidate.read': 'ADMIN',
   'candidate.write': 'ADMIN',
   'candidate.export': 'ADMIN',
 

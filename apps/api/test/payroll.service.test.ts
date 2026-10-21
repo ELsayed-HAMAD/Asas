@@ -134,6 +134,20 @@ function stubPrisma(options: StubOptions = {}) {
       }),
     },
     payrollTaxLine: { deleteMany: async () => {}, createMany: async ({ data }: { data: Row[] }) => { options.onTaxBatch?.(data) } },
+    member: { count: async () => 2 },
+    journalEntry: {
+      findFirst: async () => null,
+      create: async ({ data }: { data: Row }) => ({ id: 'entry_1', ...data }),
+    },
+    exchangeRate: {
+      findFirst: async () => null,
+    },
+    ledgerAccount: {
+      upsert: async ({ create }: { create: Row }) => ({ id: `acc_${create.code}`, ...create }),
+    },
+    journalLine: {
+      createMany: async () => ({ count: 2 }),
+    },
     $queryRaw: async (strings: TemplateStringsArray) => {
       if (strings.join('').includes('SettlementHistoryCoverage')) return [{ currentTotal: null, previousTotal: null }]
       return currentRun ? [{ id: RUN_ID }] : []
@@ -258,12 +272,47 @@ describe('payroll.service', () => {
     ).rejects.toThrow(/base salary/)
   })
 
+  it('prices a line for an employee with base salary when salary history is empty (import fallback)', async () => {
+    let lineBatch: Row[] = []
+    await createPayrollRun(stubPrisma({
+      salaryHistory: [],
+      onLineBatch: rows => { lineBatch = rows },
+    }), TENANT, {
+      ...PERIOD, label: 'Imported pay', taxRates: [{ label: 'Pension', rate: '10' }], employeeIds: ['emp_1'],
+    })
+    expect(lineBatch).toHaveLength(1)
+    expect(lineBatch[0].employeeId).toBe('emp_1')
+    expect(lineBatch[0].baseSalary).toBe('8333.33')
+  })
+
   it('approves a PENDING run, and is 409-loud (not a silent no-op) when already approved', async () => {
     const approved = await approvePayrollRun(stubPrisma(), TENANT, RUN_ID)
     expect(approved.status).toBe('APPROVED')
 
     const already = stubPrisma({ payrollRunFindFirst: runRow('APPROVED') })
     await expect(approvePayrollRun(already, TENANT, RUN_ID)).rejects.toThrow(/cannot be approved/)
+  })
+
+  it('enforces maker-checker policy: rejects self-approval when createdById matches approverId', async () => {
+    const run = { ...runRow('PENDING'), createdById: 'user_maker_1' }
+    const prisma = stubPrisma({ payrollRunFindFirst: run })
+    await expect(
+      approvePayrollRun(prisma, TENANT, RUN_ID, 'user_maker_1'),
+    ).rejects.toThrow(/Maker-checker policy violation/)
+  })
+
+  it('allows approval when checker is different from maker', async () => {
+    const run = { ...runRow('PENDING'), createdById: 'user_maker_1' }
+    const prisma = stubPrisma({ payrollRunFindFirst: run })
+    const approved = await approvePayrollRun(prisma, TENANT, RUN_ID, 'user_checker_2')
+    expect(approved.status).toBe('APPROVED')
+  })
+
+  it('allows self-approval when allowSelfApproval option is explicitly passed', async () => {
+    const run = { ...runRow('PENDING'), createdById: 'user_maker_1' }
+    const prisma = stubPrisma({ payrollRunFindFirst: run })
+    const approved = await approvePayrollRun(prisma, TENANT, RUN_ID, 'user_maker_1', { allowSelfApproval: true })
+    expect(approved.status).toBe('APPROVED')
   })
 
   it('refuses to adjust a line on an approved run', async () => {

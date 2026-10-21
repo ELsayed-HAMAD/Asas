@@ -207,6 +207,8 @@ export async function buildApp(
     // a client can log "request X" and match it against the server's `reqId` field.
     requestIdHeader: false,
     genReqId: req => resolveRequestId(req.headers['x-request-id']),
+    // Trust loopback and private container subnets behind reverse proxy to prevent rate-limit collapse (Finding 1)
+    trustProxy: environment.isProduction ? true : ['127.0.0.1', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'],
   }).withTypeProvider<ZodTypeProvider>()
 
   const objectStorage = options.objectStorage ?? createObjectStorage({
@@ -282,9 +284,9 @@ export async function buildApp(
       info: { title: 'Asas API', version: '1.0.0' },
       components: {
         securitySchemes: {
-          // better-auth's default session cookie name — the doc must name the cookie the
-          // browser actually sends or "Try it out" can never authenticate.
+          // better-auth session cookies (standard HTTP and HTTPS __Secure- prefix)
           cookieAuth: { type: 'apiKey', in: 'cookie', name: 'better-auth.session_token' },
+          secureCookieAuth: { type: 'apiKey', in: 'cookie', name: '__Secure-better-auth.session_token' },
         },
       },
     },
@@ -375,7 +377,7 @@ export async function buildApp(
   app.get(
     '/ready',
     {
-      config: { rateLimit: false },
+      config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
       schema: {
         response: {
           200: readyResponseSchema,
@@ -403,6 +405,7 @@ export async function buildApp(
             },
           }
         } catch (err) {
+          request.log.error({ err, reqId: request.id }, 'Ready probe failed: database connectivity error')
           reply.code(503)
           return {
             data: {
@@ -412,7 +415,7 @@ export async function buildApp(
               objectStorage: objectStorage.mode,
               uptime,
               timestamp: now,
-              error: err instanceof Error ? err.message : 'Database ping failed',
+              ...(environment.isProduction ? {} : { error: err instanceof Error ? err.message : 'Database ping failed' }),
             },
           }
         }

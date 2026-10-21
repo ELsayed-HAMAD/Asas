@@ -584,7 +584,18 @@ export type FinanceOverviewQuery = z.infer<typeof financeOverviewQuerySchema>
 
 // ── Posted cash settlement journals ─────────────────────────────────────────
 
-export const journalSourceTypeSchema = z.enum(['AP_PAYMENT', 'AR_COLLECTION', 'PAYROLL_PAYMENT', 'EXPENSE_REIMBURSEMENT', 'SETTLEMENT_REVERSAL', 'AP_RECOGNITION', 'AR_RECOGNITION', 'OPENING_BALANCE'])
+export const journalSourceTypeSchema = z.enum([
+  'AP_PAYMENT',
+  'AR_COLLECTION',
+  'PAYROLL_PAYMENT',
+  'EXPENSE_REIMBURSEMENT',
+  'SETTLEMENT_REVERSAL',
+  'AP_RECOGNITION',
+  'AR_RECOGNITION',
+  'PAYROLL_RECOGNITION',
+  'EXPENSE_RECOGNITION',
+  'OPENING_BALANCE',
+])
 export const journalSideSchema = z.enum(['DEBIT', 'CREDIT'])
 export const journalCurrencyProvenanceSchema = z.enum(['DOCUMENT', 'WORKSPACE_FALLBACK', 'MANUAL_BASE'])
 
