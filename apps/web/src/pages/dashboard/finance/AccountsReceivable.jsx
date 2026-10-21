@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Search, Send, ChevronDown,
   FileText, Paperclip, Phone,
@@ -52,6 +53,14 @@ export default function AccountsReceivable() {
   const [oldestFirst, setOldestFirst] = useState(true)
   const [paymentTargetId, setPaymentTargetId] = useState(null)
   const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+  const [newInvoiceCustomerId, setNewInvoiceCustomerId] = useState('');
+  const [newInvoiceNumber, setNewInvoiceNumber] = useState('');
+  const [newInvoiceAmount, setNewInvoiceAmount] = useState('');
+  const [newInvoiceDueDate, setNewInvoiceDueDate] = useState('');
+  const [newInvoiceError, setNewInvoiceError] = useState('');
+
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerEmail, setNewCustomerEmail] = useState('');
@@ -81,6 +90,41 @@ export default function AccountsReceivable() {
   const { data: customersData } = useQuery({
     queryKey: [...queryKeys.finance.all(), 'customers'],
     queryFn: financeApi.listCustomers,
+  });
+
+  React.useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setInvoiceModalOpen(true);
+      if (!newInvoiceNumber) {
+        setNewInvoiceNumber(`INV-${Date.now().toString().slice(-6)}`);
+      }
+      if (!newInvoiceDueDate) {
+        const d = new Date();
+        d.setDate(d.getDate() + 30);
+        setNewInvoiceDueDate(d.toISOString().slice(0, 10));
+      }
+    }
+  }, [searchParams]);
+
+  const createInvoiceMutation = useMutation({
+    mutationFn: (body) => financeApi.createReceivable(body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.finance.receivables.all() });
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.finance.all(), 'customers'] });
+      setInvoiceModalOpen(false);
+      setNewInvoiceAmount('');
+      setNewInvoiceNumber('');
+      setNewInvoiceDueDate('');
+      setNewInvoiceError('');
+      if (searchParams.get('new') === '1') {
+        const next = new URLSearchParams(searchParams);
+        next.delete('new');
+        setSearchParams(next, { replace: true });
+      }
+    },
+    onError: (err) => {
+      setNewInvoiceError(err?.message || 'Failed to issue receivable invoice.');
+    },
   });
   const paymentMutation = useMutation({
     mutationFn: (invoiceId) => financeApi.updateReceivableStatus(invoiceId, 'PAID'),
@@ -282,7 +326,7 @@ export default function AccountsReceivable() {
 
         {/* Right group */}
         <div className="flex items-center gap-2.5 shrink-0 ml-auto">
-          <Button 
+          <Button
             type="button"
             variant="outline"
             size="sm"
@@ -293,7 +337,7 @@ export default function AccountsReceivable() {
             {batchRemindMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
             <span>Send Batch Reminders ({selectedIds.size})</span>
           </Button>
-          <Button 
+          <Button
             type="button"
             variant="outline"
             size="sm"
@@ -303,6 +347,26 @@ export default function AccountsReceivable() {
           >
             <Users size={13} className="text-muted" />
             <span>Customers</span>
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              setNewInvoiceError('');
+              if (!newInvoiceNumber) setNewInvoiceNumber(`INV-${Date.now().toString().slice(-6)}`);
+              if (!newInvoiceDueDate) {
+                const d = new Date();
+                d.setDate(d.getDate() + 30);
+                setNewInvoiceDueDate(d.toISOString().slice(0, 10));
+              }
+              if (selectedId && !newInvoiceCustomerId) setNewInvoiceCustomerId(selectedId);
+              setInvoiceModalOpen(true);
+            }}
+            className="gap-1.5 font-medium h-9 bg-primary text-on-primary hover:bg-primary-hover shadow-sm cursor-pointer"
+            title="Create new customer invoice"
+          >
+            <Plus size={14} />
+            <span>New Invoice</span>
           </Button>
         </div>
       </div>
@@ -900,6 +964,143 @@ export default function AccountsReceivable() {
                 Close
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── New Invoice Modal ── */}
+      {invoiceModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in-50">
+          <div className="w-full max-w-md rounded-card border border-border-default bg-surface-raised p-6 shadow-elevated">
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-border-subtle">
+              <h2 className="text-base font-bold text-heading">New Receivable Invoice</h2>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={() => setInvoiceModalOpen(false)}
+                className="h-7 w-7 text-muted hover:bg-surface-muted"
+              >
+                <X size={16} />
+              </Button>
+            </div>
+
+            {newInvoiceError && (
+              <Alert variant="destructive" className="mb-4 py-2 px-3 text-xs">
+                <AlertDescription>{newInvoiceError}</AlertDescription>
+              </Alert>
+            )}
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newInvoiceCustomerId) {
+                  setNewInvoiceError('Please select or specify a customer.');
+                  return;
+                }
+                const numAmount = parseFloat(newInvoiceAmount);
+                if (isNaN(numAmount) || numAmount <= 0) {
+                  setNewInvoiceError('Please enter a valid invoice amount greater than zero.');
+                  return;
+                }
+                createInvoiceMutation.mutate({
+                  customerId: newInvoiceCustomerId,
+                  number: newInvoiceNumber.trim() || undefined,
+                  amount: numAmount.toFixed(2),
+                  dueDate: newInvoiceDueDate ? new Date(newInvoiceDueDate).toISOString() : undefined,
+                });
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div>
+                <label className="block font-medium text-body mb-1">Customer</label>
+                {(customersData?.items ?? []).length > 0 ? (
+                  <select
+                    value={newInvoiceCustomerId}
+                    onChange={(e) => setNewInvoiceCustomerId(e.target.value)}
+                    className="w-full h-9 rounded-input border border-border-default bg-surface-raised px-3 text-xs text-body focus:outline-none focus:border-primary"
+                    required
+                  >
+                    <option value="">Select a customer...</option>
+                    {(customersData?.items ?? []).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.email ? `(${c.email})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="p-3 bg-warning-light border border-warning/20 rounded-md text-warning-text text-xs">
+                    <span>No customers found. </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInvoiceModalOpen(false);
+                        setCustomerModalOpen(true);
+                      }}
+                      className="underline font-semibold"
+                    >
+                      Add a customer first
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block font-medium text-body mb-1">Invoice Number</label>
+                <Input
+                  type="text"
+                  placeholder="e.g. INV-2026-001"
+                  value={newInvoiceNumber}
+                  onChange={(e) => setNewInvoiceNumber(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium text-body mb-1">Invoice Amount</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="e.g. 2500.00"
+                  value={newInvoiceAmount}
+                  onChange={(e) => setNewInvoiceAmount(e.target.value)}
+                  className="h-9 text-xs"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium text-body mb-1">Due Date</label>
+                <Input
+                  type="date"
+                  value={newInvoiceDueDate}
+                  onChange={(e) => setNewInvoiceDueDate(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-border-subtle">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setInvoiceModalOpen(false)}
+                  disabled={createInvoiceMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={createInvoiceMutation.isPending || (customersData?.items ?? []).length === 0}
+                  className="gap-1.5"
+                >
+                  {createInvoiceMutation.isPending && <Loader2 size={13} className="animate-spin" />}
+                  <span>Issue Invoice</span>
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

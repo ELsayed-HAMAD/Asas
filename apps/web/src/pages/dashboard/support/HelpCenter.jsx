@@ -84,7 +84,7 @@ export default function SupportDashboard() {
     : allTickets
 
   return (
-    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
+    <div className="flex-1 min-h-0 min-w-0 flex flex-col bg-surface overflow-hidden relative">
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
@@ -100,7 +100,7 @@ export default function SupportDashboard() {
         </div>
       </TopBarActions>
 
-      <div className="flex flex-1 items-start justify-center p-4 sm:p-8 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 flex items-start justify-center relative">
         <div className="w-full max-w-2xl rounded-card-sm border border-border-default bg-surface-raised p-5 sm:p-8 text-center shadow-card space-y-6">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-card-sm border border-border-subtle bg-surface-muted text-body-light">
             <Headset size={22} />

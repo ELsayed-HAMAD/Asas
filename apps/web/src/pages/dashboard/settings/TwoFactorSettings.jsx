@@ -128,7 +128,7 @@ export default function TwoFactorSettings() {
       </div>
 
       <p className="rounded-input border border-border-default bg-surface-muted p-3 text-sm text-body">
-        Google, Microsoft, and GitHub sign-ins use the security controls configured with those identity providers. Asas TOTP verification applies to email and password sign-ins.
+        Google and Apple sign-ins use the security controls configured with those identity providers. Asas authenticator verification applies to email and password sign-ins.
       </p>
 
       {error && (

@@ -137,21 +137,16 @@ export default function AcceptInvitation() {
         throw new Error(res.error.message || 'Failed to create your account.')
       }
 
-      // Automatically accept the invitation
-      const acceptRes = await authClient.organization.acceptInvitation({ invitationId })
-      if (acceptRes?.error) {
-        throw new Error(acceptRes.error.message || 'Account created, but failed to accept workspace invitation.')
-      }
-
-      const orgId = invitation?.organizationId || acceptRes?.data?.organizationId
-      if (orgId) {
-        localStorage.setItem('asas.lastActiveOrgId', orgId)
-        await authClient.organization.setActive({ organizationId: orgId })
-      }
-
-      navigate('/dashboard', { replace: true })
+      // Email/password accounts must verify their address before Better Auth creates a session.
+      // Keep the invite callback through verification; acceptance happens when the user returns.
+      const callbackURL = `${window.location.origin}/accept-invitation?invitationId=${encodeURIComponent(invitationId)}`
+      const verifyQuery = new URLSearchParams({ email: targetEmail, callbackURL })
+      navigate(`/verify-email?${verifyQuery.toString()}`, {
+        replace: true,
+        state: { email: targetEmail, callbackURL, invitationId },
+      })
     } catch (err) {
-      setActionError(err?.message || 'Failed to complete registration.')
+      setActionError(err?.message || 'Failed to create your account. The invitation is unchanged and you can retry.')
       setActionLoading(false)
     }
   }
@@ -307,7 +302,7 @@ export default function AcceptInvitation() {
             </Alert>
           ) : (
             <div className="flex items-center gap-2 p-3 bg-surface-muted/50 rounded-card-sm text-xs text-muted mb-2">
-              <UserCheck size={16} className="text-emerald-600 flex-shrink-0" />
+              <UserCheck size={16} className="text-success flex-shrink-0" />
               <span>
                 Signed in as <strong className="text-heading font-medium">{session.user.email}</strong>
               </span>

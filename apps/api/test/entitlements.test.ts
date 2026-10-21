@@ -1,86 +1,64 @@
-import type { PrismaClient } from '@prisma/client'
+import type { PrismaClient, Subscription } from '@prisma/client'
+import { PLATFORM_PLANS } from '@asas/contracts'
 import { describe, expect, it } from 'vitest'
 import {
-  assertSubscriptionActive,
   checkSeatEntitlement,
   checkStorageEntitlement,
+  resolveEffectivePlanLimits,
 } from '../src/services/entitlements.js'
+import type { ObjectStorage } from '../src/services/objectStorage.js'
 
-describe('Finding 19: Subscription Entitlements Enforcement', () => {
-  it('allows invitation when seats are within plan limit', async () => {
+const freePlan = PLATFORM_PLANS.find(plan => plan.id === 'free')!
+
+describe('plan entitlements', () => {
+  it('uses the Free plan when a workspace has no subscription record', async () => {
     const prisma = {
-      subscription: {
-        findFirst: async () => ({ seatLimit: 10 }),
-      },
-      member: {
-        count: async () => 4,
-      },
-      invitation: {
-        count: async () => 2,
-      },
+      subscription: { findMany: async () => [] },
+      member: { count: async () => 3 },
+      invitation: { count: async () => 1 },
     } as unknown as PrismaClient
 
     const result = await checkSeatEntitlement(prisma, 'tenant_1')
-    expect(result.allowed).toBe(true)
-    expect(result.seatsUsed).toBe(6)
-    expect(result.seatLimit).toBe(10)
+    expect(result).toEqual({ allowed: true, seatsUsed: 4, seatLimit: freePlan.seatLimit })
   })
 
-  it('rejects invitation when seats exceed plan limit', async () => {
+  it('counts pending invitations when enforcing the Free seat limit', async () => {
     const prisma = {
-      subscription: {
-        findFirst: async () => ({ seatLimit: 5 }),
-      },
-      member: {
-        count: async () => 4,
-      },
-      invitation: {
-        count: async () => 1,
-      },
+      subscription: { findMany: async () => [] },
+      member: { count: async () => 4 },
+      invitation: { count: async () => 1 },
     } as unknown as PrismaClient
 
     const result = await checkSeatEntitlement(prisma, 'tenant_1')
-    expect(result.allowed).toBe(false)
-    expect(result.seatsUsed).toBe(5)
-    expect(result.seatLimit).toBe(5)
+    expect(result).toEqual({ allowed: false, seatsUsed: 5, seatLimit: freePlan.seatLimit })
   })
 
-  it('evaluates storage quota accurately', async () => {
-    const prisma = {
-      subscription: {
-        findFirst: async () => ({ storageLimitGb: 1 }),
-      },
-      exportJob: {
-        count: async () => 5,
-      },
-      candidate: {
-        count: async () => 10,
-      },
-    } as unknown as PrismaClient
+  it('measures tenant object bytes and includes the proposed write', async () => {
+    const prisma = { subscription: { findMany: async () => [] } } as unknown as PrismaClient
+    const storage = {
+      sumPrefixSizes: async () => 2_000,
+    } as unknown as ObjectStorage
 
-    const result = await checkStorageEntitlement(prisma, 'tenant_1')
+    const result = await checkStorageEntitlement(prisma, storage, 'tenant_1', 1_000)
     expect(result.allowed).toBe(true)
-    expect(result.storageLimitGb).toBe(1)
+    expect(result.storageUsedGb).toBe(0)
+    expect(result.storageLimitGb).toBe(freePlan.storageLimitGb)
   })
 
-  it('rejects write actions on canceled subscriptions with 402 Payment Required', async () => {
-    const prisma = {
-      subscription: {
-        findFirst: async () => ({ status: 'CANCELED' }),
-      },
-    } as unknown as PrismaClient
+  it('falls back to Free when the paid subscription is canceled', () => {
+    const canceledPaid = {
+      status: 'CANCELED',
+      stripeSubscriptionId: 'sub_paid',
+      planName: 'Professional Scale',
+      seatLimit: 50,
+      storageLimitGb: 100,
+    } as unknown as Subscription
 
-    await expect(assertSubscriptionActive(prisma, 'tenant_1')).rejects.toThrow(/subscription is inactive/i)
-  })
-
-  it('allows actions during active trial or active subscription', async () => {
-    const prisma = {
-      subscription: {
-        findFirst: async () => ({ status: 'ACTIVE' }),
-      },
-    } as unknown as PrismaClient
-
-    await expect(assertSubscriptionActive(prisma, 'tenant_1')).resolves.toBeUndefined()
+    expect(resolveEffectivePlanLimits([canceledPaid])).toMatchObject({
+      planName: freePlan.name,
+      seatLimit: freePlan.seatLimit,
+      storageLimitGb: freePlan.storageLimitGb,
+      source: 'free-fallback',
+    })
   })
 })
-

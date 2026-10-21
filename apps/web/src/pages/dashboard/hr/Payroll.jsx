@@ -227,7 +227,7 @@ export default function Payroll() {
   const allRecords = run?.lines ?? []
   const records = departmentFilter === 'ALL'
     ? allRecords
-    : allRecords.filter(r => (r.employee?.title || '').toLowerCase().includes(departmentFilter.toLowerCase()))
+    : allRecords.filter(r => r.employee?.departmentName === departmentFilter)
   const money = value => formatMoney(value, run?.currency ? { currency: run.currency } : {})
   const compactMoney = value => formatCompactTableMoney(value, run?.currency ? { currency: run.currency } : {})
   const metricFontSize = value => {
@@ -676,10 +676,13 @@ export default function Payroll() {
                   </Button>
                 </div>
               </div>
-              <label className="flex items-center gap-1.5 text-xs font-medium text-muted cursor-pointer hover:text-body transition-colors shrink-0">
-                <Checkbox defaultChecked disabled className="opacity-100" />
-                <span>Auto-Calculate</span>
-              </label>
+              <span
+                title="Payroll line amounts are priced from saved salary and tax inputs when a run is created."
+                className="flex items-center gap-1.5 text-xs font-medium text-muted shrink-0"
+              >
+                <Calculator size={14} className="text-accent" />
+                <span>Auto-priced on creation</span>
+              </span>
             </div>
             <p className="mt-1 text-[11px] text-muted flex items-center gap-1.5 truncate">
               <span className="shrink-0 font-medium text-heading">Pay date {activeRun?.payDate ? formatDate(activeRun.payDate) : '—'}</span>

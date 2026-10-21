@@ -88,6 +88,7 @@ export const payrollLineSchema = z.object({
     id: idSchema,
     name: z.string(),
     title: z.string(),
+    departmentName: z.string().nullable(),
     bankRoutingNumber: z.string().nullable().optional(),
     bankAccountNumber: z.string().nullable().optional(),
     bankAccountType: z.string().nullable().optional(),

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { MailCheck, ExternalLink, Loader2, CheckCircle2, ArrowRight, RefreshCw, AlertCircle } from 'lucide-react'
 import { authClient, useSession, signOut } from '../../lib/authClient'
+import { getSafeAuthCallbackPath } from '../../lib/authRedirect'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
 import { Alert, AlertDescription } from '../../components/ui/alert'
@@ -33,6 +34,12 @@ export default function VerifyEmail() {
 
   const searchParams = new URLSearchParams(location.search)
   const email = location.state?.email || searchParams.get('email') || session?.user?.email || ''
+  const callbackPath = getSafeAuthCallbackPath(
+    location.state?.callbackURL || searchParams.get('callbackURL'),
+    window.location.origin,
+  )
+  const callbackURL = `${window.location.origin}${callbackPath}`
+  const isInvitationFlow = callbackPath.startsWith('/accept-invitation?')
   const provider = getMailProvider(email)
 
   const [isResending, setIsResending] = useState(false)
@@ -60,7 +67,7 @@ export default function VerifyEmail() {
     try {
       const result = await authClient.sendVerificationEmail({
         email,
-        callbackURL: `${window.location.origin}/dashboard`,
+        callbackURL,
       })
 
       if (result?.error) {
@@ -96,7 +103,7 @@ export default function VerifyEmail() {
         {provider.name === 'Gmail' ? 'Confirm your Gmail' : 'Confirm your email'}
       </h1>
       <p className="text-sm text-muted mb-4">
-        A confirmation email has been sent to activate your account. Please confirm your email using {provider.name}, then proceed to onboarding.
+        A confirmation email has been sent to activate your account. Confirm your email, then Asas will return you to {isInvitationFlow ? 'the workspace invitation' : 'workspace setup'}.
       </p>
 
       {/* Email pill */}
@@ -164,10 +171,10 @@ export default function VerifyEmail() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate('/onboarding')}
+            onClick={() => navigate(callbackPath)}
             className="w-full h-10 font-medium"
           >
-            <span>Continue to Onboarding</span>
+            <span>{isInvitationFlow ? 'Continue to Invitation' : 'Continue to Workspace Setup'}</span>
             <ArrowRight size={15} />
           </Button>
         ) : (

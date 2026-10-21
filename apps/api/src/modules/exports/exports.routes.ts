@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client'
+import { Prisma, type PrismaClient } from '@prisma/client'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import {
@@ -16,8 +16,7 @@ import { requireAuthContext, requireRole } from '../../middlewares/rbac.js'
 import { requirePermission } from '../../middlewares/permissions.js'
 import { moduleKeyPrefix } from '../../plugins/sse.js'
 import { recordAuditLog } from '../../services/auditLog.js'
-import { assertSubscriptionActive } from '../../services/entitlements.js'
-import { exportFileExtension, type ExportHandler } from '../../services/queue.js'
+import { exportContentType, exportFileExtension, type ExportHandler } from '../../services/queue.js'
 import { exportObjectKey } from '../../services/objectStorage.js'
 import { renderEmployeeDirectoryXlsx, renderLedgerXlsx, renderProjectsXlsx } from '../../services/export.js'
 import type { EmployeeDirectoryRow, LedgerRow, ProjectExportRow } from '../../services/export.js'
@@ -190,61 +189,109 @@ async function buildProjects(prisma: PrismaClient, tenantId: string): Promise<Bu
   return renderProjectsXlsx(rows)
 }
 
-/** Full workspace snapshot archive containing all modules and schema manifests in structured JSON. */
-async function buildWorkspaceArchive(prisma: PrismaClient, tenantId: string): Promise<Buffer> {
-  const [
-    tenant,
-    members,
-    departments,
-    employees,
-    projects,
-    customers,
-    payableInvoices,
-    receivableInvoices,
-    journalEntries,
-  ] = await Promise.all([
-    prisma.tenant.findUnique({ where: { id: tenantId } }),
-    prisma.member.findMany({ where: { tenantId }, select: { id: true, userId: true, role: true, createdAt: true } }),
-    prisma.department.findMany({ where: { tenantId } }),
-    prisma.employee.findMany({ where: { tenantId } }),
-    prisma.project.findMany({ where: { tenantId } }),
-    prisma.customer.findMany({ where: { tenantId } }),
-    prisma.payableInvoice.findMany({ where: { tenantId } }),
-    prisma.receivableInvoice.findMany({ where: { tenantId } }),
-    prisma.journalEntry.findMany({ where: { tenantId }, include: { lines: true } }),
-  ])
+const EXCLUDED_EXPORT_MODELS = new Set(['Account', 'Session', 'TwoFactor', 'Verification'])
+const SENSITIVE_EXPORT_FIELD = /password|secret|token|credential|private.?key|api.?key|client.?secret/i
+const EXPORT_USER_FIELDS = ['id', 'name', 'email', 'emailVerified', 'createdAt', 'updatedAt'] as const
+type ExportQueryDelegate = {
+  findMany(args: { where: Record<string, unknown>; select: Record<string, boolean> }): Promise<Record<string, unknown>[]>
+}
 
-  const archive = {
-    metadata: {
-      version: '1.0.0',
-      tenantId,
-      workspaceName: tenant?.name ?? '',
-      exportedAt: new Date().toISOString(),
-      counts: {
-        members: members.length,
-        departments: departments.length,
-        employees: employees.length,
-        projects: projects.length,
-        customers: customers.length,
-        payableInvoices: payableInvoices.length,
-        receivableInvoices: receivableInvoices.length,
-        journalEntries: journalEntries.length,
+/** Build an explicit tenant predicate for models that reach a tenant through parent rows. */
+function tenantScopeForModel(modelName: string, visited = new Set<string>()): Record<string, unknown> | null {
+  if (visited.has(modelName)) return null
+  const model = Prisma.dmmf.datamodel.models.find(candidate => candidate.name === modelName)
+  if (!model) return null
+  if (model.fields.some(field => field.name === 'tenantId')) return { tenantId: '__TENANT_ID__' }
+
+  const nextVisited = new Set(visited).add(modelName)
+  const parentScopes = model.fields
+    .filter(field => field.kind === 'object' && !field.isList)
+    .map(field => ({ name: field.name, scope: tenantScopeForModel(field.type, nextVisited) }))
+    .filter((entry): entry is { name: string; scope: Record<string, unknown> } => entry.scope !== null)
+
+  if (parentScopes.length === 0) return null
+  const relationFilters = parentScopes.map(({ name, scope }) => ({ [name]: scope }))
+  return relationFilters.length === 1 ? relationFilters[0]! : { AND: relationFilters }
+}
+
+function replaceTenantPlaceholder(filter: Record<string, unknown>, tenantId: string): Record<string, unknown> {
+  if (filter.tenantId === '__TENANT_ID__') return { tenantId }
+  return Object.fromEntries(Object.entries(filter).map(([key, value]) => [
+    key,
+    Array.isArray(value)
+      ? value.map(entry => replaceTenantPlaceholder(entry as Record<string, unknown>, tenantId))
+      : value && typeof value === 'object'
+        ? replaceTenantPlaceholder(value as Record<string, unknown>, tenantId)
+        : value,
+  ]))
+}
+
+function redactNestedSecrets(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactNestedSecrets)
+  if (!value || typeof value !== 'object') return value
+  const prototype = Object.getPrototypeOf(value)
+  if (prototype !== Object.prototype && prototype !== null) return value
+  return Object.fromEntries(Object.entries(value)
+    .filter(([field]) => !SENSITIVE_EXPORT_FIELD.test(field))
+    .map(([field, child]) => [field, redactNestedSecrets(child)]))
+}
+
+/** Full tenant data archive. Authenticator secrets, sessions, passwords, and credentials are excluded. */
+export async function buildWorkspaceArchive(prisma: PrismaClient, tenantId: string): Promise<Buffer> {
+  return prisma.$transaction(async (tx) => {
+    const tenant = await tx.tenant.findUnique({ where: { id: tenantId } })
+    if (!tenant) throw new Error('Workspace not found')
+
+    const models = Prisma.dmmf.datamodel.models.filter(model =>
+      !EXCLUDED_EXPORT_MODELS.has(model.name)
+      && model.name !== 'Tenant'
+      && model.name !== 'User'
+      && tenantScopeForModel(model.name) !== null,
+    )
+    const delegates = tx as unknown as Record<string, ExportQueryDelegate>
+    const modelRecords = await Promise.all(models.map(async (model) => {
+      const delegateName = model.name[0]!.toLowerCase() + model.name.slice(1)
+      const delegate = delegates[delegateName]
+      if (!delegate || typeof delegate.findMany !== 'function') {
+        throw new Error(`Workspace export is missing the Prisma delegate for ${model.name}`)
+      }
+      const select = Object.fromEntries(model.fields
+        .filter(field => (field.kind === 'scalar' || field.kind === 'enum') && !SENSITIVE_EXPORT_FIELD.test(field.name))
+        .map(field => [field.name, true]))
+      const where = replaceTenantPlaceholder(tenantScopeForModel(model.name)!, tenantId)
+      const records = await delegate.findMany({ where, select })
+      return [model.name, records.map(record => redactNestedSecrets(record))] as const
+    }))
+
+    const users = await tx.user.findMany({
+      where: { members: { some: { tenantId } } },
+      select: Object.fromEntries(EXPORT_USER_FIELDS.map(field => [field, true])),
+    })
+    const data: Record<string, unknown> = {
+      Tenant: redactNestedSecrets(tenant),
+      UserIdentity: users,
+      ...Object.fromEntries(modelRecords),
+    }
+    const counts = Object.fromEntries(modelRecords.map(([modelName, records]) => [modelName, records.length]))
+
+    const archive = {
+      metadata: {
+        version: '2.0.0',
+        tenantId,
+        workspaceName: tenant.name,
+        exportedAt: new Date().toISOString(),
+        modelCounts: counts,
+        redactions: 'Authentication records and secret or credential fields are omitted.',
       },
-    },
-    data: {
-      tenant,
-      members,
-      departments,
-      employees,
-      projects,
-      customers,
-      payableInvoices,
-      receivableInvoices,
-      journalEntries,
-    },
-  }
+      data,
+    }
 
-  return Buffer.from(JSON.stringify(archive, null, 2), 'utf8')
+    return Buffer.from(JSON.stringify(archive, (_key, value) => typeof value === 'bigint' ? value.toString() : value, 2), 'utf8')
+  }, {
+    isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+    maxWait: 10_000,
+    timeout: 120_000,
+  })
 }
 
 /**
@@ -339,12 +386,17 @@ export async function exportRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const { tenantId, role, userId } = requireAuthContext(request)
       const prisma = request.server.prisma
-      if (typeof prisma.subscription?.findFirst === 'function') {
-        await assertSubscriptionActive(prisma, tenantId)
-      }
       const canReadSalary = role === 'ADMIN' || role === 'OWNER'
 
       const jobId = await request.server.exportQueue.submit(request.body.kind, { canReadSalary }, tenantId)
+
+      await prisma.exportJob.update({
+        where: { id: jobId },
+        data: {
+          format: exportFileExtension(request.body.kind),
+          dateRange: null,
+        },
+      })
 
       const job = await prisma.exportJob.findFirstOrThrow({ where: { id: jobId, tenantId } })
       await recordAuditLog(prisma, {
@@ -409,7 +461,7 @@ export async function exportRoutes(app: FastifyInstance): Promise<void> {
 
       reply
         .code(200)
-        .header('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        .header('content-type', exportContentType(job.dataScope ?? ''))
         .header('content-disposition', `attachment; filename="${job.filename}"`)
         .header('content-length', bytes.length)
       return reply.send(bytes)

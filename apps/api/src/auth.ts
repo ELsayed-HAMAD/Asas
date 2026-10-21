@@ -120,27 +120,19 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
       },
     },
     socialProviders: {
-      ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+      ...(env.googleClientId && env.googleClientSecret
         ? {
             google: {
-              clientId: process.env.GOOGLE_CLIENT_ID,
-              clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+              clientId: env.googleClientId,
+              clientSecret: env.googleClientSecret,
             },
           }
         : {}),
-      ...(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET
+      ...(env.appleClientId && env.appleClientSecret
         ? {
-            microsoft: {
-              clientId: process.env.MICROSOFT_CLIENT_ID,
-              clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
-            },
-          }
-        : {}),
-      ...(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET
-        ? {
-            github: {
-              clientId: process.env.GITHUB_CLIENT_ID,
-              clientSecret: process.env.GITHUB_CLIENT_SECRET,
+            apple: {
+              clientId: env.appleClientId,
+              clientSecret: env.appleClientSecret,
             },
           }
         : {}),
@@ -158,12 +150,18 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
           const frontendBase = (env.frontendOrigin.split(',')[0] ?? 'http://localhost:5173').trim()
           const inviteUrl = `${frontendBase}/accept-invitation?invitationId=${data.id}`
           const orgName = data.organization?.name || 'Workspace'
-          await mailer.enqueue({
-            to: data.email,
-            subject: `Invitation to join ${orgName} on Asas`,
-            text: `You have been invited to join ${orgName} on Asas as ${data.role}. Accept your invitation: ${inviteUrl}`,
-            html: invitationHtml(orgName, data.role, inviteUrl),
-          })
+          try {
+            await mailer.enqueue({
+              to: data.email,
+              subject: `Invitation to join ${orgName} on Asas`,
+              text: `You have been invited to join ${orgName} on Asas as ${data.role}. Accept your invitation: ${inviteUrl}`,
+              html: invitationHtml(orgName, data.role, inviteUrl),
+            })
+          } catch {
+            // Better Auth has already created the invitation at this point. Keep its direct link
+            // available to the inviter instead of returning a failed request for a saved invite.
+            console.warn(`[Auth] Invitation email could not be queued for ${maskEmail(data.email)}; share the direct invitation link instead.`)
+          }
         },
         schema: {
           organization: {
@@ -228,7 +226,7 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
           },
         },
         delete: {
-          before: async (member: { id?: string }) => {
+          before: async (member: { id?: string }, context: { context?: { session?: { user?: { id?: string } } } } | null) => {
             if (member?.id) {
               const existing = await prisma.member.findUnique({ where: { id: member.id } })
               if (existing) {
@@ -252,7 +250,7 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
                 try {
                   await recordAuditLog(prisma, {
                     tenantId: existing.tenantId,
-                    actorId: existing.userId,
+                    actorId: context?.context?.session?.user?.id ?? 'system',
                     action: 'auth.member.removed',
                     targetType: 'Member',
                     targetId: existing.id,
@@ -291,13 +289,13 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
             }
             return { data: member }
           },
-          after: async (member: { id: string; userId?: string; tenantId?: string; organizationId?: string; role?: string }) => {
+          after: async (member: { id: string; userId?: string; tenantId?: string; organizationId?: string; role?: string }, context: { context?: { session?: { user?: { id?: string } } } } | null) => {
             const tenantId = member.tenantId ?? member.organizationId ?? (await prisma.member.findUnique({ where: { id: member.id }, select: { tenantId: true } }))?.tenantId
             if (tenantId) {
               try {
                 await recordAuditLog(prisma, {
                   tenantId,
-                  actorId: member.userId ?? 'system',
+                  actorId: context?.context?.session?.user?.id ?? 'system',
                   action: 'auth.member.role.updated',
                   targetType: 'Member',
                   targetId: member.id,

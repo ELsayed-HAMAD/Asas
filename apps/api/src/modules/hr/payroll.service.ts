@@ -41,6 +41,7 @@ type LineWithIncludes = {
     id: string
     name: string
     title: string
+    department?: { name: string } | null
     bankRoutingNumber?: string | null
     bankAccountNumber?: string | null
     bankAccountType?: string | null
@@ -219,6 +220,7 @@ function mapLine(line: LineWithIncludes): PayrollLine {
       id: line.employee.id,
       name: line.employee.name,
       title: line.employee.title,
+      departmentName: line.employee.department?.name ?? null,
       bankRoutingNumber: line.employee.bankRoutingNumber ?? null,
       bankAccountNumber: line.employee.bankAccountNumber ?? null,
       bankAccountType: line.employee.bankAccountType ?? null,
@@ -295,6 +297,7 @@ export async function getPayrollRun(prisma: PayrollClient, tenantId: string, run
             id: true,
             name: true,
             title: true,
+            department: { select: { name: true } },
             bankRoutingNumber: true,
             bankAccountNumber: true,
             bankAccountType: true,

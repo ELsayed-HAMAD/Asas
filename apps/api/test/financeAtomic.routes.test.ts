@@ -48,11 +48,11 @@ async function setup(status: string, failAuditAt = 0, role = 'ADMIN', withSettle
     title: 'Call', author: null, body: null, avatarUrl: null,
     amount: new Prisma.Decimal('100'), tax: null, date: now, dueDate: now, createdAt: now, updatedAt: now,
   }
-  let committed = { row: initial, writes: 0, audits: [] as Record<string, unknown>[], journals: [] as Record<string, unknown>[], journalLines: [] as Record<string, unknown>[] }
+  let committed = { row: initial, writes: 0, audits: [] as Record<string, unknown>[], journals: [] as Record<string, unknown>[], journalLines: [] as Record<string, unknown>[], notifications: [] as Record<string, unknown>[] }
   let attemptedWrites = 0
   const publish = vi.fn(() => { expect(committed.audits.length).toBeGreaterThan(0) })
   const transaction = vi.fn(async (work: (tx: unknown) => Promise<unknown>) => {
-    const staged = { row: { ...committed.row }, writes: committed.writes, audits: [...committed.audits], journals: [...committed.journals], journalLines: [...committed.journalLines] }
+    const staged = { row: { ...committed.row }, writes: committed.writes, audits: [...committed.audits], journals: [...committed.journals], journalLines: [...committed.journalLines], notifications: [...committed.notifications] }
     const write = (data: Record<string, unknown>) => {
       attemptedWrites++
       staged.writes++
@@ -71,6 +71,10 @@ async function setup(status: string, failAuditAt = 0, role = 'ADMIN', withSettle
     }
     const tx = {
       tenant: { findUnique: async () => ({ currency: 'USD', timezone: 'UTC' }) },
+      member: { findMany: vi.fn(async () => [{ userId: 'owner_1' }]) },
+      notificationPreference: { findUnique: vi.fn(async () => null) },
+      quietHours: { findUnique: vi.fn(async () => null) },
+      notification: { create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => { staged.notifications.push(data); return { id: 'notification_1', ...data, createdAt: now } }) },
       $queryRaw: vi.fn(async (_strings: TemplateStringsArray, ...values: unknown[]) => values.includes('tenant_1') && values.includes(id) ? [{ id }] : []),
       payableInvoice: delegate, receivableInvoice: delegate, expense: delegate,
       vendor: delegate, customer: delegate, collectionActivity: delegate,
@@ -134,6 +138,12 @@ for (const scenario of cases) {
         expect(response.statusCode, response.body).toBe(scenario.code)
         expect(fixture.state().writes).toBe(1)
         expect(fixture.state().audits[0]).toMatchObject({ tenantId: 'tenant_1', actorId: 'admin_1', action: scenario.action })
+        if (scenario.action === 'finance.payable.create' || scenario.action === 'finance.receivable.create') {
+          expect(fixture.state().notifications).toHaveLength(1)
+          expect(fixture.state().notifications[0]).toMatchObject({ tenantId: 'tenant_1', userId: 'owner_1', title: scenario.action === 'finance.payable.create' ? 'New payable invoice' : 'New receivable invoice' })
+        } else {
+          expect(fixture.state().notifications).toEqual([])
+        }
         if (scenario.url === '/payables/batch-payment' || scenario.url === `/receivables/${id}/status` || isReimbursement || isExpenseVoid) {
           expect(fixture.state().journals.length).toBe(scenario.url === '/payables/batch-payment' ? 4 : scenario.url.includes('receivables') ? 2 : 1)
           expect(fixture.state().journalLines).toHaveLength(fixture.state().journals.length * 2)
@@ -158,6 +168,7 @@ for (const scenario of cases) {
         expect(fixture.state().writes).toBe(0)
         expect(fixture.state().row.status).toBe(scenario.status)
         expect(fixture.state().audits).toEqual([])
+        expect(fixture.state().notifications).toEqual([])
         if (scenario.url === '/payables/batch-payment' || scenario.url === `/receivables/${id}/status` || isReimbursement || isExpenseVoid) {
           expect(fixture.state().journals).toEqual([])
           expect(fixture.state().journalLines).toEqual([])

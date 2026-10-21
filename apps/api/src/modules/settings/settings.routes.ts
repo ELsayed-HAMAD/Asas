@@ -13,10 +13,6 @@ import {
   notificationSettingsSchema,
   notificationSettingsUpdateSchema,
   billingSettingsSchema,
-  backupSchedulesResponseSchema,
-  backupScheduleSchema,
-  backupScheduleWriteSchema,
-  backupScheduleUpdateSchema,
   exchangeRateListQuerySchema,
   exchangeRateListResponseSchema,
   exchangeRateSchema,
@@ -33,6 +29,7 @@ import { requireAuthContext, requireRole } from '../../middlewares/rbac.js'
 import { requirePermission } from '../../middlewares/permissions.js'
 import { recordAuditLog } from '../../services/auditLog.js'
 import { getTenantStorageBytes } from '../../services/objectStorage.js'
+import { ensureAutomaticBackupsUnavailable } from './settings.service.js'
 import { executeDataRetentionCleanup } from '../../services/dataRetention.js'
 import { moduleKeyPrefix } from '../../plugins/sse.js'
 import * as settingsController from './settings.controller.js'
@@ -149,27 +146,23 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
 
   server.get('/backups', {
     preHandler: requireRole('MEMBER'),
-    schema: { response: { 200: envelope(backupSchedulesResponseSchema), ...errorResponses } },
-  }, async request => {
-    const { tenantId } = requireAuthContext(request)
-    return { data: await settingsController.listBackups(request.server.prisma, tenantId) }
+    schema: { description: 'Automated backups are not configured for this deployment.', response: { ...errorResponses } },
+  }, async () => {
+    return ensureAutomaticBackupsUnavailable()
   })
 
   server.post('/backups', {
     preHandler: requirePermission('settings.billing.write'),
-    schema: { body: backupScheduleWriteSchema, response: { 201: envelope(backupScheduleSchema), ...errorResponses } },
-  }, async (request, reply) => {
-    const { tenantId } = requireAuthContext(request)
-    reply.code(201)
-    return { data: await settingsController.createBackup(request.server.prisma, tenantId, request.body) }
+    schema: { description: 'Automated backups are not configured for this deployment.', response: { ...errorResponses } },
+  }, async () => {
+    return ensureAutomaticBackupsUnavailable()
   })
 
   server.patch('/backups/:id', {
     preHandler: requirePermission('settings.billing.write'),
-    schema: { params: idParamSchema, body: backupScheduleUpdateSchema, response: { 200: envelope(backupScheduleSchema), ...errorResponses } },
-  }, async request => {
-    const { tenantId } = requireAuthContext(request)
-    return { data: await settingsController.updateBackup(request.server.prisma, tenantId, request.params.id, request.body) }
+    schema: { description: 'Automated backups are not configured for this deployment.', params: idParamSchema, response: { ...errorResponses } },
+  }, async () => {
+    return ensureAutomaticBackupsUnavailable()
   })
 
   // ── Notifications ─────────────────────────────────────────────────────────
@@ -198,14 +191,17 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     },
     async request => {
       const { tenantId, userId } = requireAuthContext(request)
-      const settings = await settingsController.updateNotifications(request.server.prisma, tenantId, request.body)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'settings.notifications.update',
-        targetType: 'Tenant',
-        targetId: tenantId,
-        metadata: { fields: Object.keys(request.body) },
+      const settings = await request.server.prisma.$transaction(async tx => {
+        const updated = await settingsController.updateNotifications(tx, tenantId, request.body)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'settings.notifications.update',
+          targetType: 'Tenant',
+          targetId: tenantId,
+          metadata: { fields: Object.keys(request.body) },
+        })
+        return updated
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('settings')])
       return { data: settings }
@@ -249,13 +245,16 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      const integration = await settingsController.createIntegration(request.server.prisma, tenantId, request.body)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'settings.integration.create',
-        targetType: 'Integration',
-        targetId: integration.id,
+      const integration = await request.server.prisma.$transaction(async tx => {
+        const created = await settingsController.createIntegration(tx, tenantId, request.body)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'settings.integration.create',
+          targetType: 'Integration',
+          targetId: created.id,
+        })
+        return created
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('settings')])
       reply.code(201)
@@ -275,23 +274,21 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     },
     async request => {
       const { tenantId, userId } = requireAuthContext(request)
-      const integration = await settingsController.updateIntegration(
-        request.server.prisma,
-        tenantId,
-        request.params.id,
-        request.body,
-      )
-      await recordAuditLog(request.server.prisma, {
+      const integration = await request.server.prisma.$transaction(async tx => {
+        const updated = await settingsController.updateIntegration(tx, tenantId, request.params.id, request.body)
+        await recordAuditLog(tx, {
         tenantId,
         actorId: userId,
         action: 'settings.integration.update',
         targetType: 'Integration',
-        targetId: integration.id,
+        targetId: updated.id,
         metadata: {
           fields: Object.keys(request.body),
           // The credential *value* itself is never audited — only that it changed.
           credentialChanged: request.body.credential !== undefined,
         },
+        })
+        return updated
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('settings')])
       return { data: integration }

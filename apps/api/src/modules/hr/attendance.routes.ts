@@ -37,6 +37,7 @@ import { moduleKeyPrefix } from '../../plugins/sse.js'
 import * as attendanceService from './attendance.service.js'
 import { AppError } from '../../utils/errors.js'
 import { recordAuditLog } from '../../services/auditLog.js'
+import { notifyWorkspaceRoles } from '../../services/notifications.js'
 
 export async function attendanceRoutes(app: FastifyInstance): Promise<void> {
   const server = app.withTypeProvider<ZodTypeProvider>()
@@ -242,9 +243,20 @@ export async function attendanceRoutes(app: FastifyInstance): Promise<void> {
         await recordAuditLog(tx, {
           tenantId, actorId: userId, action: 'hr.leave.request.create', targetType: 'LeaveRequest', targetId: created.id,
         })
+        await notifyWorkspaceRoles(tx, {
+          tenantId,
+          roles: ['OWNER', 'ADMIN'],
+          excludeUserId: userId,
+          title: 'Leave request submitted',
+          message: 'A leave request was submitted and is ready for review.',
+          type: 'INFO',
+          link: '/dashboard/hr/time-attendance',
+          module: 'hr',
+          eventType: 'leave.requested',
+        })
         return created
       }, { isolationLevel: 'Serializable' })
-      request.server.ssePublish(tenantId, [moduleKeyPrefix('hr')])
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('hr'), 'notifications'])
       reply.code(201)
       return { data: leaveRequest }
     },
@@ -268,9 +280,20 @@ export async function attendanceRoutes(app: FastifyInstance): Promise<void> {
           tenantId, actorId: userId, action: 'hr.leave.request.create', targetType: 'LeaveRequest', targetId: created.id,
           metadata: { selfService: true },
         })
+        await notifyWorkspaceRoles(tx, {
+          tenantId,
+          roles: ['OWNER', 'ADMIN'],
+          excludeUserId: userId,
+          title: 'Leave request submitted',
+          message: 'A teammate submitted a leave request and needs a decision.',
+          type: 'INFO',
+          link: '/dashboard/hr/time-attendance',
+          module: 'hr',
+          eventType: 'leave.requested',
+        })
         return created
       }, { isolationLevel: 'Serializable' })
-      request.server.ssePublish(tenantId, [moduleKeyPrefix('hr')])
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('hr'), 'notifications'])
       reply.code(201)
       return { data: leaveRequest }
     },

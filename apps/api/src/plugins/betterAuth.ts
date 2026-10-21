@@ -1,5 +1,6 @@
 import { fromNodeHeaders } from 'better-auth/node'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import { normalizeIP } from '@fastify/rate-limit'
 import type { Auth } from '../auth.js'
 
 declare module 'fastify' {
@@ -18,29 +19,20 @@ declare module 'fastify' {
  * Everything else under `/api/auth/*` (session fetches, organization calls) passes through
  * untouched and keeps riding the global 300/min ceiling.
  */
-const CREDENTIAL_PATH_PATTERN = /\/api\/auth\/(sign-in|sign-up|forgot-password|reset-password)/
+const CREDENTIAL_PATHS = new Set([
+  '/api/auth/sign-in/email',
+  '/api/auth/sign-up/email',
+  '/api/auth/request-password-reset',
+  '/api/auth/reset-password',
+  '/api/auth/send-verification-email',
+])
+const EMAIL_DELIVERY_PATHS = new Set([
+  '/api/auth/sign-up/email',
+  '/api/auth/request-password-reset',
+  '/api/auth/send-verification-email',
+])
 const CREDENTIAL_MAX = 10
 const WINDOW_MS = 60_000
-
-const credentialAttempts = new Map<string, { count: number; windowStart: number }>()
-
-function isRateLimited(ip: string, now: number): boolean {
-  const entry = credentialAttempts.get(ip)
-  if (!entry || now - entry.windowStart >= WINDOW_MS) {
-    credentialAttempts.set(ip, { count: 1, windowStart: now })
-    return false
-  }
-  entry.count += 1
-  return entry.count > CREDENTIAL_MAX
-}
-
-/** Prune closed windows so the map never grows unbounded — called on each credential attempt. */
-function pruneWindows(now: number): void {
-  if (credentialAttempts.size < 10_000) return
-  for (const [ip, entry] of credentialAttempts) {
-    if (now - entry.windowStart >= WINDOW_MS) credentialAttempts.delete(ip)
-  }
-}
 
 /**
  * Bridges Fastify to better-auth's Fetch API (`Request`/`Response`) handler.
@@ -54,16 +46,30 @@ function pruneWindows(now: number): void {
  */
 export async function betterAuthPlugin(app: FastifyInstance, auth: Auth): Promise<void> {
   app.decorate('auth', auth)
+  // Reuse the global limiter's configured store (Redis when configured) and normalized IP
+  // handling, with an isolated namespace so the auth threshold is independent of the global one.
+  const checkCredentialRateLimit = app.createRateLimit({
+    max: CREDENTIAL_MAX,
+    timeWindow: WINDOW_MS,
+    keyGenerator: request => `${normalizeIP(request.ip)}:auth-credential`,
+  })
 
   app.route({
     method: ['GET', 'POST'],
     url: '/api/auth/*',
     handler: async (request: FastifyRequest, reply: FastifyReply) => {
-      if (request.method === 'POST' && CREDENTIAL_PATH_PATTERN.test(request.url)) {
-        const now = Date.now()
-        pruneWindows(now)
-        const ip = request.ip ?? 'unknown'
-        if (isRateLimited(ip, now)) {
+      const authPath = new URL(request.url, 'http://localhost').pathname
+      if (
+        request.method === 'POST'
+        && EMAIL_DELIVERY_PATHS.has(authPath)
+        && !request.server.environment.resendApiKey
+      ) {
+        await reply.code(503).send({ error: { message: 'Email delivery is not configured. Contact your workspace administrator.' } })
+        return
+      }
+      if (request.method === 'POST' && CREDENTIAL_PATHS.has(authPath)) {
+        const limit = await checkCredentialRateLimit(request)
+        if (!limit.isAllowed && limit.isExceeded) {
           await reply.code(429).send({
             error: { message: 'Too many attempts. Wait a minute and try again.' },
           })

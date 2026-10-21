@@ -52,9 +52,9 @@ export function getPasswordStrength(password) {
     case 1:
       return { score: 1, label: 'Weak', color: 'bg-danger' }
     case 2:
-      return { score: 2, label: 'Fair', color: 'bg-amber-500' }
+      return { score: 2, label: 'Fair', color: 'bg-warning' }
     case 3:
-      return { score: 3, label: 'Good', color: 'bg-blue-500' }
+      return { score: 3, label: 'Good', color: 'bg-accent' }
     case 4:
       return { score: 4, label: 'Strong', color: 'bg-success' }
     default:

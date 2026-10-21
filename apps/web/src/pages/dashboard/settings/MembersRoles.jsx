@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Search,
@@ -9,6 +10,8 @@ import {
   Trash2,
   Mail,
   Clock,
+  Copy,
+  Check,
 } from 'lucide-react'
 import TopBarActions from '../../../components/TopBarActions'
 import SettingsTabs from './SettingsTabs'
@@ -30,6 +33,7 @@ import { getMemberRoleName } from '../../../lib/memberRole'
 import { queryKeys } from '../../../lib/queryKeys'
 
 export default function MembersRoles() {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { data: session } = useSession()
   const { data: memberRole } = useActiveMemberRole()
@@ -42,6 +46,10 @@ export default function MembersRoles() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('MEMBER')
   const [inviteError, setInviteError] = useState('')
+  const [createdInviteUrl, setCreatedInviteUrl] = useState('')
+  const [copiedInviteId, setCopiedInviteId] = useState(null)
+  const [clipboardError, setClipboardError] = useState('')
+  const [clipboardErrorTarget, setClipboardErrorTarget] = useState(null)
 
   const [roleDialogOpen, setRoleDialogOpen] = useState(false)
   const [selectedMember, setSelectedMember] = useState(null)
@@ -81,11 +89,15 @@ export default function MembersRoles() {
       }
       return res?.data
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       invalidate()
-      setInviteOpen(false)
-      setInviteEmail('')
-      setInviteRole('MEMBER')
+      if (data?.id) {
+        setCreatedInviteUrl(`${window.location.origin}/accept-invitation?invitationId=${data.id}`)
+      } else {
+        setInviteOpen(false)
+        setInviteEmail('')
+        setInviteRole('MEMBER')
+      }
     },
     onError: (err) => {
       setInviteError(err.message)
@@ -125,7 +137,13 @@ export default function MembersRoles() {
     onSuccess: () => {
       invalidate()
       setRemoveDialogOpen(false)
+      const removedSelf = memberToRemove?.userId === session?.user?.id
       setMemberToRemove(null)
+      if (removedSelf) {
+        localStorage.removeItem('asas.lastActiveOrgId')
+        queryClient.clear()
+        navigate('/choose-workspace', { replace: true })
+      }
     },
   })
 
@@ -153,8 +171,22 @@ export default function MembersRoles() {
     return name.includes(q) || email.includes(q) || role.includes(q)
   })
 
+  const copyInvitationLink = async (invitationId) => {
+    const link = `${window.location.origin}/accept-invitation?invitationId=${invitationId}`
+    try {
+      await navigator.clipboard.writeText(link)
+      setClipboardError('')
+      setClipboardErrorTarget(null)
+      setCopiedInviteId(invitationId)
+      window.setTimeout(() => setCopiedInviteId(null), 2000)
+    } catch {
+      setClipboardErrorTarget(invitationId)
+      setClipboardError('Clipboard access was blocked. Select and copy the invitation link below.')
+    }
+  }
+
   return (
-    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
+    <div className="flex-1 min-h-0 min-w-0 flex flex-col bg-surface overflow-hidden relative">
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
@@ -187,9 +219,9 @@ export default function MembersRoles() {
 
       <SettingsTabs />
 
-      <div className="flex-1 min-h-0 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden relative">
         {/* Left: Members List & Pending Invites */}
-        <div className="flex-1 min-w-0 min-h-[320px] overflow-y-auto p-4 sm:p-8 space-y-6 sm:space-y-8">
+        <div className="w-full min-w-0 xl:flex-1 xl:min-h-0 xl:overflow-y-auto p-4 sm:p-8 space-y-6 sm:space-y-8 relative">
           <QueryState
             isLoading={isLoading}
             isError={isError}
@@ -284,6 +316,7 @@ export default function MembersRoles() {
                               size="sm"
                               type="button"
                               onClick={() => {
+                                updateRoleMutation.reset()
                                 setSelectedMember(member)
                                 setNewRole(member.role)
                                 setRoleDialogOpen(true)
@@ -304,6 +337,7 @@ export default function MembersRoles() {
                               size="icon"
                               type="button"
                               onClick={() => {
+                                removeMemberMutation.reset()
                                 setMemberToRemove(member)
                                 setRemoveDialogOpen(true)
                               }}
@@ -345,6 +379,7 @@ export default function MembersRoles() {
                 </div>
 
                 <div className="divide-y divide-border-subtle">
+                  {cancelInviteMutation.isError && <p role="alert" className="px-4 py-2 text-xs text-danger">{cancelInviteMutation.error?.message || 'Unable to cancel this invitation.'}</p>}
                   {invitations.map((inv) => (
                     <div
                       key={inv.id}
@@ -362,7 +397,24 @@ export default function MembersRoles() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          onClick={() => copyInvitationLink(inv.id)}
+                          className="text-xs font-medium text-accent hover:text-accent-hover h-7 px-2 gap-1"
+                          title="Copy direct invitation link"
+                        >
+                          {copiedInviteId === inv.id ? <Check size={12} /> : <Copy size={12} />}
+                          <span>{copiedInviteId === inv.id ? 'Copied Link' : 'Copy Link'}</span>
+                        </Button>
+                        {clipboardError && clipboardErrorTarget === inv.id && (
+                          <div className="flex items-center gap-2">
+                            <Input readOnly value={`${window.location.origin}/accept-invitation?invitationId=${inv.id}`} className="w-56 text-[10px]" aria-label="Invitation link to copy manually" />
+                            <span role="alert" className="text-[11px] text-danger">{clipboardError}</span>
+                          </div>
+                        )}
                         <span className="text-xs text-caption flex items-center gap-1">
                           <Clock size={12} />
                           Pending
@@ -389,7 +441,7 @@ export default function MembersRoles() {
         </div>
 
         {/* Right: Roles Overview Reference */}
-        <div className="w-full xl:w-[340px] xl:flex-shrink-0 bg-surface-muted border-t xl:border-t-0 xl:border-l border-border-default p-8 flex flex-col space-y-6">
+        <div className="w-full xl:w-[340px] xl:flex-shrink-0 xl:overflow-y-auto bg-surface-muted border-t xl:border-t-0 xl:border-l border-border-default p-8 flex flex-col space-y-6">
           <div>
             <h3 className="text-[10px] font-bold text-caption uppercase tracking-widest mb-4">
               Roles & Permissions
@@ -440,45 +492,98 @@ export default function MembersRoles() {
       {/* Invite Member Modal */}
       <FormDialog
         open={inviteOpen}
-        onClose={() => setInviteOpen(false)}
-        title="Invite New Member"
-        subtitle="Send an invitation link by email to join this workspace."
-        confirmLabel={inviteMutation.isPending ? 'Sending...' : 'Send Invitation'}
-        isConfirmDisabled={!inviteEmail.trim() || inviteMutation.isPending}
-        onConfirm={() => inviteMutation.mutate()}
+        onClose={() => {
+          setInviteOpen(false)
+          setCreatedInviteUrl('')
+          setInviteEmail('')
+          setInviteError('')
+        }}
+        title={createdInviteUrl ? 'Invitation Ready' : 'Invite New Member'}
+        subtitle={
+          createdInviteUrl
+            ? 'The invitation has been generated. You can share this direct link.'
+            : 'Create an invitation for your teammate. We will attempt email delivery when configured; share the direct link if they do not receive it.'
+        }
+        confirmLabel={createdInviteUrl ? 'Done' : inviteMutation.isPending ? 'Sending...' : 'Send Invitation'}
+        isConfirmDisabled={!createdInviteUrl && (!inviteEmail.trim() || inviteMutation.isPending)}
+        onConfirm={() => {
+          if (createdInviteUrl) {
+            setInviteOpen(false)
+            setCreatedInviteUrl('')
+            setInviteEmail('')
+            setInviteError('')
+          } else {
+            inviteMutation.mutate()
+          }
+        }}
         error={inviteError}
       >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">
-              Email Address
-            </label>
-            <Input
-              type="email"
-              required
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="colleague@example.com"
-              className="w-full bg-surface-muted"
-            />
+        {createdInviteUrl ? (
+          <div className="space-y-4">
+            <div className="p-3 bg-success-light border border-success-border rounded-lg text-success-text text-xs leading-relaxed">
+                <p className="font-semibold mb-1">Invitation created for {inviteEmail || 'new member'}.</p>
+              <p className="text-[11px]">
+                Copy and share the invitation acceptance link directly with your team member:
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input readOnly value={createdInviteUrl} className="text-xs bg-surface-muted font-mono" />
+              <Button
+                type="button"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(createdInviteUrl)
+                    setClipboardError('')
+                    setClipboardErrorTarget(null)
+                    setCopiedInviteId('dialog')
+                    window.setTimeout(() => setCopiedInviteId(null), 2000)
+                  } catch {
+                    setClipboardErrorTarget('dialog')
+                    setClipboardError('Clipboard access was blocked. Select and copy the invitation link above.')
+                  }
+                }}
+                className="gap-1.5 text-xs shrink-0 h-9"
+              >
+                {copiedInviteId === 'dialog' ? <Check size={14} /> : <Copy size={14} />}
+                <span>{copiedInviteId === 'dialog' ? 'Copied' : 'Copy Link'}</span>
+              </Button>
+            </div>
+            {clipboardError && clipboardErrorTarget === 'dialog' && <p role="alert" className="text-xs text-danger">{clipboardError}</p>}
           </div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">
+                Email Address
+              </label>
+              <Input
+                type="email"
+                required
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="colleague@example.com"
+                className="w-full bg-surface-muted"
+              />
+            </div>
 
-          <div>
-            <label htmlFor="invite-role" className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">
-              Role
-            </label>
-            <Select value={inviteRole} onValueChange={setInviteRole}>
-              <SelectTrigger id="invite-role" className="w-full text-sm bg-surface-muted text-heading">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="MEMBER">Member (Standard Access)</SelectItem>
-                <SelectItem value="ADMIN">Admin (Full Operational Access)</SelectItem>
-                {isOwner && <SelectItem value="OWNER">Owner (Full Authority)</SelectItem>}
-              </SelectContent>
-            </Select>
+            <div>
+              <label htmlFor="invite-role" className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">
+                Role
+              </label>
+              <Select value={inviteRole} onValueChange={setInviteRole}>
+                <SelectTrigger id="invite-role" className="w-full text-sm bg-surface-muted text-heading">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MEMBER">Member (Standard Access)</SelectItem>
+                  <SelectItem value="ADMIN">Admin (Full Operational Access)</SelectItem>
+                  {isOwner && <SelectItem value="OWNER">Owner (Full Authority)</SelectItem>}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        </div>
+        )}
       </FormDialog>
 
       {/* Change Role Modal */}
@@ -536,6 +641,7 @@ export default function MembersRoles() {
         } from the workspace? They will immediately lose access.`}
         confirmLabel="Remove Member"
         busy={removeMemberMutation.isPending}
+        error={removeMemberMutation.error?.message}
         danger
       />
     </div>

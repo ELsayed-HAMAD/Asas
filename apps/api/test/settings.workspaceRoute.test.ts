@@ -31,7 +31,28 @@ async function setup(options: { role?: string; unauthenticated?: boolean } = {})
     exchangeRate: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     invitation: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     member: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
-    tenant: { delete: vi.fn().mockResolvedValue({ id: 'tenant_1' }) },
+    tenant: {
+      findUnique: vi.fn().mockResolvedValue({ id: 'tenant_1' }),
+      delete: vi.fn().mockResolvedValue({ id: 'tenant_1' }),
+    },
+    notificationPreference: {
+      upsert: vi.fn().mockResolvedValue({}),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    quietHours: {
+      upsert: vi.fn().mockResolvedValue({}),
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
+    auditLog: { create: vi.fn().mockResolvedValue({}) },
+    integration: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockImplementation(async ({ data }) => ({
+        id: 'clxxxxxxxxxxxxxxxxxxxxxxx', tenantId: 'tenant_1', description: null, status: 'CONFIGURE',
+        syncPullRequests: false, syncCiCdStatus: false, credential: null,
+        createdAt: new Date('2026-10-21T00:00:00.000Z'), updatedAt: new Date('2026-10-21T00:00:00.000Z'),
+        ...data,
+      })),
+    },
   }
 
   const prisma = {
@@ -82,6 +103,48 @@ describe('DELETE /workspace', () => {
     expect(res.statusCode).toBe(200)
     expect(res.json()).toEqual({ data: { success: true } })
     expect(tx.tenant.delete).toHaveBeenCalledWith({ where: { id: 'tenant_1' } })
+  })
+})
+
+describe('settings reliability', () => {
+  it('commits notification preferences and their audit record in the same transaction', async () => {
+    const { app, prisma, tx } = await setup({ role: 'ADMIN' })
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/notifications',
+      payload: { modules: { finance: { 'invoice.created': { inApp: false } } } },
+    })
+    expect(response.statusCode, response.body).toBe(200)
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1)
+    expect(tx.notificationPreference.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { tenantId_module_eventType: { tenantId: 'tenant_1', module: 'finance', eventType: 'invoice.created' } },
+    }))
+    expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ tenantId: 'tenant_1', actorId: 'user_1', action: 'settings.notifications.update' }),
+    }))
+    await app.close()
+  })
+
+  it('rejects backup schedule operations instead of returning fabricated success', async () => {
+    const { app } = await setup({ role: 'ADMIN' })
+    const get = await app.inject({ method: 'GET', url: '/backups' })
+    const create = await app.inject({ method: 'POST', url: '/backups', payload: { name: 'Daily', schedule: '0 0 * * *' } })
+    expect(get.statusCode).toBe(409)
+    expect(create.statusCode).toBe(409)
+    expect(get.json().error.message).toContain('Automated backups are not configured')
+    await app.close()
+  })
+
+  it('commits integration configuration and its audit record in one transaction', async () => {
+    const { app, prisma, tx } = await setup({ role: 'ADMIN' })
+    const response = await app.inject({ method: 'POST', url: '/integrations', payload: { name: 'Operations webhook' } })
+    expect(response.statusCode, response.body).toBe(201)
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1)
+    expect(tx.integration.create).toHaveBeenCalledWith({ data: expect.objectContaining({ tenantId: 'tenant_1', name: 'Operations webhook' }) })
+    expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ tenantId: 'tenant_1', actorId: 'user_1', action: 'settings.integration.create', targetId: 'clxxxxxxxxxxxxxxxxxxxxxxx' }),
+    }))
+    await app.close()
   })
 })
 

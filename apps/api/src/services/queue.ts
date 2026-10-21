@@ -78,6 +78,7 @@ export interface ExportJobStore {
   create(data: { tenantId: string; filename: string; dataScope: string; status: ExportJobStatus }): Promise<{ id: string }>
   updateMany(args: { where: { id: string }; data: Record<string, unknown> }): Promise<unknown>
   getTenantId(jobId: string): Promise<string | null>
+  withStorageCapacity<T>(tenantId: string, additionalBytes: number, write: () => Promise<T>): Promise<T>
 }
 
 /** Where every exported file lands, keyed by job id — the download endpoint's read path. */
@@ -88,6 +89,12 @@ export function exportFilePath(jobId: string, extension: string): string {
 /** The file extension a kind renders to — the download endpoint needs it to address the file. */
 export function exportFileExtension(kind: string): string {
   return (KIND_FILENAME[kind] ?? { extension: 'xlsx' }).extension
+}
+
+export function exportContentType(kind: string): string {
+  return exportFileExtension(kind) === 'json'
+    ? 'application/json; charset=utf-8'
+    : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 }
 
 const BOSS_QUEUE = 'exports'
@@ -138,7 +145,9 @@ export async function createExportQueue(options: CreateExportQueueOptions): Prom
       const buffer = await handler(job.data, { jobId: job.jobId })
       const tenantId = await store.getTenantId(job.jobId)
       if (!tenantId) throw new Error(`Export job ${job.jobId} not found`)
-      await storage.put(exportObjectKey(tenantId, job.jobId, extension), buffer, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      await store.withStorageCapacity(tenantId, buffer.byteLength, () =>
+        storage.put(exportObjectKey(tenantId, job.jobId, extension), buffer, exportContentType(job.kind)),
+      )
       await updateRow(job.jobId, { status: 'DONE', progressPct: 100 })
     } catch (error) {
       await updateRow(job.jobId, { status: 'FAILED' })

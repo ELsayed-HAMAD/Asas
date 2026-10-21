@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
-import { signUp, useSession, signOut } from '../../lib/authClient'
+import { signUp, useSession, signOut, authClient } from '../../lib/authClient'
+import { authApi } from '../../lib/api/auth'
+import DevSocialModal from '../../components/auth/DevSocialModal'
+import { GoogleIcon, AppleIcon } from '../../components/common/BrandIcons'
 import { validatePasswordPolicy, PASSWORD_POLICY_DESCRIPTION } from '../../lib/passwordPolicy'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -14,6 +17,8 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', password: '' })
   const [error, setError] = useState('')
+  const [devModalOpen, setDevModalOpen] = useState(false)
+  const [devModalProvider, setDevModalProvider] = useState('google')
 
   const handleChange = event => setForm(current => ({ ...current, [event.target.name]: event.target.value }))
 
@@ -88,12 +93,70 @@ export default function Register() {
     }
   }
 
+  const handleSocialSignUp = async (provider) => {
+    setError('')
+    try {
+      // Check if real OAuth provider is configured on the backend
+      const statusRes = await authApi.getProviders().catch(() => null)
+      const providers = statusRes?.data || statusRes || {}
+
+      if (providers[provider]) {
+        const res = await authClient.signIn.social({
+          provider,
+          callbackURL: `${window.location.origin}/onboarding`,
+        })
+        if (res?.error) {
+          setError(res.error?.message || `${provider === 'apple' ? 'Apple' : 'Google'} sign-up is not configured in this environment. Please sign up with your work email below.`)
+        }
+      } else if (providers.devAuthAllowed) {
+        // Open local development SSO sandbox
+        setDevModalProvider(provider)
+        setDevModalOpen(true)
+      } else {
+        setError(`${provider === 'apple' ? 'Apple' : 'Google'} single sign-on is not configured in this enterprise environment. Please register with your corporate email below.`)
+      }
+    } catch (socialErr) {
+      setError(socialErr?.message || `${provider === 'apple' ? 'Apple' : 'Google'} sign-up is currently unavailable in this environment.`)
+    }
+  }
+
   return (
     <div className="flex flex-col">
       {/* Header */}
       <div className="mb-6 text-center">
-        <h1 className="text-2xl font-semibold text-heading mb-1.5">Create your workspace</h1>
-        <p className="text-sm text-muted">Set up your account to start managing your enterprise.</p>
+        <h1 className="text-2xl font-semibold text-heading mb-1.5">Create your enterprise workspace</h1>
+        <p className="text-sm text-muted">Create a secure workspace for your company’s finance, people, and daily operations.</p>
+      </div>
+
+      {/* Social SSO Buttons */}
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => handleSocialSignUp('google')}
+          className="w-full flex items-center justify-center gap-2 text-xs font-medium h-10 border-border/80 hover:bg-surface-raised hover-lift transition-micro active:scale-[0.98] cursor-pointer shadow-xs"
+        >
+          <GoogleIcon className="w-4 h-4" />
+          <span>Google</span>
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => handleSocialSignUp('apple')}
+          className="w-full flex items-center justify-center gap-2 text-xs font-medium h-10 border-border/80 hover:bg-surface-raised hover-lift transition-micro active:scale-[0.98] cursor-pointer shadow-xs"
+        >
+          <AppleIcon className="w-4 h-4" />
+          <span>Apple</span>
+        </Button>
+      </div>
+
+      <div className="relative mb-5">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-border-subtle" />
+        </div>
+        <div className="relative flex justify-center">
+          <span className="bg-surface-raised px-3 text-xs text-caption">or register with work email</span>
+        </div>
       </div>
 
       {/* Form */}
@@ -169,7 +232,7 @@ export default function Register() {
         <Button
           type="submit"
           disabled={isLoading}
-          className="w-full h-10 mt-4 cursor-pointer"
+          className="w-full h-10 mt-4 cursor-pointer shadow-card hover:shadow-glow hover-lift transition-micro active:scale-[0.98]"
         >
           {isLoading ? <Loader2 size={16} className="animate-spin" /> : 'Create Account'}
         </Button>
@@ -189,6 +252,16 @@ export default function Register() {
           Sign in
         </Link>
       </p>
+
+      <DevSocialModal
+        isOpen={devModalOpen}
+        onClose={() => setDevModalOpen(false)}
+        provider={devModalProvider}
+        onSuccess={(data) => {
+          setDevModalOpen(false)
+          window.location.assign(data.redirectUrl || '/onboarding')
+        }}
+      />
     </div>
   )
 }

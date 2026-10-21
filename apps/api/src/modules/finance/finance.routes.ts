@@ -59,6 +59,7 @@ import { z } from 'zod'
 import { hasRequiredRole, requireAuthContext, requireRole } from '../../middlewares/rbac.js'
 import { PERMISSIONS, requirePermission } from '../../middlewares/permissions.js'
 import { recordAuditLog } from '../../services/auditLog.js'
+import { notifyWorkspaceRoles } from '../../services/notifications.js'
 import { mailer } from '../../services/mailer.js'
 import { moduleKeyPrefix } from '../../plugins/sse.js'
 import { renderInvoicePdf } from '../../services/pdf.js'
@@ -396,9 +397,20 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
           targetId: invoice.id,
           metadata: { amount: invoice.amount },
         })
+        await notifyWorkspaceRoles(tx, {
+          tenantId,
+          roles: ['OWNER', 'ADMIN'],
+          excludeUserId: userId,
+          title: 'New payable invoice',
+          message: `A payable invoice${invoice.invoiceNumber ? ` ${invoice.invoiceNumber}` : ''} was created and is ready for review.`,
+          type: 'INFO',
+          link: '/dashboard/finance/accounts-payable',
+          module: 'finance',
+          eventType: 'invoice.created',
+        })
         return invoice
       })
-      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance'), 'notifications'])
       reply.code(201)
       return { data: invoice }
     },
@@ -813,9 +825,20 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
           targetId: invoice.id,
           metadata: { amount: invoice.amount },
         })
+        await notifyWorkspaceRoles(tx, {
+          tenantId,
+          roles: ['OWNER', 'ADMIN'],
+          excludeUserId: userId,
+          title: 'New receivable invoice',
+          message: `A customer invoice${invoice.number ? ` ${invoice.number}` : ''} was created.`,
+          type: 'INFO',
+          link: '/dashboard/finance/accounts-receivable',
+          module: 'finance',
+          eventType: 'invoice.created',
+        })
         return invoice
       })
-      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance'), 'notifications'])
       reply.code(201)
       return { data: invoice }
     },

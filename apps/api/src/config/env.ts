@@ -48,10 +48,22 @@ export interface AsasEnv {
   stripeWebhookSecret: string
   /** Comma-separated allow-list of Stripe recurring Price IDs. */
   stripePriceIds: string[]
+  /** Google OAuth Client ID & Secret for Social SSO */
+  googleClientId: string
+  googleClientSecret: string
+  /** Apple OAuth Services ID & Secret */
+  appleClientId: string
+  appleClientSecret: string
+  /** Local-only identity bypass for exercising the social onboarding UI without OAuth credentials. */
+  devSocialAuthEnabled: boolean
 }
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
   const nodeEnv = source.NODE_ENV || 'development'
+  const devSocialAuthRequested = source.DEV_SOCIAL_AUTH_ENABLED === 'true'
+  if (devSocialAuthRequested && nodeEnv !== 'development') {
+    throw new Error('DEV_SOCIAL_AUTH_ENABLED may only be enabled when NODE_ENV=development')
+  }
   const frontendOrigin = source.FRONTEND_ORIGIN || (nodeEnv === 'production' ? 'https://app.asas.local' : 'http://localhost:5173,http://127.0.0.1:5173')
   const objectStorageDriver = source.OBJECT_STORAGE_DRIVER ?? 'local'
   if (objectStorageDriver !== 'local' && objectStorageDriver !== 's3') {
@@ -83,6 +95,11 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
     stripeSecretKey: source.STRIPE_SECRET_KEY ?? '',
     stripeWebhookSecret: source.STRIPE_WEBHOOK_SECRET ?? '',
     stripePriceIds: (source.STRIPE_PRICE_IDS ?? '').split(',').map(value => value.trim()).filter(Boolean),
+    googleClientId: source.GOOGLE_CLIENT_ID?.trim() ?? '',
+    googleClientSecret: source.GOOGLE_CLIENT_SECRET?.trim() ?? '',
+    appleClientId: source.APPLE_CLIENT_ID?.trim() ?? '',
+    appleClientSecret: source.APPLE_CLIENT_SECRET?.trim() ?? '',
+    devSocialAuthEnabled: devSocialAuthRequested,
   }
 }
 

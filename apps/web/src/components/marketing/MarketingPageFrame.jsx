@@ -1,50 +1,61 @@
 import { Link } from 'react-router-dom'
-import { Button } from '../ui/button'
-
-const navLinks = [
-  { label: 'Features', to: '/#features' },
-  { label: 'Solutions', to: '/solutions' },
-  { label: 'Pricing', to: '/pricing' },
-  { label: 'Documentation', to: '/documentation' },
-]
+import MarketingNavbar from './MarketingNavbar'
 
 export default function MarketingPageFrame({ eyebrow, title, description, children }) {
   return (
-    <div className="min-h-screen bg-surface-raised text-body">
-      <header className="sticky top-0 z-50 border-b border-border-subtle bg-surface-raised/90 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-6 py-3.5">
-          <Link to="/" className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-button bg-primary text-xs font-bold text-white">A</span>
-            <span className="text-sm font-semibold text-heading">Asas Enterprise</span>
-          </Link>
-          <div className="order-3 flex w-full flex-wrap items-center gap-x-5 gap-y-2 border-t border-border-subtle pt-3 text-xs sm:text-sm md:order-2 md:w-auto md:border-0 md:pt-0">
-            {navLinks.map(link => <Link key={link.to} to={link.to} className="text-muted transition-colors hover:text-heading">{link.label}</Link>)}
-          </div>
-          <div className="order-2 ml-auto flex items-center gap-4 md:order-3">
-            <Link to="/login" className="text-sm text-muted transition-colors hover:text-heading">Sign in</Link>
-            <Button asChild size="sm">
-              <Link to="/register">Get started</Link>
-            </Button>
-          </div>
+    <div className="relative min-h-screen bg-surface text-body flex flex-col justify-between selection:bg-primary-light selection:text-primary overflow-hidden">
+      {/* Subtle ambient light orb */}
+      <div className="absolute top-12 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-accent/4 rounded-full blur-3xl pointer-events-none -z-10 animate-float" />
+
+      <div>
+        {/* Floating Navbar */}
+        <div className="pt-4">
+          <MarketingNavbar />
         </div>
-      </header>
 
-      <main>
-        <section className="mx-auto max-w-6xl px-6 pb-10 pt-14 md:pb-14 md:pt-20">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-accent">{eyebrow}</p>
-          <h1 className="max-w-4xl text-3xl font-extrabold tracking-tight text-heading md:text-5xl">{title}</h1>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-muted md:text-lg">{description}</p>
-        </section>
-        <div className="mx-auto max-w-6xl px-6 pb-20">{children}</div>
-      </main>
+        <main>
+          {/* Header Section */}
+          <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-12 pb-8 sm:pt-16 sm:pb-12 text-center md:text-left animate-fade-in-up">
+            {eyebrow && (
+              <p className="mb-2.5 text-xs font-bold uppercase tracking-widest text-accent">
+                {eyebrow}
+              </p>
+            )}
+            <h1 className="max-w-4xl text-3xl sm:text-5xl font-extrabold tracking-tight text-heading">
+              {title}
+            </h1>
+            {description && (
+              <p className="mt-4 max-w-3xl text-base sm:text-lg leading-relaxed text-body-light">
+                {description}
+              </p>
+            )}
+          </section>
 
-      <footer className="border-t border-primary-hover bg-primary px-6 py-6">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
-          <Link to="/" className="text-sm font-medium text-white">Asas Enterprise</Link>
-          <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
-            <Link to="/documentation" className="text-body-light transition-colors hover:text-white">Documentation</Link>
-            <Link to="/privacy" className="text-body-light transition-colors hover:text-white">Privacy</Link>
-            <Link to="/terms" className="text-body-light transition-colors hover:text-white">Terms</Link>
+          {/* Children Content */}
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 pb-20 animate-fade-in">
+            {children}
+          </div>
+        </main>
+      </div>
+
+      {/* Enterprise Footer */}
+      <footer className="bg-primary text-on-primary border-t border-border-default py-10 px-4 sm:px-6 mt-auto">
+        <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5 group">
+            <div className="w-6 h-6 rounded-card-sm bg-accent text-on-primary flex items-center justify-center font-bold text-xs shadow-card group-hover:scale-105 transition-micro">
+              A
+            </div>
+            <span className="text-sm font-semibold text-on-primary">Asas Enterprise OS</span>
+            <span className="text-xs text-primary-subtle ml-2">© {new Date().getFullYear()} All rights reserved.</span>
+          </div>
+
+          <nav aria-label="Footer" className="flex flex-wrap items-center gap-5 text-xs">
+            <Link to="/solutions" className="text-primary-subtle hover:text-on-primary transition-micro hover:scale-105">Solutions</Link>
+            <Link to="/pricing" className="text-primary-subtle hover:text-on-primary transition-micro hover:scale-105">Pricing</Link>
+            <Link to="/documentation" className="text-primary-subtle hover:text-on-primary transition-micro hover:scale-105">Documentation</Link>
+            <Link to="/status" className="text-primary-subtle hover:text-on-primary transition-micro hover:scale-105">System Status</Link>
+            <Link to="/privacy" className="text-primary-subtle hover:text-on-primary transition-micro hover:scale-105">Privacy</Link>
+            <Link to="/terms" className="text-primary-subtle hover:text-on-primary transition-micro hover:scale-105">Terms</Link>
           </nav>
         </div>
       </footer>

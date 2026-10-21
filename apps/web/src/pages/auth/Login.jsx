@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Loader2, MailCheck, ArrowRight, RefreshCw } from 'lucide-react'
 import { authClient, signIn } from '../../lib/authClient'
+import { authApi } from '../../lib/api/auth'
+import DevSocialModal from '../../components/auth/DevSocialModal'
+import { GoogleIcon, AppleIcon } from '../../components/common/BrandIcons'
 import FormDialog from '../../components/common/FormDialog'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -30,6 +33,8 @@ export default function Login() {
   const [unverifiedEmail, setUnverifiedEmail] = useState('')
   const [resendingVerification, setResendingVerification] = useState(false)
   const [resendVerificationNotice, setResendVerificationNotice] = useState('')
+  const [devModalOpen, setDevModalOpen] = useState(false)
+  const [devModalProvider, setDevModalProvider] = useState('google')
 
   const [forgotOpen, setForgotOpen] = useState(false)
   const [forgotEmail, setForgotEmail] = useState('')
@@ -130,12 +135,71 @@ export default function Login() {
     }
   }
 
+  const handleSocialSignIn = async (provider) => {
+    setError('')
+    try {
+      // Check if real OAuth provider is configured on the backend
+      const statusRes = await authApi.getProviders().catch(() => null)
+      const providers = statusRes?.data || statusRes || {}
+
+      if (providers[provider]) {
+        const redirectTo = location.state?.from?.pathname || '/dashboard'
+        const res = await authClient.signIn.social({
+          provider,
+          callbackURL: `${window.location.origin}${redirectTo}`,
+        })
+        if (res?.error) {
+          setError(res.error?.message || `${provider === 'apple' ? 'Apple' : 'Google'} sign-in is not configured. Please use your work email.`)
+        }
+      } else if (providers.devAuthAllowed) {
+        // Open local development SSO sandbox
+        setDevModalProvider(provider)
+        setDevModalOpen(true)
+      } else {
+        setError(`${provider === 'apple' ? 'Apple' : 'Google'} single sign-on is not configured in this enterprise environment. Please sign in with your corporate email below.`)
+      }
+    } catch (socialErr) {
+      setError(socialErr?.message || `${provider === 'apple' ? 'Apple' : 'Google'} sign-in is currently unavailable in this environment.`)
+    }
+  }
+
   return (
     <div>
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-heading mb-1">Welcome back</h1>
-        <p className="text-sm text-muted">Sign in to your Asas workspace</p>
+        <p className="text-sm text-muted">Sign in to your Asas enterprise workspace</p>
+      </div>
+
+      {/* Social SSO Buttons */}
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => handleSocialSignIn('google')}
+          className="w-full flex items-center justify-center gap-2 text-xs font-medium h-10 border-border/80 hover:bg-surface-raised hover-lift transition-micro active:scale-[0.98] cursor-pointer shadow-xs"
+        >
+          <GoogleIcon className="w-4 h-4" />
+          <span>Google</span>
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => handleSocialSignIn('apple')}
+          className="w-full flex items-center justify-center gap-2 text-xs font-medium h-10 border-border/80 hover:bg-surface-raised hover-lift transition-micro active:scale-[0.98] cursor-pointer shadow-xs"
+        >
+          <AppleIcon className="w-4 h-4" />
+          <span>Apple</span>
+        </Button>
+      </div>
+
+      <div className="relative mb-5">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-border-subtle" />
+        </div>
+        <div className="relative flex justify-center">
+          <span className="bg-surface-raised px-3 text-xs text-caption">or continue with work email</span>
+        </div>
       </div>
 
       {/* Error / Unverified Notice */}
@@ -269,7 +333,7 @@ export default function Login() {
         <Button
           type="submit"
           disabled={loading}
-          className="w-full h-10 font-semibold cursor-pointer"
+          className="w-full h-10 font-semibold cursor-pointer shadow-card hover:shadow-glow hover-lift transition-micro active:scale-[0.98]"
         >
           {loading ? (
             <>
@@ -332,6 +396,17 @@ export default function Login() {
           )}
         </div>
       </FormDialog>
+
+      <DevSocialModal
+        isOpen={devModalOpen}
+        onClose={() => setDevModalOpen(false)}
+        provider={devModalProvider}
+        onSuccess={(data) => {
+          setDevModalOpen(false)
+          const target = location.state?.from?.pathname || data.redirectUrl || '/dashboard'
+          window.location.assign(target)
+        }}
+      />
     </div>
   )
 }

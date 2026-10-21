@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Search,
   Clock,
@@ -18,11 +18,12 @@ import { queryKeys } from '../../../lib/queryKeys';
 /**
  * Reusable toggle wrapping shadcn/Radix Switch.
  */
-const Toggle = ({ on, color = 'green', onClick }) => {
+const Toggle = ({ on, color = 'green', onClick, disabled = false }) => {
   return (
     <Switch
       checked={Boolean(on)}
       onCheckedChange={onClick}
+      disabled={disabled}
       color={color}
     />
   );
@@ -36,13 +37,11 @@ const Toggle = ({ on, color = 'green', onClick }) => {
  * upserts the channels the user actually toggles).
  */
 const EVENT_ROWS = [
-  { group: 'Finance', module: 'finance', eventType: 'invoice.approval', name: 'Invoice Approvals', preview: 'invoice' },
-  { group: 'Projects', module: 'projects', eventType: 'sprint.milestone', name: 'Sprint Milestone', preview: 'sprint' },
-  { group: 'System', module: 'system', eventType: 'security.new_login', name: 'New Login (New IP)', preview: 'system', danger: true },
-  { group: 'Risks', module: 'projects', eventType: 'risk.escalation', name: 'Risk Matrix Escalation', preview: 'risk' },
+  { group: 'Finance', module: 'finance', eventType: 'invoice.created', name: 'New invoice created', preview: 'invoice' },
+  { group: 'HR', module: 'hr', eventType: 'leave.requested', name: 'Leave request submitted', preview: 'leave' },
 ];
 
-const DEFAULT_PREFERENCES = { inApp: true, email: true, slack: false };
+const DEFAULT_PREFERENCES = { inApp: true, email: false, slack: false };
 
 const getPreviewData = (event) => {
   switch (event) {
@@ -50,6 +49,8 @@ const getPreviewData = (event) => {
       return { title: 'Action Required: Sprint Milestone', desc: 'A sprint milestone is ready for review.', btn: 'Review milestone', icon: 'S', color: 'bg-accent' };
     case 'system':
       return { title: 'Security Alert: New Login', desc: 'A new login was detected and needs review.', btn: 'Review activity', icon: '!', color: 'bg-danger' };
+    case 'leave':
+      return { title: 'Leave request submitted', desc: 'A teammate submitted a leave request for review.', btn: 'Review requests', icon: 'L', color: 'bg-accent' };
     case 'risk':
       return { title: 'Risk Escalation: Delay', desc: 'A project risk has been escalated for review.', btn: 'Review risk', icon: 'R', color: 'bg-warning' };
     case 'invoice':
@@ -61,8 +62,8 @@ const getPreviewData = (event) => {
 export default function SettingsNotifications() {
   const queryClient = useQueryClient();
   const [previewEvent, setPreviewEvent] = useState('invoice');
-  const [criticalOverride, setCriticalOverride] = useState(true);
   const [search, setSearch] = useState('')
+  const [draft, setDraft] = useState(null)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.settings.notifications(),
@@ -73,6 +74,10 @@ export default function SettingsNotifications() {
     mutationFn: (patch) => settingsApi.updateNotifications(patch),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.settings.all() }),
   });
+
+  useEffect(() => {
+    if (data) setDraft(data)
+  }, [data])
 
   if (isLoading) {
     return (
@@ -90,17 +95,33 @@ export default function SettingsNotifications() {
     );
   }
 
-  const modules = data.modules ?? {};
-  const quietHours = data.quietHours ?? { start: '22:00', end: '07:00' };
+  const modules = draft?.modules ?? data.modules ?? {};
+  const quietHours = draft?.quietHours ?? data.quietHours ?? { start: '22:00', end: '07:00' };
 
-  const toggleChannel = (module, eventType, channel) => (event) => {
-    event.stopPropagation();
-    const current = (modules[module]?.[eventType] ?? DEFAULT_PREFERENCES)[channel];
-    updateMutation.mutate({ modules: { [module]: { [eventType]: { [channel]: !current } } } });
+  const toggleChannel = (module, eventType, channel) => (checked) => {
+    updateMutation.reset()
+    setDraft(current => {
+      const next = current ?? data
+      const preferences = next.modules?.[module]?.[eventType] ?? DEFAULT_PREFERENCES
+      return {
+        ...next,
+        modules: {
+          ...next.modules,
+          [module]: {
+            ...next.modules?.[module],
+            [eventType]: { ...preferences, [channel]: checked },
+          },
+        },
+      }
+    })
   };
 
   const setQuietHour = (field) => (event) => {
-    updateMutation.mutate({ quietHours: { [field]: event.target.value } });
+    updateMutation.reset()
+    setDraft(current => ({
+      ...(current ?? data),
+      quietHours: { ...(current ?? data).quietHours, [field]: event.target.value },
+    }))
   };
 
   const preview = getPreviewData(previewEvent);
@@ -115,7 +136,7 @@ export default function SettingsNotifications() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
+    <div className="flex-1 min-h-0 flex flex-col bg-surface overflow-hidden min-w-0 relative">
 
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
@@ -138,7 +159,7 @@ export default function SettingsNotifications() {
             onClick={savePreferences}
             className="h-8 whitespace-nowrap"
           >
-            {updateMutation.isPending ? 'Saving...' : updateMutation.isError ? 'Retry Save' : 'Save Preferences'}
+            {updateMutation.isPending ? 'Saving...' : updateMutation.isError ? 'Retry Save' : updateMutation.isSuccess ? 'Saved' : 'Save Preferences'}
           </Button>
         </div>
       </TopBarActions>
@@ -146,10 +167,10 @@ export default function SettingsNotifications() {
       <SettingsTabs />
 
       {/* ── Main Split View ── */}
-      <div className="flex-1 min-h-0 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden relative">
 
         {/* Left: Configuration Content Area */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-8 max-w-4xl space-y-6">
+        <div className="w-full min-w-0 xl:flex-1 xl:min-h-0 xl:overflow-y-auto p-4 sm:p-8 max-w-4xl space-y-6 relative">
 
           {/* Delivery Schedule Card */}
           {/* Delivery Schedule Card */}
@@ -184,13 +205,15 @@ export default function SettingsNotifications() {
                 </div>
               </div>
 
-              {/* Security Override */}
-              <div className="bg-surface-muted border border-border-default rounded-button p-5 flex items-center justify-between">
+              {/* Urgent alert behavior is fixed in the notification dispatcher. */}
+              <div className="bg-surface-muted border border-border-default rounded-button p-5 flex items-start gap-4">
                 <div className="flex items-center gap-4">
                   <Shield size={20} className="text-accent shrink-0" fill="var(--color-accent)" stroke="white" />
-                  <h3 className="text-sm font-bold text-heading">Override for Critical Security Alerts</h3>
+                  <div>
+                    <h3 className="text-sm font-bold text-heading">Urgent alerts bypass quiet hours</h3>
+                    <p className="mt-1 text-xs text-muted">This is a platform policy. It applies when a workflow emits an urgent alert.</p>
+                  </div>
                 </div>
-                <Toggle on={criticalOverride} color="green" onClick={() => setCriticalOverride(prev => !prev)} />
               </div>
             </CardContent>
           </Card>
@@ -199,7 +222,7 @@ export default function SettingsNotifications() {
           <Card className="rounded-card-sm border-border-default shadow-card">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg font-bold text-heading">Event Triggers & Channels</CardTitle>
-              <CardDescription className="text-sm text-muted">Route specific events to preferred platforms.</CardDescription>
+              <CardDescription className="text-sm text-muted">In-app alerts are active. Email and Slack delivery are not connected for this deployment.</CardDescription>
             </CardHeader>
 
             <CardContent className="pt-0">
@@ -208,8 +231,8 @@ export default function SettingsNotifications() {
                 <div className="grid grid-cols-12 py-3 border-b border-border-default">
                   <div className="col-span-6 text-[10px] font-bold text-muted uppercase tracking-widest">Event Type</div>
                   <div className="col-span-2 text-[10px] font-bold text-muted uppercase tracking-widest text-center">In-App</div>
-                  <div className="col-span-2 text-[10px] font-bold text-muted uppercase tracking-widest text-center">Email</div>
-                  <div className="col-span-2 text-[10px] font-bold text-muted uppercase tracking-widest text-center">Slack</div>
+                  <div className="col-span-2 text-[10px] font-bold text-muted uppercase tracking-widest text-center">Email unavailable</div>
+                  <div className="col-span-2 text-[10px] font-bold text-muted uppercase tracking-widest text-center">Slack unavailable</div>
                 </div>
 
                 {/* Table Body */}
@@ -227,8 +250,8 @@ export default function SettingsNotifications() {
                           <span className="block text-sm font-semibold text-heading">{row.name}</span>
                         </div>
                         <div className="col-span-2 flex justify-center"><Toggle on={prefs.inApp} color="green" onClick={toggleChannel(row.module, row.eventType, 'inApp')} /></div>
-                        <div className="col-span-2 flex justify-center"><Toggle on={prefs.email} color="green" onClick={toggleChannel(row.module, row.eventType, 'email')} /></div>
-                        <div className="col-span-2 flex justify-center"><Toggle on={prefs.slack} color="green" onClick={toggleChannel(row.module, row.eventType, 'slack')} /></div>
+                        <div className="col-span-2 flex justify-center"><Toggle on={false} color="green" disabled /></div>
+                        <div className="col-span-2 flex justify-center"><Toggle on={false} color="green" disabled /></div>
                       </div>
                     );
                   })}
@@ -240,9 +263,9 @@ export default function SettingsNotifications() {
         </div>
 
         {/* Right: Live Preview Panel */}
-        <div className="w-full xl:w-[360px] xl:flex-shrink-0 bg-surface-raised border-t xl:border-t-0 xl:border-l border-border-default flex flex-col max-h-[65vh] xl:max-h-none z-10">
+        <div className="w-full xl:w-[360px] xl:flex-shrink-0 bg-surface-raised border-t xl:border-t-0 xl:border-l border-border-default flex flex-col z-10">
 
-          <div className="flex-1 overflow-y-auto p-8 space-y-8">
+          <div className="xl:flex-1 xl:overflow-y-auto p-8 space-y-8">
 
             {/* Live Preview Container */}
             <div>

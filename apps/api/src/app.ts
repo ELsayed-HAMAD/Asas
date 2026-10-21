@@ -18,6 +18,8 @@ import { type Auth, createAuth } from './auth.js'
 import { loadEnv } from './config/env.js'
 import { errorHandler } from './middlewares/errorHandler.js'
 import { auditLogRoutes } from './modules/auditLog/auditLog.routes.js'
+import { notificationRoutes } from './modules/notifications/notifications.routes.js'
+import { authRoutes } from './modules/auth/auth.routes.js'
 import { crmRoutes } from './modules/crm/crm.routes.js'
 import { financeRoutes } from './modules/finance/finance.routes.js'
 import { registerExportHandlers, exportRoutes } from './modules/exports/exports.routes.js'
@@ -37,6 +39,7 @@ import { sentryPlugin } from './plugins/sentry.js'
 import { initSseRedis, publish, ssePlugin } from './plugins/sse.js'
 import { createRedisClient } from './lib/redis.js'
 import { exportQueuePlugin } from './services/queue.js'
+import { withStorageCapacity } from './services/entitlements.js'
 import { mailerQueuePlugin } from './services/mailerQueue.js'
 import { mailer } from './services/mailer.js'
 import { ResendTransport } from './services/resendTransport.js'
@@ -257,10 +260,8 @@ export async function buildApp(
     credentials: true,
   })
 
-  // Global ceiling. The credential endpoints (sign-in/sign-up/password) get their own tighter
-  // fixed-window limiter inside the better-auth catch-all (`plugins/betterAuth.ts`), because
-  // `@fastify/rate-limit` cannot scope rules to a wildcard sub-path — everything else rides
-  // this global ceiling.
+  // Global ceiling. Credential endpoints also apply a tighter namespaced limit inside the
+  // Better Auth catch-all, using this plugin's same Redis or in-memory store.
   const rateLimitOptions: Record<string, unknown> = { max: 300, timeWindow: '1 minute' }
   if (environment.redisUrl) {
     try {
@@ -337,6 +338,8 @@ export async function buildApp(
         create: data => app.prisma.exportJob.create({ data }),
         updateMany: args => app.prisma.exportJob.updateMany(args),
         getTenantId: async jobId => (await app.prisma.exportJob.findUnique({ where: { id: jobId }, select: { tenantId: true } }))?.tenantId ?? null,
+        withStorageCapacity: (tenantId, additionalBytes, write) =>
+          withStorageCapacity(app.prisma, objectStorage, tenantId, additionalBytes, async () => write()),
       },
       storage: objectStorage,
     })
@@ -363,6 +366,8 @@ export async function buildApp(
     await app.register(onboardingRoutes, { prefix: '/api/v1/onboarding' })
     await app.register(exportRoutes, { prefix: '/api/v1/exports' })
     await app.register(auditLogRoutes, { prefix: '/api/v1/audit-logs' })
+    await app.register(notificationRoutes, { prefix: '/api/v1/notifications' })
+    await app.register(authRoutes, { prefix: '/api/v1/auth' })
   }
 
   app.get(
