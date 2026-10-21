@@ -16,7 +16,7 @@ import { computePeriodSalarySchedule, validatePayrollPeriod, computePayrollLine,
 import { AppError } from '../../utils/errors.js'
 import { monthToDateComparisonPeriods, tenantToday } from '../../utils/dates.js'
 import type { PayslipDoc } from '../../services/pdf.js'
-import { payrollSettlementComparison, recordCashSettlement, reverseCashSettlement } from '../finance/ledger.service.js'
+import { payrollSettlementComparison, recordCashSettlement, recordPayrollRecognition, reverseCashSettlement, reversePayrollRecognitionIfPresent } from '../finance/ledger.service.js'
 
 type PayrollClient = PrismaClient | Prisma.TransactionClient
 
@@ -37,7 +37,16 @@ type LineWithIncludes = {
   gross: Prisma.Decimal
   deductions: Prisma.Decimal
   net: Prisma.Decimal
-  employee: { id: string; name: string; title: string }
+  employee: {
+    id: string
+    name: string
+    title: string
+    bankRoutingNumber?: string | null
+    bankAccountNumber?: string | null
+    bankAccountType?: string | null
+    bankIban?: string | null
+    bankBic?: string | null
+  }
   taxLines: { id: string; label: string; amount: Prisma.Decimal; override: boolean }[]
 }
 
@@ -206,7 +215,16 @@ function mapLine(line: LineWithIncludes): PayrollLine {
   return {
     id: line.id,
     employeeId: line.employeeId,
-    employee: line.employee,
+    employee: {
+      id: line.employee.id,
+      name: line.employee.name,
+      title: line.employee.title,
+      bankRoutingNumber: line.employee.bankRoutingNumber ?? null,
+      bankAccountNumber: line.employee.bankAccountNumber ?? null,
+      bankAccountType: line.employee.bankAccountType ?? null,
+      bankIban: line.employee.bankIban ?? null,
+      bankBic: line.employee.bankBic ?? null,
+    },
     baseSalary: line.baseSalary?.toString() ?? null,
     sourceSalary: line.sourceSalary?.toString() ?? null,
     salaryBasis: line.salaryBasis ?? null,
@@ -272,7 +290,18 @@ export async function getPayrollRun(prisma: PayrollClient, tenantId: string, run
       where: { payrollRunId: run.id, tenantId },
       orderBy: { employee: { name: 'asc' } },
       include: {
-        employee: { select: { id: true, name: true, title: true } },
+        employee: {
+          select: {
+            id: true,
+            name: true,
+            title: true,
+            bankRoutingNumber: true,
+            bankAccountNumber: true,
+            bankAccountType: true,
+            bankIban: true,
+            bankBic: true,
+          },
+        },
         taxLines: true,
       },
     }),
@@ -289,6 +318,9 @@ export async function getPayrollRun(prisma: PayrollClient, tenantId: string, run
     label: run.label,
     payDate: run.payDate ? run.payDate.toISOString().slice(0, 10) : null,
     status: run.status,
+    createdById: run.createdById ?? null,
+    approvedAt: run.approvedAt?.toISOString() ?? null,
+    approvedById: run.approvedById ?? null,
     voidedAt: run.voidedAt?.toISOString() ?? null,
     voidedById: run.voidedById,
     voidReason: run.voidReason,
@@ -317,9 +349,10 @@ export async function createPayrollRun(
   prisma: PayrollClient,
   tenantId: string,
   input: PayrollRunCreateInput,
+  actorId?: string,
 ): Promise<PayrollRun & { creationReplayed: boolean }> {
   if ('$transaction' in prisma) {
-    return prisma.$transaction(tx => createPayrollRun(tx, tenantId, input), { maxWait: 5000 })
+    return prisma.$transaction(tx => createPayrollRun(tx, tenantId, input, actorId), { maxWait: 5000 })
   }
   let periodInfo: ReturnType<typeof validatePayrollPeriod>
   try { periodInfo = validatePayrollPeriod(input) } catch (error) {
@@ -395,6 +428,7 @@ export async function createPayrollRun(
       salaryBasis: input.salaryBasis, prorationMethod: 'CALENDAR_DAYS', currency,
       requestKey: input.requestKey, requestHash,
       status: 'PENDING',
+      createdById: actorId ?? null,
       taxRates: input.taxRates,
     },
   })
@@ -403,11 +437,17 @@ export async function createPayrollRun(
   const taxLineWritesByEmployee = new Map<string, ReturnType<typeof priceLine>['taxLines']>()
   for (const employee of employees) {
     const savedRates = ratesByEmployee.get(employee.id) ?? []
-    const salaryRates: SalaryRate[] = savedRates.map(rate => ({
-      salary: Money.fromDecimal(rate.salary.toString(), rate.currency as typeof currency, 'HALF_UP'),
-      salaryBasis: rate.salaryBasis,
-      effectiveFrom: rate.effectiveFrom.toISOString().slice(0, 10),
-    }))
+    const salaryRates: SalaryRate[] = savedRates.length > 0
+      ? savedRates.map(rate => ({
+          salary: Money.fromDecimal(rate.salary.toString(), rate.currency as typeof currency, 'HALF_UP'),
+          salaryBasis: rate.salaryBasis,
+          effectiveFrom: rate.effectiveFrom.toISOString().slice(0, 10),
+        }))
+      : [{
+          salary: Money.fromDecimal(employee.salary!.toString(), (employee.currency ?? currency) as typeof currency, 'HALF_UP'),
+          salaryBasis: employee.salaryBasis ?? input.salaryBasis,
+          effectiveFrom: employee.hiredAt ? employee.hiredAt.toISOString().slice(0, 10) : input.periodStart,
+        }]
     let periodPay: ReturnType<typeof computePeriodSalarySchedule>
     try {
       periodPay = computePeriodSalarySchedule(salaryRates, input.salaryBasis, input, employee.hiredAt?.toISOString().slice(0, 10), employee.employmentEndDate?.toISOString().slice(0, 10))
@@ -500,6 +540,9 @@ export async function listPayrollRuns(
     label: run.label,
     payDate: run.payDate ? run.payDate.toISOString().slice(0, 10) : null,
     status: run.status,
+    createdById: run.createdById ?? null,
+    approvedAt: run.approvedAt?.toISOString() ?? null,
+    approvedById: run.approvedById ?? null,
     lineCount: run._count.lines,
     createdAt: run.createdAt.toISOString(),
   }))
@@ -524,24 +567,63 @@ export async function listPayrollRuns(
 }
 
 /**
- * Approve a run. Only a PENDING run can be approved (idempotency: an already-approved run is
- * 409, not a silent no-op, so a double-approval is loud). The approver's identity is recorded
- * by the *route* in the append-only audit log — the service does not take a user id, which
- * keeps it from being called outside an authenticated request.
+ * Approve a run. Only a PENDING run can be approved.
+ * Enforces maker-checker policy (a run cannot be approved by the user who created it when multiple workspace members exist).
+ * Posts payroll accrual recognition to the ledger atomically upon approval.
  */
-export async function approvePayrollRun(prisma: PayrollClient, tenantId: string, runId: string): Promise<PayrollRun> {
-  if ('$transaction' in prisma) return prisma.$transaction(tx => approvePayrollRun(tx, tenantId, runId))
-  // Conditional write: the status check and the transition are one statement, so two
-  // concurrent approvals cannot both succeed (the loser matches zero rows).
+export async function approvePayrollRun(
+  prisma: PayrollClient,
+  tenantId: string,
+  runId: string,
+  approverId?: string,
+  options?: { allowSelfApproval?: boolean },
+): Promise<PayrollRun> {
+  if ('$transaction' in prisma) {
+    return prisma.$transaction(tx => approvePayrollRun(tx, tenantId, runId, approverId, options), { maxWait: 5000 })
+  }
+  const run = await prisma.payrollRun.findFirst({ where: { id: runId, tenantId } })
+  if (!run) throw new AppError(404, 'Payroll run not found')
+  if (run.status !== 'PENDING') throw new AppError(409, `A ${run.status.toLowerCase()} run cannot be approved`)
+
+  // Maker-checker dual-authorization validation
+  if (approverId && run.createdById && run.createdById === approverId && !options?.allowSelfApproval) {
+    const memberCount = await (prisma as PrismaClient).member?.count?.({ where: { tenantId } }) ?? 2
+    if (memberCount > 1) {
+      throw new AppError(403, 'Maker-checker policy violation: A payroll run cannot be approved by the user who created it.')
+    }
+  }
+
+  const approvedAt = new Date()
   const { count } = await prisma.payrollRun.updateMany({
     where: { id: runId, tenantId, status: 'PENDING' },
-    data: { status: 'APPROVED' },
+    data: {
+      status: 'APPROVED',
+      approvedAt,
+      approvedById: approverId ?? null,
+    },
   })
   if (count === 0) {
-    const run = await prisma.payrollRun.findFirst({ where: { id: runId, tenantId } })
-    if (!run) throw new AppError(404, 'Payroll run not found')
-    throw new AppError(409, `A ${run.status.toLowerCase()} run cannot be approved`)
+    throw new AppError(409, 'The payroll run changed while approval was being recorded')
   }
+
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } })
+  if (!tenant) throw new AppError(404, 'Workspace not found')
+  const currency = run.currency ?? tenant.currency
+
+  const totals = await prisma.payrollLine.aggregate({ where: { payrollRunId: runId, tenantId }, _sum: { net: true } })
+  const amount = totals._sum.net?.toString() ?? '0'
+
+  await recordPayrollRecognition(prisma, {
+    tenantId,
+    runId,
+    amount,
+    currency,
+    workspaceCurrency: tenant.currency,
+    postedAt: approvedAt,
+    actorId: approverId ?? null,
+    description: `Payroll accrual · ${run.label}`,
+  })
+
   return getPayrollRun(prisma, tenantId, runId)
 }
 
@@ -593,6 +675,9 @@ export async function voidPayrollRun(prisma: PayrollClient, tenantId: string, ru
       tenantId, sourceId: runId, sourceType: 'PAYROLL_PAYMENT', reason, actorId, postedAt: new Date(),
     })
   }
+  await reversePayrollRecognitionIfPresent(prisma, {
+    tenantId, runId, reason, actorId, postedAt: new Date(),
+  })
   const changed = await prisma.payrollRun.updateMany({
     where: { id: runId, tenantId, status: run.status },
     data: { status: 'VOID', voidReason: reason.trim(), voidedAt: new Date(), voidedById: actorId },

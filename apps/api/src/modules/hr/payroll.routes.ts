@@ -102,7 +102,7 @@ export async function payrollRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
       const run = await request.server.prisma.$transaction(async tx => {
-        const run = await payrollService.createPayrollRun(tx, tenantId, request.body)
+        const run = await payrollService.createPayrollRun(tx, tenantId, request.body, userId)
         if (!run.creationReplayed) await recordAuditLog(tx, {
           tenantId, actorId: userId, action: 'payroll.run.create',
           targetType: 'PayrollRun', targetId: run.id,
@@ -128,7 +128,7 @@ export async function payrollRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
       const run = await request.server.prisma.$transaction(async tx => {
-        const run = await payrollService.approvePayrollRun(tx, tenantId, request.params.id)
+        const run = await payrollService.approvePayrollRun(tx, tenantId, request.params.id, userId)
         await recordAuditLog(tx, {
           tenantId,
           actorId: userId,

@@ -61,15 +61,28 @@ export function generateNachaForRun(run, lines, companyOptions = {}) {
     destinationBankName: companyOptions.destinationBankName || 'FEDACH OPERATOR',
   }
 
+  if (companyOptions.requireBankDetails) {
+    const missing = lines.filter(l => !l.employee?.bankRoutingNumber || !l.employee?.bankAccountNumber)
+    if (missing.length > 0) {
+      throw new Error(`Direct deposit ACH file cannot be generated: the following employees are missing bank routing or account numbers: ${missing.map(l => l.employee?.name || l.employeeId).join(', ')}`)
+    }
+  }
+
   const entries = lines.map((line, idx) => {
     const netAmount = Money.fromDecimal(line.net || '0', currency)
+    const emp = line.employee || {}
+    const empName = emp.name || `Employee ${idx + 1}`
+    const routingNumber = emp.bankRoutingNumber || companyOptions.defaultReceivingRouting || '011000015'
+    const accountNumber = emp.bankAccountNumber || `ACC${(line.employeeId || idx).toString().replace(/[^0-9]/g, '').slice(-12).padStart(6, '0')}`
+    const accountType = (emp.bankAccountType || 'CHECKING').toUpperCase()
+
     return {
       employeeId: line.employeeId || `EMP-${idx + 1}`,
-      employeeName: line.employee?.name || `Employee ${idx + 1}`,
-      routingNumber: companyOptions.defaultReceivingRouting || '011000015',
-      accountNumber: `ACC${(line.employeeId || idx).toString().replace(/[^0-9]/g, '').slice(-12).padStart(6, '0')}`,
+      employeeName: empName,
+      routingNumber,
+      accountNumber,
       amountCents: netAmount.minorUnits,
-      accountType: 'CHECKING',
+      accountType: accountType === 'SAVINGS' ? 'SAVINGS' : 'CHECKING',
     }
   })
 
@@ -92,12 +105,25 @@ export function generateSepaForRun(run, lines, initiatorOptions = {}) {
     bic: initiatorOptions.bic || 'DEUTDEFF',
   }
 
+  if (initiatorOptions.requireBankDetails) {
+    const missing = lines.filter(l => !l.employee?.bankIban)
+    if (missing.length > 0) {
+      throw new Error(`SEPA credit transfer XML cannot be generated: the following employees are missing IBAN: ${missing.map(l => l.employee?.name || l.employeeId).join(', ')}`)
+    }
+  }
+
   const entries = lines.map((line, idx) => {
     const netAmount = Money.fromDecimal(line.net || '0', 'EUR')
+    const emp = line.employee || {}
+    const empName = emp.name || `Employee ${idx + 1}`
+    const iban = (emp.bankIban || initiatorOptions.defaultCreditorIban || 'FR1420041010050500013M02606').replace(/\s+/g, '').toUpperCase()
+    const bic = (emp.bankBic || initiatorOptions.defaultCreditorBic || '').replace(/\s+/g, '').toUpperCase()
+
     return {
       endToEndId: `SALARY-${(line.id || line.employeeId || idx).slice(0, 25)}`,
-      employeeName: line.employee?.name || `Employee ${idx + 1}`,
-      iban: initiatorOptions.defaultCreditorIban || 'FR1420041010050500013M02606',
+      employeeName: empName,
+      iban,
+      bic: bic || undefined,
       amountCents: netAmount.minorUnits,
       remittanceInfo: `Salary - ${run.label || 'Payroll'}`,
     }

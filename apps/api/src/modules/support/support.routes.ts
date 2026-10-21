@@ -44,9 +44,13 @@ export async function supportRoutes(app: FastifyInstance): Promise<void> {
       schema: { response: { 200: envelope(supportTicketListResponseSchema), ...errorResponses } },
     },
     async request => {
-      const { tenantId } = requireAuthContext(request)
+      const { tenantId, role, userId } = requireAuthContext(request)
+      const isElevated = role === 'ADMIN' || role === 'OWNER'
       const rows = await request.server.prisma.supportTicket.findMany({
-        where: { tenantId },
+        where: {
+          tenantId,
+          ...(isElevated ? {} : { createdById: userId }),
+        },
         orderBy: { createdAt: 'desc' },
       })
       return { data: { items: rows.map(mapTicket) } }
@@ -63,7 +67,12 @@ export async function supportRoutes(app: FastifyInstance): Promise<void> {
       const { tenantId, userId } = requireAuthContext(request)
       const row = await request.server.prisma.$transaction(async tx => {
         const ticket = await tx.supportTicket.create({
-          data: { tenantId, subject: request.body.subject, channel: request.body.channel ?? 'dashboard' },
+          data: {
+            tenantId,
+            createdById: userId,
+            subject: request.body.subject,
+            channel: request.body.channel ?? 'dashboard',
+          },
         })
         await recordAuditLog(tx, {
           tenantId,

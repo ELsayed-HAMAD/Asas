@@ -14,6 +14,13 @@ describe('email environment', () => {
     expect(() => assertEnv(loadEnv({ NODE_ENV: 'production', DATABASE_URL: 'postgres://db', AUTH_SECRET: 'secret', RESEND_API_KEY: 're_test_key', MAIL_FROM: 'Asas <mail@example.com>', OBJECT_STORAGE_DRIVER: 's3', S3_BUCKET: 'asas-files' })))
       .not.toThrow()
   })
+
+  it('enforces HTTPS for FRONTEND_ORIGIN in production', () => {
+    expect(() => assertEnv(loadEnv({ NODE_ENV: 'production', DATABASE_URL: 'postgres://db', AUTH_SECRET: 'secret', OBJECT_STORAGE_DRIVER: 's3', S3_BUCKET: 'asas-files', FRONTEND_ORIGIN: 'http://insecure.example.com' })))
+      .toThrow('FRONTEND_ORIGIN must use HTTPS in production to prevent cookie leakage over plaintext')
+    expect(() => assertEnv(loadEnv({ NODE_ENV: 'production', DATABASE_URL: 'postgres://db', AUTH_SECRET: 'secret', OBJECT_STORAGE_DRIVER: 's3', S3_BUCKET: 'asas-files', FRONTEND_ORIGIN: 'https://app.asas.com' })))
+      .not.toThrow()
+  })
 })
 
 describe('object storage environment', () => {
@@ -57,3 +64,24 @@ describe('Stripe billing environment', () => {
     expect(() => assertEnv(loadEnv({ DATABASE_URL: 'postgres://db', STRIPE_PRICE_IDS: 'price_basic' }))).toThrow('STRIPE_SECRET_KEY is required')
   })
 })
+
+describe('PORT environment validation', () => {
+  it('defaults to 4000 when PORT is omitted', () => {
+    const env = loadEnv({})
+    expect(env.port).toBe(4000)
+  })
+
+  it('parses valid integer PORT strings', () => {
+    const env = loadEnv({ PORT: '8080' })
+    expect(env.port).toBe(8080)
+  })
+
+  it('rejects invalid, negative, zero, non-integer, and out-of-range ports', () => {
+    expect(() => loadEnv({ PORT: 'invalid' })).toThrow('PORT must be an integer between 1 and 65535')
+    expect(() => loadEnv({ PORT: '0' })).toThrow('PORT must be an integer between 1 and 65535')
+    expect(() => loadEnv({ PORT: '-1' })).toThrow('PORT must be an integer between 1 and 65535')
+    expect(() => loadEnv({ PORT: '70000' })).toThrow('PORT must be an integer between 1 and 65535')
+    expect(() => loadEnv({ PORT: '4000.5' })).toThrow('PORT must be an integer between 1 and 65535')
+  })
+})
+

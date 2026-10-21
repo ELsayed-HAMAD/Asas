@@ -25,6 +25,8 @@ import * as candidatesService from './candidates.service.js'
 import { renderCandidateCsv } from './candidateExport.js'
 import { recordAuditLog } from '../../services/auditLog.js'
 import { candidateResumeKey, candidateResumeStagingKey } from '../../services/objectStorage.js'
+import { checkStorageEntitlement } from '../../services/entitlements.js'
+import { AppError } from '../../utils/errors.js'
 
 /**
  * HR candidates — recruitment pipeline reads/writes plus the CV (resume) surface.
@@ -91,7 +93,7 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
   })
 
   server.get('/candidates/:id/interviews', {
-    preHandler: requireRole('MEMBER'),
+    preHandler: requirePermission('candidate.read'),
     schema: { params: idParamSchema, response: { 200: envelope(candidateInterviewListSchema), ...errorResponses } },
   }, async request => {
     const { tenantId } = requireAuthContext(request)
@@ -130,7 +132,7 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
   server.get(
     '/candidates',
     {
-      preHandler: requireRole('MEMBER'),
+      preHandler: requirePermission('candidate.read'),
       schema: {
         querystring: candidateListQuerySchema,
         response: { 200: envelope(candidateListResponseSchema), ...errorResponses },
@@ -146,7 +148,7 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
   server.get(
     '/candidates/:id',
     {
-      preHandler: requireRole('MEMBER'),
+      preHandler: requirePermission('candidate.read'),
       schema: {
         params: idParamSchema,
         response: { 200: envelope(candidateSchema), ...errorResponses },
@@ -260,6 +262,12 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
     async request => {
       const { tenantId } = requireAuthContext(request)
       const prisma = request.server.prisma
+      if (typeof (prisma as any).subscription?.findFirst === 'function') {
+        const storageCheck = await checkStorageEntitlement(prisma, tenantId, MAX_RESUME_BYTES)
+        if (!storageCheck.allowed) {
+          throw new AppError(402, 'Workspace storage quota exceeded. Please upgrade your subscription plan.')
+        }
+      }
       const candidate = await candidatesService.getCandidate(prisma, tenantId, request.params.id)
 
       const expiresUnix = Math.floor(Date.now() / 1000) + UPLOAD_TTL_SECONDS
@@ -267,7 +275,7 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
       const uploadToken = signUpload(authSecret, tenantId, candidate.id, expiresUnix, uploadId)
       const uploadTarget = request.server.objectStorage.mode === 's3' ? 'object' as const : 'api' as const
       const uploadUrl = uploadTarget === 'object'
-        ? await request.server.objectStorage.presignPut(candidateResumeStagingKey(tenantId, candidate.id, uploadId), 'application/pdf', UPLOAD_TTL_SECONDS)
+        ? await request.server.objectStorage.presignPut(candidateResumeStagingKey(tenantId, candidate.id, uploadId), 'application/pdf', UPLOAD_TTL_SECONDS, MAX_RESUME_BYTES)
         : `/api/v1/hr/candidates/${candidate.id}/resume?h=${uploadToken}&exp=${expiresUnix}&uploadId=${uploadId}`
       return {
         data: {
@@ -405,7 +413,7 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
   server.get(
     '/candidates/:id/resume',
     {
-      preHandler: requireRole('MEMBER'),
+      preHandler: requirePermission('candidate.read'),
       schema: { params: idParamSchema, ...({} as object) },
     },
     async (request, reply) => {

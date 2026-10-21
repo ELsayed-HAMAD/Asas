@@ -196,6 +196,8 @@ export async function listPurchaseOrders(
       id: order.id,
       status: order.status as PurchaseOrder['status'],
       createdAt: order.createdAt.toISOString(),
+      approvedAt: order.approvedAt ? order.approvedAt.toISOString() : undefined,
+      receivedAt: order.receivedAt ? order.receivedAt.toISOString() : undefined,
       productId: line?.product.id ?? '',
       productName: line?.product.name ?? 'Unknown product',
       sku: line?.product.sku ?? '',
@@ -215,24 +217,35 @@ export async function approvePurchaseOrder(
   })
   if (!order) throw new AppError(404, 'Purchase order not found')
   if (order.status !== 'DRAFT') {
-    throw new AppError(400, `Cannot approve order with status "${order.status}"`)
+    throw new AppError(409, `Cannot approve order with status "${order.status}"`)
   }
 
-  const updated = await prisma.purchaseOrder.update({
-    where: { id },
-    data: { status: 'APPROVED' },
-    include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+  return prisma.$transaction(async tx => {
+    const updatedCount = await tx.purchaseOrder.updateMany({
+      where: { id, tenantId, status: 'DRAFT' },
+      data: { status: 'APPROVED', approvedAt: new Date() },
+    })
+    if (updatedCount.count !== 1) {
+      throw new AppError(409, 'Purchase order is not in an approvable state or was already updated')
+    }
+
+    const updated = await tx.purchaseOrder.findUniqueOrThrow({
+      where: { id },
+      include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+    })
+    const line = updated.lines[0]
+    return {
+      id: updated.id,
+      status: 'APPROVED',
+      createdAt: updated.createdAt.toISOString(),
+      approvedAt: updated.approvedAt ? updated.approvedAt.toISOString() : undefined,
+      receivedAt: updated.receivedAt ? updated.receivedAt.toISOString() : undefined,
+      productId: line?.product.id ?? '',
+      productName: line?.product.name ?? 'Unknown product',
+      sku: line?.product.sku ?? '',
+      quantity: line?.quantity ?? 0,
+    }
   })
-  const line = updated.lines[0]
-  return {
-    id: updated.id,
-    status: 'APPROVED',
-    createdAt: updated.createdAt.toISOString(),
-    productId: line?.product.id ?? '',
-    productName: line?.product.name ?? 'Unknown product',
-    sku: line?.product.sku ?? '',
-    quantity: line?.quantity ?? 0,
-  }
 }
 
 export async function receivePurchaseOrder(
@@ -245,21 +258,34 @@ export async function receivePurchaseOrder(
     include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
   })
   if (!order) throw new AppError(404, 'Purchase order not found')
+  if (order.status === 'DRAFT') {
+    throw new AppError(409, 'Purchase order must be approved before receiving')
+  }
   if (order.status === 'RECEIVED') {
-    throw new AppError(400, 'Purchase order is already received')
+    throw new AppError(409, 'Purchase order is already received')
   }
   if (order.status === 'CANCELLED') {
-    throw new AppError(400, 'Cannot receive cancelled purchase order')
+    throw new AppError(409, 'Cannot receive cancelled purchase order')
+  }
+  if (order.status !== 'APPROVED') {
+    throw new AppError(409, `Cannot receive purchase order with status "${order.status}"`)
   }
 
   return prisma.$transaction(async tx => {
-    const updated = await tx.purchaseOrder.update({
+    const updatedCount = await tx.purchaseOrder.updateMany({
+      where: { id, tenantId, status: 'APPROVED' },
+      data: { status: 'RECEIVED', receivedAt: new Date() },
+    })
+    if (updatedCount.count !== 1) {
+      throw new AppError(409, 'Purchase order is not in an approvable state or was already received')
+    }
+
+    const updatedOrder = await tx.purchaseOrder.findUniqueOrThrow({
       where: { id },
-      data: { status: 'RECEIVED' },
       include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
     })
 
-    for (const line of updated.lines) {
+    for (const line of updatedOrder.lines) {
       await tx.product.update({
         where: { id: line.productId },
         data: { stock: { increment: line.quantity } },
@@ -269,16 +295,63 @@ export async function receivePurchaseOrder(
           tenantId,
           productId: line.productId,
           delta: line.quantity,
-          note: `PO #${order.id} received`,
+          note: `PO #${updatedOrder.id} received`,
         },
       })
     }
 
+    const line = updatedOrder.lines[0]
+    return {
+      id: updatedOrder.id,
+      status: 'RECEIVED',
+      createdAt: updatedOrder.createdAt.toISOString(),
+      approvedAt: updatedOrder.approvedAt ? updatedOrder.approvedAt.toISOString() : undefined,
+      receivedAt: updatedOrder.receivedAt ? updatedOrder.receivedAt.toISOString() : undefined,
+      productId: line?.product.id ?? '',
+      productName: line?.product.name ?? 'Unknown product',
+      sku: line?.product.sku ?? '',
+      quantity: line?.quantity ?? 0,
+    }
+  })
+}
+
+export async function cancelPurchaseOrder(
+  prisma: PrismaClient,
+  tenantId: string,
+  id: string,
+): Promise<PurchaseOrder> {
+  const order = await prisma.purchaseOrder.findFirst({
+    where: { id, tenantId },
+    include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+  })
+  if (!order) throw new AppError(404, 'Purchase order not found')
+  if (order.status === 'RECEIVED') {
+    throw new AppError(409, 'Cannot cancel already received purchase order')
+  }
+  if (order.status === 'CANCELLED') {
+    throw new AppError(409, 'Purchase order is already cancelled')
+  }
+
+  return prisma.$transaction(async tx => {
+    const updatedCount = await tx.purchaseOrder.updateMany({
+      where: { id, tenantId, status: { in: ['DRAFT', 'APPROVED'] } },
+      data: { status: 'CANCELLED' },
+    })
+    if (updatedCount.count !== 1) {
+      throw new AppError(409, 'Purchase order is not in a cancellable state or was already updated')
+    }
+
+    const updated = await tx.purchaseOrder.findUniqueOrThrow({
+      where: { id },
+      include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+    })
     const line = updated.lines[0]
     return {
       id: updated.id,
-      status: 'RECEIVED',
+      status: 'CANCELLED',
       createdAt: updated.createdAt.toISOString(),
+      approvedAt: updated.approvedAt ? updated.approvedAt.toISOString() : undefined,
+      receivedAt: updated.receivedAt ? updated.receivedAt.toISOString() : undefined,
       productId: line?.product.id ?? '',
       productName: line?.product.name ?? 'Unknown product',
       sku: line?.product.sku ?? '',

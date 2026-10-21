@@ -85,11 +85,15 @@ async function setup(options: { failAudit?: boolean; failRead?: boolean; status?
         update: async ({ data }: { data: Record<string, unknown> }) => { write(); staged.line = { ...staged.line, ...data } as typeof staged.line; return staged.line },
         aggregate: async () => ({ _sum: { gross: staged.line.gross, deductions: staged.line.deductions, net: staged.line.net } }),
       },
+      member: { count: async () => 1, findUnique: async () => ({ role: options.role ?? 'ADMIN', employeeId }) },
       ledgerAccount: { upsert: async ({ create }: { create: Record<string, unknown> }) => ({ id: String(create.code) }) },
-      journalEntry: { create: async ({ data }: { data: Record<string, unknown> }) => {
-        staged.journals.push(data)
-        return { id: `journal_${staged.journals.length}` }
-      } },
+      journalEntry: {
+        findFirst: async () => null,
+        create: async ({ data }: { data: Record<string, unknown> }) => {
+          staged.journals.push(data)
+          return { id: `journal_${staged.journals.length}` }
+        },
+      },
       journalLine: { createMany: async ({ data }: { data: Record<string, unknown>[] }) => { staged.journalLines.push(...data); return { count: data.length } } },
       payrollTaxLine: {
         deleteMany: async () => { write(); staged.line.taxLines = [] },

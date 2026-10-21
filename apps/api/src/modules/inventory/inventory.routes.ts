@@ -206,6 +206,26 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
     return { data: order }
   })
 
+  server.post('/purchase-orders/:id/cancel', {
+    preHandler: requirePermission('inventory.write'),
+    schema: {
+      params: idParamSchema,
+      response: { 200: envelope(purchaseOrderSchema), ...errorResponses },
+    },
+  }, async request => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const order = await inventoryController.cancelPurchaseOrder(request.server.prisma, tenantId, request.params.id)
+    await recordAuditLog(request.server.prisma, {
+      tenantId,
+      actorId: userId,
+      action: 'inventory.purchase-order.cancel',
+      targetType: 'PurchaseOrder',
+      targetId: order.id,
+    })
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
+    return { data: order }
+  })
+
   server.post(
     '/products',
     {

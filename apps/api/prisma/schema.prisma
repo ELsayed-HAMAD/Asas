@@ -218,6 +218,8 @@ model Tenant {
   dateFormat         String           @default("MMM d, yyyy")
   overtimeThresholdHours Float        @default(8)
   onboardingStatus   OnboardingStatus @default(PENDING)
+  status             String           @default("ACTIVE")
+  archivedAt         DateTime?
   sampleDataManifest Json?
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
@@ -295,6 +297,7 @@ model User {
   auditLogs            AuditLog[]
   exchangeRatesCreated ExchangeRate[]
   twoFactors            TwoFactor[]
+  supportTickets       SupportTicket[]
 }
 
 model TwoFactor {
@@ -489,6 +492,11 @@ model Employee {
   location       String?
   employeeNumber String?
   email          String?
+  bankRoutingNumber  String?
+  bankAccountNumber  String?
+  bankAccountType    String?
+  bankIban           String?
+  bankBic            String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
@@ -543,6 +551,9 @@ model PayrollRun {
   salaryBasis     SalaryBasis?
   prorationMethod String?
   currency        String?
+  createdById     String?
+  approvedAt      DateTime?
+  approvedById    String?
   paidAt          DateTime?
   paidById        String?
   voidedAt        DateTime?
@@ -560,6 +571,7 @@ model PayrollRun {
   tenant             Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   lines              PayrollLine[]
   settlementJournals JournalEntry[]
+  recognitionJournals JournalEntry[] @relation("PayrollRecognition")
 
   @@unique([tenantId, requestKey])
   @@unique([id, tenantId])
@@ -897,6 +909,7 @@ model Expense {
   project            Project?       @relation(fields: [projectId, tenantId], references: [id, tenantId], onDelete: NoAction)
   employee           Employee?      @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   settlementJournals JournalEntry[]
+  recognitionJournals JournalEntry[] @relation("ExpenseRecognition")
 
   @@unique([id, tenantId])
   @@index([tenantId])
@@ -958,6 +971,8 @@ model JournalEntry {
   expenseId                     String?
   recognizesPayableInvoiceId    String?
   recognizesReceivableInvoiceId String?
+  recognizesPayrollRunId        String?
+  recognizesExpenseId           String?
   reversesJournalEntryId        String?  @unique
   reversalReason                String?
   currencyProvenance            String
@@ -974,6 +989,8 @@ model JournalEntry {
   expense              Expense?           @relation(fields: [expenseId, tenantId], references: [id, tenantId], onDelete: Restrict)
   recognizedPayable    PayableInvoice?    @relation("PayableRecognition", fields: [recognizesPayableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
   recognizedReceivable ReceivableInvoice? @relation("ReceivableRecognition", fields: [recognizesReceivableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  recognizedPayrollRun PayrollRun?        @relation("PayrollRecognition", fields: [recognizesPayrollRunId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  recognizedExpense    Expense?           @relation("ExpenseRecognition", fields: [recognizesExpenseId, tenantId], references: [id, tenantId], onDelete: Restrict)
   reverses             JournalEntry?      @relation("JournalReversal", fields: [reversesJournalEntryId, tenantId], references: [id, tenantId], onDelete: Restrict)
   reversedBy           JournalEntry?      @relation("JournalReversal")
   lines                JournalLine[]
@@ -1290,11 +1307,13 @@ model ProductSupplier {
 }
 
 model PurchaseOrder {
-  id        String   @id @default(cuid())
-  tenantId  String
-  status    String   @default("DRAFT")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String    @id @default(cuid())
+  tenantId   String
+  status     String    @default("DRAFT")
+  approvedAt DateTime?
+  receivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   tenant Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   lines  PurchaseOrderLine[]
@@ -1639,15 +1658,18 @@ model BackupSchedule {
 }
 
 model SupportTicket {
-  id         String              @id @default(cuid())
-  tenantId   String
-  subject    String
-  channel    String?
-  status     SupportTicketStatus @default(OPEN)
-  createdAt  DateTime            @default(now())
-  resolvedAt DateTime?
+  id          String              @id @default(cuid())
+  tenantId    String
+  createdById String?
+  subject     String
+  channel     String?
+  status      SupportTicketStatus @default(OPEN)
+  createdAt   DateTime            @default(now())
+  resolvedAt  DateTime?
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
+  @@index([createdById])
 }

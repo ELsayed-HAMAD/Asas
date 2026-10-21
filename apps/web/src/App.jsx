@@ -26,6 +26,9 @@ import Register from './pages/auth/Register'
 import TwoFactorVerify from './pages/auth/TwoFactorVerify'
 import VerifyEmail from './pages/auth/VerifyEmail'
 import Onboarding from './pages/auth/Onboarding'
+import ResetPassword from './pages/auth/ResetPassword'
+import AcceptInvitation from './pages/auth/AcceptInvitation'
+import WorkspaceChooser from './pages/auth/WorkspaceChooser'
 
 const DashboardPlaceholder = lazy(() => import('./pages/dashboard/DashboardPlaceholder'))
 const DashboardOverview = lazy(() => import('./pages/dashboard/DashboardOverview'))
@@ -135,11 +138,14 @@ export default function App() {
         </Route>
         <Route path="/register" element={<Register />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/accept-invitation" element={<AcceptInvitation />} />
       </Route>
 
-      {/* ── Onboarding (protected) ── */}
+      {/* ── Onboarding & Workspace Chooser (protected) ── */}
       <Route element={<RequireAuth />}>
         <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/choose-workspace" element={<WorkspaceChooser />} />
       </Route>
 
       {/* ── Dashboard (protected) ── */}

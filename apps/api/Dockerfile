@@ -40,17 +40,25 @@ ENV NODE_ENV=production \
     PORT=4000 \
     HOST=0.0.0.0
 
+# Create non-root system group and user
+RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
+
 # Enable corepack for running migration deploy
 RUN corepack enable && corepack prepare pnpm@11.9.0 --activate
 
-# Copy dependencies, built assets and prisma schema
-COPY --from=builder /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages ./packages
-COPY --from=builder /app/apps/api/package.json ./apps/api/
-COPY --from=builder /app/apps/api/dist ./apps/api/dist
-COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
-COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
+# Copy dependencies, built assets and prisma schema with non-root ownership
+COPY --from=builder --chown=nodejs:nodejs /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml ./
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/packages ./packages
+COPY --from=builder --chown=nodejs:nodejs /app/apps/api/package.json ./apps/api/
+COPY --from=builder --chown=nodejs:nodejs /app/apps/api/dist ./apps/api/dist
+COPY --from=builder --chown=nodejs:nodejs /app/apps/api/prisma ./apps/api/prisma
+COPY --from=builder --chown=nodejs:nodejs /app/apps/api/node_modules ./apps/api/node_modules
+
+# Ensure storage directory exists and has correct permissions
+RUN mkdir -p /app/apps/api/storage && chown -R nodejs:nodejs /app
+
+USER nodejs
 
 WORKDIR /app/apps/api
 

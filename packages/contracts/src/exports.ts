@@ -13,11 +13,13 @@ import { exportJobStatusSchema } from './enums.generated.js'
 import { idSchema, isoDateTimeSchema } from './primitives/ids.js'
 import { paginationQuerySchema, paginated } from './primitives/pagination.js'
 
-export const exportJobKindSchema = z.enum(['employees', 'ledger', 'projects'])
+export const exportJobKindSchema = z.enum(['employees', 'ledger', 'projects', 'workspace'])
 export type ExportJobKind = z.infer<typeof exportJobKindSchema>
 
 export const exportJobCreateSchema = z.object({
   kind: exportJobKindSchema,
+  format: z.enum(['xlsx', 'json', 'csv']).optional(),
+  dateRange: z.string().optional(),
 })
 export type ExportJobCreateInput = z.infer<typeof exportJobCreateSchema>
 

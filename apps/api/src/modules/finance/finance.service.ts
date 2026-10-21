@@ -57,7 +57,7 @@ import { AppError } from '../../utils/errors.js'
 import { monthToDateComparisonPeriods, tenantToday } from '../../utils/dates.js'
 export { monthToDateComparisonPeriods } from '../../utils/dates.js'
 import { computeAgingBuckets } from './aging.service.js'
-import { expenseSettlementComparison, getJournal as getLedgerJournal, listJournals as listLedgerJournals, payableSettlementComparison, receivableSettlementComparison, postOpeningBalance as postLedgerOpeningBalance, recentSettlements, recordCashSettlement, recordInvoiceRecognition, reverseCashSettlement, reverseInvoiceRecognitionIfPresent, settlementCashFlow, settlementCashFlowComparison, trialBalance as getLedgerTrialBalance } from './ledger.service.js'
+import { expenseSettlementComparison, getJournal as getLedgerJournal, listJournals as listLedgerJournals, payableSettlementComparison, receivableSettlementComparison, postOpeningBalance as postLedgerOpeningBalance, recentSettlements, recordCashSettlement, recordExpenseRecognition, recordInvoiceRecognition, reverseCashSettlement, reverseExpenseRecognitionIfPresent, reverseInvoiceRecognitionIfPresent, settlementCashFlow, settlementCashFlowComparison, trialBalance as getLedgerTrialBalance } from './ledger.service.js'
 import type { InvoiceDoc } from '../../services/pdf.js'
 
 export type FinanceClient = PrismaClient | Prisma.TransactionClient
@@ -1400,6 +1400,9 @@ export async function updateExpenseStatus(
     const existing = await tx.expense.findFirstOrThrow({ where: { id, tenantId } })
     assertTransition(EXPENSE_TRANSITIONS, existing.status, status)
     if (status === 'APPROVED') assertIndependentApproval(existing.createdById, userId)
+    if (status === 'REJECTED') {
+      await reverseExpenseRecognitionIfPresent(tx, { tenantId, expenseId: id, reason: 'Expense rejected', actorId: userId, postedAt: new Date() })
+    }
     const reimbursedAt = status === 'REIMBURSED' ? new Date() : undefined
     const expense = await tx.expense.update({
       where: { id, tenantId },
@@ -1410,6 +1413,14 @@ export async function updateExpenseStatus(
       },
       include: { employee: { select: { name: true } } },
     })
+    if (status === 'APPROVED') {
+      await recordExpenseRecognition(tx, {
+        tenantId, expenseId: expense.id, amount: expense.amount.toString(),
+        currency: expense.currency ?? currency, workspaceCurrency: currency,
+        postedAt: expense.approvedAt ?? new Date(), actorId: userId,
+        description: `Expense recognized: ${expense.name}${expense.employee?.name ? ` · ${expense.employee.name}` : ''}`,
+      })
+    }
     if (status === 'REIMBURSED' && reimbursedAt) {
       await recordCashSettlement(tx, {
         tenantId, sourceId: expense.id, sourceType: 'EXPENSE_REIMBURSEMENT', amount: expense.amount.toString(),
@@ -1439,6 +1450,9 @@ export async function voidExpense(prisma: FinanceClient, tenantId: string, id: s
         tenantId, sourceId: id, sourceType: 'EXPENSE_REIMBURSEMENT', reason, actorId, postedAt: new Date(),
       })
     }
+    await reverseExpenseRecognitionIfPresent(tx, {
+      tenantId, expenseId: id, reason, actorId, postedAt: new Date(),
+    })
     const expense = await tx.expense.update({
       where: { id, tenantId },
       data: { status: 'VOID', voidReason: reason.trim(), voidedAt: new Date(), voidedById: actorId },

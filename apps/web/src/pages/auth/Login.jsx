@@ -47,7 +47,7 @@ export default function Login() {
     try {
       const res = await authClient.forgetPassword({
         email: forgotEmail.trim(),
-        redirectTo: window.location.origin + '/login',
+        redirectTo: window.location.origin + '/reset-password',
       })
       if (res?.error) {
         setForgotError(res.error?.message || 'Could not send reset link.')

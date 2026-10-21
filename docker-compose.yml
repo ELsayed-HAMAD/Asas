@@ -29,6 +29,18 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: asas-migrate
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/asas
+    command: ["pnpm", "prisma", "migrate", "deploy"]
+    depends_on:
+      db:
+        condition: service_healthy
+
   api:
     build:
       context: .
@@ -39,6 +51,7 @@ services:
       - ./apps/api/.env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/asas
+      BETTER_AUTH_URL: http://localhost:4000
       REDIS_URL: redis://redis:6379
       PORT: 4000
       HOST: 0.0.0.0
@@ -46,16 +59,22 @@ services:
       FRONTEND_ORIGIN: http://localhost:80,http://localhost:5173,http://localhost
     ports:
       - "4000:4000"
+    volumes:
+      - api_storage:/app/apps/api/storage
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: http://localhost:4000
     container_name: asas-web
     restart: unless-stopped
     ports:
@@ -65,3 +84,4 @@ services:
 
 volumes:
   postgres_data:
+  api_storage:

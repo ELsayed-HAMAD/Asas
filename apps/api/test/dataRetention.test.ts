@@ -56,7 +56,10 @@ describe('Compliance & Data Retention Cleanup', () => {
     const prisma = {
       $connect: async () => {},
       $disconnect: async () => {},
-      member: { findUnique: async () => ({ role: 'ADMIN' }) },
+      member: {
+        findUnique: async () => ({ role: 'ADMIN' }),
+        findMany: async () => [{ user: { email: 'admin@example.com' } }],
+      },
       tenant: { findUnique: async () => ({ id: 'tenant_1' }) },
       verification: { deleteMany: deleteTokensSpy },
       session: { deleteMany: deleteSessionsSpy },

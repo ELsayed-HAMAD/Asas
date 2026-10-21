@@ -57,6 +57,11 @@ function mapEmployee(employee: PrismaEmployeeWithIncludes, canReadSalary: boolea
     location: employee.location,
     employeeNumber: employee.employeeNumber,
     email: employee.email,
+    bankRoutingNumber: canReadSalary ? (employee.bankRoutingNumber ?? null) : null,
+    bankAccountNumber: canReadSalary ? (employee.bankAccountNumber ?? null) : null,
+    bankAccountType: canReadSalary ? (employee.bankAccountType ?? null) : null,
+    bankIban: canReadSalary ? (employee.bankIban ?? null) : null,
+    bankBic: canReadSalary ? (employee.bankBic ?? null) : null,
     createdAt: employee.createdAt.toISOString(),
     updatedAt: employee.updatedAt.toISOString(),
   }
@@ -204,19 +209,24 @@ export async function createEmployee(
       location: input.location ?? null,
       employeeNumber: input.employeeNumber ?? null,
       email: input.email ?? null,
+      bankRoutingNumber: input.bankRoutingNumber ?? null,
+      bankAccountNumber: input.bankAccountNumber ?? null,
+      bankAccountType: input.bankAccountType ?? null,
+      bankIban: input.bankIban ?? null,
+      bankBic: input.bankBic ?? null,
       },
       include: employeeInclude,
     })
-    if (input.salary != null && input.salaryEffectiveFrom) {
+    if (input.salary != null) {
       const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } })
       if (!tenant) throw new AppError(404, 'Workspace not found')
       await tx.employeeSalaryHistory.create({ data: {
         tenantId, employeeId: created.id, salary: input.salary, salaryBasis: input.salaryBasis ?? null,
-        currency: tenant.currency, effectiveFrom: new Date(`${input.salaryEffectiveFrom}T00:00:00.000Z`), createdById: actorId ?? null,
+        currency: tenant.currency, effectiveFrom: input.salaryEffectiveFrom ? new Date(`${input.salaryEffectiveFrom}T00:00:00.000Z`) : (created.hiredAt ?? new Date()), createdById: actorId ?? null,
       } })
       if (actorId) await recordAuditLog(tx, {
         tenantId, actorId, action: 'hr.employee.salary.rate.create', targetType: 'Employee', targetId: created.id,
-        metadata: { salary: input.salary, salaryBasis: input.salaryBasis ?? null, effectiveFrom: input.salaryEffectiveFrom, currency: tenant.currency },
+        metadata: { salary: input.salary, salaryBasis: input.salaryBasis ?? null, effectiveFrom: input.salaryEffectiveFrom ?? created.hiredAt?.toISOString().slice(0, 10) ?? new Date().toISOString().slice(0, 10), currency: tenant.currency },
       })
     }
     if (input.salary == null) return created
@@ -288,6 +298,11 @@ export async function updateEmployee(
       ...(input.location !== undefined && { location: input.location }),
       ...(input.employeeNumber !== undefined && { employeeNumber: input.employeeNumber }),
       ...(input.email !== undefined && { email: input.email }),
+      ...(input.bankRoutingNumber !== undefined && { bankRoutingNumber: input.bankRoutingNumber }),
+      ...(input.bankAccountNumber !== undefined && { bankAccountNumber: input.bankAccountNumber }),
+      ...(input.bankAccountType !== undefined && { bankAccountType: input.bankAccountType }),
+      ...(input.bankIban !== undefined && { bankIban: input.bankIban }),
+      ...(input.bankBic !== undefined && { bankBic: input.bankBic }),
       },
     })
     if (salaryChangedAt && input.salaryEffectiveFrom && rateSalary !== null) {

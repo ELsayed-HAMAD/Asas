@@ -32,6 +32,7 @@ export const inventoryApi = {
     http.get('/inventory/purchase-orders', { query: { productId, status } }),
   approvePurchaseOrder: (id) => http.post(`/inventory/purchase-orders/${id}/approve`),
   receivePurchaseOrder: (id) => http.post(`/inventory/purchase-orders/${id}/receive`),
+  cancelPurchaseOrder: (id) => http.post(`/inventory/purchase-orders/${id}/cancel`),
 
   listStockMovements: ({ page = 1, limit = 25, productId, search, warehouse, type } = {}) =>
     http.get('/inventory/stock/movements', { query: { page, limit, productId, search, warehouse, type } }),

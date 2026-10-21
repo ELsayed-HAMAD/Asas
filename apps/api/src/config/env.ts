@@ -52,15 +52,19 @@ export interface AsasEnv {
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
   const nodeEnv = source.NODE_ENV || 'development'
-  const frontendOrigin = source.FRONTEND_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173'
+  const frontendOrigin = source.FRONTEND_ORIGIN || (nodeEnv === 'production' ? 'https://app.asas.local' : 'http://localhost:5173,http://127.0.0.1:5173')
   const objectStorageDriver = source.OBJECT_STORAGE_DRIVER ?? 'local'
   if (objectStorageDriver !== 'local' && objectStorageDriver !== 's3') {
     throw new Error('OBJECT_STORAGE_DRIVER must be either local or s3')
   }
+  const rawPort = source.PORT !== undefined && source.PORT !== '' ? Number(source.PORT) : 4000
+  if (!Number.isInteger(rawPort) || rawPort < 1 || rawPort > 65535) {
+    throw new Error(`PORT must be an integer between 1 and 65535, received: ${source.PORT}`)
+  }
   return {
     databaseUrl: source.DATABASE_URL ?? '',
     authSecret: source.AUTH_SECRET ?? source.BETTER_AUTH_SECRET ?? '',
-    port: Number(source.PORT || 4000),
+    port: rawPort,
     host: source.HOST || '127.0.0.1',
     frontendOrigin,
     nodeEnv,
@@ -89,6 +93,12 @@ export function assertEnv(environment: AsasEnv = loadEnv()): AsasEnv {
   }
   if (environment.nodeEnv === 'production' && !environment.authSecret) {
     throw new Error('Missing required environment variable: AUTH_SECRET (required in production)')
+  }
+  if (environment.isProduction) {
+    const origins = environment.frontendOrigin.split(',').map(o => o.trim())
+    if (origins.some(o => !o.startsWith('https://'))) {
+      throw new Error('FRONTEND_ORIGIN must use HTTPS in production to prevent cookie leakage over plaintext')
+    }
   }
   if (environment.nodeEnv === 'production' && environment.resendApiKey && !environment.mailFrom) {
     throw new Error('Missing required environment variable: MAIL_FROM (required with RESEND_API_KEY)')

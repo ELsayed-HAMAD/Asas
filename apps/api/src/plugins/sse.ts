@@ -47,12 +47,20 @@ export function moduleKeyPrefix(moduleName: string): string {
 /** A client that has opened the event stream for one tenant. */
 interface Subscriber {
   tenantId: string
+  userId: string
+  ip: string
   send: (event: string, data: string) => void
   close: () => void
 }
 
-/** In-memory subscriber registry, keyed by tenant. */
-const subscribers = new Map<string, Set<Subscriber>>()
+export const MAX_STREAMS_PER_USER = 5
+export const MAX_STREAMS_PER_IP = 10
+export const MAX_STREAMS_PER_TENANT = 100
+
+/** In-memory subscriber registry, indexed by tenant, user, and IP for bounded connection management. */
+const subscribersByTenant = new Map<string, Set<Subscriber>>()
+const subscribersByUser = new Map<string, Set<Subscriber>>()
+const subscribersByIp = new Map<string, Set<Subscriber>>()
 
 const SSE_REDIS_CHANNEL = 'asas:sse:invalidation'
 const localInstanceId = Math.random().toString(36).slice(2)
@@ -115,7 +123,7 @@ declare module 'fastify' {
 }
 
 function deliverToLocalSubscribers(tenantId: string, keys: readonly string[]): void {
-  const set = subscribers.get(tenantId)
+  const set = subscribersByTenant.get(tenantId)
   if (!set) return
   const payload = JSON.stringify({ type: 'invalidate' as const, keys: [...keys] })
   for (const subscriber of set) {
@@ -151,19 +159,92 @@ export function publish(tenantId: string, keys: readonly string[]): void {
 }
 
 function addSubscriber(subscriber: Subscriber): void {
-  let set = subscribers.get(subscriber.tenantId)
-  if (!set) {
-    set = new Set()
-    subscribers.set(subscriber.tenantId, set)
+  // Add to tenant index
+  let tenantSet = subscribersByTenant.get(subscriber.tenantId)
+  if (!tenantSet) {
+    tenantSet = new Set()
+    subscribersByTenant.set(subscriber.tenantId, tenantSet)
   }
-  set.add(subscriber)
+  tenantSet.add(subscriber)
+
+  // Add to user index
+  let userSet = subscribersByUser.get(subscriber.userId)
+  if (!userSet) {
+    userSet = new Set()
+    subscribersByUser.set(subscriber.userId, userSet)
+  }
+  userSet.add(subscriber)
+
+  // Add to IP index
+  let ipSet = subscribersByIp.get(subscriber.ip)
+  if (!ipSet) {
+    ipSet = new Set()
+    subscribersByIp.set(subscriber.ip, ipSet)
+  }
+  ipSet.add(subscriber)
 }
 
 function removeSubscriber(subscriber: Subscriber): void {
-  const set = subscribers.get(subscriber.tenantId)
-  if (!set) return
-  set.delete(subscriber)
-  if (set.size === 0) subscribers.delete(subscriber.tenantId)
+  const tenantSet = subscribersByTenant.get(subscriber.tenantId)
+  if (tenantSet) {
+    tenantSet.delete(subscriber)
+    if (tenantSet.size === 0) subscribersByTenant.delete(subscriber.tenantId)
+  }
+
+  const userSet = subscribersByUser.get(subscriber.userId)
+  if (userSet) {
+    userSet.delete(subscriber)
+    if (userSet.size === 0) subscribersByUser.delete(subscriber.userId)
+  }
+
+  const ipSet = subscribersByIp.get(subscriber.ip)
+  if (ipSet) {
+    ipSet.delete(subscriber)
+    if (ipSet.size === 0) subscribersByIp.delete(subscriber.ip)
+  }
+}
+
+/** Close all active SSE connections for a revoked or signed-out user. */
+export function closeStreamsForUser(userId: string): number {
+  const set = subscribersByUser.get(userId)
+  if (!set) return 0
+  const count = set.size
+  for (const subscriber of [...set]) {
+    subscriber.close()
+  }
+  return count
+}
+
+/** Close all active SSE connections for a purged, archived, or deleted tenant. */
+export function closeStreamsForTenant(tenantId: string): number {
+  const set = subscribersByTenant.get(tenantId)
+  if (!set) return 0
+  const count = set.size
+  for (const subscriber of [...set]) {
+    subscriber.close()
+  }
+  return count
+}
+
+/** Returns connection statistics across tenants, users, and IPs. */
+export function getSseStats(): {
+  totalConnections: number
+  tenantCounts: Record<string, number>
+  userCounts: Record<string, number>
+} {
+  let totalConnections = 0
+  const tenantCounts: Record<string, number> = {}
+  const userCounts: Record<string, number> = {}
+
+  for (const [tenantId, set] of subscribersByTenant) {
+    tenantCounts[tenantId] = set.size
+    totalConnections += set.size
+  }
+  for (const [userId, set] of subscribersByUser) {
+    userCounts[userId] = set.size
+  }
+
+  return { totalConnections, tenantCounts, userCounts }
 }
 
 /**
@@ -198,8 +279,29 @@ export async function ssePlugin(app: FastifyInstance): Promise<void> {
       // `requireAuthContext`) is deliberate — this handler controls the raw reply stream and
       // must never let an error bubble back through the JSON error handler.
       const tenantId = request.authContext?.tenantId
-      if (!tenantId) {
+      const userId = request.authContext?.userId
+      const ip = request.ip || '127.0.0.1'
+      if (!tenantId || !userId) {
         reply.code(401).send({ error: { message: 'Authentication required' } })
+        return
+      }
+
+      // Check connection bounds (Finding 22)
+      const userStreams = subscribersByUser.get(userId)?.size ?? 0
+      if (userStreams >= MAX_STREAMS_PER_USER) {
+        reply.code(429).send({ error: { message: 'Too many live event streams for this user' } })
+        return
+      }
+
+      const ipStreams = subscribersByIp.get(ip)?.size ?? 0
+      if (ipStreams >= MAX_STREAMS_PER_IP) {
+        reply.code(429).send({ error: { message: 'Too many live event streams from this IP address' } })
+        return
+      }
+
+      const tenantStreams = subscribersByTenant.get(tenantId)?.size ?? 0
+      if (tenantStreams >= MAX_STREAMS_PER_TENANT) {
+        reply.code(429).send({ error: { message: 'Workspace event stream limit reached' } })
         return
       }
 
@@ -235,6 +337,8 @@ export async function ssePlugin(app: FastifyInstance): Promise<void> {
 
       const subscriber: Subscriber = {
         tenantId,
+        userId,
+        ip,
         send: (event, data) => {
           if (closed) return
           reply.raw.write(`event: ${event}\ndata: ${data}\n\n`)

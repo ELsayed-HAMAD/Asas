@@ -332,14 +332,14 @@ export type WorkspaceDeleteResponse = z.infer<typeof workspaceDeleteResponseSche
 // ── Compliance / GDPR ────────────────────────────────────────────────────────
 
 export const gdprAnonymizeRequestSchema = z.object({
-  targetType: z.enum(['EMPLOYEE', 'USER']),
+  targetType: z.enum(['EMPLOYEE', 'USER', 'CANDIDATE']),
   targetId: idSchema,
   reason: boundedText(500),
 })
 
 export const gdprAnonymizeResponseSchema = z.object({
   success: z.boolean(),
-  targetType: z.enum(['EMPLOYEE', 'USER']),
+  targetType: z.enum(['EMPLOYEE', 'USER', 'CANDIDATE']),
   targetId: idSchema,
   anonymizedAt: isoDateTimeSchema,
   recordsScrubbed: z.number().int().min(0),

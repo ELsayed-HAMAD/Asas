@@ -1,7 +1,15 @@
 import type { PrismaClient } from '@prisma/client'
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Auth } from '../src/auth.js'
-import { hasRequiredRole, resolveAuthContext, clearAuthContextCache } from '../src/middlewares/rbac.js'
+import {
+  clearAuthContextCache,
+  hasRequiredRole,
+  invalidateAuthCacheForTenant,
+  invalidateAuthCacheForToken,
+  invalidateAuthCacheForUser,
+  resolveAuthContext,
+  sessionTokenFromHeaders,
+} from '../src/middlewares/rbac.js'
 
 describe('hasRequiredRole', () => {
   it('orders roles MEMBER < ADMIN < OWNER', () => {
@@ -176,5 +184,49 @@ describe('resolveAuthContext', () => {
     await resolveAuthContext(auth, prisma, {})
     // Without a cookie header there is no cache key, so each call resolves fresh.
     expect(getSessionCalls).toBe(2)
+  })
+
+  it('correctly extracts session tokens with and without __Secure- prefix', () => {
+    expect(sessionTokenFromHeaders({})).toBeNull()
+    expect(sessionTokenFromHeaders({ cookie: 'foo=bar' })).toBeNull()
+    expect(sessionTokenFromHeaders({ cookie: 'better-auth.session_token=token_standard_123' })).toBe('token_standard_123')
+    expect(sessionTokenFromHeaders({ cookie: '__Secure-better-auth.session_token=token_secure_456' })).toBe('token_secure_456')
+    expect(sessionTokenFromHeaders({ cookie: 'foo=bar; __Secure-better-auth.session_token=token_combo_789; other=1' })).toBe('token_combo_789')
+  })
+
+  it('immediately invalidates cache by token, user, or tenant', async () => {
+    let getSessionCalls = 0
+    const auth = {
+      api: {
+        getSession: async () => {
+          getSessionCalls += 1
+          return { session: { activeOrganizationId: 'tenant_1' }, user: { id: 'user_1' } }
+        },
+      },
+    } as unknown as Pick<Auth, 'api'>
+    const prisma = stubPrisma({ role: 'ADMIN', employeeId: 'emp_1' })
+    const headers = { cookie: '__Secure-better-auth.session_token=secure_tok_1' }
+
+    await resolveAuthContext(auth, prisma, headers)
+    expect(getSessionCalls).toBe(1)
+
+    // Second call is cached
+    await resolveAuthContext(auth, prisma, headers)
+    expect(getSessionCalls).toBe(1)
+
+    // Invalidate by token
+    invalidateAuthCacheForToken('secure_tok_1')
+    await resolveAuthContext(auth, prisma, headers)
+    expect(getSessionCalls).toBe(2)
+
+    // Invalidate by user
+    invalidateAuthCacheForUser('user_1')
+    await resolveAuthContext(auth, prisma, headers)
+    expect(getSessionCalls).toBe(3)
+
+    // Invalidate by tenant
+    invalidateAuthCacheForTenant('tenant_1')
+    await resolveAuthContext(auth, prisma, headers)
+    expect(getSessionCalls).toBe(4)
   })
 })

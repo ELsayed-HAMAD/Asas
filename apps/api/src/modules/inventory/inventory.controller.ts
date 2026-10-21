@@ -57,6 +57,10 @@ export function receivePurchaseOrder(prisma: PrismaClient, tenantId: string, id:
   return service.receivePurchaseOrder(prisma, tenantId, id)
 }
 
+export function cancelPurchaseOrder(prisma: PrismaClient, tenantId: string, id: string): Promise<PurchaseOrder> {
+  return service.cancelPurchaseOrder(prisma, tenantId, id)
+}
+
 // ── Products ─────────────────────────────────────────────────────────────────────
 
 export function listProducts(

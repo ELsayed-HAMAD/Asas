@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { signUp, useSession, signOut } from '../../lib/authClient'
+import { validatePasswordPolicy, PASSWORD_POLICY_DESCRIPTION } from '../../lib/passwordPolicy'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Alert, AlertDescription } from '../../components/ui/alert'
@@ -59,6 +60,13 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+
+    const policyErr = validatePasswordPolicy(form.password)
+    if (policyErr) {
+      setError(policyErr)
+      return
+    }
+
     setIsLoading(true)
     try {
       const name = form.name.trim()
@@ -155,7 +163,7 @@ export default function Register() {
             placeholder="Create a strong password"
             required
           />
-          <p className="text-[11px] text-caption mt-1.5">Must be at least 12 characters and include a symbol.</p>
+          <p className="text-[11px] text-caption mt-1.5">{PASSWORD_POLICY_DESCRIPTION}</p>
         </div>
 
         <Button

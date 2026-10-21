@@ -99,4 +99,25 @@ describe('health probe', () => {
     expect(json.data.database).toBe('disconnected')
     expect(json.data.error).toBe('Database unreachable')
   })
+
+  it('omits error details from /ready in production to prevent credential and network topology leakage', async () => {
+    const mockPrisma = {
+      $queryRaw: async () => { throw new Error('Connection failed to postgres://admin:secret@db.internal:5432/db') },
+      $connect: async () => {},
+      $disconnect: async () => {},
+    } as any
+
+    const env = loadEnv({ NODE_ENV: 'production' })
+    const app = await buildApp(env, { logger: false, prisma: mockPrisma })
+    apps.push(app)
+
+    const response = await app.inject({ method: 'GET', url: '/ready' })
+    expect(response.statusCode).toBe(503)
+    const json = response.json()
+    expect(json.data.status).toBe('unhealthy')
+    expect(json.data.database).toBe('disconnected')
+    expect(json.data.error).toBeUndefined()
+    expect(response.body).not.toContain('secret')
+    expect(response.body).not.toContain('db.internal')
+  })
 })
