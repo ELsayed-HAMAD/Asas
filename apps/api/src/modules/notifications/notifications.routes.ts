@@ -9,6 +9,7 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { requireAuthContext } from '../../middlewares/rbac.js'
+import { moduleKeyPrefix } from '../../plugins/sse.js'
 import {
   deleteNotification,
   listUserNotifications,
@@ -52,7 +53,7 @@ export async function notificationRoutes(app: FastifyInstance): Promise<void> {
       const { tenantId, userId } = requireAuthContext(request)
       const read = request.body?.read ?? true
       await markNotificationRead(request.server.prisma, tenantId, userId, request.params.id, read)
-      request.server.ssePublish(tenantId, ['notifications', `notifications:${userId}`])
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('notifications')])
       return { data: { success: true } }
     },
   )
@@ -70,7 +71,7 @@ export async function notificationRoutes(app: FastifyInstance): Promise<void> {
     async (request) => {
       const { tenantId, userId } = requireAuthContext(request)
       await markAllNotificationsRead(request.server.prisma, tenantId, userId)
-      request.server.ssePublish(tenantId, ['notifications', `notifications:${userId}`])
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('notifications')])
       return { data: { success: true } }
     },
   )
@@ -89,7 +90,7 @@ export async function notificationRoutes(app: FastifyInstance): Promise<void> {
     async (request) => {
       const { tenantId, userId } = requireAuthContext(request)
       await deleteNotification(request.server.prisma, tenantId, userId, request.params.id)
-      request.server.ssePublish(tenantId, ['notifications', `notifications:${userId}`])
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('notifications')])
       return { data: { success: true } }
     },
   )

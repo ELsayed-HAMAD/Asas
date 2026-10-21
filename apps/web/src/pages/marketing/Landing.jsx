@@ -888,8 +888,8 @@ export default function Landing() {
             <h4 className="text-xs font-semibold uppercase tracking-wider text-on-primary mb-3">Resources</h4>
             <ul className="space-y-2 text-xs">
               <li><Link to="/documentation" className="text-primary-subtle hover:text-on-primary transition-colors">Documentation</Link></li>
-              <li><Link to="/documentation#api" className="text-primary-subtle hover:text-on-primary transition-colors">API Reference</Link></li>
-              <li><Link to="/documentation#security" className="text-primary-subtle hover:text-on-primary transition-colors">Security Whitepaper</Link></li>
+              <li><Link to="/documentation#api-reference" className="text-primary-subtle hover:text-on-primary transition-colors">API Reference</Link></li>
+              <li><Link to="/documentation#security" className="text-primary-subtle hover:text-on-primary transition-colors">Access & data handling</Link></li>
             </ul>
           </div>
 

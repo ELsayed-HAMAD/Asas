@@ -23,6 +23,7 @@ import { downloadCsv } from '../../../lib/csv';
 import { useDebouncedValue } from '../../../lib/useDebouncedValue';
 import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
+import SearchInput from '../../../components/common/SearchInput';
 import { useSearchParams } from 'react-router-dom';
 import { useActiveMemberRole } from '../../../lib/authClient';
 import { getMemberRoleName } from '../../../lib/memberRole';
@@ -310,16 +311,12 @@ export default function Expenses() {
           {/* List Pane Toolbar (compact height 44px) */}
           <div className="h-11 flex-shrink-0 px-3 flex items-center justify-between gap-2.5 bg-surface-raised rounded-card-sm border border-border-default shadow-card">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="relative flex-shrink-0">
-                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-                <Input
-                  type="text"
-                  value={searchInput}
-                  onChange={event => setSearchInput(event.target.value)}
-                  placeholder="Search..."
-                  className="pl-8 pr-2.5 h-7 text-xs bg-surface-raised w-40 sm:w-52"
-                />
-              </div>
+              <SearchInput
+                value={searchInput}
+                onChange={event => setSearchInput(event.target.value)}
+                placeholder="Search..."
+                wrapperClassName="w-40 sm:w-52"
+              />
               <Select
                 value={departmentId || '__all__'}
                 onValueChange={v => setDepartmentId(v === '__all__' ? '' : v)}

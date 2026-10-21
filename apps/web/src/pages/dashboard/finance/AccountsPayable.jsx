@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Search,
   Calendar,
   MoreVertical,
   FileText,
@@ -25,6 +24,7 @@ import { http } from '../../../lib/api/http';
 import { useDebouncedValue } from '../../../lib/useDebouncedValue';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import SearchInput from '../../../components/common/SearchInput';
 import { downloadCsv } from '../../../lib/csv';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
@@ -283,16 +283,12 @@ export default function AccountsPayable() {
       <div className="flex flex-wrap items-center justify-between gap-3 w-full mb-5 flex-shrink-0">
         {/* Left group */}
         <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-            <Input
-              type="text"
-              placeholder="Search invoices..."
-              value={searchInput}
-              onChange={event => setSearchInput(event.target.value)}
-              className="pl-9 pr-4 text-xs bg-surface-raised w-72 max-w-full shadow-card h-9"
-            />
-          </div>
+          <SearchInput
+            placeholder="Search invoices..."
+            value={searchInput}
+            onChange={event => setSearchInput(event.target.value)}
+            wrapperClassName="w-72 max-w-full"
+          />
           <Select value={statusGroup} onValueChange={setStatusGroup}>
             <SelectTrigger aria-label="Payables view" className="text-xs bg-surface-raised hover:bg-surface-muted shadow-card h-9 w-[130px]">
               <SelectValue placeholder="Payables view" />

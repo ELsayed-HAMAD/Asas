@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Search,
   Clock,
   Shield,
   Loader2,
@@ -8,12 +7,15 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import TopBarActions from '../../../components/TopBarActions';
 import SettingsTabs from './SettingsTabs';
+import SearchInput from '../../../components/common/SearchInput';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Switch } from '../../../components/ui/switch';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../components/ui/card';
 import { settingsApi } from '../../../lib/api/settings';
 import { queryKeys } from '../../../lib/queryKeys';
+import { useActiveMemberRole } from '../../../lib/authClient';
+import { getMemberRoleName } from '../../../lib/memberRole';
 
 /**
  * Reusable toggle wrapping shadcn/Radix Switch.
@@ -61,6 +63,9 @@ const getPreviewData = (event) => {
 
 export default function SettingsNotifications() {
   const queryClient = useQueryClient();
+  const { data: memberRole } = useActiveMemberRole();
+  const roleName = getMemberRoleName(memberRole);
+  const canManageSettings = roleName === 'OWNER' || roleName === 'ADMIN';
   const [previewEvent, setPreviewEvent] = useState('invoice');
   const [search, setSearch] = useState('')
   const [draft, setDraft] = useState(null)
@@ -140,22 +145,19 @@ export default function SettingsNotifications() {
 
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption z-10 pointer-events-none" />
-            <Input
-              type="text"
-              value={search}
-              onChange={event => setSearch(event.target.value)}
-              placeholder="Search..."
-              className="pl-9 pr-4 py-1.5 h-8 text-sm w-64 bg-surface-muted"
-            />
-          </div>
+          <SearchInput
+            value={search}
+            onChange={event => setSearch(event.target.value)}
+            placeholder="Search..."
+            wrapperClassName="w-64"
+          />
 
           <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-strong shrink-0"></div>
 
           <Button
             type="button"
-            disabled={updateMutation.isPending}
+            disabled={!canManageSettings || updateMutation.isPending}
+            title={!canManageSettings ? 'Only workspace admins and owners can change notification settings' : undefined}
             onClick={savePreferences}
             className="h-8 whitespace-nowrap"
           >
@@ -192,6 +194,7 @@ export default function SettingsNotifications() {
                       type="time"
                       value={quietHours.start}
                       onChange={setQuietHour('start')}
+                      disabled={!canManageSettings}
                       className="w-28 bg-surface-raised font-medium"
                     />
                     and
@@ -199,6 +202,7 @@ export default function SettingsNotifications() {
                       type="time"
                       value={quietHours.end}
                       onChange={setQuietHour('end')}
+                      disabled={!canManageSettings}
                       className="w-28 bg-surface-raised font-medium"
                     />
                   </div>
@@ -249,7 +253,7 @@ export default function SettingsNotifications() {
                           <span className={`block text-[10px] font-medium mb-0.5 ${row.danger ? 'text-danger' : 'text-muted'}`}>{row.group}</span>
                           <span className="block text-sm font-semibold text-heading">{row.name}</span>
                         </div>
-                        <div className="col-span-2 flex justify-center"><Toggle on={prefs.inApp} color="green" onClick={toggleChannel(row.module, row.eventType, 'inApp')} /></div>
+                        <div className="col-span-2 flex justify-center"><Toggle on={prefs.inApp} color="green" disabled={!canManageSettings} onClick={toggleChannel(row.module, row.eventType, 'inApp')} /></div>
                         <div className="col-span-2 flex justify-center"><Toggle on={false} color="green" disabled /></div>
                         <div className="col-span-2 flex justify-center"><Toggle on={false} color="green" disabled /></div>
                       </div>

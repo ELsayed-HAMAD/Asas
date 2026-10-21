@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSession } from '../lib/authClient'
+import { queryKeys } from '../lib/queryKeys'
 import {
   Bell,
   Check,
@@ -63,12 +65,15 @@ function getCategoryIcon(category) {
 export default function NotificationPopover() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { data: session } = useSession()
+  const userId = session?.user?.id
   const [filter, setFilter] = useState('all') // 'all' | 'unread'
   const [open, setOpen] = useState(false)
 
   const { data: notificationsData, isLoading, isError } = useQuery({
-    queryKey: ['notifications'],
+    queryKey: queryKeys.notifications.user(userId ?? 'signed-out'),
     queryFn: () => http.get('/notifications'),
+    enabled: Boolean(userId),
     refetchInterval: 20000,
   })
 
@@ -78,21 +83,21 @@ export default function NotificationPopover() {
   const markReadMutation = useMutation({
     mutationFn: (id) => http.patch(`/notifications/${id}/read`, { body: {} }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all() })
     },
   })
 
   const markAllReadMutation = useMutation({
     mutationFn: () => http.post('/notifications/mark-all-read', { body: {} }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all() })
     },
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id) => http.delete(`/notifications/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all() })
     },
   })
 

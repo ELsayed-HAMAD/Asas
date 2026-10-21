@@ -3,7 +3,7 @@ import { z } from 'zod'
 export const inAppNotificationSchema = z.object({
   id: z.string(),
   tenantId: z.string(),
-  userId: z.string().nullable(),
+  userId: z.string(),
   title: z.string(),
   message: z.string(),
   type: z.enum(['INFO', 'SUCCESS', 'WARNING', 'DANGER']),

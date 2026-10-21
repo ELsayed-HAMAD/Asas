@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  Search,
   ChevronsUpDown,
   Clock,
   Loader2,
@@ -18,6 +17,7 @@ import { formatCompactTableMoney, formatDate, formatMoney } from '../../../lib/f
 import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import SearchInput from '../../../components/common/SearchInput';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
@@ -201,18 +201,14 @@ export default function PortfolioOverview() {
             </SelectContent>
           </Select>
 
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-            <Input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search..."
-              aria-label="Search projects"
-              title="Search projects"
-              className="pl-9 pr-4 h-9 text-sm bg-surface-raised w-[220px]"
-            />
-          </div>
+          <SearchInput
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search..."
+            aria-label="Search projects"
+            title="Search projects"
+            wrapperClassName="w-[220px]"
+          />
 
           <Button
             onClick={() => setProjectOpen(true)}

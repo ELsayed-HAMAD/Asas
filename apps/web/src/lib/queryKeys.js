@@ -55,6 +55,7 @@ function resourceKeys(base) {
 
 const authBase = moduleKeys('auth')
 const tenantBase = moduleKeys('tenant')
+const notificationsBase = moduleKeys('notifications')
 
 const hrBase = moduleKeys('hr')
 const hrEmployeesBase = () => [...hrBase.all(), 'employees']
@@ -107,6 +108,11 @@ export const queryKeys = {
   tenant: {
     ...tenantBase,
     current: () => [...tenantBase.all(), 'current'],
+  },
+
+  notifications: {
+    ...notificationsBase,
+    user: (userId) => [...notificationsBase.all(), 'user', userId],
   },
 
   hr: {

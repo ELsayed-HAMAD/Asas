@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Headset, CheckCircle2, Search, Loader2 } from 'lucide-react'
+import { Headset, CheckCircle2, Loader2 } from 'lucide-react'
 import TopBarActions from '../../../components/TopBarActions'
 import EmptyState from '../../../components/common/EmptyState'
+import SearchInput from '../../../components/common/SearchInput'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
 import { Badge } from '../../../components/ui/badge'
@@ -87,16 +88,12 @@ export default function SupportDashboard() {
     <div className="flex-1 min-h-0 min-w-0 flex flex-col bg-surface overflow-hidden relative">
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption z-10 pointer-events-none" />
-            <Input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filter tickets..."
-              className="pl-9 pr-4 py-1.5 h-8 text-sm w-64 bg-surface-raised"
-            />
-          </div>
+          <SearchInput
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Filter tickets..."
+            wrapperClassName="w-64"
+          />
         </div>
       </TopBarActions>
 

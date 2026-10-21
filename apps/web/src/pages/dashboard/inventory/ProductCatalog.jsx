@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Search,
   LayoutGrid,
   Filter,
   X,
@@ -25,6 +24,7 @@ import TopBarActions from '../../../components/TopBarActions';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
+import SearchInput from '../../../components/common/SearchInput';
 import { Badge } from '../../../components/ui/badge';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
 import {
@@ -424,17 +424,13 @@ export default function Inventory() {
           <div data-testid="product-list-header" className="flex flex-wrap min-[900px]:flex-nowrap items-center gap-2 mb-4 shrink-0 min-h-[36px]">
             <h1 className="sr-only">Product Catalog</h1>
 
-            <div className="relative w-full min-[900px]:w-auto min-[900px]:flex-1 min-w-[200px] shrink-0">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-              <Input
-                type="text"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search..."
-                aria-label="Search products"
-                className="w-full h-9 pl-9 pr-3 text-sm bg-surface-raised text-heading placeholder:text-caption shadow-card"
-              />
-            </div>
+            <SearchInput
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search..."
+              aria-label="Search products"
+              wrapperClassName="w-full min-[900px]:w-auto min-[900px]:flex-1 min-w-[200px] shrink-0"
+            />
 
             <Select
               value={showArchived ? 'archived' : 'active'}

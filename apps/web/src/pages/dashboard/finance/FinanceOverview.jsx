@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Calendar, Search, Download,
+  Calendar, Download,
   Wallet, RefreshCw, FileText, Flame,
   MoreHorizontal, TrendingUp, Loader2
 } from 'lucide-react';
@@ -14,6 +14,7 @@ import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney, formatCompactMoney, formatCompactTableMoney, moneyToMajor } from '../../../lib/format';
 import { downloadCsv } from '../../../lib/csv';
 import FormDialog from '../../../components/common/FormDialog';
+import SearchInput from '../../../components/common/SearchInput';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
@@ -178,16 +179,12 @@ export default function FinanceOverview() {
       <div className="flex flex-wrap items-center justify-between gap-3 w-full mb-5 flex-shrink-0">
         {/* Left group */}
         <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-            <Input
-              type="text"
-              placeholder="Search..."
-              value={transactionSearch}
-              onChange={event => setTransactionSearch(event.target.value)}
-              className="ps-9 pe-4 py-2 text-xs w-72 max-w-full bg-surface-raised shadow-card"
-            />
-          </div>
+          <SearchInput
+            placeholder="Search..."
+            value={transactionSearch}
+            onChange={event => setTransactionSearch(event.target.value)}
+            wrapperClassName="w-72 max-w-full"
+          />
 
           <Select value={String(selectedYear)} onValueChange={val => setSelectedYear(val)}>
             <SelectTrigger aria-label="Finance calendar year" className="flex items-center gap-2 border border-border-default text-body px-3.5 h-9 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card shrink-0">

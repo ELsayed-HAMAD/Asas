@@ -107,6 +107,20 @@ describe('DELETE /workspace', () => {
 })
 
 describe('settings reliability', () => {
+  it('blocks MEMBER writes to notification preferences and integrations before mutation', async () => {
+    const { app, prisma } = await setup({ role: 'MEMBER' })
+    const notifications = await app.inject({
+      method: 'PATCH',
+      url: '/notifications',
+      payload: { modules: { finance: { 'invoice.created': { inApp: false } } } },
+    })
+    const integration = await app.inject({ method: 'POST', url: '/integrations', payload: { name: 'Operations webhook' } })
+    expect(notifications.statusCode).toBe(403)
+    expect(integration.statusCode).toBe(403)
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+    await app.close()
+  })
+
   it('commits notification preferences and their audit record in the same transaction', async () => {
     const { app, prisma, tx } = await setup({ role: 'ADMIN' })
     const response = await app.inject({

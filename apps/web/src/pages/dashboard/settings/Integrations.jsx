@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Search,
   ChevronDown,
   Plus,
   Link2Off,
@@ -10,12 +9,15 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import TopBarActions from '../../../components/TopBarActions';
 import SettingsTabs from './SettingsTabs';
+import SearchInput from '../../../components/common/SearchInput';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
 import { Switch } from '../../../components/ui/switch';
 import { settingsApi } from '../../../lib/api/settings';
 import { queryKeys } from '../../../lib/queryKeys';
+import { useActiveMemberRole } from '../../../lib/authClient';
+import { getMemberRoleName } from '../../../lib/memberRole';
 
 /**
  * Brand-mark tiles for the integration cards. The legacy page hand-coded one colored letter tile
@@ -46,6 +48,9 @@ function IntegrationIcon({ name }) {
 
 export default function SettingsIntegrations() {
   const queryClient = useQueryClient();
+  const { data: memberRole } = useActiveMemberRole();
+  const roleName = getMemberRoleName(memberRole);
+  const canManageIntegrations = roleName === 'OWNER' || roleName === 'ADMIN';
   const [selectedId, setSelectedId] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -125,16 +130,12 @@ export default function SettingsIntegrations() {
 
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption z-10 pointer-events-none" />
-            <Input
-              type="text"
-              placeholder="Search integrations..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              className="pl-9 pr-4 py-1.5 h-8 text-sm w-64 bg-surface-raised"
-            />
-          </div>
+          <SearchInput
+            placeholder="Search integrations..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            wrapperClassName="w-64"
+          />
 
           <Button
             variant="outline"
@@ -149,6 +150,8 @@ export default function SettingsIntegrations() {
           <Button
             type="button"
             onClick={() => setShowCreate(true)}
+            disabled={!canManageIntegrations}
+            title={!canManageIntegrations ? 'Only workspace admins and owners can manage integrations' : undefined}
             className="h-8 gap-2"
           >
             <Plus size={16} /> Custom Endpoint
@@ -259,6 +262,8 @@ export default function SettingsIntegrations() {
                         type="button"
                         variant="link"
                         onClick={() => { setCredentialInput(''); setShowCredentialModal(true); }}
+                        disabled={!canManageIntegrations}
+                        title={!canManageIntegrations ? 'Only workspace admins and owners can manage integrations' : undefined}
                         className="text-xs font-semibold text-accent hover:text-accent-hover"
                       >
                         {selected.credential?.configured ? 'Update Endpoint' : 'Add Endpoint'}
@@ -275,7 +280,7 @@ export default function SettingsIntegrations() {
                       <Button
                         type="button"
                         variant="link"
-                        disabled={!selected?.credential?.configured || testPingMutation.isPending}
+                        disabled={!canManageIntegrations || !selected?.credential?.configured || testPingMutation.isPending}
                         onClick={() => selected && testPingMutation.mutate(selected.id)}
                         className="text-[11px] font-bold text-accent hover:text-accent-hover transition-colors disabled:opacity-50"
                         title="Send a test ping to the configured public HTTPS endpoint"
@@ -326,7 +331,8 @@ export default function SettingsIntegrations() {
               <Button
                 type="button"
                 onClick={() => testPingMutation.mutate(selected.id)}
-                disabled={testPingMutation.isPending || !selected.credential?.configured}
+                disabled={!canManageIntegrations || testPingMutation.isPending || !selected.credential?.configured}
+                title={!canManageIntegrations ? 'Only workspace admins and owners can manage integrations' : undefined}
                 className="w-full flex items-center justify-center gap-2"
               >
                 {testPingMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : null}
@@ -341,7 +347,8 @@ export default function SettingsIntegrations() {
                     removeEndpointMutation.mutate(selected.id);
                   }
                 }}
-                disabled={!selected?.credential?.configured || removeEndpointMutation.isPending}
+                disabled={!canManageIntegrations || !selected?.credential?.configured || removeEndpointMutation.isPending}
+                title={!canManageIntegrations ? 'Only workspace admins and owners can manage integrations' : undefined}
                 className="w-full flex items-center justify-center gap-2"
               >
                 {removeEndpointMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Link2Off size={16} />}
@@ -383,7 +390,7 @@ export default function SettingsIntegrations() {
             </label>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setShowCredentialModal(false)}>Cancel</Button>
-              <Button type="submit" disabled={!credentialInput.trim() || toggleMutation.isPending}>
+              <Button type="submit" disabled={!canManageIntegrations || !credentialInput.trim() || toggleMutation.isPending}>
                 {toggleMutation.isPending ? 'Saving…' : 'Save endpoint'}
               </Button>
             </div>
@@ -416,7 +423,7 @@ export default function SettingsIntegrations() {
             {createMutation.isError && <p className="mb-3 text-sm text-danger">Could not create integration. Check the name and try again.</p>}
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-              <Button type="submit" disabled={createMutation.isPending || !newName.trim()}>{createMutation.isPending ? 'Adding…' : 'Add integration'}</Button>
+              <Button type="submit" disabled={!canManageIntegrations || createMutation.isPending || !newName.trim()}>{createMutation.isPending ? 'Adding…' : 'Add integration'}</Button>
             </div>
           </form>
         </div>

@@ -53,6 +53,11 @@ async function signIn(page, account) {
   await expect(page.getByText(account.name, { exact: true })).toBeVisible({ timeout: 15_000 })
 }
 
+async function selectRadixOption(page, trigger, optionName) {
+  await trigger.click()
+  await page.getByRole('option', { name: optionName, exact: true }).click()
+}
+
 test('two workspaces can sign in at the same time without sharing browser session identity', async ({ browser }) => {
   const accountOne = { id: 'user_one', name: 'Northwind Owner', email: 'northwind@example.test', emailVerified: true }
   const accountTwo = { id: 'user_two', name: 'Contoso Finance', email: 'contoso@example.test', emailVerified: true }
@@ -109,7 +114,7 @@ test('dashboard Arabic direction stays within phone, tablet, and desktop viewpor
     await expect(userMenuButton).toBeVisible()
     await userMenuButton.click()
 
-    const languageToggle = page.locator('button[data-testid="language-toggle"]').first()
+    const languageToggle = page.getByTestId('language-toggle').first()
     await expect(languageToggle).toBeVisible()
     await languageToggle.click()
     await expect.poll(() => page.evaluate(() => document.documentElement.dir)).toBe('rtl')
@@ -128,34 +133,41 @@ test('marketing navigation opens useful pages and displays configured prices res
   const account = { id: 'marketing_visitor', name: 'Marketing Visitor', email: 'marketing@example.test', emailVerified: true }
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
   await mockAuth(context, account, async route => {
-    if (new URL(route.request().url()).pathname.endsWith('/billing/plans')) return json(route, { data: { enabled: true, items: [
-      { priceId: 'price_team', name: 'Team', amount: '29.00', currency: 'USD', interval: 'month', seatLimit: 10, storageLimitGb: 100 },
-    ] } })
+    if (new URL(route.request().url()).pathname.endsWith('/billing/plans')) return json(route, { data: {
+      enabled: true,
+      stripeConfigured: true,
+      tiers: [{ id: 'starter', name: 'Standard Growth', tagline: 'A larger seat and storage allowance for growing teams.', priceMonthly: 29, priceAnnual: 24, currency: 'USD', seatLimit: 15, storageLimitGb: 25, features: ['Up to 15 team members'] }],
+      items: [],
+    } })
     return json(route, { data: {} })
   })
   const page = await context.newPage()
 
   try {
     await page.goto('/')
-    await page.getByRole('link', { name: 'Features' }).click()
+    await page.getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('link', { name: 'Features', exact: true })
+      .click()
     await expect(page).toHaveURL(/#features$/)
-    await page.getByRole('link', { name: 'Solutions' }).click()
-    await expect(page.getByRole('heading', { name: 'Connected work across your business' })).toBeVisible()
-    await page.getByRole('link', { name: 'Pricing' }).click()
-    await expect(page.getByRole('heading', { name: 'A clear view of your workspace plan' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Team' })).toBeVisible()
-    await expect(page.getByText('$29.00')).toBeVisible()
+    await page.getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('link', { name: 'Solutions', exact: true })
+      .click()
+    await expect(page.getByRole('heading', { name: 'Purpose-built modules unified into a single operating core' })).toBeVisible()
+    await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Pricing', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Predictable plans tailored to your operating scale' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Standard Growth', exact: true })).toBeVisible()
+    await expect(page.getByText('$29', { exact: true })).toBeVisible()
     await page.getByRole('banner').getByRole('link', { name: 'Documentation' }).click()
-    await expect(page.getByRole('heading', { name: 'A practical guide to Asas' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Get started with Asas' })).toBeVisible()
     await page.goto('/status')
-    await expect(page.getByRole('heading', { name: 'Public live status is not connected' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Platform status' })).toBeVisible()
 
     for (const path of ['/', '/solutions', '/pricing', '/documentation', '/status']) {
       await page.setViewportSize({ width: 390, height: 844 })
       await page.goto(path)
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
       await expect.poll(() => page.locator('header').evaluate(header => header.scrollWidth <= header.clientWidth)).toBe(true)
-      if (path === '/') await expect(page.getByRole('link', { name: 'Features' })).toBeVisible()
+      if (path === '/') await expect(page.locator('a[href="/#features"]:visible').first()).toBeVisible()
     }
   } finally {
     await context.close()
@@ -163,7 +175,7 @@ test('marketing navigation opens useful pages and displays configured prices res
 })
 
 test('workspace admin can launch hosted plan checkout from Billing & Plans', async ({ browser }) => {
-  const account = { id: 'billing_owner', name: 'Billing Workspace Owner', email: 'billing@example.test', emailVerified: true }
+  const account = { id: 'billing_owner', name: 'Billing Workspace Owner', email: 'billing@example.test', emailVerified: true, role: 'ADMIN' }
   const context = await browser.newContext()
   await mockAuth(context, account, async route => {
     const path = new URL(route.request().url()).pathname
@@ -171,7 +183,16 @@ test('workspace admin can launch hosted plan checkout from Billing & Plans', asy
       return json(route, { data: { stripePortalAvailable: false, subscriptions: [], paymentMethods: [], invoices: [] } })
     }
     if (path.endsWith('/billing/plans')) {
-      return json(route, { data: { enabled: true, items: [{ priceId: 'price_basic', name: 'Basic', amount: '10.00', currency: 'USD', interval: 'month', seatLimit: 10, storageLimitGb: 100 }] } })
+      return json(route, { data: {
+        enabled: true,
+        stripeConfigured: true,
+        defaultPlanId: 'free',
+        tiers: [
+          { id: 'free', name: 'Free Starter', tagline: 'Free', priceMonthly: 0, priceAnnual: 0, currency: 'USD', seatLimit: 5, storageLimitGb: 5 },
+          { id: 'starter', name: 'Standard Growth', tagline: 'Growth', priceMonthly: 29, priceAnnual: 24, currency: 'USD', seatLimit: 15, storageLimitGb: 25 },
+        ],
+        items: [{ priceId: 'price_starter', name: 'Standard Growth', amount: '29.00', currency: 'USD', interval: 'month', seatLimit: 15, storageLimitGb: 25 }],
+      } })
     }
     if (path.endsWith('/billing/checkout')) return json(route, { data: { url: 'https://checkout.stripe.com/test-session' } })
     return json(route, { data: {} })
@@ -184,15 +205,79 @@ test('workspace admin can launch hosted plan checkout from Billing & Plans', asy
     for (const width of [390, 768, 1280]) {
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/dashboard/settings/billing')
-      await page.getByRole('heading', { name: 'Available plans' }).waitFor()
+      await page.getByRole('heading', { name: 'Available platform plans' }).waitFor()
       const dimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }))
       expect(dimensions.content, `Billing page should fit the ${width}px viewport`).toBeLessThanOrEqual(dimensions.viewport)
-      const settingsNavigation = page.getByRole('navigation', { name: 'Settings navigation' })
-      await expect.poll(() => settingsNavigation.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+      await expect(page.getByRole('tab', { name: 'Billing & Plans' })).toHaveAttribute('data-state', 'active')
     }
-    await page.getByRole('button', { name: 'Choose plan' }).click()
+    await page.getByRole('button', { name: 'Continue to checkout' }).click()
     await expect(page).toHaveURL('https://checkout.stripe.com/test-session')
     await expect(page).toHaveTitle('Hosted checkout test')
+  } finally {
+    await context.close()
+  }
+})
+
+test('workspace members see Settings write controls disabled across notifications, integrations, and billing', async ({ browser }) => {
+  const account = { id: 'settings_member', name: 'Settings Member', email: 'settings.member@example.test', emailVerified: true, role: 'MEMBER' }
+  const context = await browser.newContext()
+  await mockAuth(context, account, async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/settings/notifications')) return json(route, { data: {
+      modules: {
+        finance: { 'invoice.created': { inApp: true, email: false, slack: false } },
+        hr: { 'leave.requested': { inApp: true, email: false, slack: false } },
+      },
+      quietHours: { start: '22:00', end: '07:00' },
+      quietHoursDefaulted: true,
+    } })
+    if (path.endsWith('/settings/integrations')) return json(route, { data: { items: [{
+      id: 'endpoint_1', name: 'Operations endpoint', description: '', status: 'CONFIGURE',
+      syncPullRequests: false, syncCiCdStatus: false,
+      credential: { configured: true, masked: 'https://hooks…/test' }, createdAt: '2026-10-01T00:00:00.000Z',
+    }] } })
+    if (path.endsWith('/webhook-logs')) return json(route, { data: { items: [] } })
+    if (path.endsWith('/settings/billing')) return json(route, { data: {
+      stripePortalAvailable: true, subscriptions: [], paymentMethods: [], invoices: [],
+    } })
+    if (path.endsWith('/exports/jobs')) return json(route, { data: {
+      items: [{ id: 'export_1', kind: 'workspace', status: 'DONE', progressPct: 100, downloadUrl: '/api/v1/exports/jobs/export_1/download', filename: 'workspace.json', createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:01:00.000Z' }],
+      pagination: { page: 1, limit: 100, total: 1, pages: 1 }, summary: null,
+    } })
+    if (path.endsWith('/billing/plans')) return json(route, { data: {
+      enabled: true, stripeConfigured: true, defaultPlanId: 'free',
+      tiers: [
+        { id: 'free', name: 'Free Starter', tagline: 'Free', priceMonthly: 0, priceAnnual: 0, currency: 'USD', seatLimit: 5, storageLimitGb: 5 },
+        { id: 'starter', name: 'Standard Growth', tagline: 'Growth', priceMonthly: 29, priceAnnual: 24, currency: 'USD', seatLimit: 15, storageLimitGb: 25 },
+      ],
+      items: [{ priceId: 'price_starter', name: 'Standard Growth', amount: '29.00', currency: 'USD', interval: 'month', seatLimit: 15, storageLimitGb: 25 }],
+    } })
+    return json(route, { data: {} })
+  })
+  const page = await context.newPage()
+
+  try {
+    await signIn(page, account)
+
+    await page.goto('/dashboard/settings/notifications')
+    await expect(page.getByRole('button', { name: 'Save Preferences' })).toBeDisabled()
+    await expect(page.getByRole('switch').first()).toBeDisabled()
+    await expect(page.locator('input[type="time"]').first()).toBeDisabled()
+
+    await page.goto('/dashboard/settings/integrations')
+    await expect(page.getByRole('button', { name: 'Custom Endpoint' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Update Endpoint' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Test Endpoint' })).toBeDisabled()
+
+    await page.goto('/dashboard/settings/billing')
+    await expect(page.getByRole('button', { name: 'Manage billing' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Continue to checkout' })).toBeDisabled()
+
+    await page.goto('/dashboard/settings/data-export')
+    await expect(page.getByRole('button', { name: 'Generate JSON Workspace Export' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Download' }).first()).toBeDisabled()
+    await page.getByRole('button', { name: 'View Export History' }).click()
+    await expect(page.getByRole('button', { name: 'Download' })).toBeDisabled()
   } finally {
     await context.close()
   }
@@ -222,14 +307,14 @@ test('dashboard content fits phone, tablet, and desktop viewports', async ({ bro
       if (width === 1280) {
         const userMenuButton = page.getByTestId('user-menu-button')
         await userMenuButton.click()
-        const logoutButton = page.getByRole('button', { name: 'Log Out' })
+        const logoutButton = page.getByRole('menuitem', { name: 'Log Out' })
         await expect(logoutButton).toBeVisible()
         const menuCard = logoutButton.locator('xpath=ancestor::div[contains(@class, "rounded-xl")]')
         await expect.poll(async () => {
           const box = await menuCard.boundingBox()
           return box?.width ?? 0
         }).toBeGreaterThanOrEqual(285)
-        await userMenuButton.click()
+        await page.keyboard.press('Escape')
         await expect(logoutButton).toBeHidden()
       }
     }
@@ -385,10 +470,20 @@ test('CRM overview charts and dashboard actions fit phone, tablet, and desktop v
         const dimensions = await metric.evaluate(element => ({ text: element.textContent, clientWidth: element.clientWidth, scrollWidth: element.scrollWidth, fontSize: getComputedStyle(element).fontSize }))
         expect(dimensions.scrollWidth, `${value} should fit its KPI card at ${width}px (${JSON.stringify(dimensions)})`).toBeLessThanOrEqual(dimensions.clientWidth)
       }
-      await expect.poll(() => page.evaluate(width => {
+      const viewportMetrics = await page.evaluate(width => {
         const header = document.querySelector('header')
-        return header.scrollWidth <= header.clientWidth && document.documentElement.scrollWidth <= width
-      }, width)).toBe(true)
+        return {
+          headerClientWidth: header.clientWidth,
+          headerScrollWidth: header.scrollWidth,
+          pageClientWidth: document.documentElement.clientWidth,
+          pageScrollWidth: document.documentElement.scrollWidth,
+          width,
+        }
+      }, width)
+      expect(viewportMetrics.headerScrollWidth, `CRM header overflow at ${width}px: ${JSON.stringify(viewportMetrics)}`)
+        .toBeLessThanOrEqual(viewportMetrics.headerClientWidth)
+      expect(viewportMetrics.pageScrollWidth, `CRM page overflow at ${width}px: ${JSON.stringify(viewportMetrics)}`)
+        .toBeLessThanOrEqual(width)
     }
   } finally {
     await context.close()
@@ -584,7 +679,7 @@ test('project portfolio keeps populated budget figures and its detail panel usab
       await page.goto('/dashboard/projects')
       await expect(page.getByText(projectName, { exact: true }).first()).toBeVisible()
       const budgetKpiCard = page.getByText('Total Budget', { exact: true }).locator('..')
-      const budgetKpi = budgetKpiCard.locator('p.text-3xl')
+      const budgetKpi = budgetKpiCard.locator('p.text-\\[28px\\]')
       await expect(budgetKpi).toBeVisible()
       const budgetCardBounds = await budgetKpiCard.boundingBox()
       const kpiBounds = await budgetKpi.evaluate(element => {
@@ -721,7 +816,7 @@ test('payroll keeps employee selections across pages and recovers an uncertain c
     await page.getByRole('checkbox', { name: 'Payroll Employee 26 Analyst' }).check()
     await expect(page.getByText('(2 selected)')).toBeVisible()
     await page.locator('#payroll-run-label').fill('October payroll retry')
-    await page.getByLabel('Unspecified salary basis').selectOption('MONTHLY')
+    await selectRadixOption(page, page.getByLabel('Unspecified salary basis'), 'Monthly salary')
     await page.getByLabel('Earning period start').fill('2026-10-01')
     await page.getByLabel('Earning period end').fill('2026-10-31')
     await page.getByRole('button', { name: 'Create run' }).click()
@@ -777,7 +872,7 @@ test('workspace admin can edit employee salary, basis, and employment end date',
     await expect(page.getByRole('heading', { name: 'Alex Employee' })).toBeVisible()
     await page.getByRole('button', { name: 'Edit profile' }).click()
     await page.getByRole('spinbutton', { name: 'Salary' }).fill('80000.00')
-    await page.getByRole('combobox', { name: /Salary basis/ }).selectOption('ANNUAL')
+    await selectRadixOption(page, page.getByRole('combobox', { name: 'Salary basis' }), 'Annual')
     await page.getByLabel('Salary effective from').fill('2026-10-17')
     await page.getByLabel('Employment end date').fill('2026-11-30')
     await page.getByRole('button', { name: 'Save changes' }).click()
@@ -888,7 +983,7 @@ test('recruitment candidates are server-paginated and role choices remain comple
     await expect.poll(() => requested.some(item => item.page === 2 && item.limit === 8)).toBe(true)
     await expect(page.getByText('Page 2 of 2')).toBeVisible()
     await expect(page.getByText('Candidate 09', { exact: true })).toBeVisible()
-    await page.getByRole('combobox', { name: 'Filter by candidate role' }).selectOption('Designer')
+    await selectRadixOption(page, page.getByRole('combobox', { name: 'Filter by candidate role' }), 'Designer')
     await expect(page.getByText('Candidate 09', { exact: true })).toBeVisible()
     await expect.poll(() => requested.some(item => item.page === 1 && item.role === 'Designer')).toBe(true)
   } finally {
@@ -896,14 +991,15 @@ test('recruitment candidates are server-paginated and role choices remain comple
   }
 })
 
-test('expense entry can find and select employees beyond the first page', async ({ browser }) => {
+test('expense entry can search and select an employee from the loaded workspace list', async ({ browser }) => {
   const account = { id: 'expense_admin', name: 'Expense Admin', email: 'expense.admin@example.test', emailVerified: true, role: 'ADMIN' }
-  const employeesPageOne = Array.from({ length: 25 }, (_, index) => ({
+  const employees = Array.from({ length: 25 }, (_, index) => ({
     id: `employee_${String(index + 1).padStart(2, '0')}`,
     name: `Employee ${String(index + 1).padStart(2, '0')}`,
     status: 'ACTIVE',
   }))
   const employeeTwentySix = { id: 'employee_26', name: 'Employee 26', status: 'ACTIVE' }
+  employees.push(employeeTwentySix)
   const requested = []
   const expenseRequests = []
   const context = await browser.newContext()
@@ -928,13 +1024,11 @@ test('expense entry can find and select employees beyond the first page', async 
       } })
     }
     if (path.endsWith('/hr/employees') && route.request().method() === 'GET') {
-      const pageNumber = Number(url.searchParams.get('page') || '1')
-      const search = url.searchParams.get('search')
-      requested.push({ page: pageNumber, search, limit: Number(url.searchParams.get('limit')) })
-      const isEmployeeTwentySix = pageNumber === 2 || search?.toLowerCase().includes('employee 26')
+      const limit = Number(url.searchParams.get('limit'))
+      requested.push({ limit })
       return json(route, { data: {
-        items: isEmployeeTwentySix ? [employeeTwentySix] : employeesPageOne,
-        pagination: { page: pageNumber, limit: 25, total: 26, pages: 2 },
+        items: employees.slice(0, limit || 100),
+        pagination: { page: 1, limit: limit || 100, total: employees.length, pages: Math.ceil(employees.length / (limit || 100)) },
         summary: { totalHeadcount: 26, onLeaveCount: 0, openRoles: 0, hiredThisMonth: 0, hiredPreviousMonthToDate: 0 },
       } })
     }
@@ -948,16 +1042,15 @@ test('expense entry can find and select employees beyond the first page', async 
     await expect(page.getByText('Showing 26 of 26 expenses')).toBeVisible()
     await expect(page.getByText('Merchant 26', { exact: true }).first()).toBeVisible()
     await page.getByRole('button', { name: 'New Expense' }).click()
-    await page.getByRole('button', { name: 'Next', exact: true }).click()
-    const employeeSelect = page.getByRole('combobox', { name: 'Expense employee' })
-    await expect(employeeSelect.locator('option', { hasText: 'Employee 26' })).toHaveCount(1)
-    await employeeSelect.selectOption('employee_26')
-    await expect(employeeSelect).toHaveValue('employee_26')
-    await expect.poll(() => requested.some(item => item.page === 2 && item.limit === 25)).toBe(true)
-    await page.getByRole('searchbox', { name: 'Search employees' }).fill('Employee 26')
-    await expect.poll(() => requested.some(item => item.search === 'Employee 26' && item.page === 1)).toBe(true)
-    await expect(employeeSelect.locator('option', { hasText: 'Employee 26' })).toHaveCount(1)
-    await expect(employeeSelect).toHaveValue('employee_26')
+    const employeeSelect = page.getByRole('button', { name: 'Expense employee' })
+    await employeeSelect.click()
+    const employeeSearch = page.getByPlaceholder('Search employee...')
+    await employeeSearch.fill('Employee 26')
+    await expect.poll(() => requested.some(item => item.limit === 100)).toBe(true)
+    const employeeOption = page.getByRole('menuitem').filter({ hasText: 'Employee 26' })
+    await expect(employeeOption).toBeVisible()
+    await employeeOption.click()
+    await expect(employeeSelect).toContainText('Employee 26')
   } finally {
     await context.close()
   }
@@ -1008,7 +1101,7 @@ test('accounts payable pages open bills and exposes paid history', async ({ brow
     await expect(page.getByText('Last Open Vendor', { exact: true })).toBeVisible()
     await page.getByText('Last Open Vendor', { exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Last Open Vendor' })).toBeVisible()
-    await page.getByRole('combobox', { name: 'Payables view' }).selectOption('HISTORY')
+    await selectRadixOption(page, page.getByRole('combobox', { name: 'Payables view' }), 'History')
     await expect.poll(() => requested.some(item => item.statusGroup === 'HISTORY')).toBe(true)
     await expect(page.getByRole('heading', { name: 'Historical Vendor' })).toBeVisible()
     await expect(page.getByRole('cell', { name: 'PAID', exact: true })).toBeVisible()
@@ -1016,11 +1109,10 @@ test('accounts payable pages open bills and exposes paid history', async ({ brow
     await page.getByRole('button', { name: 'Next project page' }).click()
     await expect.poll(() => projectRequests.some(item => item.page === 2 && item.limit === 25)).toBe(true)
     const projectSelect = page.getByRole('combobox', { name: 'Project' })
-    await projectSelect.selectOption('project_26')
+    await selectRadixOption(page, projectSelect, 'Project 26')
     await page.getByRole('searchbox', { name: 'Search projects' }).fill('Project 26')
     await expect.poll(() => projectRequests.some(item => item.search === 'Project 26' && item.page === 1)).toBe(true)
-    await expect(projectSelect).toHaveValue('project_26')
-    await expect(projectSelect.locator('option')).toContainText(['Project 26'])
+    await expect(projectSelect).toContainText('Project 26')
   } finally {
     await context.close()
   }
@@ -1096,11 +1188,15 @@ test('payroll run selector can reach runs beyond the first page', async ({ brows
     await signIn(page, account)
     await page.goto('/dashboard/hr/payroll')
     const runSelect = page.getByRole('combobox', { name: 'Payroll run' })
-    await expect(runSelect.locator('option')).toHaveCount(25)
+    await runSelect.click()
+    await expect(page.getByRole('option')).toHaveCount(25)
+    await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Next payroll run page' }).click()
     await expect.poll(() => requested.some(item => item.page === 2 && item.limit === 25)).toBe(true)
-    await expect(runSelect).toHaveValue('run_26')
-    await expect(runSelect.locator('option')).toHaveCount(1)
+    await expect(runSelect).toContainText('Run 26')
+    await runSelect.click()
+    await expect(page.getByRole('option')).toHaveCount(1)
+    await page.keyboard.press('Escape')
     await expect(page.getByText('2/2')).toBeVisible()
   } finally {
     await context.close()
@@ -1138,7 +1234,7 @@ test('product catalog pages beyond the first 100-row cap', async ({ browser }) =
     await table.getByText('Product 26', { exact: true }).click()
     const archiveButton = page.getByRole('button', { name: 'Archive Product' })
     await archiveButton.click()
-    const confirmation = page.getByRole('dialog')
+    const confirmation = page.getByRole('alertdialog')
     await expect(confirmation).toBeVisible()
     const confirmationBounds = await confirmation.boundingBox()
     expect(confirmationBounds.width).toBeLessThanOrEqual(390)
@@ -1223,14 +1319,13 @@ test('stock movement entry searches and pages the full product catalog while ret
     await expect(dialog).toBeHidden()
     await expect(openDialogButton).toBeFocused()
     await openDialogButton.click()
-    const productSelect = page.getByRole('combobox').filter({ has: page.locator('option[value^="product_"]') })
+    const productSelect = page.getByRole('combobox', { name: 'Product' })
     await page.getByRole('button', { name: 'Next product page' }).click()
     await expect.poll(() => requested.some(item => item.page === 2 && item.limit === 25)).toBe(true)
-    await productSelect.selectOption('product_26')
+    await selectRadixOption(page, productSelect, 'Product 26 (SKU-26) — 20 on hand')
     await page.getByRole('searchbox', { name: 'Search products' }).fill('special')
     await expect.poll(() => requested.some(item => item.search === 'special' && item.page === 1 && item.limit === 25)).toBe(true)
-    await expect(productSelect).toHaveValue('product_26')
-    await expect(productSelect.locator('option')).toContainText(['Product 26 (SKU-26)', 'Product 99 (SKU-99)'])
+    await expect(productSelect).toContainText('Product 26 (SKU-26)')
   } finally {
     await context.close()
   }

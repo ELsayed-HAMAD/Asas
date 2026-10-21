@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import {
   Dialog,
@@ -33,6 +34,7 @@ export default function FormDialog({
   confirmVariant = 'primary',
 }) {
   const isDialogOpen = Boolean(open ?? isOpen)
+  const returnFocusTo = useRef(null)
 
   // Native form submit: Enter in a field and the submit button both land here. We prevent the
   // browser's default navigation and delegate to the page's handler, but never while busy.
@@ -43,7 +45,19 @@ export default function FormDialog({
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={(val) => { if (!val && !busy) onClose?.() }}>
-      <DialogContent className={`w-full ${width} bg-surface-raised rounded-card border border-border-default shadow-elevated p-0 flex flex-col max-h-[85vh] overflow-hidden`}>
+      <DialogContent
+        className={`w-full ${width} bg-surface-raised rounded-card border border-border-default shadow-elevated p-0 flex flex-col max-h-[85vh] overflow-hidden`}
+        onOpenAutoFocus={() => {
+          returnFocusTo.current = document.activeElement
+        }}
+        onCloseAutoFocus={(event) => {
+          if (returnFocusTo.current?.isConnected) {
+            event.preventDefault()
+            returnFocusTo.current.focus()
+          }
+          returnFocusTo.current = null
+        }}
+      >
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 text-left rtl:text-right">
             <DialogTitle id="form-dialog-title" className="text-lg font-bold text-heading">

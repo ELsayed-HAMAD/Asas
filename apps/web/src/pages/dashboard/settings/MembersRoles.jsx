@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  Search,
   UserPlus,
   Shield,
   ShieldAlert,
@@ -18,6 +17,7 @@ import SettingsTabs from './SettingsTabs'
 import FormDialog from '../../../components/common/FormDialog'
 import ConfirmDialog from '../../../components/common/ConfirmDialog'
 import QueryState from '../../../components/common/QueryState'
+import SearchInput from '../../../components/common/SearchInput'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
 import { Badge } from '../../../components/ui/badge'
@@ -189,16 +189,12 @@ export default function MembersRoles() {
     <div className="flex-1 min-h-0 min-w-0 flex flex-col bg-surface overflow-hidden relative">
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption z-10 pointer-events-none" />
-            <Input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search members..."
-              className="pl-9 pr-3 py-1.5 h-8 text-sm w-64 bg-surface-muted text-heading"
-            />
-          </div>
+          <SearchInput
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search members..."
+            wrapperClassName="w-64"
+          />
           {isAdmin && (
             <Button
               type="button"

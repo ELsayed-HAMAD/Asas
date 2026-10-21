@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import {
   Dialog,
@@ -14,6 +15,7 @@ import {
   AlertDialogTitle,
   AlertDialogDescription,
   AlertDialogFooter,
+  AlertDialogCancel,
 } from '../ui/alert-dialog'
 import { Button } from '../ui/button'
 import { Alert, AlertDescription } from '../ui/alert'
@@ -38,6 +40,7 @@ export default function ConfirmDialog({
   error,
 }) {
   const isDialogOpen = Boolean(open ?? isOpen)
+  const returnFocusTo = useRef(null)
 
   const Root = danger ? AlertDialog : Dialog
   const Content = danger ? AlertDialogContent : DialogContent
@@ -48,7 +51,19 @@ export default function ConfirmDialog({
 
   return (
     <Root open={isDialogOpen} onOpenChange={(val) => { if (!val && !busy) onClose?.() }}>
-      <Content className="w-full max-w-md bg-surface-raised rounded-card border border-border-default shadow-elevated p-6">
+      <Content
+        className="w-full max-w-md bg-surface-raised rounded-card border border-border-default shadow-elevated p-6"
+        onOpenAutoFocus={() => {
+          returnFocusTo.current = document.activeElement
+        }}
+        onCloseAutoFocus={(event) => {
+          if (returnFocusTo.current?.isConnected) {
+            event.preventDefault()
+            returnFocusTo.current.focus()
+          }
+          returnFocusTo.current = null
+        }}
+      >
         <Header className="text-left rtl:text-right">
           <Title id="confirm-dialog-title" className="text-lg font-bold text-heading">
             {title}
@@ -67,14 +82,20 @@ export default function ConfirmDialog({
         )}
 
         <Footer className="mt-4 flex items-center justify-end gap-3 sm:space-x-0">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={busy}
-          >
-            {cancelLabel}
-          </Button>
+          {danger ? (
+            <AlertDialogCancel type="button" disabled={busy} className="mt-0">
+              {cancelLabel}
+            </AlertDialogCancel>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={busy}
+            >
+              {cancelLabel}
+            </Button>
+          )}
           <Button
             type="button"
             variant={danger ? 'destructive' : 'default'}

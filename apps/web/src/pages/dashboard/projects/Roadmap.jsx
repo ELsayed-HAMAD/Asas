@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   ChevronRight,
-  Search,
   ChevronDown,
   X,
   Folder,
@@ -18,6 +17,7 @@ import { downloadRoadmapCsv } from '../../../lib/roadmapExport';
 import PageHeader from '../../../components/common/PageHeader';
 import PageToolbar from '../../../components/common/PageToolbar';
 import FormDialog from '../../../components/common/FormDialog';
+import SearchInput from '../../../components/common/SearchInput';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
@@ -174,18 +174,14 @@ export default function Roadmap() {
             className="mb-4"
             left={
               <>
-                <div className="relative flex-1 min-w-[160px] max-w-[280px]">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-                  <Input
-                    type="text"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    placeholder="Search..."
-                    aria-label="Search roadmap"
-                    title="Search roadmap"
-                    className="pl-9 pr-4 h-10 text-sm border-0 rounded-[10px] bg-surface-raised text-heading placeholder:text-caption shadow-[0_1px_2px_rgba(16,24,40,0.04)] w-full"
-                  />
-                </div>
+                <SearchInput
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search..."
+                  aria-label="Search roadmap"
+                  title="Search roadmap"
+                  wrapperClassName="flex-1 min-w-[160px] max-w-[280px]"
+                />
 
                 <Button
                   type="button"

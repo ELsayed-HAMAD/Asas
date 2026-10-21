@@ -14,7 +14,9 @@ test('desktop marketing navigation resolves every primary destination and scroll
   await mockSignedOutSession(context)
   await page.goto('/pricing')
 
-  await page.getByRole('link', { name: 'Features' }).click()
+  await page.getByRole('navigation', { name: 'Main navigation' })
+    .getByRole('link', { name: 'Features', exact: true })
+    .click()
   await expect(page).toHaveURL(/\/#features$/)
   await expect(page.locator('#features')).toBeInViewport()
 

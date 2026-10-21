@@ -256,7 +256,7 @@ export async function attendanceRoutes(app: FastifyInstance): Promise<void> {
         })
         return created
       }, { isolationLevel: 'Serializable' })
-      request.server.ssePublish(tenantId, [moduleKeyPrefix('hr'), 'notifications'])
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('hr'), moduleKeyPrefix('notifications')])
       reply.code(201)
       return { data: leaveRequest }
     },
@@ -293,7 +293,7 @@ export async function attendanceRoutes(app: FastifyInstance): Promise<void> {
         })
         return created
       }, { isolationLevel: 'Serializable' })
-      request.server.ssePublish(tenantId, [moduleKeyPrefix('hr'), 'notifications'])
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('hr'), moduleKeyPrefix('notifications')])
       reply.code(201)
       return { data: leaveRequest }
     },

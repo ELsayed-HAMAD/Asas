@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Search, Download,
+  Download,
   TrendingUp, AlertTriangle, Pencil, Mail, Calendar,
   Banknote, Briefcase, Network, History, Trash2,
   Building2, Plus, Check, X,
@@ -16,6 +16,7 @@ import { exportsApi } from '../../../lib/api/exports'
 import { downloadCsv } from '../../../lib/csv'
 import FormDialog from '../../../components/common/FormDialog'
 import ConfirmDialog from '../../../components/common/ConfirmDialog'
+import SearchInput from '../../../components/common/SearchInput'
 import { useActiveMemberRole } from '../../../lib/authClient'
 import { getMemberRoleName } from '../../../lib/memberRole'
 import { Button } from '../../../components/ui/button'
@@ -285,16 +286,12 @@ export default function EmployeeDirectory() {
         <div className="w-full flex flex-wrap items-center justify-between gap-3">
           {/* Left group (flush with the left edge of TOTAL HEADCOUNT) */}
           <div className="flex flex-wrap items-center gap-2.5">
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-              <Input
-                type="text"
-                value={search}
-                onChange={event => { setSearch(event.target.value); setPage(1) }}
-                placeholder="Search employees..."
-                className="pl-9 pr-4 py-2 text-sm w-[280px] bg-surface-muted/50"
-              />
-            </div>
+            <SearchInput
+              value={search}
+              onChange={event => { setSearch(event.target.value); setPage(1) }}
+              placeholder="Search employees..."
+              wrapperClassName="w-[280px]"
+            />
             <Select
               value={departmentId || '__all__'}
               onValueChange={val => { setDepartmentId(val === '__all__' ? '' : val); setPage(1) }}
@@ -730,7 +727,7 @@ export default function EmployeeDirectory() {
                 value={editForm.salaryBasis || '__none__'}
                 onValueChange={val => setEditForm(current => ({ ...current, salaryBasis: val === '__none__' ? '' : val }))}
               >
-                <SelectTrigger className="w-full bg-surface-raised">
+                <SelectTrigger aria-label="Salary basis" className="w-full bg-surface-raised">
                   <SelectValue placeholder="None" />
                 </SelectTrigger>
                 <SelectContent>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Search, Filter, Download, X, FileText,
+  Filter, Download, X, FileText,
   Calendar, UserPlus, ArrowRight,
   MapPin, Mail, Loader2, Upload, Eye, Pencil,
 } from 'lucide-react'
@@ -13,6 +13,7 @@ import FormDialog from '../../../components/common/FormDialog'
 import QueryState from '../../../components/common/QueryState'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
+import SearchInput from '../../../components/common/SearchInput'
 import { Textarea } from '../../../components/ui/textarea'
 import { Badge } from '../../../components/ui/badge'
 import { Alert, AlertDescription } from '../../../components/ui/alert'
@@ -600,16 +601,12 @@ export default function RecruitmentPipeline() {
       <div className="flex flex-wrap items-center justify-between gap-3 w-full mb-5 flex-shrink-0">
         {/* Left group */}
         <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-            <Input
-              type="text"
-              value={search}
-              onChange={event => { setSearch(event.target.value); setPage(1) }}
-              placeholder="Search candidates..."
-              className="pl-9 pr-4 py-2 text-xs w-72 max-w-full"
-            />
-          </div>
+          <SearchInput
+            value={search}
+            onChange={event => { setSearch(event.target.value); setPage(1) }}
+            placeholder="Search candidates..."
+            wrapperClassName="w-72 max-w-full"
+          />
           <Select
             value={roleFilter}
             onValueChange={val => { setRoleFilter(val); setPage(1) }}
