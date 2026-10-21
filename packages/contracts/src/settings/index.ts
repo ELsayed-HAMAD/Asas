@@ -176,11 +176,8 @@ export type Integration = z.infer<typeof integrationSchema>
 export const integrationWriteSchema = z.object({
   name: shortTextSchema,
   description: boundedText(500).optional().nullable(),
-  status: integrationStatusSchema.optional(),
-  syncPullRequests: z.boolean().optional(),
-  syncCiCdStatus: z.boolean().optional(),
   credential: boundedText(4096).optional().nullable(),
-})
+}).strict()
 
 export type IntegrationWriteInput = z.infer<typeof integrationWriteSchema>
 
@@ -195,19 +192,20 @@ export const integrationUpdateSchema = z
   .object({
     name: shortTextSchema.optional(),
     description: boundedText(500).nullable().optional(),
-    status: integrationStatusSchema.optional(),
-    syncPullRequests: z.boolean().optional(),
-    syncCiCdStatus: z.boolean().optional(),
     credential: z
       .object({
         value: boundedText(4096).optional(),
         clear: z.literal(true).optional(),
       })
+      .strict()
       .refine(value => !(value.clear && value.value !== undefined), {
         message: 'credential.clear and credential.value are mutually exclusive',
       })
+      .refine(value => value.clear === true || value.value !== undefined, {
+        message: 'Provide a credential value or clear the existing endpoint',
+      })
       .optional(),
-  })
+  }).strict()
   .refine(value => Object.keys(value).length > 0, { message: 'At least one field is required' })
 
 export type IntegrationUpdateInput = z.infer<typeof integrationUpdateSchema>
@@ -293,36 +291,6 @@ export const billingCheckoutRequestSchema = z.object({
   priceId: z.string().regex(/^price_[A-Za-z0-9]+$/),
 })
 export const billingSessionResponseSchema = z.object({ url: z.string().url() })
-
-export const backupScheduleSchema = z.object({
-  id: idSchema,
-  name: shortTextSchema,
-  schedule: shortTextSchema,
-  enabled: z.boolean(),
-  createdAt: isoDateTimeSchema,
-})
-
-export const backupScheduleWriteSchema = z.object({
-  name: shortTextSchema,
-  schedule: shortTextSchema,
-  enabled: z.boolean().optional(),
-})
-
-export const backupScheduleUpdateSchema = z
-  .object({
-    name: shortTextSchema.optional(),
-    schedule: shortTextSchema.optional(),
-    enabled: z.boolean().optional(),
-  })
-  .refine(value => Object.keys(value).length > 0, { message: 'At least one field is required' })
-
-export const backupSchedulesResponseSchema = z.object({
-  items: z.array(backupScheduleSchema),
-})
-
-export type BackupSchedule = z.infer<typeof backupScheduleSchema>
-export type BackupScheduleWriteInput = z.infer<typeof backupScheduleWriteSchema>
-export type BackupScheduleUpdateInput = z.infer<typeof backupScheduleUpdateSchema>
 
 export const workspaceDeleteResponseSchema = z.object({
   success: z.boolean(),

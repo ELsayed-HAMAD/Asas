@@ -1,82 +1,101 @@
+import { BookOpenCheck, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { ArrowUpRight, BookOpenCheck } from 'lucide-react'
 import MarketingPageFrame from '../../components/marketing/MarketingPageFrame'
+import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 
-const guides = [
-  {
-    id: 'getting-started', title: '1. Set up a workspace',
-    text: 'Create your account, finish the workspace setup, and confirm the organization details and base currency before recording financial activity. Invite colleagues after setup and assign access that matches their responsibilities.',
-    links: [{ label: 'Create an account', to: '/register' }, { label: 'Members and roles', to: '/dashboard/settings/members' }],
-  },
-  {
-    id: 'finance', title: '2. Record and review finances',
-    text: 'Add customers and vendors, record invoices and expenses, and use the finance pages to review amounts due and recorded settlements. Import a bank statement to reconcile its rows against ledger entries. Opening balances belong in Trial Balance before the first ledger journal.',
-    links: [{ label: 'Finance overview', to: '/dashboard/finance' }, { label: 'Bank reconciliation', to: '/dashboard/finance/reconciliation' }, { label: 'Trial balance', to: '/dashboard/finance/trial-balance' }],
-  },
-  {
-    id: 'people-payroll', title: '3. Manage people and payroll',
-    text: 'Keep employee details current, then use attendance and leave tools to review recorded work time. Payroll runs use the salary, pay period, and tax-rate information available to the workspace. Review a run before approval; only authorized roles can approve or pay runs.',
-    links: [{ label: 'Employee directory', to: '/dashboard/hr/employees' }, { label: 'Time and attendance', to: '/dashboard/hr/time-attendance' }, { label: 'Payroll', to: '/dashboard/hr/payroll' }],
-  },
-  {
-    id: 'crm', title: '4. Follow deals and sales activity',
-    text: 'Create deals in the CRM pipeline and move them through the available stages as work progresses. Record a note, call, or email activity to keep a history with the deal. Email activity is logged in Asas; it does not send an email. Reports use recorded deal outcomes and dates, so undated legacy records may be excluded from dated metrics.',
-    links: [{ label: 'CRM overview', to: '/dashboard/crm' }, { label: 'Deals pipeline', to: '/dashboard/crm/deals' }, { label: 'Sales performance', to: '/dashboard/crm/sales-performance' }, { label: 'Revenue forecast', to: '/dashboard/crm/revenue-forecast' }],
-  },
-  {
-    id: 'projects', title: '5. Plan project work',
-    text: 'Create a project, organize issues, and use a sprint to schedule and review a focused set of work. Record estimates and completion dates as work happens; the portfolio and burndown views are based on those recorded values.',
-    links: [{ label: 'Project portfolio', to: '/dashboard/projects' }, { label: 'Roadmap', to: '/dashboard/projects/roadmap' }, { label: 'Active sprints', to: '/dashboard/projects/sprints' }],
-  },
-  {
-    id: 'inventory', title: '6. Track inventory',
-    text: 'Add products to the catalog, review stock by warehouse, and use Stock Movements to record receipts or issues. Movement history preserves the quantity changes and their notes. Recording movements requires an authorized workspace role.',
-    links: [{ label: 'Product catalog', to: '/dashboard/inventory' }, { label: 'Stock movements', to: '/dashboard/inventory/movements' }],
-  },
-  {
-    id: 'workspace-settings', title: '7. Configure and export workspace data',
-    text: 'Workspace administrators can manage integrations, notification preferences, data exports, and subscription billing in Settings. Export controls download the data available to your role; sensitive payroll records have additional access restrictions.',
-    links: [{ label: 'Settings', to: '/dashboard/settings' }, { label: 'Integrations', to: '/dashboard/settings/integrations' }, { label: 'Data export', to: '/dashboard/settings/data-export' }, { label: 'Billing and plans', to: '/dashboard/settings/billing' }],
-  },
+const SECTIONS = [
+  { id: 'getting-started', label: '1. Getting started' },
+  { id: 'finance-core', label: '2. Finance records' },
+  { id: 'api-reference', label: '3. API reference' },
+  { id: 'security', label: '4. Access & data' },
 ]
 
 export default function Documentation() {
   return (
     <MarketingPageFrame
-      eyebrow="Documentation"
-      title="A practical guide to Asas"
-      description="Use this guide to set up a workspace and find the main workflows for finance, people, CRM, projects, inventory, and administration. Some actions are limited by workspace role."
+      eyebrow="Product guide"
+      title="Get started with Asas"
+      description="A practical guide to creating a workspace, using finance tools, and finding the API reference available for your deployment."
     >
       <div className="grid gap-8 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="h-fit rounded-card border border-border-subtle bg-surface-raised p-5 shadow-card lg:sticky lg:top-28">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-heading"><BookOpenCheck size={16} className="text-accent" /> In this guide</h2>
-          <nav aria-label="Documentation sections" className="flex flex-wrap gap-x-4 gap-y-2 lg:flex-col">
-            {guides.map(guide => <a key={guide.id} href={`#${guide.id}`} className="text-sm text-muted transition-colors hover:text-heading">{guide.title.replace(/^\d+\. /, '')}</a>)}
+        <aside className="h-fit rounded-card border border-border-default/80 glass-strong p-5 shadow-glass lg:sticky lg:top-24">
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border-subtle/80">
+            <BookOpenCheck className="w-5 h-5 text-accent" />
+            <h2 className="text-sm font-bold text-heading">Guide index</h2>
+          </div>
+          <nav aria-label="Documentation sections" className="flex flex-col gap-1">
+            {SECTIONS.map(section => (
+              <a key={section.id} href={`#${section.id}`} className="px-3 py-2 rounded-button text-xs font-medium text-body hover:text-heading hover:bg-surface-muted/80 transition-colors">
+                {section.label}
+              </a>
+            ))}
           </nav>
-        </aside>
-        <div className="space-y-5">
-          {guides.map(guide => (
-            <section id={guide.id} key={guide.id} className="scroll-mt-28 rounded-card border border-border-subtle bg-surface-raised p-6 shadow-card">
-              <h2 className="text-lg font-bold text-heading">{guide.title}</h2>
-              <p className="mt-3 text-sm leading-6 text-body-light">{guide.text}</p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                {guide.links.map(link => (
-                  <Button asChild key={link.to} variant="outline" size="sm" className="gap-1.5 text-xs font-semibold">
-                    <Link to={link.to}>{link.label}<ArrowUpRight size={13} /></Link>
-                  </Button>
-                ))}
-              </div>
-            </section>
-          ))}
-          <section id="security" className="scroll-mt-28 rounded-card border border-border-subtle bg-surface-raised p-6 shadow-card">
-            <h2 className="text-lg font-bold text-heading">Security and access</h2>
-            <p className="mt-3 text-sm leading-6 text-body-light">Asas checks workspace access on the server for protected operations. Member roles control access to sensitive actions, payroll records have additional role restrictions, and important financial changes are recorded in the workspace audit log. Use Members and Roles to review who can access each workflow.</p>
-            <Button asChild variant="outline" size="sm" className="mt-5 gap-1.5 text-xs font-semibold">
-              <Link to="/dashboard/settings/members">Review members and roles <ArrowUpRight size={13} /></Link>
+          <div className="mt-6 pt-4 border-t border-border-subtle/80">
+            <p className="text-[11px] text-caption mb-2">Compare workspace plans</p>
+            <Button asChild variant="outline" size="sm" className="w-full text-xs">
+              <Link to="/pricing">View pricing</Link>
             </Button>
+          </div>
+        </aside>
+
+        <div className="space-y-6">
+          <section id="getting-started" className="scroll-mt-28 rounded-card border border-border-default/80 bg-surface-raised p-6 sm:p-8 shadow-card">
+            <div className="flex items-center gap-2 mb-3">
+              <Badge variant="outline" className="text-xs text-accent border-accent-muted bg-accent-light">Setup</Badge>
+              <h2 className="text-xl font-bold text-heading">Create a workspace</h2>
+            </div>
+            <p className="text-sm text-body-light leading-relaxed mb-5">
+              Create an account, complete the workspace setup prompts, and invite teammates from settings when you are ready.
+              The available setup fields and member roles are shown in the application for your deployment.
+            </p>
+            <div className="rounded-card-sm bg-surface-muted border border-border-default p-4 text-sm text-body-light">
+              Review billing, notifications, integrations, and data export settings before relying on an external provider or scheduled operation.
+              A setting being visible does not mean the related provider or background service is configured.
+            </div>
+            <Button asChild size="sm" className="mt-5"><Link to="/register">Create an account</Link></Button>
           </section>
-          <p className="px-1 text-xs leading-5 text-muted">Dashboard links require sign-in and are subject to your workspace permissions. Financial and payroll reports show recorded values; historical data without enough provenance is not estimated.</p>
+
+          <section id="finance-core" className="scroll-mt-28 rounded-card border border-border-default bg-surface-raised p-6 sm:p-8 shadow-card">
+            <div className="flex items-center gap-2 mb-3">
+              <Badge variant="outline" className="text-xs text-accent border-accent-muted bg-accent-light">Finance</Badge>
+              <h2 className="text-xl font-bold text-heading">Finance records</h2>
+            </div>
+            <p className="text-sm text-body-light leading-relaxed">
+              Use the finance workspace to manage accounts, journal entries, and customer receivables. Exchange-rate records are
+              managed in workspace settings; Asas does not provide a live market-rate feed. Confirm rates, tax treatment, and
+              accounting decisions with your finance team before posting transactions.
+            </p>
+            <Button asChild variant="outline" size="sm" className="mt-5"><Link to="/solutions">Explore product areas</Link></Button>
+          </section>
+
+          <section id="api-reference" className="scroll-mt-28 rounded-card border border-border-default bg-surface-raised p-6 sm:p-8 shadow-card">
+            <div className="flex items-center gap-2 mb-3">
+              <Badge variant="outline" className="text-xs text-accent border-accent-muted bg-accent-light">Developers</Badge>
+              <h2 className="text-xl font-bold text-heading">API reference</h2>
+            </div>
+            <p className="text-sm text-body-light leading-relaxed">
+              The API reference is generated from the running API and is available at <code>/docs</code> on the API deployment
+              when API documentation is enabled. It describes the actual routes, request schemas, and authentication available
+              in that deployment. This site does not publish a separate API token or webhook guide.
+            </p>
+          </section>
+
+          <section id="security" className="scroll-mt-28 rounded-card border border-border-default bg-surface-raised p-6 sm:p-8 shadow-card">
+            <div className="flex items-center gap-2 mb-3">
+              <Badge variant="outline" className="text-xs text-success-text border-success-border bg-success-light">Workspace</Badge>
+              <h2 className="text-xl font-bold text-heading">Access & data handling</h2>
+            </div>
+            <p className="text-sm text-body-light leading-relaxed mb-4">
+              The application uses authenticated sessions and workspace-scoped access checks. Some administrative and business
+              actions are recorded in activity or audit logs; these records are not described as tamper-proof. Retention cleanup
+              and backups depend on the deployment configuration, so confirm backup arrangements with its operator.
+            </p>
+            <div className="flex items-start gap-3 rounded-card-sm bg-surface-muted border border-border-default p-4 text-xs text-body-light">
+              <ShieldCheck className="w-4 h-4 text-accent mt-0.5 shrink-0" />
+              <span>Use the application’s settings and the API reference served by your deployment to check which controls are available and active.</span>
+            </div>
+          </section>
         </div>
       </div>
     </MarketingPageFrame>

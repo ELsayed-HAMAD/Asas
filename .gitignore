@@ -183,6 +183,30 @@ $RECYCLE.BIN/
 brain/
 *.scratch.*
 scratch/
+.ai/
+.prompts/
+.prompt/
+# Local AI instruction, prompt, and context files. Keep these out of public repos.
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+COPILOT.md
+copilot-instructions.md
+*.instructions.md
+*.prompt.md
+*.ai.md
+*.codex.md
+*.copilot.md
+*.gemini.md
+*.chatgpt.md
+.cursorrules
+.windsurfrules
+.aider*.*
+.continue*.*
+.clinerules*
+.roorules*
+.cursorignore
+.codeiumignore
 
 # =========================
 # Audit, Review, Plan & Remediation Files

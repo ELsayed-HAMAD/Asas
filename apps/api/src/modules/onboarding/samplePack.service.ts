@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { Prisma, type PrismaClient } from '@prisma/client'
 import type { ImportEmployeesRequest } from '@asas/contracts'
 import { computePayrollLine, Money, type TaxRate } from '@asas/domain'
+import { recordAuditLog } from '../../services/auditLog.js'
 import { AppError } from '../../utils/errors.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -255,6 +256,7 @@ const SAMPLE_TAX_RATES: TaxRate[] = [
 export async function applyEnterpriseSamplePack(
   prisma: PrismaClient,
   tenantId: string,
+  actorId?: string,
 ): Promise<Record<string, number>> {
 
   const pack = await readPack('enterprise.json')
@@ -703,6 +705,19 @@ export async function applyEnterpriseSamplePack(
       where: { id: tenantId },
       data: { onboardingStatus: 'SAMPLE_LOADED', sampleDataManifest: await captureSampleManifest(tx, tenantId) },
     })
+    if (actorId) {
+      await recordAuditLog(tx, {
+        tenantId,
+        actorId,
+        action: 'onboarding.sample.apply',
+        targetType: 'Tenant',
+        targetId: tenantId,
+        metadata: {
+          sections: Object.keys(summary).length,
+          rows: Object.values(summary).reduce((total, rows) => total + rows, 0),
+        },
+      })
+    }
   }, { timeout: 300000, isolationLevel: 'Serializable' })
 
   return summary
@@ -867,6 +882,7 @@ export async function captureSampleManifest(tx: Prisma.TransactionClient, tenant
 export async function clearSamplePack(
   prisma: PrismaClient,
   tenantId: string,
+  actorId?: string,
 ): Promise<{ cleared: Record<string, number>; onboardingStatus: 'PENDING' }> {
   const cleared: Record<string, number> = {}
   await prisma.$transaction(async tx => {
@@ -890,6 +906,16 @@ export async function clearSamplePack(
       cleared[model] = result.count
     }
     await tx.tenant.update({ where: { id: tenantId }, data: { onboardingStatus: 'PENDING', sampleDataManifest: Prisma.DbNull } })
+    if (actorId) {
+      await recordAuditLog(tx, {
+        tenantId,
+        actorId,
+        action: 'onboarding.sample.clear',
+        targetType: 'Tenant',
+        targetId: tenantId,
+        metadata: { rows: Object.values(cleared).reduce((total, rows) => total + rows, 0) },
+      })
+    }
   }, { timeout: 300000, isolationLevel: 'Serializable' })
 
   return { cleared, onboardingStatus: 'PENDING' }
@@ -906,6 +932,7 @@ export async function importEmployees(
   prisma: PrismaClient,
   tenantId: string,
   input: ImportEmployeesInput,
+  actorId?: string,
 ): Promise<{ imported: number }> {
   const departmentCache = new Map<string, string>()
 
@@ -968,6 +995,16 @@ export async function importEmployees(
       count++
     }
     await tx.tenant.update({ where: { id: tenantId }, data: { onboardingStatus: 'IMPORTED' } })
+    if (actorId) {
+      await recordAuditLog(tx, {
+        tenantId,
+        actorId,
+        action: 'onboarding.import.employees',
+        targetType: 'Tenant',
+        targetId: tenantId,
+        metadata: { imported: count },
+      })
+    }
     return count
   }, { timeout: 300000 })
 

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { exchangeRateListQuerySchema, exchangeRateWriteSchema, generalSettingsUpdateSchema } from './settings/index.js'
+import {
+  exchangeRateListQuerySchema,
+  exchangeRateWriteSchema,
+  generalSettingsUpdateSchema,
+  integrationUpdateSchema,
+  integrationWriteSchema,
+} from './settings/index.js'
 
 describe('workspace FX contracts', () => {
   it('requires a positive decimal quote with bounded currency precision and timestamp', () => {
@@ -24,5 +30,19 @@ describe('workspace overtime settings', () => {
     for (const overtimeThresholdHours of [0, 24.1, -1, '8']) {
       expect(generalSettingsUpdateSchema.safeParse({ overtimeThresholdHours }).success).toBe(false)
     }
+  })
+})
+
+describe('integration endpoint settings', () => {
+  it('does not let callers fake provider sync or endpoint health status', () => {
+    expect(integrationWriteSchema.safeParse({ name: 'GitHub', status: 'CONNECTED', syncPullRequests: true }).success).toBe(false)
+    expect(integrationUpdateSchema.safeParse({ status: 'CONNECTED' }).success).toBe(false)
+    expect(integrationUpdateSchema.safeParse({ syncCiCdStatus: true }).success).toBe(false)
+  })
+
+  it('requires an actual endpoint update or explicit clear operation', () => {
+    expect(integrationUpdateSchema.safeParse({ credential: {} }).success).toBe(false)
+    expect(integrationUpdateSchema.safeParse({ credential: { clear: true } }).success).toBe(true)
+    expect(integrationUpdateSchema.safeParse({ credential: { value: 'https://hooks.example.com/asas' } }).success).toBe(true)
   })
 })

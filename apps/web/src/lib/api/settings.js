@@ -10,7 +10,7 @@ import { http } from '../api/http'
  * decoded `data` payload directly (e.g. `getNotifications()` resolves to `{ modules, quietHours,
  * quietHoursDefaulted }`).
  *
- * Billing and backup records are tenant-scoped and read or updated through this same settings API.
+ * Billing records are tenant-scoped and read or updated through this same settings API.
  */
 export const settingsApi = {
   listExchangeRates: (query = {}) => http.get(`/settings/exchange-rates${query.page || query.limit || query.currency ? `?${new URLSearchParams(query)}` : ''}`),
@@ -19,9 +19,6 @@ export const settingsApi = {
   getBillingPlans: () => http.get('/billing/plans'),
   createBillingCheckout: (priceId) => http.post('/billing/checkout', { body: { priceId } }),
   createBillingPortal: () => http.post('/billing/portal'),
-  listBackups: () => http.get('/settings/backups'),
-  createBackup: (body) => http.post('/settings/backups', { body }),
-  updateBackup: (id, body) => http.patch(`/settings/backups/${id}`, { body }),
   /** GET /settings/notifications → { modules, quietHours, quietHoursDefaulted }. */
   getNotifications: () => http.get('/settings/notifications'),
 

@@ -1,11 +1,11 @@
 /**
- * Cross-module export contract — the job-based bulk exports (employee directory, general
- * ledger) that run through the API's queue (`apps/api/src/services/queue.ts`) and land in the
+ * Cross-module export contract for employee, ledger, project, and workspace exports. Jobs run
+ * through the API queue (`apps/api/src/services/queue.ts`) and land in the
  * existing `ExportJob` table.
  *
  * PDF documents (payslips, invoices) are NOT jobs: they are deterministic, single-document
  * downloads served on demand, so they get a plain GET endpoint instead of job bookkeeping.
- * The two kinds live here because the worker needs to know what to render — the kind is the
+ * Supported kinds live here because the worker needs to know what to render — the kind is the
  * queue payload's only business field besides the id of the job row.
  */
 import { z } from 'zod'
@@ -18,9 +18,7 @@ export type ExportJobKind = z.infer<typeof exportJobKindSchema>
 
 export const exportJobCreateSchema = z.object({
   kind: exportJobKindSchema,
-  format: z.enum(['xlsx', 'json', 'csv']).optional(),
-  dateRange: z.string().optional(),
-})
+}).strict()
 export type ExportJobCreateInput = z.infer<typeof exportJobCreateSchema>
 
 export const exportJobSchema = z.object({

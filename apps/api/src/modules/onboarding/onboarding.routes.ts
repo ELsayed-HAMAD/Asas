@@ -54,17 +54,23 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
     },
     async request => {
       const { tenantId, userId } = requireAuthContext(request)
-      const changed = await request.server.prisma.tenant.updateMany({
-        where: { id: tenantId, onboardingStatus: 'PENDING' },
-        data: { onboardingStatus: 'EMPTY' },
-      })
-      if (changed.count !== 1) throw new AppError(409, 'Only a pending workspace can start empty')
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'onboarding.markEmpty',
-        targetType: 'Tenant',
-        targetId: tenantId,
+      await request.server.prisma.$transaction(async tx => {
+        const changed = await tx.tenant.updateMany({
+          where: { id: tenantId, onboardingStatus: 'PENDING' },
+          data: { onboardingStatus: 'EMPTY' },
+        })
+        if (changed.count === 1) {
+          await recordAuditLog(tx, {
+            tenantId,
+            actorId: userId,
+            action: 'onboarding.markEmpty',
+            targetType: 'Tenant',
+            targetId: tenantId,
+          })
+          return
+        }
+        const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { onboardingStatus: true } })
+        if (tenant?.onboardingStatus !== 'EMPTY') throw new AppError(409, 'Only a pending workspace can start empty')
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('hr')])
       const status = await getOnboardingStatus(request.server.prisma, tenantId)
@@ -80,18 +86,7 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      const summary = await applyEnterpriseSamplePack(request.server.prisma, tenantId)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'onboarding.sample.apply',
-        targetType: 'Tenant',
-        targetId: tenantId,
-        metadata: {
-          sections: Object.keys(summary).length,
-          rows: Object.values(summary).reduce((total, rows) => total + rows, 0),
-        },
-      })
+      const summary = await applyEnterpriseSamplePack(request.server.prisma, tenantId, userId)
       for (const moduleName of ['hr', 'finance', 'crm', 'projects', 'inventory'] as const) {
         request.server.ssePublish(tenantId, [moduleKeyPrefix(moduleName)])
       }
@@ -115,15 +110,8 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
         request.server.prisma,
         tenantId,
         request.body as ImportEmployeesRequest,
+        userId,
       )
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'onboarding.import.employees',
-        targetType: 'Tenant',
-        targetId: tenantId,
-        metadata: { imported: result.imported },
-      })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('hr')])
       reply.code(201)
       return { data: { ...result, onboardingStatus: 'IMPORTED' as const } }
@@ -138,15 +126,7 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
     },
     async request => {
       const { tenantId, userId } = requireAuthContext(request)
-      const result = await clearSamplePack(request.server.prisma, tenantId)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'onboarding.sample.clear',
-        targetType: 'Tenant',
-        targetId: tenantId,
-        metadata: { rows: Object.values(result.cleared).reduce((total, rows) => total + rows, 0) },
-      })
+      const result = await clearSamplePack(request.server.prisma, tenantId, userId)
       // The sweep touched every business module — publish all their prefixes so an open tab
       // refetches whichever surface it is showing (same set as the sample-apply above).
       for (const moduleName of ['hr', 'finance', 'crm', 'projects', 'inventory'] as const) {

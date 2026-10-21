@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { dispatchToBetterAuth } from '../src/plugins/betterAuth.js'
+import Fastify from 'fastify'
+import rateLimit from '@fastify/rate-limit'
+import { loadEnv } from '../src/config/env.js'
+import { betterAuthPlugin, dispatchToBetterAuth } from '../src/plugins/betterAuth.js'
 
 /**
  * Unit-tests the Fastify\u2192Fetch bridge in isolation from better-auth itself, so it doesn't
@@ -81,5 +84,64 @@ describe('dispatchToBetterAuth', () => {
 
     expect(response.status).toBe(201)
     expect(await response.json()).toEqual({ ok: true })
+  })
+})
+
+describe('better-auth route safeguards', () => {
+  it('rejects email-dependent auth requests before dispatch when delivery is unavailable', async () => {
+    const app = Fastify({ logger: false })
+    await app.register(rateLimit, { global: false, max: 300, timeWindow: '1 minute' })
+    app.decorate('environment', loadEnv({
+      NODE_ENV: 'test',
+      DATABASE_URL: 'postgresql://mock:mock@localhost:5432/db',
+      RESEND_API_KEY: '',
+    }))
+    let dispatches = 0
+    await betterAuthPlugin(app, {
+      handler: async () => {
+        dispatches += 1
+        return new Response('{}')
+      },
+    } as any)
+
+    for (const url of [
+      '/api/auth/sign-up/email',
+      '/api/auth/request-password-reset?callbackURL=%2Fdashboard',
+      '/api/auth/send-verification-email',
+    ]) {
+      const response = await app.inject({ method: 'POST', url, payload: { email: 'owner@example.com' } })
+      expect(response.statusCode).toBe(503)
+      expect(response.json().error.message).toContain('Email delivery is not configured')
+    }
+
+    expect(dispatches).toBe(0)
+    await app.close()
+  })
+
+  it('rate-limits the actual password reset endpoint', async () => {
+    const app = Fastify({ logger: false, trustProxy: true })
+    await app.register(rateLimit, { global: false, max: 300, timeWindow: '1 minute' })
+    app.decorate('environment', loadEnv({
+      NODE_ENV: 'test',
+      DATABASE_URL: 'postgresql://mock:mock@localhost:5432/db',
+      RESEND_API_KEY: 're_test_configured',
+    }))
+    await betterAuthPlugin(app, {
+      handler: async () => new Response('{}'),
+    } as any)
+
+    const responses = []
+    for (let attempt = 0; attempt < 11; attempt += 1) {
+      responses.push(await app.inject({
+        method: 'POST',
+        url: '/api/auth/request-password-reset',
+        headers: { 'x-forwarded-for': '203.0.113.71' },
+        payload: { email: 'owner@example.com' },
+      }))
+    }
+
+    expect(responses.slice(0, 10).every(response => response.statusCode === 200)).toBe(true)
+    expect(responses[10]?.statusCode).toBe(429)
+    await app.close()
   })
 })

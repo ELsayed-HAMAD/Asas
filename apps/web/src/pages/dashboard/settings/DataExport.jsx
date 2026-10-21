@@ -4,7 +4,6 @@ import {
   FileText,
   Loader2,
   Cloud,
-  Calendar,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import TopBarActions from '../../../components/TopBarActions';
@@ -21,19 +20,11 @@ import {
 } from '../../../components/ui/select';
 import { exportsApi } from '../../../lib/api/exports';
 import { queryKeys } from '../../../lib/queryKeys';
-import { settingsApi } from '../../../lib/api/settings';
 
-/**
- * The legacy "Data Scope" options had no 1:1 mapping to the backend's two export kinds
- * (`employees` | `ledger`). The three legacy labels are kept verbatim for the old look, and each
- * maps to the closest real kind: the two people/workspace scopes export the employee directory,
- * and the ledgers scope exports the general ledger. Format and Date Range have no backend
- * equivalent at all (`createJob` takes only `kind`), so those selects stay as inert decoration —
- * exactly as they were on the legacy page.
- */
+/** Each visible scope maps to an implemented export kind with a fixed output format. */
 const SCOPE_TO_KIND = {
   'Full Workspace': 'workspace',
-  'Specific Projects': 'projects',
+  'Project Summary': 'projects',
   'Financial Ledgers': 'ledger',
   'Employee Directory': 'employees',
 };
@@ -44,6 +35,8 @@ export default function SettingsDataExport() {
   const [jobSearch, setJobSearch] = useState('')
   const [showHistory, setShowHistory] = useState(false)
   const [historyPage, setHistoryPage] = useState(1)
+  const [downloadError, setDownloadError] = useState('')
+  const [downloadingJobId, setDownloadingJobId] = useState(null)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.exports.jobs.list({ page: historyPage, limit: 100 }),
@@ -55,14 +48,8 @@ export default function SettingsDataExport() {
       return items.some((j) => j.status === 'RUNNING' || j.status === 'QUEUED') ? 1500 : false;
     },
   });
-  const backupsQuery = useQuery({ queryKey: queryKeys.settings.backups(), queryFn: settingsApi.listBackups });
-  const backupMutation = useMutation({
-    mutationFn: () => settingsApi.createBackup({ name: 'Workspace backup', schedule: 'Weekly' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.settings.backups() }),
-  });
-
   const createMutation = useMutation({
-    mutationFn: (kind) => exportsApi.createJob({ kind }),
+    mutationFn: (input) => exportsApi.createJob(input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.exports.all() }),
   });
 
@@ -88,6 +75,8 @@ export default function SettingsDataExport() {
   const availableDownloads = searchJobs.filter((j) => j.status === 'DONE');
 
   const handleDownload = async (job) => {
+    setDownloadError('')
+    setDownloadingJobId(job.id)
     try {
       const blob = await exportsApi.downloadJob(job.id);
       const url = URL.createObjectURL(blob);
@@ -97,15 +86,16 @@ export default function SettingsDataExport() {
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      // Surface a download failure by re-throwing into the query error state would be overkill;
-      // a failed binary fetch simply does nothing (the job row is still visible to retry).
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      setDownloadError(error?.message || 'The export could not be downloaded. Please try again.')
+    } finally {
+      setDownloadingJobId(null)
     }
   };
 
   return (
-    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
+    <div className="flex-1 min-h-0 flex flex-col bg-surface overflow-hidden min-w-0 relative">
 
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
@@ -136,18 +126,17 @@ export default function SettingsDataExport() {
       <SettingsTabs />
 
       {/* ── Main Split View ── */}
-      <div className="flex-1 min-h-0 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden relative">
 
         {/* Left: Configuration Content Area */}
-        <div className="flex-1 min-w-0 min-h-[320px] overflow-y-auto p-4 sm:p-8 max-w-4xl space-y-6">
+        <div className="w-full min-w-0 xl:flex-1 xl:min-h-0 xl:overflow-y-auto p-4 sm:p-8 max-w-4xl space-y-6 relative">
 
           {/* New Export Request Card */}
           <div className="bg-surface-raised border border-border-default rounded-card-sm p-card shadow-card">
             <h2 className="text-lg font-bold text-heading mb-6">New Export Request</h2>
 
             <div className="space-y-5">
-              {/* Row 1: Scope & Format */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div>
                 <div>
                   <label htmlFor="data-scope" className="block text-xs font-bold text-muted mb-1.5">Data Scope</label>
                   <Select value={scope} onValueChange={setScope}>
@@ -156,47 +145,31 @@ export default function SettingsDataExport() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Full Workspace">Full Workspace</SelectItem>
-                      <SelectItem value="Specific Projects">Specific Projects</SelectItem>
+                      <SelectItem value="Project Summary">Project Summary</SelectItem>
                       <SelectItem value="Financial Ledgers">Financial Ledgers</SelectItem>
                       <SelectItem value="Employee Directory">Employee Directory</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <label htmlFor="data-format" className="block text-xs font-bold text-muted mb-1.5">Format</label>
-                  <Select defaultValue="JSON & CSV">
-                    <SelectTrigger id="data-format" className="w-full text-sm bg-surface-raised">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="JSON & CSV">JSON & CSV</SelectItem>
-                      <SelectItem value="PDF Reports">PDF Reports</SelectItem>
-                      <SelectItem value="SQL Dump">SQL Dump</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
 
-              {/* Row 2: Date Range */}
-              <div>
-                <label htmlFor="date-range" className="block text-xs font-bold text-muted mb-1.5">Date Range</label>
-                <Select defaultValue="All Time">
-                  <SelectTrigger id="date-range" className="w-full text-sm bg-surface-raised">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All Time">All Time</SelectItem>
-                    <SelectItem value="Last 30 Days">Last 30 Days</SelectItem>
-                    <SelectItem value="Year to Date">Year to Date</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <p className="text-xs text-muted">
+                {scope === 'Full Workspace'
+                  ? 'Exports tenant records across business modules as JSON. Passwords, sessions, authentication data, and saved credentials are excluded; this is not a restorable database backup.'
+                  : scope === 'Project Summary'
+                    ? 'Creates an XLSX summary of projects, budgets, recorded spend, departments, status, and sprint counts.'
+                    : scope === 'Financial Ledgers'
+                      ? 'Creates an XLSX export of the workspace general ledger.'
+                      : 'Creates an XLSX export of the employee directory. Salary details are limited by your access role.'}
+              </p>
 
               {/* Submit Button */}
               <div className="pt-2">
                 <Button
                   type="button"
-                  onClick={() => createMutation.mutate(SCOPE_TO_KIND[scope] || 'employees')}
+                  onClick={() => createMutation.mutate({
+                    kind: SCOPE_TO_KIND[scope] || 'employees',
+                  })}
                   disabled={createMutation.isPending}
                   className="w-full"
                 >
@@ -205,33 +178,35 @@ export default function SettingsDataExport() {
                       <Loader2 size={14} className="animate-spin" /> Generating...
                     </span>
                   ) : (
-                    'Generate Export Archive'
+                    scope === 'Full Workspace' ? 'Generate JSON Workspace Export' : 'Generate XLSX Export'
                   )}
                 </Button>
+                {createMutation.isError && <p role="alert" className="mt-3 text-xs text-danger">{createMutation.error?.message || 'The export could not be started.'}</p>}
               </div>
             </div>
           </div>
 
-          {/* Scheduled Backups */}
+          {/* Backup configuration is currently not connected to a scheduler or backup storage. */}
           <div className="bg-surface-raised border border-border-default rounded-card-sm p-card shadow-card">
-            <h2 className="text-lg font-bold text-heading mb-6">Scheduled Backups</h2>
-
-            <div className="space-y-6">
-              {backupsQuery.data?.items?.length ? backupsQuery.data.items.map(backup => <div key={backup.id} className="flex items-center justify-between border border-border-subtle rounded-button p-4"><div><p className="text-sm font-semibold text-heading">{backup.name}</p><p className="text-xs text-muted">{backup.schedule} · {backup.enabled ? 'Enabled' : 'Disabled'}</p></div><Button variant="link" size="sm" type="button" onClick={() => settingsApi.updateBackup(backup.id, { enabled: !backup.enabled }).then(() => queryClient.invalidateQueries({ queryKey: queryKeys.settings.backups() }))} className="h-auto p-0 text-xs font-semibold text-accent hover:underline">{backup.enabled ? 'Disable' : 'Enable'}</Button></div>) : <div className="flex flex-col items-center justify-center text-sm text-muted py-8 text-center"><Calendar size={32} className="opacity-20 mb-3" />No scheduled backups configured.</div>}
-              <Button type="button" onClick={() => backupMutation.mutate()} disabled={backupMutation.isPending}>{backupMutation.isPending ? 'Creating...' : 'Create weekly backup'}</Button>
-            </div>
+            <h2 className="text-lg font-bold text-heading mb-3">Automated backups</h2>
+            <p className="text-sm text-body-light leading-relaxed">
+              Automatic backup schedules are not active in this deployment. Exports can be generated above, but they are not
+              database backups and cannot be used for full disaster recovery. Confirm database backup and restore coverage with
+              the service operator.
+            </p>
           </div>
 
         </div>
 
         {/* Right: Recent Exports Panel */}
-        <div className="w-full xl:w-[360px] xl:flex-shrink-0 bg-surface-raised border-t xl:border-t-0 xl:border-l border-border-default flex flex-col max-h-[65vh] xl:max-h-none z-10">
+        <div className="w-full xl:w-[360px] xl:flex-shrink-0 bg-surface-raised border-t xl:border-t-0 xl:border-l border-border-default flex flex-col z-10">
 
-          <div className="flex-1 overflow-y-auto p-8 space-y-6">
+          <div className="xl:flex-1 xl:overflow-y-auto p-8 space-y-6">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-lg font-bold text-heading">{showHistory ? 'Export History' : 'Recent Exports'}</h2>
               {showHistory && <Button variant="link" size="sm" type="button" onClick={() => setShowHistory(false)} className="h-auto p-0 text-xs font-semibold text-accent hover:text-accent-hover">Recent</Button>}
             </div>
+            {downloadError && <p role="alert" className="rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-xs text-danger">{downloadError}</p>}
 
             {showHistory ? (
               <div className="bg-surface-raised border border-border-default rounded-card-sm p-5 shadow-card space-y-4">
@@ -244,7 +219,7 @@ export default function SettingsDataExport() {
                         <span className="text-[11px] text-muted">{job.kind} · {new Date(job.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>
-                    {job.status === 'DONE' && <Button variant="link" size="sm" type="button" onClick={() => handleDownload(job)} className="h-auto p-0 text-[11px] font-semibold text-accent hover:text-accent-hover">Download</Button>}
+                    {job.status === 'DONE' && <Button variant="link" size="sm" type="button" disabled={downloadingJobId === job.id} onClick={() => handleDownload(job)} className="h-auto p-0 text-[11px] font-semibold text-accent hover:text-accent-hover">{downloadingJobId === job.id ? 'Downloading…' : 'Download'}</Button>}
                   </div>
                 )) : <p className="text-xs text-muted">No matching export jobs.</p>}
                 <div className="flex items-center justify-between pt-2 text-xs text-muted">
@@ -298,10 +273,11 @@ export default function SettingsDataExport() {
                         variant="link"
                         size="sm"
                         type="button"
+                        disabled={downloadingJobId === dl.id}
                         onClick={() => handleDownload(dl)}
                         className="h-auto p-0 text-[11px] font-semibold text-accent hover:text-accent-hover transition-colors shrink-0"
                       >
-                        Download
+                        {downloadingJobId === dl.id ? 'Downloading…' : 'Download'}
                       </Button>
                     </div>
                   </div>

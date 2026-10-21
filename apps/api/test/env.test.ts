@@ -85,3 +85,12 @@ describe('PORT environment validation', () => {
   })
 })
 
+describe('development social authentication environment', () => {
+  it('rejects enabling the identity-bypass sandbox outside local development', () => {
+    expect(() => loadEnv({ NODE_ENV: 'staging', DEV_SOCIAL_AUTH_ENABLED: 'true' }))
+      .toThrow('DEV_SOCIAL_AUTH_ENABLED may only be enabled when NODE_ENV=development')
+    expect(loadEnv({ NODE_ENV: 'development' }).devSocialAuthEnabled).toBe(false)
+    expect(loadEnv({ NODE_ENV: 'development', DEV_SOCIAL_AUTH_ENABLED: 'true' }).devSocialAuthEnabled).toBe(true)
+  })
+})
+

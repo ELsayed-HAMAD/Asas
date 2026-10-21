@@ -2,15 +2,19 @@ import { createHash } from 'node:crypto'
 import {
   billingCheckoutRequestSchema,
   billingPlansResponseSchema,
+  platformPlansResponseSchema,
+  PLATFORM_PLANS,
   billingSessionResponseSchema,
   envelope,
   errorResponses,
 } from '@asas/contracts'
+import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { AppError } from '../../utils/errors.js'
 import { requireAuthContext } from '../../middlewares/rbac.js'
 import { requirePermission } from '../../middlewares/permissions.js'
+import { moduleKeyPrefix } from '../../plugins/sse.js'
 import { recordAuditLog } from '../../services/auditLog.js'
 import { processStripeWebhookEvent } from '../../services/stripeBilling.js'
 
@@ -32,13 +36,95 @@ export async function stripeBillingRoutes(app: FastifyInstance): Promise<void> {
 
   const server = app.withTypeProvider<ZodTypeProvider>()
 
-  // Prices and plan limits are public catalog data used by the marketing pricing page.
+  // Platform catalog: always available publicly for marketing and workspace upgrades
   server.get('/plans', {
-    schema: { response: { 200: envelope(billingPlansResponseSchema), ...errorResponses } },
+    schema: { response: { 200: envelope(platformPlansResponseSchema), ...errorResponses } },
   }, async request => {
     const provider = request.server.stripeBilling
-    if (!provider) return { data: { enabled: false, items: [] } }
-    return { data: { enabled: true, items: await provider.listPlans() } }
+    const stripePlans = provider ? await provider.listPlans() : []
+    // Never expose internal tier IDs as if they were real Stripe price IDs. Those IDs
+    // are not checkout-capable and made the UI claim billing was enabled when it was not.
+    const stripeConfigured = Boolean(provider && stripePlans.length > 0)
+    return {
+      data: {
+        enabled: stripeConfigured,
+        stripeConfigured,
+        defaultPlanId: 'free',
+        items: stripePlans,
+        tiers: PLATFORM_PLANS,
+      },
+    }
+  })
+
+  server.post('/switch-plan', {
+    preHandler: requirePermission('settings.billing.write'),
+    schema: {
+      body: z.object({
+        planId: z.enum(['free', 'starter', 'pro', 'enterprise']),
+      }),
+      response: {
+        200: envelope(z.object({
+          success: z.boolean(),
+          planName: z.string(),
+        })),
+        ...errorResponses,
+      },
+    },
+  }, async request => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const targetPlan = PLATFORM_PLANS.find(p => p.id === request.body.planId)
+    if (!targetPlan) throw new AppError(400, 'Invalid plan selected')
+
+    if (targetPlan.id !== 'free') {
+      throw new AppError(409, 'Paid plans must be activated through a configured Stripe checkout.')
+    }
+
+    const sub = await request.server.prisma.subscription.findFirst({
+      where: { tenantId, status: 'ACTIVE', stripeSubscriptionId: { not: null } },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    if (sub) {
+      throw new AppError(409, 'Cancel the active Stripe subscription in Manage billing before switching to the Free plan.')
+    }
+
+    const activeFreePlan = await request.server.prisma.subscription.findFirst({
+      where: {
+        tenantId,
+        status: 'ACTIVE',
+        stripeSubscriptionId: null,
+        planName: targetPlan.name,
+        seatLimit: targetPlan.seatLimit,
+        storageLimitGb: targetPlan.storageLimitGb,
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (activeFreePlan) return { data: { success: true, planName: targetPlan.name } }
+
+    await request.server.prisma.$transaction(async tx => {
+      await tx.subscription.updateMany({ where: { tenantId, stripeSubscriptionId: null }, data: { status: 'CANCELED' } })
+      await tx.subscription.create({
+        data: {
+          tenantId,
+          planName: targetPlan.name,
+          priceMonthly: targetPlan.priceMonthly,
+          seatLimit: targetPlan.seatLimit,
+          storageLimitGb: targetPlan.storageLimitGb,
+          status: 'ACTIVE',
+        },
+      })
+    })
+
+    await recordAuditLog(request.server.prisma, {
+      tenantId,
+      actorId: userId,
+      action: 'billing.plan.switched',
+      targetType: 'Subscription',
+      metadata: { planId: targetPlan.id, planName: targetPlan.name },
+    })
+
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('settings')])
+    return { data: { success: true, planName: targetPlan.name } }
   })
 
   server.post('/checkout', {

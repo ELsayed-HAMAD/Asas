@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, CreditCard, Briefcase,
   Package, FolderKanban, Settings, HelpCircle,
   ChevronDown, ChevronLeft, ChevronRight, Plus, LogOut, Menu,
-  Check, User, Moon, Download, Search, Bell, Globe, Mail, Building2
+  Check, User, Moon, Download, Search, Globe, Mail, Building2
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -16,6 +16,7 @@ import {
 } from '../lib/authClient'
 import FormDialog from '../components/common/FormDialog'
 import CommandPalette from '../components/CommandPalette'
+import NotificationPopover from '../components/NotificationPopover'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import {
@@ -236,7 +237,7 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t, i
               onClick={onNavigate}
               data-active={parentActive ? "true" : undefined}
               aria-label={itemLabel}
-              className={`relative flex items-center justify-center h-10 min-h-[40px] max-h-[40px] rounded-button text-sm transition-colors ${
+              className={`relative flex items-center justify-center h-10 min-h-[40px] max-h-[40px] rounded-button text-sm transition-micro ${
                 parentActive
                   ? 'bg-surface-active text-heading font-medium'
                   : 'text-muted hover:text-heading hover:bg-surface-muted'
@@ -244,7 +245,7 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t, i
             >
               {parentActive && (
                 <div
-                  className="absolute start-0 top-2 bottom-2 w-[3px] bg-primary rounded-e-full"
+                  className="absolute start-0 top-2 bottom-2 w-[3px] bg-accent rounded-e-full animate-scale-in"
                 />
               )}
               <item.icon size={18} />
@@ -266,7 +267,7 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t, i
             onClick={onNavigate}
             data-active={isActive ? "true" : undefined}
             aria-label={itemLabel}
-            className={`relative flex items-center justify-center h-10 min-h-[40px] max-h-[40px] rounded-button text-sm transition-colors ${
+            className={`relative flex items-center justify-center h-10 min-h-[40px] max-h-[40px] rounded-button text-sm transition-micro ${
               isActive
                 ? 'bg-surface-active text-heading font-medium'
                 : 'text-muted hover:text-heading hover:bg-surface-muted'
@@ -274,7 +275,7 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t, i
           >
             {isActive && (
               <div
-                className="absolute start-0 top-2 bottom-2 w-[3px] bg-primary rounded-e-full"
+                className="absolute start-0 top-2 bottom-2 w-[3px] bg-accent rounded-e-full animate-scale-in"
               />
             )}
             <item.icon size={18} />
@@ -294,7 +295,7 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t, i
           type="button"
           onClick={() => toggleSection(item.id)}
           aria-expanded={Boolean(isOpen)}
-          className={`w-full h-10 min-h-[40px] max-h-[40px] flex items-center justify-between px-3 rounded-button text-sm transition-colors cursor-pointer ${
+          className={`w-full h-10 min-h-[40px] max-h-[40px] flex items-center justify-between px-3 rounded-button text-sm transition-micro cursor-pointer ${
             parentActive
               ? 'text-heading font-medium'
               : 'text-muted hover:text-heading hover:bg-surface-muted'
@@ -306,7 +307,7 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t, i
           </div>
           <ChevronDown
             size={13}
-            className={`transition-transform duration-200 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}
+            className={`transition-transform duration-300 ease-out flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}
           />
         </button>
 
@@ -321,7 +322,7 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t, i
                 to={child.path}
                 onClick={onNavigate}
                 data-active={isActive ? "true" : undefined}
-                className={`relative flex items-center h-[34px] min-h-[34px] max-h-[34px] px-2.5 rounded-button text-[13px] leading-none transition-colors ${
+                className={`relative flex items-center h-[34px] min-h-[34px] max-h-[34px] px-2.5 rounded-button text-[13px] leading-none transition-micro ${
                   isActive
                     ? 'bg-surface-active text-heading font-medium'
                     : 'text-muted hover:text-heading hover:bg-surface-muted'
@@ -329,7 +330,7 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t, i
               >
                 {isActive && (
                   <div
-                    className="absolute start-0 top-1.5 bottom-1.5 w-[2.5px] bg-primary rounded-e-full"
+                    className="absolute start-0 top-1.5 bottom-1.5 w-[2.5px] bg-accent rounded-e-full animate-scale-in"
                   />
                 )}
                 {childLabel}
@@ -347,7 +348,7 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t, i
       to={item.path}
       onClick={onNavigate}
       data-active={isActive ? "true" : undefined}
-      className={`relative flex items-center gap-2.5 h-10 min-h-[40px] max-h-[40px] px-3 rounded-button text-sm transition-colors ${
+      className={`relative flex items-center gap-2.5 h-10 min-h-[40px] max-h-[40px] px-3 rounded-button text-sm transition-micro ${
         isActive
           ? 'bg-surface-active text-heading font-medium'
           : 'text-muted hover:text-heading hover:bg-surface-muted'
@@ -355,7 +356,7 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t, i
     >
       {isActive && (
         <div
-          className="absolute start-0 top-2 bottom-2 w-[3px] bg-primary rounded-e-full"
+          className="absolute start-0 top-2 bottom-2 w-[3px] bg-accent rounded-e-full animate-scale-in"
         />
       )}
       <item.icon size={18} />
@@ -573,7 +574,7 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
       {/* Brand */}
       <div className={`px-4 py-3.5 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} border-b border-border-subtle flex-shrink-0`}>
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded-button bg-primary text-on-primary flex items-center justify-center text-sm font-bold flex-shrink-0">
+          <div className="w-8 h-8 rounded-button bg-primary text-on-primary flex items-center justify-center text-sm font-bold flex-shrink-0 shadow-card transition-micro">
             A
           </div>
           {!isCollapsed && (
@@ -674,7 +675,7 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
             side="top"
             align="start"
             sideOffset={8}
-            className="w-72 p-0 bg-surface-raised border border-border-default rounded-xl shadow-2xl z-50 overflow-hidden"
+            className="w-72 p-0 glass-strong border border-border-default/60 rounded-xl shadow-glass z-50 overflow-hidden animate-scale-in"
           >
             {/* 1. Identity Header */}
             <div className="p-4 flex items-center gap-4">
@@ -808,7 +809,7 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
       </div>
 
       <Dialog open={quickEntryOpen} onOpenChange={setQuickEntryOpen}>
-        <DialogContent className="w-full max-w-lg p-0 bg-surface-raised border border-border-default rounded-card-sm shadow-card overflow-hidden">
+        <DialogContent className="w-full max-w-lg p-0 glass-strong border border-border-default/60 rounded-card-sm shadow-glass overflow-hidden animate-scale-in">
           <div className="flex items-center justify-between p-4 border-b border-border-subtle">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
@@ -820,11 +821,11 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
               </div>
             </div>
           </div>
-          <div className="p-4 grid grid-cols-2 gap-3">
+          <div className="p-4 grid grid-cols-2 gap-3 stagger-children">
             <button
               type="button"
               onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/hr/employees?new=1'); }}
-              className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
+              className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent hover-lift text-left group cursor-pointer"
             >
               <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
                 <Users size={18} />
@@ -837,7 +838,7 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
             <button
               type="button"
               onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/finance/accounts-payable?new=1'); }}
-              className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
+              className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent hover-lift text-left group cursor-pointer"
             >
               <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
                 <CreditCard size={18} />
@@ -850,7 +851,7 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
             <button
               type="button"
               onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/finance/expenses?new=1'); }}
-              className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
+              className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent hover-lift text-left group cursor-pointer"
             >
               <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
                 <CreditCard size={18} />
@@ -863,7 +864,7 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
             <button
               type="button"
               onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/crm/deals?new=1'); }}
-              className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
+              className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent hover-lift text-left group cursor-pointer"
             >
               <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
                 <Briefcase size={18} />
@@ -876,7 +877,7 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
             <button
               type="button"
               onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/inventory?new=1'); }}
-              className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
+              className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent hover-lift text-left group cursor-pointer"
             >
               <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
                 <Package size={18} />
@@ -889,7 +890,7 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
             <button
               type="button"
               onClick={() => { setQuickEntryOpen(false); navigate('/dashboard/projects/sprints?new=1'); }}
-              className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent transition-all text-left group cursor-pointer"
+              className="flex items-start gap-3 p-3 rounded-card-sm border border-border-subtle bg-surface hover:bg-surface-muted hover:border-accent hover-lift text-left group cursor-pointer"
             >
               <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">
                 <FolderKanban size={18} />
@@ -1117,7 +1118,7 @@ export default function DashboardLayout() {
 
       {/* ── Desktop sidebar ── */}
       <TooltipProvider delayDuration={150}>
-        <aside className={`hidden md:flex ${sidebarCollapsed ? 'w-16 min-w-16' : 'w-55 min-w-55'} h-screen max-h-screen bg-surface-raised border-e border-border-subtle flex-col relative z-30 transition-all duration-200`}>
+        <aside className={`hidden md:flex ${sidebarCollapsed ? 'w-16 min-w-16' : 'w-55 min-w-55'} h-screen max-h-screen glass-strong border-e border-border-subtle/60 flex-col relative z-30 transition-all duration-300 ease-out`}>
           <SidebarContent navProps={navProps} navigate={navigate} isCollapsed={sidebarCollapsed} toggleCollapse={toggleCollapse} />
         </aside>
       </TooltipProvider>
@@ -1133,7 +1134,7 @@ export default function DashboardLayout() {
             onClick={() => setMobileSidebarOpen(false)}
           />
           {/* Drawer */}
-          <aside id="mobile-navigation-drawer" aria-label="Main navigation" className="relative z-10 w-55 h-full max-h-screen bg-surface-raised border-e border-border-subtle flex flex-col">
+          <aside id="mobile-navigation-drawer" aria-label="Main navigation" className="relative z-10 w-55 h-full max-h-screen glass-strong border-e border-border-subtle/60 flex flex-col animate-slide-in-right">
             <SidebarContent navProps={{ ...navProps, isCollapsed: false }} navigate={navigate} isCollapsed={false} />
           </aside>
         </div>
@@ -1144,7 +1145,7 @@ export default function DashboardLayout() {
 
         {/* Topbar */}
         {/* Topbar (56px, one row, 12px gaps, nothing wraps) */}
-        <header className="bg-surface-raised border-b border-border-subtle px-4 md:px-6 h-14 min-h-[56px] flex items-center justify-between gap-3 min-w-0">
+        <header className="glass-strong border-b border-border-subtle/60 px-4 md:px-6 h-14 min-h-[56px] flex items-center justify-between gap-3 min-w-0">
 
           {/* Left: hamburger (mobile only) + breadcrumb */}
           <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1210,17 +1211,7 @@ export default function DashboardLayout() {
                 </div>
                 <Kbd>⌘K</Kbd>
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                type="button"
-                onClick={() => navigate('/dashboard/settings/notifications')}
-                className="h-9 w-9 text-muted hover:text-heading hover:bg-surface-muted flex-shrink-0"
-                title="Notification Settings"
-                aria-label="Notification Settings"
-              >
-                <Bell size={16} />
-              </Button>
+              <NotificationPopover />
             </div>
 
             <div id="topbar-actions-portal" className="flex min-w-0 items-center justify-end gap-2 flex-shrink-0 min-h-[36px] empty:hidden border-s border-border-default ps-3">
@@ -1229,16 +1220,16 @@ export default function DashboardLayout() {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 min-w-0 min-h-0 overflow-x-auto overflow-y-auto flex flex-col">
+        <main className="relative flex-1 min-w-0 min-h-0 overflow-x-auto overflow-y-auto flex flex-col">
           {session?.user && !session.user.emailVerified && (
-            <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-2 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200">
+            <div className="bg-warning-light border-b border-warning/20 px-6 py-2 flex items-center justify-between text-xs text-warning-text">
               <div className="flex items-center gap-2">
-                <Mail size={14} className="text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                <Mail size={14} className="text-warning flex-shrink-0" />
                 <span>
                   Please confirm your email address (<strong>{session.user.email}</strong>) to complete verification.
                 </span>
               </div>
-              <Link to="/verify-email" state={{ email: session.user.email }} className="font-medium underline hover:text-amber-800 dark:hover:text-amber-100 ml-4 flex-shrink-0">
+              <Link to="/verify-email" state={{ email: session.user.email }} className="font-medium underline hover:text-heading ml-4 flex-shrink-0">
                 View instructions →
               </Link>
             </div>

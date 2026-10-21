@@ -1,14 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { listCurrencies } from '@asas/domain/money'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  Search,
-  Cloud,
   Loader2,
   AlertTriangle,
   RefreshCw,
   Check,
+  Upload,
+  X,
 } from 'lucide-react'
 import TopBarActions from '../../../components/TopBarActions'
 import SettingsTabs from './SettingsTabs'
@@ -42,7 +42,9 @@ export default function SettingsGeneral() {
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   const { data: memberRole } = useActiveMemberRole()
-  const isOwner = getMemberRoleName(memberRole) === 'OWNER'
+  const roleName = getMemberRoleName(memberRole)
+  const isOwner = roleName === 'OWNER'
+  const canManageSettings = roleName === 'OWNER' || roleName === 'ADMIN'
   const { data: activeOrg } = useActiveOrganization()
 
   const { data: settings, isLoading, isError } = useQuery({
@@ -75,6 +77,22 @@ export default function SettingsGeneral() {
   const [form, setForm] = useState({ name: '', supportEmail: '', logoUrl: '', timezone: '', currency: '', dateFormat: '', overtimeThresholdHours: '8' })
   const [saved, setSaved] = useState(false)
   const [rateForm, setRateForm] = useState({ currency: '', rateToBase: '', effectiveAt: '', reference: '' })
+  const fileInputRef = useRef(null)
+
+  const handleLogoFileChange = (e) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert('Image must be under 2MB.')
+        return
+      }
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        setForm((curr) => ({ ...curr, logoUrl: event.target?.result || '' }))
+      }
+      reader.readAsDataURL(file)
+    }
+  }
 
   useEffect(() => {
     if (settings) {
@@ -111,7 +129,6 @@ export default function SettingsGeneral() {
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     },
-    onError: () => queryClient.invalidateQueries({ queryKey: queryKeys.settings.general() }),
   })
 
   const clearMutation = useMutation({
@@ -176,40 +193,33 @@ export default function SettingsGeneral() {
   const setField = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }))
 
   return (
-    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
+    <div className="flex-1 min-h-0 flex flex-col bg-surface overflow-hidden min-w-0 relative">
 
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption z-10 pointer-events-none" />
-            <Input
-              type="text"
-              placeholder="Search settings..."
-              className="pl-9 pr-4 py-1.5 h-8 text-sm w-64 bg-surface-raised"
-            />
-          </div>
-
           <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-strong shrink-0"></div>
 
           <Button
             onClick={() => saveMutation.mutate()}
-            disabled={saveMutation.isPending}
+            disabled={!canManageSettings || saveMutation.isPending}
+            title={!canManageSettings ? 'Only workspace admins and owners can change settings' : undefined}
             className="px-5 py-1.5 h-8 text-sm font-semibold whitespace-nowrap"
           >
             {saved ? <Check size={14} /> : saveMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : null}
             {saved ? 'Saved' : 'Save Changes'}
           </Button>
           {saveMutation.isError && <p role="alert" className="text-xs text-danger">{saveMutation.error?.message || 'Unable to save settings.'}</p>}
+          {!canManageSettings && <span className="text-xs text-muted">View only — admin access is required to change workspace settings.</span>}
         </div>
       </TopBarActions>
 
       <SettingsTabs />
 
       {/* ── Main Split View ── */}
-      <div className="flex-1 min-h-0 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden relative">
 
         {/* Left: Settings Content Area */}
-        <div className="flex-1 min-w-0 min-h-[320px] overflow-y-auto p-4 sm:p-8 space-y-6">
+        <div className="w-full min-w-0 xl:flex-1 xl:min-h-0 xl:overflow-y-auto p-4 sm:p-8 space-y-6 relative">
 
           <TwoFactorSettings />
 
@@ -220,30 +230,52 @@ export default function SettingsGeneral() {
 
             <div className="flex items-start gap-6">
               {/* Logo Upload */}
-              <div
-                onClick={() => {
-                  const url = window.prompt('Enter image URL for workspace logo (or leave empty to remove):', form.logoUrl || '');
-                  if (url !== null) {
-                    setForm(curr => ({ ...curr, logoUrl: url.trim() }));
-                  }
-                }}
-                className="w-32 h-32 rounded-button border-2 border-dashed border-border-strong bg-surface-muted flex flex-col items-center justify-center text-caption hover:bg-surface-active hover:border-caption transition-colors cursor-pointer shrink-0 overflow-hidden relative group"
-                title="Click to set logo URL"
-              >
-                {form.logoUrl ? (
-                  <>
-                    <img src={form.logoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-semibold transition-opacity">
-                      Change Logo
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-10 h-10 bg-surface-strong rounded-full flex items-center justify-center mb-2">
-                      <Cloud size={20} className="text-muted" />
-                    </div>
-                    <span className="text-xs font-semibold text-body-light">Upload Logo</span>
-                  </>
+              <div className="flex flex-col items-center gap-2 shrink-0">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  onChange={handleLogoFileChange}
+                  disabled={!canManageSettings}
+                  className="hidden"
+                />
+                <div
+                  role="button"
+                  tabIndex={canManageSettings ? 0 : -1}
+                  aria-disabled={!canManageSettings}
+                  onClick={() => canManageSettings && fileInputRef.current?.click()}
+                  onKeyDown={event => { if (canManageSettings && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); fileInputRef.current?.click() } }}
+                  className={`w-32 h-32 rounded-button border-2 border-dashed border-border-strong bg-surface-muted flex flex-col items-center justify-center text-caption transition-colors shrink-0 overflow-hidden relative group ${canManageSettings ? 'hover:bg-surface-active hover:border-caption cursor-pointer' : 'cursor-not-allowed opacity-70'}`}
+                  title="Click to select logo image"
+                >
+                  {form.logoUrl ? (
+                    <>
+                      <img src={form.logoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-semibold transition-opacity">
+                        Change File
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-10 h-10 bg-surface-strong rounded-full flex items-center justify-center mb-2">
+                        <Upload size={18} className="text-muted" />
+                      </div>
+                      <span className="text-xs font-semibold text-body-light">Upload File</span>
+                      <span className="text-[10px] text-caption mt-0.5">PNG, JPG, SVG</span>
+                    </>
+                  )}
+                </div>
+
+                {form.logoUrl && (
+                  <button
+                    type="button"
+                    disabled={!canManageSettings}
+                    onClick={() => setForm((curr) => ({ ...curr, logoUrl: '' }))}
+                    className="text-[11px] text-danger hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <X size={12} />
+                    <span>Remove logo</span>
+                  </button>
                 )}
               </div>
 
@@ -255,6 +287,7 @@ export default function SettingsGeneral() {
                     type="text"
                     value={form.name}
                     onChange={setField('name')}
+                    disabled={!canManageSettings}
                     className="w-full"
                   />
                 </div>
@@ -264,6 +297,7 @@ export default function SettingsGeneral() {
                     type="email"
                     value={form.supportEmail}
                     onChange={setField('supportEmail')}
+                    disabled={!canManageSettings}
                     className="w-full"
                   />
                 </div>
@@ -273,6 +307,7 @@ export default function SettingsGeneral() {
                     type="url"
                     value={form.logoUrl}
                     onChange={setField('logoUrl')}
+                    disabled={!canManageSettings}
                     placeholder="https://example.com/logo.png"
                     className="w-full"
                   />
@@ -292,6 +327,7 @@ export default function SettingsGeneral() {
                 <Select
                   value={form.timezone || localTimezone}
                   onValueChange={val => setForm(current => ({ ...current, timezone: val }))}
+                  disabled={!canManageSettings}
                 >
                   <SelectTrigger id="settings-timezone" className="w-full text-sm bg-surface-raised">
                     <SelectValue />
@@ -314,7 +350,7 @@ export default function SettingsGeneral() {
                 <Select
                   value={form.currency || 'USD'}
                   onValueChange={val => setForm(current => ({ ...current, currency: val }))}
-                  disabled={Boolean(settings.currencyLockedAt)}
+                  disabled={!canManageSettings || Boolean(settings.currencyLockedAt)}
                 >
                   <SelectTrigger
                     id="settings-currency"
@@ -341,6 +377,7 @@ export default function SettingsGeneral() {
                 <Select
                   value={form.dateFormat || 'MMM d, yyyy'}
                   onValueChange={val => setForm(current => ({ ...current, dateFormat: val }))}
+                  disabled={!canManageSettings}
                 >
                   <SelectTrigger id="settings-date-format" className="w-full text-sm bg-surface-raised">
                     <SelectValue />
@@ -361,6 +398,7 @@ export default function SettingsGeneral() {
                   step="0.25"
                   value={form.overtimeThresholdHours}
                   onChange={setField('overtimeThresholdHours')}
+                  disabled={!canManageSettings}
                   className="w-full"
                 />
                 <p className="mt-1.5 text-xs text-muted">New weekly timesheets use this threshold. Existing weeks keep their recorded threshold.</p>
@@ -375,9 +413,10 @@ export default function SettingsGeneral() {
             <form className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 items-end mb-5" onSubmit={(event) => { event.preventDefault(); rateMutation.mutate() }}>
               <div>
                 <label htmlFor="rate-currency" className="block text-xs font-bold text-heading mb-1.5">Currency</label>
-                <Select
+              <Select
                   value={rateForm.currency || listCurrencies().find(({ code }) => code !== settings.currency)?.code || ''}
                   onValueChange={val => setRateForm((current) => ({ ...current, currency: val }))}
+                disabled={!canManageSettings}
                 >
                   <SelectTrigger id="rate-currency" className="w-full text-sm bg-surface-raised">
                     <SelectValue />
@@ -391,17 +430,17 @@ export default function SettingsGeneral() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-heading mb-1.5">Rate to {settings.currency}</label>
-                <Input required type="text" inputMode="decimal" value={rateForm.rateToBase} onChange={(event) => setRateForm((current) => ({ ...current, rateToBase: event.target.value }))} placeholder="e.g. 1.0875" className="w-full" />
+              <Input required type="text" inputMode="decimal" value={rateForm.rateToBase} onChange={(event) => setRateForm((current) => ({ ...current, rateToBase: event.target.value }))} placeholder="e.g. 1.0875" className="w-full" disabled={!canManageSettings} />
               </div>
               <div>
                 <label className="block text-xs font-bold text-heading mb-1.5">Effective at</label>
-                <Input required type="datetime-local" value={rateForm.effectiveAt} onChange={(event) => setRateForm((current) => ({ ...current, effectiveAt: event.target.value }))} className="w-full" />
+              <Input required type="datetime-local" value={rateForm.effectiveAt} onChange={(event) => setRateForm((current) => ({ ...current, effectiveAt: event.target.value }))} className="w-full" disabled={!canManageSettings} />
               </div>
               <div>
                 <label className="block text-xs font-bold text-heading mb-1.5">Reference</label>
-                <Input type="text" value={rateForm.reference} onChange={(event) => setRateForm((current) => ({ ...current, reference: event.target.value }))} placeholder="Source or note" className="w-full" />
+              <Input type="text" value={rateForm.reference} onChange={(event) => setRateForm((current) => ({ ...current, reference: event.target.value }))} placeholder="Source or note" className="w-full" disabled={!canManageSettings} />
               </div>
-              <Button type="submit" disabled={rateMutation.isPending} className="w-full">{rateMutation.isPending ? 'Saving…' : 'Add Rate'}</Button>
+              <Button type="submit" disabled={!canManageSettings || rateMutation.isPending} className="w-full">{rateMutation.isPending ? 'Saving…' : 'Add Rate'}</Button>
             </form>
             {rateMutation.isError && <p role="alert" className="text-xs text-danger mb-3">{rateMutation.error?.message || 'Unable to save exchange rate.'}</p>}
             <div className="divide-y divide-border-default">
@@ -430,7 +469,7 @@ export default function SettingsGeneral() {
                 <Button
                   variant="destructive"
                   onClick={() => setConfirmOpen(true)}
-                  disabled={clearMutation.isPending}
+                  disabled={!canManageSettings || clearMutation.isPending}
                   className="whitespace-nowrap"
                 >
                   <RefreshCw size={14} className={clearMutation.isPending ? 'animate-spin' : ''} />
@@ -459,9 +498,9 @@ export default function SettingsGeneral() {
         </div>
 
         {/* Right: Subscription Inspector Panel */}
-        <div className="w-full xl:w-[360px] xl:flex-shrink-0 bg-surface-raised border-t xl:border-t-0 xl:border-l border-border-default flex flex-col max-h-[65vh] xl:max-h-none shadow-panel z-10">
+        <div className="w-full xl:w-[360px] xl:flex-shrink-0 bg-surface-raised border-t xl:border-t-0 xl:border-l border-border-default flex flex-col shadow-panel z-10">
 
-          <div className="flex-1 overflow-y-auto p-8">
+          <div className="xl:flex-1 xl:overflow-y-auto p-8">
             <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-6">Subscription Inspector</h3>
 
             {/* Current Plan Card */}

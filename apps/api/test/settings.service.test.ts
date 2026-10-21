@@ -181,7 +181,7 @@ describe('deleteWorkspace', () => {
 })
 
 describe('testIntegration', () => {
-  it('creates a ping webhook log and decrypts credential for the tenant-scoped integration', async () => {
+  it('does not claim a secret-only integration is connected or pinged', async () => {
     const createdAt = new Date('2026-10-11T20:00:00.000Z')
     const { encryptCredential } = await import('../src/services/crypto.js')
     const encryptedKey = encryptCredential('webhook_secret_key_12345', 'tenant_1')
@@ -193,11 +193,12 @@ describe('testIntegration', () => {
           tenantId: 'tenant_1',
           credential: encryptedKey,
         }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       webhookLog: {
         create: vi.fn().mockResolvedValue({
           id: 'log_new',
-          statusCode: 200,
+          statusCode: 400,
           event: 'ping',
           createdAt,
         }),
@@ -211,16 +212,65 @@ describe('testIntegration', () => {
     expect(prisma.webhookLog.create).toHaveBeenCalledWith({
       data: {
         integrationId: 'integration_1',
-        statusCode: 200,
+        statusCode: 400,
         event: 'ping',
       },
     })
-    expect(result.success).toBe(true)
+    expect(result.success).toBe(false)
+    expect(prisma.integration.updateMany).toHaveBeenCalledWith({
+      where: { id: 'integration_1', tenantId: 'tenant_1', credential: encryptedKey },
+      data: { status: 'CONFIGURE' },
+    })
     expect(result.log).toEqual({
       id: 'log_new',
-      statusCode: 200,
+      statusCode: 400,
       event: 'ping',
       createdAt: createdAt.toISOString(),
+    })
+  })
+
+  it('refuses non-HTTPS and private network endpoints without making a request', async () => {
+    const { encryptCredential } = await import('../src/services/crypto.js')
+    const privateEndpoint = encryptCredential('http://127.0.0.1:3000/ping', 'tenant_1')
+    const prisma = {
+      integration: {
+        findFirst: vi.fn().mockResolvedValue({ id: 'integration_1', tenantId: 'tenant_1', credential: privateEndpoint }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      webhookLog: { create: vi.fn().mockResolvedValue({ id: 'log_1', statusCode: 400, event: 'ping', createdAt: new Date() }) },
+    } as unknown as PrismaClient
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+
+    try {
+      const { testIntegration } = await import('../src/modules/settings/settings.service.js')
+      const result = await testIntegration(prisma, 'tenant_1', 'integration_1')
+      expect(result.success).toBe(false)
+      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(prisma.integration.updateMany).toHaveBeenCalledWith({ where: { id: 'integration_1', tenantId: 'tenant_1', credential: privateEndpoint }, data: { status: 'CONFIGURE' } })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('keeps a concurrent endpoint edit from inheriting an old probe result', async () => {
+    const updateMany = vi.fn().mockResolvedValue({ count: 0 })
+    const prisma = {
+      integration: {
+        findFirst: vi.fn().mockResolvedValue({ id: 'integration_1', tenantId: 'tenant_1', credential: null }),
+        updateMany,
+      },
+      webhookLog: {
+        create: vi.fn().mockResolvedValue({ id: 'log_1', statusCode: 400, event: 'ping', createdAt: new Date('2026-10-11T20:00:00.000Z') }),
+      },
+    } as unknown as PrismaClient
+
+    const { testIntegration } = await import('../src/modules/settings/settings.service.js')
+    const result = await testIntegration(prisma, 'tenant_1', 'integration_1')
+
+    expect(result.success).toBe(false)
+    expect(prisma.integration.updateMany).toHaveBeenCalledWith({
+      where: { id: 'integration_1', tenantId: 'tenant_1', credential: null },
+      data: { status: 'CONFIGURE' },
     })
   })
 
@@ -238,9 +288,9 @@ describe('testIntegration', () => {
             tenantId: 'tenant_1',
             name: 'GitHub CI',
             description: 'CI integration',
-            status: 'CONNECTED',
-            syncPullRequests: true,
-            syncCiCdStatus: true,
+            status: data.status,
+            syncPullRequests: data.syncPullRequests,
+            syncCiCdStatus: data.syncCiCdStatus,
             credential: data.credential,
             createdAt: new Date('2026-10-21T00:00:00.000Z'),
             updatedAt: new Date('2026-10-21T00:00:00.000Z'),
@@ -256,6 +306,11 @@ describe('testIntegration', () => {
       name: 'GitHub CI',
       credential: rawKey,
     })
+
+    expect(prisma.integration.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: 'CONFIGURE', syncPullRequests: false, syncCiCdStatus: false }),
+    }))
+    expect(res).toMatchObject({ status: 'CONFIGURE', syncPullRequests: false, syncCiCdStatus: false })
 
     // 1. In database, credential MUST be encrypted with v1 AES-GCM
     expect(isEncrypted(savedCredential)).toBe(true)
@@ -279,26 +334,9 @@ describe('testIntegration', () => {
     expect(prisma.webhookLog.create).not.toHaveBeenCalled()
   })
 
-  it('generates a tenant-scoped structured backup bundle snapshot', async () => {
-    const prisma = {
-      tenant: { findUnique: vi.fn().mockResolvedValue({ id: 'tenant_1', name: 'Acme Corp' }) },
-      member: { findMany: vi.fn().mockResolvedValue([{ id: 'm_1', userId: 'u_1', role: 'OWNER', createdAt: new Date() }]) },
-      department: { findMany: vi.fn().mockResolvedValue([{ id: 'd_1', name: 'Engineering' }]) },
-      employee: { findMany: vi.fn().mockResolvedValue([{ id: 'e_1', name: 'Alice' }]) },
-      project: { findMany: vi.fn().mockResolvedValue([]) },
-      customer: { findMany: vi.fn().mockResolvedValue([]) },
-      payableInvoice: { findMany: vi.fn().mockResolvedValue([]) },
-      receivableInvoice: { findMany: vi.fn().mockResolvedValue([]) },
-      journalEntry: { findMany: vi.fn().mockResolvedValue([]) },
-      supportTicket: { findMany: vi.fn().mockResolvedValue([]) },
-    } as unknown as PrismaClient
-
-    const { createBackupSnapshot } = await import('../src/modules/settings/settings.service.js')
-    const snapshot = await createBackupSnapshot(prisma, 'tenant_1')
-
-    expect(snapshot.filename).toContain('backup-tenant_1-')
-    expect(snapshot.sizeBytes).toBeGreaterThan(0)
-    expect(snapshot.downloadUrl).toContain('/api/v1/settings/backups/snapshots/')
+  it('rejects backup operations instead of persisting work no scheduler will execute', async () => {
+    const { ensureAutomaticBackupsUnavailable } = await import('../src/modules/settings/settings.service.js')
+    expect(() => ensureAutomaticBackupsUnavailable()).toThrow('Automated backups are not configured')
   })
 })
 

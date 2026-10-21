@@ -40,6 +40,9 @@ async function setup(role: 'ADMIN' | 'MEMBER' = 'ADMIN', objectStorage: ObjectSt
     activities: [],
   }
   const tx = {
+    $queryRaw: vi.fn(async () => []),
+    $executeRawUnsafe: vi.fn(async () => 1),
+    subscription: { findMany: vi.fn(async () => []) },
     candidate: {
       findFirst: vi.fn().mockResolvedValue(candidateRecord),
       update: vi.fn().mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
@@ -158,8 +161,9 @@ describe('candidate scheduling and export routes', () => {
       put: vi.fn(async () => undefined),
       get: vi.fn(async () => null),
       presignGet: vi.fn(async () => 'https://objects.example.test/signed-get'),
+      sumPrefixSizes: vi.fn(async () => 12),
     } as unknown as ObjectStorage
-    const { app, prisma, events } = await setup('ADMIN', objectStorage)
+    const { app, tx, events } = await setup('ADMIN', objectStorage)
     try {
       const grantResponse = await app.inject(`/hr/candidates/${candidateId}/resume-upload-url`)
       expect(grantResponse.statusCode).toBe(200)
@@ -176,8 +180,8 @@ describe('candidate scheduling and export routes', () => {
       expect(completion.json().data.resumeUrl).toBe(`/api/v1/hr/candidates/${candidateId}/resume`)
       expect(objectStorage.copy).toHaveBeenCalledWith(`staging/resumes/tenant_1/${candidateId}/${grant.uploadId}.pdf`, `resumes/tenant_1/${candidateId}.pdf`, 'application/pdf')
       expect(objectStorage.delete).toHaveBeenCalledOnce()
-      expect(prisma.candidateActivity.create).toHaveBeenCalledWith({ data: { candidateId, action: 'cv.uploaded' } })
-      expect(events).toEqual(['sse'])
+      expect(tx.candidateActivity.create).toHaveBeenCalledWith({ data: { candidateId, action: 'cv.uploaded' } })
+      expect(events).toEqual(['commit', 'sse'])
     } finally { await app.close() }
   })
 

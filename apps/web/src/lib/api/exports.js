@@ -18,7 +18,7 @@ export const exportsApi = {
    * inline queue mode (the default) usually resolves the row to DONE before this returns, but
    * the client treats both modes the same: create, then poll `listJobs` until DONE.
    */
-  createJob: ({ kind }) => http.post('/exports/jobs', { body: { kind } }),
+  createJob: ({ kind, format, dateRange }) => http.post('/exports/jobs', { body: { kind, format, dateRange } }),
 
   /**
    * GET /exports/jobs/:id/download → Blob. Binary, not the JSON envelope, so this uses

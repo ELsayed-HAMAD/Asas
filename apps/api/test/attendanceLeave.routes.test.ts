@@ -16,6 +16,11 @@ async function setup() {
     employee: { name: 'Self User', avatarUrl: null, departmentId: null, department: null },
   }
   const tx = {
+    member: { findMany: vi.fn().mockResolvedValue([{ userId: 'owner_1' }]) },
+    notificationPreference: { findUnique: vi.fn().mockResolvedValue(null) },
+    quietHours: { findUnique: vi.fn().mockResolvedValue(null) },
+    tenant: { findUnique: vi.fn().mockResolvedValue({ timezone: 'UTC' }) },
+    notification: { create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => { events.push('notification'); return { id: 'notification_1', ...data, createdAt: new Date() } }) },
     employee: { findFirst: vi.fn().mockResolvedValue({ id: 'cemployee1' }) },
     leavePolicy: { findUnique: vi.fn().mockResolvedValue(null) },
     leaveRequest: {
@@ -60,7 +65,9 @@ describe('leave self-service routes', () => {
       expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ actorId: 'user_self', targetType: 'LeaveRequest', targetId: leaveId }),
       }))
-      expect(events).toEqual(['audit', 'commit', 'sse'])
+      expect(tx.member.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId: 'tenant_1', role: { in: ['OWNER', 'ADMIN'] }, userId: { not: 'user_self' } } }))
+      expect(tx.notification.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ tenantId: 'tenant_1', userId: 'owner_1', title: 'Leave request submitted' }) }))
+      expect(events).toEqual(['audit', 'notification', 'commit', 'sse'])
     } finally { await app.close() }
   })
 

@@ -99,7 +99,7 @@ export default function ResetPassword() {
   if (success) {
     return (
       <div className="flex flex-col text-center">
-        <div className="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center mx-auto mb-4">
+        <div className="w-12 h-12 rounded-full bg-success-light text-success flex items-center justify-center mx-auto mb-4">
           <CheckCircle2 size={24} />
         </div>
         <h1 className="text-2xl font-semibold text-heading mb-2">Password Reset Complete</h1>
@@ -214,7 +214,7 @@ export default function ResetPassword() {
           {rules.map((rule, idx) => (
             <div key={idx} className="flex items-center gap-2 text-caption">
               {rule.valid ? (
-                <Check size={13} className="text-emerald-600 flex-shrink-0" />
+                <Check size={13} className="text-success flex-shrink-0" />
               ) : (
                 <span className="w-1.5 h-1.5 rounded-full bg-border-default ml-1 mr-0.5 flex-shrink-0" />
               )}

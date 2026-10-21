@@ -191,6 +191,13 @@ describe('payroll.service', () => {
     expect(run).toMatchObject({ periodStart: null, periodEnd: null, payFrequency: null, periodsPerYear: null, salaryBasis: null, currency: null })
     expect(run.lines[0]).toMatchObject({ baseSalary: '100000.00', sourceSalary: null, salaryBasis: null, eligibleDays: null, periodDays: null })
   })
+  it('returns each employee department from the persisted department relation', async () => {
+    const run = await getPayrollRun(stubPrisma({
+      lines: [lineRow({ employee: { id: 'emp_1', name: 'Ada Lovelace', title: 'Engineer', department: { name: 'Finance' } } })],
+    }), TENANT, RUN_ID)
+
+    expect(run.lines[0]?.employee.departmentName).toBe('Finance')
+  })
   it('uses recorded currency and earning dates on payslips after workspace settings change', async () => {
     const doc = await getPayslipDoc(stubPrisma({ currency: 'JPY', payrollRunFindFirst: {
       ...runRow('PENDING'), currency: 'KWD', periodStart: new Date('2026-08-01'), periodEnd: new Date('2026-08-31'),

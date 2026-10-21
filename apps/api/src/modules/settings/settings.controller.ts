@@ -10,9 +10,6 @@ import type {
   WebhookLogsResponse,
   NotificationSettings,
   NotificationSettingsUpdateInput,
-  BackupSchedule,
-  BackupScheduleUpdateInput,
-  BackupScheduleWriteInput,
   BillingSettings,
   ExchangeRate,
   ExchangeRateListQuery,
@@ -57,7 +54,7 @@ export function getNotifications(prisma: PrismaClient, tenantId: string): Promis
 }
 
 export function updateNotifications(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Prisma.TransactionClient,
   tenantId: string,
   input: NotificationSettingsUpdateInput,
 ): Promise<NotificationSettings> {
@@ -73,7 +70,7 @@ export function getIntegrationWebhookLogs(prisma: PrismaClient, tenantId: string
 }
 
 export function createIntegration(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Prisma.TransactionClient,
   tenantId: string,
   input: IntegrationWriteInput,
 ): Promise<Integration> {
@@ -81,7 +78,7 @@ export function createIntegration(
 }
 
 export function updateIntegration(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Prisma.TransactionClient,
   tenantId: string,
   id: string,
   input: IntegrationUpdateInput,
@@ -101,18 +98,6 @@ export function getBilling(prisma: PrismaClient, tenantId: string, measuredStora
   return settingsService.getBillingSettings(prisma, tenantId, measuredStorageUsedGb)
 }
 
-export function listBackups(prisma: PrismaClient, tenantId: string): Promise<{ items: BackupSchedule[] }> {
-  return settingsService.listBackupSchedules(prisma, tenantId)
-}
-
-export function createBackup(prisma: PrismaClient, tenantId: string, input: BackupScheduleWriteInput): Promise<BackupSchedule> {
-  return settingsService.createBackupSchedule(prisma, tenantId, input)
-}
-
-export function updateBackup(prisma: PrismaClient, tenantId: string, id: string, input: BackupScheduleUpdateInput): Promise<BackupSchedule> {
-  return settingsService.updateBackupSchedule(prisma, tenantId, id, input)
-}
-
 export function deleteWorkspace(prisma: PrismaClient, tenantId: string, userId: string): Promise<{ success: boolean }> {
   return settingsService.deleteWorkspace(prisma, tenantId, userId)
 }
@@ -130,6 +115,5 @@ export type {
   Integration,
   IntegrationsListResponse,
   NotificationSettings,
-  BackupSchedule,
   BillingSettings,
 }

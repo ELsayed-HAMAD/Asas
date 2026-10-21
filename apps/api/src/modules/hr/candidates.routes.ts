@@ -25,7 +25,7 @@ import * as candidatesService from './candidates.service.js'
 import { renderCandidateCsv } from './candidateExport.js'
 import { recordAuditLog } from '../../services/auditLog.js'
 import { candidateResumeKey, candidateResumeStagingKey } from '../../services/objectStorage.js'
-import { checkStorageEntitlement } from '../../services/entitlements.js'
+import { checkStorageEntitlement, withStorageCapacity } from '../../services/entitlements.js'
 import { AppError } from '../../utils/errors.js'
 
 /**
@@ -262,13 +262,15 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
     async request => {
       const { tenantId } = requireAuthContext(request)
       const prisma = request.server.prisma
-      if (typeof (prisma as any).subscription?.findFirst === 'function') {
-        const storageCheck = await checkStorageEntitlement(prisma, tenantId, MAX_RESUME_BYTES)
+      const candidate = await candidatesService.getCandidate(prisma, tenantId, request.params.id)
+      const storage = request.server.objectStorage
+      if (typeof prisma.subscription?.findMany === 'function') {
+        const existingResumeBytes = (await storage.head(candidateResumeKey(tenantId, candidate.id)))?.size ?? 0
+        const storageCheck = await checkStorageEntitlement(prisma, storage, tenantId, MAX_RESUME_BYTES, existingResumeBytes)
         if (!storageCheck.allowed) {
           throw new AppError(402, 'Workspace storage quota exceeded. Please upgrade your subscription plan.')
         }
       }
-      const candidate = await candidatesService.getCandidate(prisma, tenantId, request.params.id)
 
       const expiresUnix = Math.floor(Date.now() / 1000) + UPLOAD_TTL_SECONDS
       const uploadId = randomUUID()
@@ -334,13 +336,24 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
         return { error: { message: 'The file is not a PDF' } }
       }
 
-      await storage.copy(stagedKey, candidateResumeKey(tenantId, candidate.id), 'application/pdf')
-      await storage.delete(stagedKey)
-      const updated = await request.server.prisma.candidate.update({
-        where: { id: candidate.id },
-        data: { resumeUrl: `/api/v1/hr/candidates/${candidate.id}/resume` },
-      })
-      await request.server.prisma.candidateActivity.create({ data: { candidateId: candidate.id, action: 'cv.uploaded' } })
+      const stableKey = candidateResumeKey(tenantId, candidate.id)
+      const updated = await withStorageCapacity(
+        request.server.prisma,
+        storage,
+        tenantId,
+        0,
+        async tx => {
+          await storage.copy(stagedKey, stableKey, 'application/pdf')
+          await storage.delete(stagedKey)
+          const saved = await tx.candidate.update({
+            where: { id: candidate.id },
+            data: { resumeUrl: `/api/v1/hr/candidates/${candidate.id}/resume` },
+          })
+          await tx.candidateActivity.create({ data: { candidateId: candidate.id, action: 'cv.uploaded' } })
+          return saved
+        },
+        async () => (await storage.head(stableKey))?.size ?? 0,
+      )
       request.server.ssePublish(tenantId, [moduleKeyPrefix('hr')])
       reply.code(200)
       return { data: candidatesService.mapCandidate(updated) }
@@ -391,13 +404,24 @@ export async function candidateRoutes(app: FastifyInstance): Promise<void> {
 
       const prisma = request.server.prisma
       const candidate = await candidatesService.getCandidate(prisma, tenantId, candidateId)
-      await request.server.objectStorage.put(candidateResumeKey(tenantId, candidate.id), body, 'application/pdf')
-
-      const updated = await prisma.candidate.update({
-        where: { id: candidate.id },
-        data: { resumeUrl: `/api/v1/hr/candidates/${candidate.id}/resume` },
-      })
-      await prisma.candidateActivity.create({ data: { candidateId: candidate.id, action: 'cv.uploaded' } })
+      const storage = request.server.objectStorage
+      const stableKey = candidateResumeKey(tenantId, candidate.id)
+      const updated = await withStorageCapacity(
+        prisma,
+        storage,
+        tenantId,
+        body.byteLength,
+        async tx => {
+          await storage.put(stableKey, body, 'application/pdf')
+          const saved = await tx.candidate.update({
+            where: { id: candidate.id },
+            data: { resumeUrl: `/api/v1/hr/candidates/${candidate.id}/resume` },
+          })
+          await tx.candidateActivity.create({ data: { candidateId: candidate.id, action: 'cv.uploaded' } })
+          return saved
+        },
+        async () => (await storage.head(stableKey))?.size ?? 0,
+      )
       request.server.ssePublish(tenantId, [moduleKeyPrefix('hr')])
       reply.code(200)
       return { data: candidatesService.mapCandidate(updated) }

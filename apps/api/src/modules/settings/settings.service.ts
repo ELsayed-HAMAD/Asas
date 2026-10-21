@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import type {
   Integration as PrismaIntegration,
@@ -19,9 +18,6 @@ import type {
   NotificationSettings,
   NotificationSettingsUpdateInput,
   QuietHours,
-  BackupSchedule,
-  BackupScheduleUpdateInput,
-  BackupScheduleWriteInput,
   BillingSettings,
   ExchangeRate,
   ExchangeRateListQuery,
@@ -35,6 +31,7 @@ import { invalidateAuthCacheForTenant } from '../../middlewares/rbac.js'
 import { closeStreamsForTenant } from '../../plugins/sse.js'
 import { decryptCredential, encryptCredential, maskCredential } from '../../services/crypto.js'
 import { AppError } from '../../utils/errors.js'
+import { probePublicHttpsEndpoint } from './integrationProbe.js'
 
 /**
  * Settings — tenant general settings, notification preferences, and integrations.
@@ -160,21 +157,18 @@ export async function createExchangeRate(prisma: PrismaClient | Prisma.Transacti
  * receive rows for other modules from other flows, and those round-trip untouched.
  */
 export const NOTIFICATION_MODULES = [
-  { module: 'finance', eventType: 'invoice.approval' },
-  { module: 'finance', eventType: 'payment.failed' },
-  { module: 'projects', eventType: 'sprint.milestone' },
-  { module: 'projects', eventType: 'risk.escalation' },
-  { module: 'system', eventType: 'security.new_login' },
+  { module: 'finance', eventType: 'invoice.created' },
+  { module: 'hr', eventType: 'leave.requested' },
 ] as const
 
-const DEFAULT_PREFERENCES = { inApp: true, email: true, slack: false }
+const DEFAULT_PREFERENCES = { inApp: true, email: false, slack: false }
 
 type PreferenceRow = { module: string; eventType: string; inApp: boolean; email: boolean; slack: boolean }
 
 function groupByModule(rows: readonly PreferenceRow[]): Record<string, NotificationModule> {
   const modules: Record<string, NotificationModule> = {}
   for (const row of rows) {
-    const entry = { inApp: row.inApp, email: row.email, slack: row.slack }
+    const entry = { inApp: row.inApp, email: false, slack: false }
     const bucket = modules[row.module] ?? {}
     bucket[row.eventType] = entry
     modules[row.module] = bucket
@@ -183,7 +177,7 @@ function groupByModule(rows: readonly PreferenceRow[]): Record<string, Notificat
 }
 
 export async function getNotificationSettings(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Prisma.TransactionClient,
   tenantId: string,
 ): Promise<NotificationSettings> {
   const [rows, quietHours] = await Promise.all([
@@ -216,16 +210,19 @@ export async function getNotificationSettings(
 }
 
 export async function updateNotificationSettings(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Prisma.TransactionClient,
   tenantId: string,
   input: NotificationSettingsUpdateInput,
 ): Promise<NotificationSettings> {
   await assertTenantExists(prisma, tenantId)
 
-  await prisma.$transaction(async tx => {
+  const updateRows = async (tx: PrismaClient | Prisma.TransactionClient) => {
     if (input.modules) {
       for (const [module, events] of Object.entries(input.modules)) {
         for (const [eventType, prefs] of Object.entries(events)) {
+          if (prefs.email === true || prefs.slack === true) {
+            throw new AppError(409, 'Email and Slack notification delivery are not configured for this deployment.')
+          }
           await tx.notificationPreference.upsert({
             where: { tenantId_module_eventType: { tenantId, module, eventType } },
             create: {
@@ -260,7 +257,10 @@ export async function updateNotificationSettings(
         },
       })
     }
-  })
+  }
+
+  if ('$transaction' in prisma) await prisma.$transaction(updateRows)
+  else await updateRows(prisma)
 
   return getNotificationSettings(prisma, tenantId)
 }
@@ -275,8 +275,9 @@ function mapIntegration(integration: PrismaIntegration): Integration {
     name: integration.name,
     description: integration.description,
     status: integration.status,
-    syncPullRequests: integration.syncPullRequests,
-    syncCiCdStatus: integration.syncCiCdStatus,
+    // Provider sync is not implemented. Do not expose legacy flags as active capabilities.
+    syncPullRequests: false,
+    syncCiCdStatus: false,
     credential: {
       configured: integration.credential !== null,
       masked: integration.credential !== null ? maskCredential(integration.credential, integration.tenantId) : null,
@@ -321,7 +322,7 @@ export async function getIntegrationWebhookLogs(
 }
 
 export async function createIntegration(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Prisma.TransactionClient,
   tenantId: string,
   input: IntegrationWriteInput,
 ): Promise<Integration> {
@@ -334,9 +335,9 @@ export async function createIntegration(
       tenantId,
       name: input.name,
       description: input.description ?? null,
-      status: input.status ?? 'CONFIGURE',
-      syncPullRequests: input.syncPullRequests ?? false,
-      syncCiCdStatus: input.syncCiCdStatus ?? false,
+      status: 'CONFIGURE',
+      syncPullRequests: false,
+      syncCiCdStatus: false,
       credential: input.credential ? encryptCredential(input.credential, tenantId) : null,
     },
   })
@@ -344,7 +345,7 @@ export async function createIntegration(
 }
 
 export async function updateIntegration(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Prisma.TransactionClient,
   tenantId: string,
   id: string,
   input: IntegrationUpdateInput,
@@ -357,9 +358,7 @@ export async function updateIntegration(
     data: {
       ...(input.name !== undefined && { name: input.name }),
       ...(input.description !== undefined && { description: input.description }),
-      ...(input.status !== undefined && { status: input.status }),
-      ...(input.syncPullRequests !== undefined && { syncPullRequests: input.syncPullRequests }),
-      ...(input.syncCiCdStatus !== undefined && { syncCiCdStatus: input.syncCiCdStatus }),
+      ...(input.credential !== undefined && { status: 'CONFIGURE' }),
       // `clear` and `value` are mutually exclusive (enforced by the contract), so at most one of
       // these keys is ever present.
       ...(input.credential?.clear === true && { credential: null }),
@@ -383,31 +382,20 @@ export async function testIntegration(
     decryptedCred = decryptCredential(integration.credential, tenantId)
   }
 
-  let statusCode = 200
-  let isSuccess = true
+  let statusCode = 400
+  let isSuccess = false
 
-  // If the integration credential or description specifies a webhook URL
-  const targetUrl = decryptedCred?.startsWith('http')
-    ? decryptedCred
-    : integration.description?.match(/https?:\/\/[^\s]+/)?.[0]
-
+  // The integration credential field stores the endpoint for this probe. Never report a
+  // token-only configuration as connected, and never probe arbitrary HTTP/private hosts.
+  const targetUrl = decryptedCred
   if (targetUrl) {
     try {
-      const probeResponse = await fetch(targetUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'User-Agent': 'Asas-Integration-Probe/1.0' },
-        body: JSON.stringify({ event: 'ping', timestamp: new Date().toISOString(), tenantId }),
-        signal: AbortSignal.timeout(5000),
-      })
-      statusCode = probeResponse.status
-      isSuccess = probeResponse.ok
-    } catch (err: any) {
-      statusCode = err.name === 'TimeoutError' ? 504 : 502
+      statusCode = await probePublicHttpsEndpoint(targetUrl)
+      isSuccess = statusCode >= 200 && statusCode < 300
+    } catch (err) {
+      statusCode = err instanceof Error && err.name === 'TimeoutError' ? 504 : 400
       isSuccess = false
     }
-  } else if (!decryptedCred) {
-    statusCode = 400
-    isSuccess = false
   }
 
   const log = await prisma.webhookLog.create({
@@ -416,6 +404,12 @@ export async function testIntegration(
       statusCode,
       event: 'ping',
     },
+  })
+  // The endpoint may have been changed while the network probe was in flight. Only let this
+  // probe update health for the exact credential value it actually tested.
+  await prisma.integration.updateMany({
+    where: { id: integration.id, tenantId, credential: integration.credential },
+    data: { status: isSuccess ? 'CONNECTED' : 'CONFIGURE' },
   })
 
   return {
@@ -432,8 +426,27 @@ export async function testIntegration(
 // ── Billing and backups ────────────────────────────────────────────────────
 
 export async function getBillingSettings(prisma: PrismaClient, tenantId: string, measuredStorageUsedGb: number | null = null): Promise<BillingSettings> {
-  const [subscriptions, paymentMethods, invoices, memberCount, tenant] = await Promise.all([
-    prisma.subscription.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } }),
+  let subscriptions = await prisma.subscription.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } })
+  if (subscriptions.length === 0) {
+    try {
+      const free = await prisma.subscription.create({
+        data: {
+          tenantId,
+          planName: 'Free Starter',
+          priceMonthly: 0,
+          status: 'ACTIVE',
+          seatLimit: 5,
+          storageLimitGb: 5,
+        },
+      })
+      subscriptions = [free]
+    } catch {
+      // Concurrency catch: if created in parallel, re-query
+      subscriptions = await prisma.subscription.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } })
+    }
+  }
+
+  const [paymentMethods, invoices, memberCount, tenant] = await Promise.all([
     prisma.paymentMethod.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } }),
     prisma.billingInvoice.findMany({ where: { tenantId }, orderBy: { date: 'desc' } }),
     prisma.member.count({ where: { tenantId } }),
@@ -472,111 +485,8 @@ export async function getBillingSettings(prisma: PrismaClient, tenantId: string,
   }
 }
 
-function mapBackupSchedule(row: { id: string; name: string; schedule: string; enabled: boolean; createdAt: Date }): BackupSchedule {
-  return { id: row.id, name: row.name, schedule: row.schedule, enabled: row.enabled, createdAt: row.createdAt.toISOString() }
-}
-
-export async function listBackupSchedules(prisma: PrismaClient, tenantId: string): Promise<{ items: BackupSchedule[] }> {
-  const rows = await prisma.backupSchedule.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' } })
-  return { items: rows.map(mapBackupSchedule) }
-}
-
-export async function createBackupSchedule(prisma: PrismaClient, tenantId: string, input: BackupScheduleWriteInput): Promise<BackupSchedule> {
-  const row = await prisma.backupSchedule.create({ data: { tenantId, name: input.name, schedule: input.schedule, enabled: input.enabled ?? true } })
-  return mapBackupSchedule(row)
-}
-
-export async function updateBackupSchedule(prisma: PrismaClient, tenantId: string, id: string, input: BackupScheduleUpdateInput): Promise<BackupSchedule> {
-  const existing = await prisma.backupSchedule.findFirst({ where: { id, tenantId } })
-  if (!existing) throw new AppError(404, 'Backup schedule not found')
-  const row = await prisma.backupSchedule.update({
-    where: { id },
-    data: {
-      ...(input.name !== undefined && { name: input.name }),
-      ...(input.schedule !== undefined && { schedule: input.schedule }),
-      ...(input.enabled !== undefined && { enabled: input.enabled }),
-    },
-  })
-  return mapBackupSchedule(row)
-}
-
-export async function createBackupSnapshot(
-  prisma: PrismaClient,
-  tenantId: string,
-  scheduleId?: string,
-): Promise<{ id: string; filename: string; sizeBytes: number; createdAt: string; downloadUrl: string }> {
-  await assertTenantExists(prisma, tenantId)
-
-  const [
-    tenant,
-    members,
-    departments,
-    employees,
-    projects,
-    customers,
-    payableInvoices,
-    receivableInvoices,
-    journalEntries,
-    supportTickets,
-  ] = await Promise.all([
-    prisma.tenant.findUnique({ where: { id: tenantId } }),
-    prisma.member.findMany({ where: { tenantId }, select: { id: true, userId: true, role: true, createdAt: true } }),
-    prisma.department.findMany({ where: { tenantId } }),
-    prisma.employee.findMany({ where: { tenantId } }),
-    prisma.project.findMany({ where: { tenantId } }),
-    prisma.customer.findMany({ where: { tenantId } }),
-    prisma.payableInvoice.findMany({ where: { tenantId } }),
-    prisma.receivableInvoice.findMany({ where: { tenantId } }),
-    prisma.journalEntry.findMany({ where: { tenantId }, include: { lines: true } }),
-    prisma.supportTicket.findMany({ where: { tenantId } }),
-  ])
-
-  const bundle = {
-    manifest: {
-      version: '1.0.0',
-      tenantId,
-      workspaceName: tenant?.name ?? '',
-      createdAt: new Date().toISOString(),
-      scheduleId: scheduleId ?? null,
-      recordCounts: {
-        members: members.length,
-        departments: departments.length,
-        employees: employees.length,
-        projects: projects.length,
-        customers: customers.length,
-        payableInvoices: payableInvoices.length,
-        receivableInvoices: receivableInvoices.length,
-        journalEntries: journalEntries.length,
-        supportTickets: supportTickets.length,
-      },
-    },
-    data: {
-      tenant,
-      members,
-      departments,
-      employees,
-      projects,
-      customers,
-      payableInvoices,
-      receivableInvoices,
-      journalEntries,
-      supportTickets,
-    },
-  }
-
-  const jsonStr = JSON.stringify(bundle, null, 2)
-  const sizeBytes = Buffer.byteLength(jsonStr, 'utf8')
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-  const filename = `backup-${tenantId}-${timestamp}.json`
-  const snapshotId = `bkp_${randomUUID()}`
-
-  return {
-    id: snapshotId,
-    filename,
-    sizeBytes,
-    createdAt: new Date().toISOString(),
-    downloadUrl: `/api/v1/settings/backups/snapshots/${snapshotId}/download`,
-  }
+export function ensureAutomaticBackupsUnavailable(): never {
+  throw new AppError(409, 'Automated backups are not configured for this deployment.')
 }
 
 // ── Shared ──────────────────────────────────────────────────────────────────
@@ -634,7 +544,7 @@ export async function deleteWorkspace(
   return { success: true }
 }
 
-async function assertTenantExists(prisma: PrismaClient, tenantId: string): Promise<void> {
+async function assertTenantExists(prisma: PrismaClient | Prisma.TransactionClient, tenantId: string): Promise<void> {
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } })
   if (!tenant) throw new AppError(404, 'Workspace not found')
 }

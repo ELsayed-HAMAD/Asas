@@ -272,6 +272,7 @@ model Tenant {
   exportJobs           ExportJob[]
   backupSchedules      BackupSchedule[]
   supportTickets       SupportTicket[]
+  notifications        Notification[]
 }
 
 // ─── Auth (Better Auth core + organization plugin, mapped onto Tenant) ───────
@@ -298,6 +299,7 @@ model User {
   exchangeRatesCreated ExchangeRate[]
   twoFactors            TwoFactor[]
   supportTickets       SupportTicket[]
+  notifications        Notification[]
 }
 
 model TwoFactor {
@@ -1625,6 +1627,26 @@ model QuietHours {
   end      String @default("07:00")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String
+  title     String
+  message   String
+  type      String   @default("INFO")
+  link      String?
+  read      Boolean  @default(false)
+  availableAt DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId, read])
+  @@index([tenantId, availableAt])
+  @@index([tenantId, createdAt])
 }
 
 model ExportJob {
