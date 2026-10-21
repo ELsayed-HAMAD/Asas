@@ -8,7 +8,7 @@ import { invalidateAuthCacheForTenant, invalidateAuthCacheForUser } from './midd
 import { closeStreamsForUser } from './plugins/sse.js'
 import { recordAuditLog } from './services/auditLog.js'
 import { emailVerificationHtml, invitationHtml, passwordResetHtml } from './services/authEmailTemplates.js'
-import { checkSeatEntitlement } from './services/entitlements.js'
+import { releaseWorkspaceSeat, reserveWorkspaceSeat } from './services/entitlements.js'
 import { mailer } from './services/mailer.js'
 
 /**
@@ -146,6 +146,46 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
         creatorRole: 'OWNER',
         ac,
         roles: { OWNER: owner, ADMIN: admin, MEMBER: member },
+        organizationHooks: {
+          beforeAddMember: async ({ member: candidateMember }) => {
+            const reservationId = await reserveWorkspaceSeat(prisma, candidateMember.organizationId, { purpose: 'MEMBER' })
+            if (!reservationId) {
+              throw new APIError('BAD_REQUEST', {
+                message: 'Workspace seat limit reached. Please upgrade your subscription plan to add more members.',
+              })
+            }
+            return { data: { ...candidateMember, seatReservationId: reservationId } }
+          },
+          afterAddMember: async ({ member: createdMember, organization }) => {
+            if (createdMember.seatReservationId) {
+              try {
+                await releaseWorkspaceSeat(prisma, organization.id, createdMember.seatReservationId)
+              } catch {
+                // The reservation expires automatically if cleanup fails after the member is added.
+              }
+            }
+          },
+          beforeAcceptInvitation: async ({ invitation }) => {
+            const reservationId = await reserveWorkspaceSeat(prisma, invitation.organizationId, {
+              purpose: 'INVITATION_ACCEPTANCE',
+              invitationId: invitation.id,
+            })
+            if (!reservationId) {
+              throw new APIError('BAD_REQUEST', {
+                message: 'Workspace seat limit reached. Please upgrade the workspace plan before accepting this invitation.',
+              })
+            }
+          },
+          afterAcceptInvitation: async ({ invitation, organization }) => {
+            if (invitation.seatReservationId) {
+              try {
+                await releaseWorkspaceSeat(prisma, organization.id, invitation.seatReservationId)
+              } catch {
+                // The reservation expires and is recovered if cleanup fails after acceptance.
+              }
+            }
+          },
+        },
         sendInvitationEmail: async (data: { id: string; email: string; role: string; organization?: { name: string } | null }) => {
           const frontendBase = (env.frontendOrigin.split(',')[0] ?? 'http://localhost:5173').trim()
           const inviteUrl = `${frontendBase}/accept-invitation?invitationId=${data.id}`
@@ -180,11 +220,15 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
             fields: { organizationId: 'tenantId' },
             additionalFields: {
               employeeId: { type: 'string', required: false, input: false },
+              seatReservationId: { type: 'string', required: false, input: false },
             },
           },
           invitation: {
             modelName: 'Invitation',
             fields: { organizationId: 'tenantId' },
+            additionalFields: {
+              seatReservationId: { type: 'string', required: false, input: false },
+            },
           },
         },
       }),
@@ -310,21 +354,29 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
       },
       invitation: {
         create: {
-          before: async (invitation: { tenantId?: string; organizationId?: string }) => {
+          before: async (invitation: { tenantId?: string; organizationId?: string; seatReservationId?: string }) => {
             const tenantId = invitation.tenantId ?? invitation.organizationId
             if (tenantId) {
-              const seatCheck = await checkSeatEntitlement(prisma, tenantId)
-              if (!seatCheck.allowed) {
+              const reservationId = await reserveWorkspaceSeat(prisma, tenantId, { purpose: 'INVITATION' })
+              if (!reservationId) {
                 throw new APIError('BAD_REQUEST', {
                   message: 'Workspace seat limit reached. Please upgrade your subscription plan to invite more members.',
                 })
               }
+              return { data: { ...invitation, seatReservationId: reservationId } }
             }
             return { data: invitation }
           },
-          after: async (invitation: { id: string; tenantId?: string; organizationId?: string; email: string; role: string; inviterId?: string }) => {
+          after: async (invitation: { id: string; tenantId?: string; organizationId?: string; email: string; role: string; inviterId?: string; seatReservationId?: string }) => {
             const tenantId = invitation.tenantId ?? invitation.organizationId
             if (tenantId) {
+              if (invitation.seatReservationId) {
+                try {
+                  await releaseWorkspaceSeat(prisma, tenantId, invitation.seatReservationId)
+                } catch {
+                  // The reservation expires automatically if cleanup fails after invitation creation.
+                }
+              }
               try {
                 await recordAuditLog(prisma, {
                   tenantId,

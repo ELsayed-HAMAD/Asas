@@ -221,7 +221,7 @@ test('inventory product catalog layout-only cleanup verified across 1280px, 1440
   expect(Math.round(jumpSearchBox.height)).toBe(36);
 
   // Bell button (36x36)
-  const bellBtn = topbar.getByTitle('Notification Settings');
+  const bellBtn = topbar.getByRole('button', { name: 'Open notifications' });
   await expect(bellBtn).toBeVisible();
   const bellBox = await bellBtn.boundingBox();
   expect(Math.round(bellBox.width)).toBe(36);
@@ -276,9 +276,9 @@ test('inventory product catalog layout-only cleanup verified across 1280px, 1440
   expect(Math.abs(searchBox.x - tableCardBox.x)).toBeLessThanOrEqual(2);
   expect(searchBox.width).toBeGreaterThanOrEqual(300); // Flew into freed title space
 
-  // Fixed widths of the other 3 controls: ~150px, ~110px, 36x36
+  // Fixed widths of the other 3 controls: 150px, 125px, 36x36
   expect(Math.round(activeSelectBox.width)).toBe(150);
-  expect(Math.round(stockFilterBox.width)).toBe(110);
+  expect(Math.round(stockFilterBox.width)).toBe(125);
   expect(Math.round(gridBox.width)).toBe(36);
 
   // All 4 controls are 36px high
@@ -336,7 +336,7 @@ test('inventory product catalog layout-only cleanup verified across 1280px, 1440
   expect(skuWrap).toBe('nowrap');
 
   // Status badge: 22px height, min-width 96px, single line text
-  const statusBadge = rows.first().locator('td').nth(3).locator('span');
+  const statusBadge = rows.first().locator('td').nth(3).locator('div').first();
   await expect(statusBadge).toBeVisible();
   const badgeHeight = await statusBadge.evaluate((el) => Math.round(el.getBoundingClientRect().height));
   const badgeMinWidth = await statusBadge.evaluate((el) => parseInt(getComputedStyle(el).minWidth, 10));
@@ -462,9 +462,9 @@ test('inventory product catalog layout-only cleanup verified across 1280px, 1440
     expect(Math.abs(listPaneBox.height - currentPanelBox.height)).toBeLessThanOrEqual(2);
 
     // Status badge is fully visible on one line
-    const statusText = await rows.nth(1).locator('td').nth(3).locator('span').evaluate((el) => el.textContent.trim());
+    const statusText = await rows.nth(1).locator('td').nth(3).locator('div').first().evaluate((el) => el.textContent.trim());
     expect(statusText).toBe('227 IN STOCK');
-    const badge2Wrap = await rows.nth(1).locator('td').nth(3).locator('span').evaluate((el) => getComputedStyle(el).whiteSpace);
+    const badge2Wrap = await rows.nth(1).locator('td').nth(3).locator('div').first().evaluate((el) => getComputedStyle(el).whiteSpace);
     expect(badge2Wrap).toBe('nowrap');
   }
 

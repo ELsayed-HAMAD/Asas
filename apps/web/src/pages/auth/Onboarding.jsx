@@ -15,7 +15,7 @@ import {
   Check,
 } from 'lucide-react'
 import { http } from '../../lib/api/http'
-import { useActiveOrganization, useSession, authClient } from '../../lib/authClient'
+import { useActiveOrganization, useListOrganizations, useSession, authClient } from '../../lib/authClient'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Alert, AlertDescription } from '../../components/ui/alert'
@@ -77,8 +77,20 @@ const MODULES = [
   },
 ]
 
+function authFailureMessage(error, fallback) {
+  const status = Number(error?.status)
+  const safeMessage = status >= 500
+    ? (error?.statusText || error?.code)
+    : (error?.message || error?.body?.message || error?.statusText || error?.code)
+
+  if (safeMessage) return `${fallback} ${safeMessage}`
+  if (status) return `${fallback} (HTTP ${status}).`
+  return fallback
+}
+
 export default function Onboarding() {
   const { data: activeOrganization } = useActiveOrganization()
+  const { data: organizations, isPending: organizationsPending } = useListOrganizations()
   const { data: session } = useSession()
 
   const [step, setStep] = useState(1)
@@ -123,7 +135,20 @@ export default function Onboarding() {
     setLoading(true)
     setLoadingMessage('Configuring executive workspace...')
     try {
-      let currentOrgId = activeOrganization?.id || session?.session?.activeOrganizationId
+      // A session can retain an activeOrganizationId after that membership is removed.
+      // Only reuse an ID that still appears in Better Auth's current membership list.
+      const orgList = Array.isArray(organizations) ? organizations : []
+      const sessionOrganizationId = session?.session?.activeOrganizationId
+      const verifiedSessionOrganizationId = orgList.some(org => org.id === sessionOrganizationId)
+        ? sessionOrganizationId
+        : null
+      const pendingOrganizations = orgList.filter(org => org.onboardingStatus === 'PENDING')
+      const resumableOrganizationId = pendingOrganizations.length === 1
+        ? pendingOrganizations[0].id
+        : orgList.length === 1
+          ? orgList[0].id
+          : null
+      let currentOrgId = activeOrganization?.id || verifiedSessionOrganizationId || resumableOrganizationId
 
       if (!currentOrgId) {
         setLoadingMessage('Registering organization...')
@@ -135,7 +160,14 @@ export default function Onboarding() {
           slug,
         })
 
-        if (createRes?.error && /already exists/i.test(createRes.error.message || '')) {
+        const createError = createRes?.error
+        const createErrorDetails = [createError?.message, createError?.statusText, createError?.code]
+          .filter(Boolean)
+          .join(' ')
+        const isSlugConflict = createError?.status === 409 ||
+          /slug.{0,40}(already exists|already taken)|already exists/i.test(createErrorDetails)
+
+        if (createError && isSlugConflict) {
           const uniqueSlug = `${slug}-${Math.random().toString(36).substring(2, 6)}`
           createRes = await authClient.organization.create({
             name: nameToUse,
@@ -143,16 +175,18 @@ export default function Onboarding() {
           })
         }
 
-        if (createRes?.error || !createRes?.data?.id) {
-          throw new Error(createRes?.error?.message || 'Could not provision workspace.')
-        }
+        if (createRes?.error) throw new Error(authFailureMessage(createRes.error, 'Could not provision workspace.'))
+        if (!createRes?.data?.id) throw new Error('Workspace service returned success without a workspace ID.')
 
         currentOrgId = createRes.data.id
         const activation = await authClient.organization.setActive({ organizationId: currentOrgId })
         if (activation?.error) throw new Error(activation.error.message || 'Could not activate the new workspace.')
       } else if (!activeOrganization?.id) {
         const activation = await authClient.organization.setActive({ organizationId: currentOrgId })
-        if (activation?.error) throw new Error(activation.error.message || 'Could not activate the selected workspace.')
+        if (activation?.error) {
+          const status = activation.error.status ? ` (HTTP ${activation.error.status})` : ''
+          throw new Error(activation.error.message || activation.error.statusText || `Could not activate the selected workspace${status}.`)
+        }
       }
 
       // Update General Settings (Currency, Timezone, Company Name)
@@ -504,7 +538,7 @@ export default function Onboarding() {
                 </Button>
                 <Button
                   onClick={finishOnboarding}
-                  disabled={loading}
+                  disabled={loading || organizationsPending}
                   className="bg-primary hover:bg-primary-hover text-on-primary font-medium px-7 h-11 rounded-button shadow-card flex items-center gap-2 cursor-pointer"
                 >
                   {loading ? (

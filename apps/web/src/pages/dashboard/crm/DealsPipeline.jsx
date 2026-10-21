@@ -1,7 +1,6 @@
 import React, { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Search,
   MoreHorizontal,
   Mail,
   Phone,
@@ -20,9 +19,9 @@ import { formatMoney, formatDate, moneyToMajor } from '../../../lib/format';
 import { useActiveMemberRole } from '../../../lib/authClient';
 import { getMemberRoleName } from '../../../lib/memberRole';
 import { formatCompactMoney } from '../../../lib/crmMoney';
-import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import SearchInput from '../../../components/common/SearchInput';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Textarea } from '../../../components/ui/textarea';
@@ -117,24 +116,24 @@ function StageSwitcherCard({ stage, group, isActive, onSelect }) {
       aria-label={cardDescription}
       title={cardDescription}
       onClick={() => onSelect(stage)}
-      className={`rounded-[12px] p-[10px_12px] min-w-[150px] min-[1100px]:min-w-0 text-start cursor-pointer transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+      className={`rounded-xl sm:rounded-2xl p-4 sm:p-5 min-w-[170px] min-[1100px]:min-w-0 text-start cursor-pointer transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
         isActive
           ? 'bg-surface-raised border border-primary shadow-[0_0_0_1px_var(--color-primary)]'
           : 'bg-surface-raised border border-border-default hover:border-border-strong'
       } ${isOver ? 'ring-2 ring-accent bg-accent-light/30' : ''}`}
     >
-      <div className="flex items-center justify-between gap-1.5 min-w-0">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className={`w-2 h-2 rounded-full shrink-0 ${getStageDotColor(stage)}`} aria-hidden="true" />
-          <span className="text-xs font-semibold text-muted whitespace-nowrap">
+      <div className="flex items-center justify-between gap-2.5 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shrink-0 ${getStageDotColor(stage)}`} aria-hidden="true" />
+          <span className="text-xs sm:text-sm font-semibold text-muted whitespace-nowrap">
             {STAGE_LABELS[stage]}
           </span>
         </div>
-        <span className="text-xs text-muted font-medium shrink-0 whitespace-nowrap ms-auto">
+        <span className="text-xs sm:text-[13px] text-muted font-medium shrink-0 whitespace-nowrap ms-auto ps-1.5">
           {countLabel}
         </span>
       </div>
-      <div className="mt-1.5 text-[18px] font-extrabold text-heading tabular-nums leading-tight whitespace-nowrap">
+      <div className="mt-2.5 text-2xl sm:text-[25px] font-bold tracking-tight text-heading tabular-nums leading-tight whitespace-nowrap">
         {formatCompactMoney(totalValue || 0)}
       </div>
     </button>
@@ -223,76 +222,74 @@ function DetailPanel({
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header: avatar 48px (radius 12), deal title 16px extrabold (wraps max 2 lines), sub line 13px muted, "..." menu aligned right */}
-      <div>
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="w-12 h-12 rounded-[12px] bg-primary flex items-center justify-center text-lg font-bold text-white shadow-card shrink-0">
-              {initials(deal)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2
-                className="text-base font-extrabold text-heading leading-snug line-clamp-2"
-                title={deal.name}
-              >
-                {deal.name}
-              </h2>
-              <p className="text-[13px] text-muted mt-1 leading-tight truncate">
-                {deal.company || 'No company'} · {deal.owner?.title || deal.owner?.name || 'Owner unassigned'}
-              </p>
-            </div>
+    <div className="space-y-3.5">
+      {/* Header row: avatar, deal title, sub line, "..." menu aligned right */}
+      <div className="flex items-center justify-between gap-3 mb-3.5">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-sm font-bold text-white shrink-0 shadow-sm">
+            {initials(deal)}
           </div>
+          <div className="min-w-0 flex-1">
+            <h2
+              className="text-base font-semibold text-heading leading-tight truncate"
+              title={deal.name}
+            >
+              {deal.name}
+            </h2>
+            <p className="text-xs text-slate-500 truncate mt-0.5">
+              {deal.company || 'No company'} · {deal.owner?.title || deal.owner?.name || 'Owner unassigned'}
+            </p>
+          </div>
+        </div>
 
-          <div className="flex items-center gap-1 shrink-0">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-caption hover:text-body"
-                  title="Deal options"
-                >
-                  <MoreHorizontal size={18} />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  disabled={!canWrite}
-                  onClick={onDelete}
-                  className="text-danger focus:text-danger focus:bg-danger-light"
-                >
-                  <Trash2 className="mr-2 h-3.5 w-3.5" />
-                  Delete Deal
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {showCloseButton && onClose && (
+        <div className="flex items-center gap-1 shrink-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                onClick={onClose}
-                aria-label="Close"
-                className="h-8 w-8 text-caption hover:text-body"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100/80 transition-colors shrink-0"
+                title="Deal options"
               >
-                <X size={18} />
+                <MoreHorizontal className="w-4 h-4" />
               </Button>
-            )}
-          </div>
-        </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                disabled={!canWrite}
+                onClick={onDelete}
+                className="text-danger focus:text-danger focus:bg-danger-light"
+              >
+                <Trash2 className="mr-2 h-3.5 w-3.5" />
+                Delete Deal
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-        {/* Amount: 32px extrabold, existing blue, tabular-nums */}
-        <div className="mt-2">
-          <p className="text-[32px] font-extrabold text-[#2563eb] tracking-tight tabular-nums leading-none">
-            {formatMoney(deal.value)}
-          </p>
+          {showCloseButton && onClose && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              aria-label="Close"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100/80 transition-colors shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Actions: Log Email / Log Call / Edit in a 3-column grid, 8px gap, 36px high, equal width, nowrap, existing icons */}
+      {/* Amount: 24px bold, existing blue, tabular-nums */}
+      <div className="pt-1 pb-1">
+        <p className="text-2xl font-bold text-[#2563eb] tracking-tight tabular-nums leading-none">
+          {formatMoney(deal.value)}
+        </p>
+      </div>
+
+      {/* Actions: Log Email / Log Call / Edit in a 3-column grid, 8px gap, compact Apple-style */}
       <div className="grid grid-cols-3 gap-2">
         <Button
           type="button"
@@ -301,9 +298,9 @@ function DetailPanel({
           onClick={() => onOpenActivity('EMAIL')}
           disabled={!canWrite}
           title={!canWrite ? 'Requires the ADMIN role' : 'Record an email activity'}
-          className="h-9 px-2 text-sm font-semibold whitespace-nowrap"
+          className="h-8.5 px-2.5 rounded-xl bg-white/90 hover:bg-slate-50/90 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)] inline-flex items-center justify-center gap-1.5 text-xs font-medium whitespace-nowrap transition-all text-slate-700"
         >
-          <Mail size={16} className="text-muted mr-1.5 shrink-0" /> Log Email
+          <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" /> Log Email
         </Button>
         <Button
           type="button"
@@ -312,9 +309,9 @@ function DetailPanel({
           onClick={() => onOpenActivity('CALL')}
           disabled={!canWrite}
           title={!canWrite ? 'Requires the ADMIN role' : 'Record a call activity'}
-          className="h-9 px-2 text-sm font-semibold whitespace-nowrap"
+          className="h-8.5 px-2.5 rounded-xl bg-white/90 hover:bg-slate-50/90 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)] inline-flex items-center justify-center gap-1.5 text-xs font-medium whitespace-nowrap transition-all text-slate-700"
         >
-          <Phone size={16} className="text-muted mr-1.5 shrink-0" /> Log Call
+          <Phone className="w-3.5 h-3.5 text-slate-500 shrink-0" /> Log Call
         </Button>
         <Button
           type="button"
@@ -323,16 +320,16 @@ function DetailPanel({
           onClick={onEdit}
           disabled={!canWrite}
           title={!canWrite ? 'Requires the ADMIN role' : 'Edit deal'}
-          className="h-9 px-2 text-sm font-semibold whitespace-nowrap"
+          className="h-8.5 px-2.5 rounded-xl bg-white/90 hover:bg-slate-50/90 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)] inline-flex items-center justify-center gap-1.5 text-xs font-medium whitespace-nowrap transition-all text-slate-700"
         >
-          <Pencil size={16} className="text-muted mr-1.5 shrink-0" /> Edit
+          <Pencil className="w-3.5 h-3.5 text-slate-500 shrink-0" /> Edit
         </Button>
       </div>
 
-      {/* Stage row: label "STAGE" (11px uppercase muted) left, select (36px) right, 12px gap */}
-      <div>
-        <div className="flex items-center gap-3">
-          <label htmlFor="deal-stage" className="text-[11px] font-semibold text-muted uppercase tracking-wider shrink-0">
+      {/* Stage row: label "STAGE" left, select right */}
+      <div className="pt-3 border-t border-slate-200/60">
+        <div className="flex items-center justify-between gap-4">
+          <label htmlFor="deal-stage" className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 shrink-0 w-14">
             Stage
           </label>
           <Select
@@ -342,8 +339,9 @@ function DetailPanel({
           >
             <SelectTrigger
               id="deal-stage"
+              aria-label="Stage"
               title={!canWrite ? 'Requires the ADMIN role' : undefined}
-              className="flex-1 min-h-[36px] h-9 bg-surface-muted text-sm font-medium text-body"
+              className="flex-1 max-w-[240px] h-9 px-3.5 text-xs font-medium rounded-xl bg-slate-100/80 border border-slate-200/70 flex items-center justify-between text-body"
             >
               <SelectValue />
             </SelectTrigger>
@@ -363,83 +361,95 @@ function DetailPanel({
 
       {/* Win Probability section: only render it if the selected deal has win-probability data */}
       {deal.winProbability != null && (
-        <div className="pt-4 border-t border-border-default">
-          <h3 className="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2">Win Probability</h3>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-bold text-heading tabular-nums">
+        <div className="border-t border-slate-100 pt-3 space-y-1.5">
+          <h3 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            Win Probability
+          </h3>
+          <div className="flex items-baseline justify-between text-xs">
+            <span className="font-bold text-sm text-heading tabular-nums">
               {Math.round(deal.winProbability)}%
             </span>
-            <span className="text-[13px] text-muted">
+            <span className="text-xs text-slate-500">
               {deal.closeDate ? `Closing ${formatDate(deal.closeDate, { month: 'short', day: 'numeric' })}` : 'No close date'}
             </span>
           </div>
           <Progress
             value={Math.min(100, Math.max(0, deal.winProbability))}
-            className="h-1.5 mt-2 bg-surface-strong"
+            className="h-1.5 w-full rounded-full overflow-hidden bg-slate-100"
             indicatorClassName="bg-accent"
           />
         </div>
       )}
 
-      {/* Recent Activity section: 1px top divider, label, then existing empty text or activity list */}
-      <div className="pt-4 border-t border-border-default">
-        <h3 className="text-[11px] font-semibold text-muted uppercase tracking-wider mb-2">Recent Activity</h3>
+      {/* Recent Activity section: 1px top divider, label, inset container */}
+      <div className="border-t border-slate-100 pt-3 space-y-1.5">
+        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+          Recent Activity
+        </h3>
         {activitiesLoading ? (
-          <p className="text-[13px] text-muted">Loading activity…</p>
+          <div className="bg-slate-50/80 border border-slate-200/60 rounded-xl px-3.5 py-2.5 text-xs text-slate-500 leading-relaxed">
+            Loading activity…
+          </div>
         ) : activitiesError ? (
-          <p role="alert" className="text-[13px] text-danger">Could not load deal activity.</p>
+          <div role="alert" className="bg-slate-50/80 border border-red-200/50 rounded-xl px-3.5 py-2.5 text-xs text-danger leading-relaxed">
+            Could not load deal activity.
+          </div>
         ) : null}
         {!activitiesLoading && !activitiesError && (activityData?.items?.length ?? 0) === 0 && (
-          <p className="text-[13px] text-muted">No recent activity logged for this deal.</p>
+          <div className="bg-slate-50/80 border border-slate-200/60 rounded-xl px-3.5 py-2.5 text-xs text-slate-500 leading-relaxed">
+            No recent activity logged for this deal.
+          </div>
         )}
         {!activitiesLoading && !activitiesError && (activityData?.items?.length ?? 0) > 0 && (
-          <div className="relative ps-3 space-y-4 mt-3">
-            <div className="absolute inset-inline-start-[19px] top-2 bottom-4 w-px bg-surface-strong" />
-            {activityData.items.slice(0, 3).map(activity => (
-              <div key={activity.id} className="relative z-10 flex gap-3 text-[13px]">
-                <div className="bg-surface-raised ring-4 ring-white dark:ring-surface-raised mt-0.5 rounded-full shrink-0">
-                  {activity.type === 'EMAIL' ? (
-                    <Mail size={16} className="text-faint" />
-                  ) : activity.type === 'CALL' ? (
-                    <Phone size={16} className="text-faint" />
-                  ) : (
-                    <Circle size={16} className="text-faint" strokeWidth={2.5} />
-                  )}
+          <div className="bg-slate-50/80 border border-slate-200/60 rounded-xl px-3.5 py-2.5 text-xs text-slate-500 leading-relaxed space-y-3">
+            <div className="relative ps-3 space-y-3.5 mt-1">
+              <div className="absolute inset-inline-start-[17px] top-2 bottom-4 w-px bg-slate-200" />
+              {activityData.items.slice(0, 3).map(activity => (
+                <div key={activity.id} className="relative z-10 flex gap-2.5 text-xs">
+                  <div className="bg-white ring-2 ring-slate-100 mt-0.5 rounded-full shrink-0 p-0.5">
+                    {activity.type === 'EMAIL' ? (
+                      <Mail size={14} className="text-slate-400" />
+                    ) : activity.type === 'CALL' ? (
+                      <Phone size={14} className="text-slate-400" />
+                    ) : (
+                      <Circle size={14} className="text-slate-400" strokeWidth={2.5} />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-heading leading-tight">{activity.title}</p>
+                    <p className="mt-0.5 text-[11px] text-slate-500">
+                      {activity.type === 'EMAIL' ? 'Email' : activity.type === 'CALL' ? 'Call' : 'Note'} · {activity.actorName || 'Unknown author'} · {formatDate(activity.createdAt, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </p>
+                    {activity.body && <p className="mt-1 whitespace-pre-wrap break-words text-xs text-body">{activity.body}</p>}
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-heading leading-tight">{activity.title}</p>
-                  <p className="mt-0.5 text-xs text-muted">
-                    {activity.type === 'EMAIL' ? 'Email' : activity.type === 'CALL' ? 'Call' : 'Note'} · {activity.actorName || 'Unknown author'} · {formatDate(activity.createdAt, { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </p>
-                  {activity.body && <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] text-body">{activity.body}</p>}
+              ))}
+              {(activityData.pagination?.pages ?? 0) > 1 && (
+                <div className="flex items-center justify-between pt-1.5 text-xs text-slate-500">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={activityPage <= 1}
+                    onClick={() => onActivityPageChange(page => page - 1)}
+                    className="h-6 px-2 text-xs"
+                  >
+                    Newer
+                  </Button>
+                  <span>Page {activityPage} of {activityData.pagination.pages}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={activityPage >= activityData.pagination.pages}
+                    onClick={() => onActivityPageChange(page => page + 1)}
+                    className="h-6 px-2 text-xs"
+                  >
+                    Older
+                  </Button>
                 </div>
-              </div>
-            ))}
-            {(activityData.pagination?.pages ?? 0) > 1 && (
-              <div className="flex items-center justify-between pt-2 text-xs text-muted">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={activityPage <= 1}
-                  onClick={() => onActivityPageChange(page => page - 1)}
-                  className="h-6 px-2 text-xs"
-                >
-                  Newer
-                </Button>
-                <span>Page {activityPage} of {activityData.pagination.pages}</span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={activityPage >= activityData.pagination.pages}
-                  onClick={() => onActivityPageChange(page => page + 1)}
-                  className="h-6 px-2 text-xs"
-                >
-                  Older
-                </Button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -747,38 +757,11 @@ export default function DealsPipeline() {
   return (
     <div className="flex-1 min-w-0 flex flex-col bg-surface-raised">
 
-      <TopBarActions>
-        <div className="flex items-center gap-2">
-          {/* Table Search (~240px, 36px high, matching search style) */}
-          <div className="relative">
-            <Search size={14} className="absolute inset-inline-start-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-            <Input
-              type="text"
-              value={search}
-              onChange={event => { setSearch(event.target.value); setPageByStage(Object.fromEntries(STAGE_ORDER.map(stage => [stage, 1]))); }}
-              placeholder="Search..."
-              className="w-[240px] h-9 ps-9 pe-3 text-sm bg-surface-muted"
-            />
-          </div>
-
-          {/* New Deal button (36px high) */}
-          <Button
-            type="button"
-            disabled={!canWrite}
-            onClick={openNewDealDialog}
-            title={!canWrite ? 'Requires the ADMIN role' : undefined}
-            className="h-9 px-4 text-sm font-semibold"
-          >
-            New Deal
-          </Button>
-        </div>
-      </TopBarActions>
-
       {/* ── Main Workspace ── */}
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <div className="flex-1 min-w-0 flex flex-col p-6 pt-4 gap-4">
           {/* 4) STAGE CARDS ROW (Switcher) - All 5 in one row */}
-          <div className="grid grid-cols-[repeat(5,minmax(150px,1fr))] min-[1100px]:grid-cols-[repeat(5,minmax(0,1fr))] gap-2 shrink-0 overflow-x-auto min-[1100px]:overflow-visible [scrollbar-width:thin]">
+          <div className="grid grid-cols-[repeat(5,minmax(170px,1fr))] min-[1100px]:grid-cols-[repeat(5,minmax(0,1fr))] gap-3 sm:gap-3.5 shrink-0 overflow-x-auto min-[1100px]:overflow-visible [scrollbar-width:thin]">
             {groups.map(group => (
               <StageSwitcherCard
                 key={group.stage}
@@ -792,11 +775,33 @@ export default function DealsPipeline() {
 
           {/* 2) TWO-COLUMN AREA (grid: 1fr 380px, align-items: start, gap 16) */}
           <div className="grid grid-cols-1 min-[1100px]:grid-cols-[1fr_380px] items-start gap-4 min-w-0">
-            {/* 5) LIST PANE CARD */}
-            <div
-              data-testid="deals-list-card"
-              className="rounded-[12px] border border-border-default bg-surface-raised flex flex-col min-w-0 overflow-hidden"
-            >
+            {/* Left Column: Controls + Table Card */}
+            <div className="flex flex-col gap-3 min-w-0">
+              {/* Table Controls (Expanded Search & New Deal Button) */}
+              <div className="flex items-center gap-3 shrink-0">
+                <SearchInput
+                  value={search}
+                  onChange={event => { setSearch(event.target.value); setPageByStage(Object.fromEntries(STAGE_ORDER.map(stage => [stage, 1]))); }}
+                  placeholder="Search..."
+                  wrapperClassName="flex-1 min-w-0"
+                />
+
+                <Button
+                  type="button"
+                  disabled={!canWrite}
+                  onClick={openNewDealDialog}
+                  title={!canWrite ? 'Requires the ADMIN role' : undefined}
+                  className="h-9 px-5 text-sm font-semibold rounded-xl shrink-0"
+                >
+                  New Deal
+                </Button>
+              </div>
+
+              {/* 5) LIST PANE CARD */}
+              <div
+                data-testid="deals-list-card"
+                className="rounded-[12px] border border-border-default bg-surface-raised flex flex-col min-w-0 overflow-hidden"
+              >
               {/* Column Header (outside scroll area, fixed height) */}
               <div
                 className="grid items-center border-b border-border-default bg-surface-muted/90 backdrop-blur-xs text-[11px] font-semibold uppercase text-muted tracking-[0.06em] shrink-0 h-10 min-h-[40px] px-5 gap-x-3"
@@ -878,12 +883,13 @@ export default function DealsPipeline() {
                 </div>
               </div>
             </div>
+          </div>
 
             {/* 6) DETAIL PANEL: natural content height, sticky on >= 1100px */}
             <aside
               role="complementary"
               aria-label="Deal details"
-              className="w-full min-[1100px]:w-[380px] min-[1100px]:shrink-0 min-[1100px]:sticky min-[1100px]:top-4 self-start rounded-[12px] border border-border-default bg-surface-raised p-5 flex flex-col space-y-4"
+              className="w-full min-[1100px]:w-[380px] min-[1100px]:shrink-0 min-[1100px]:sticky min-[1100px]:top-4 self-start bg-white/80 backdrop-blur-xl border border-slate-200/70 rounded-2xl p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05)] flex flex-col space-y-3.5"
             >
               <DetailPanel
                 deal={selectedDeal}

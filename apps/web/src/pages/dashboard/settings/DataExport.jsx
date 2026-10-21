@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Search,
   FileText,
   Loader2,
   Cloud,
@@ -8,8 +7,8 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import TopBarActions from '../../../components/TopBarActions';
 import SettingsTabs from './SettingsTabs';
+import SearchInput from '../../../components/common/SearchInput';
 import { Button } from '../../../components/ui/button';
-import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
 import {
   Select,
@@ -20,6 +19,8 @@ import {
 } from '../../../components/ui/select';
 import { exportsApi } from '../../../lib/api/exports';
 import { queryKeys } from '../../../lib/queryKeys';
+import { useActiveMemberRole } from '../../../lib/authClient';
+import { getMemberRoleName } from '../../../lib/memberRole';
 
 /** Each visible scope maps to an implemented export kind with a fixed output format. */
 const SCOPE_TO_KIND = {
@@ -31,6 +32,9 @@ const SCOPE_TO_KIND = {
 
 export default function SettingsDataExport() {
   const queryClient = useQueryClient();
+  const { data: memberRole } = useActiveMemberRole();
+  const roleName = getMemberRoleName(memberRole);
+  const canManageExports = roleName === 'OWNER' || roleName === 'ADMIN';
   const [scope, setScope] = useState('Full Workspace');
   const [jobSearch, setJobSearch] = useState('')
   const [showHistory, setShowHistory] = useState(false)
@@ -99,16 +103,12 @@ export default function SettingsDataExport() {
 
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption z-10 pointer-events-none" />
-            <Input
-              type="text"
-              value={jobSearch}
-              onChange={event => setJobSearch(event.target.value)}
-              placeholder="Search..."
-              className="pl-9 pr-4 py-1.5 h-8 text-sm w-64 bg-surface-muted"
-            />
-          </div>
+          <SearchInput
+            value={jobSearch}
+            onChange={event => setJobSearch(event.target.value)}
+            placeholder="Search..."
+            wrapperClassName="w-64"
+          />
 
           <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-strong shrink-0"></div>
 
@@ -170,7 +170,8 @@ export default function SettingsDataExport() {
                   onClick={() => createMutation.mutate({
                     kind: SCOPE_TO_KIND[scope] || 'employees',
                   })}
-                  disabled={createMutation.isPending}
+                  disabled={!canManageExports || createMutation.isPending}
+                  title={!canManageExports ? 'Only workspace admins and owners can create exports' : undefined}
                   className="w-full"
                 >
                   {createMutation.isPending ? (
@@ -219,7 +220,7 @@ export default function SettingsDataExport() {
                         <span className="text-[11px] text-muted">{job.kind} · {new Date(job.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>
-                    {job.status === 'DONE' && <Button variant="link" size="sm" type="button" disabled={downloadingJobId === job.id} onClick={() => handleDownload(job)} className="h-auto p-0 text-[11px] font-semibold text-accent hover:text-accent-hover">{downloadingJobId === job.id ? 'Downloading…' : 'Download'}</Button>}
+                    {job.status === 'DONE' && <Button variant="link" size="sm" type="button" disabled={!canManageExports || downloadingJobId === job.id} title={!canManageExports ? 'Only workspace admins and owners can download exports' : undefined} onClick={() => handleDownload(job)} className="h-auto p-0 text-[11px] font-semibold text-accent hover:text-accent-hover">{downloadingJobId === job.id ? 'Downloading…' : 'Download'}</Button>}
                   </div>
                 )) : <p className="text-xs text-muted">No matching export jobs.</p>}
                 <div className="flex items-center justify-between pt-2 text-xs text-muted">
@@ -273,7 +274,8 @@ export default function SettingsDataExport() {
                         variant="link"
                         size="sm"
                         type="button"
-                        disabled={downloadingJobId === dl.id}
+                        disabled={!canManageExports || downloadingJobId === dl.id}
+                        title={!canManageExports ? 'Only workspace admins and owners can download exports' : undefined}
                         onClick={() => handleDownload(dl)}
                         className="h-auto p-0 text-[11px] font-semibold text-accent hover:text-accent-hover transition-colors shrink-0"
                       >

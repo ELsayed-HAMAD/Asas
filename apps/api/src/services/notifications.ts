@@ -174,7 +174,7 @@ export async function createInAppNotification(
   })
 
   if (ssePublish) {
-    ssePublish(tenantId, ['notifications', `notifications:${userId}`])
+    ssePublish(tenantId, ['asas,notifications'])
   }
 
   return {

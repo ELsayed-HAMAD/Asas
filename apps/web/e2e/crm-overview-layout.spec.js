@@ -156,7 +156,7 @@ test('crm overview dashboard strictly satisfies all layout rules at 1280px, 1440
         // Search or jump to...
         await expect(page.getByTitle(/Global search/i)).toBeVisible()
         // Notification bell
-        await expect(page.getByTitle(/Notification Settings/i)).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Open notifications' })).toBeVisible()
 
         // "Search deals..." input: 36px high, ~260px wide
         const searchDealsInput = page.getByPlaceholder('Search deals...')

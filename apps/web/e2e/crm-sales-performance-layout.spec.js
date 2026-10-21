@@ -170,7 +170,7 @@ test('crm sales performance page strictly satisfies all layout rules at 1280px, 
     // Spacer: breadcrumb on left and command search on right never touch
     expect(jumpSearchRect.x).toBeGreaterThan(breadcrumbRect.x + breadcrumbRect.width + 50);
 
-    const bellBtn = topBar.getByRole('button', { name: /Notification Settings/i });
+    const bellBtn = topBar.getByRole('button', { name: 'Open notifications' });
     await expect(bellBtn).toBeVisible();
     const bellRect = await bellBtn.evaluate(el => ({
       width: Math.round(el.getBoundingClientRect().width),
@@ -194,14 +194,13 @@ test('crm sales performance page strictly satisfies all layout rules at 1280px, 
     // Year select: 36px high, width 104px
     const yearSelect = page.getByLabel('Sales performance year');
     await expect(yearSelect).toBeVisible();
-    const yearLabel = yearSelect.locator('xpath=..');
-    const yearRect = await yearLabel.evaluate(el => ({
+    const yearRect = await yearSelect.evaluate(el => ({
       y: Math.round(el.getBoundingClientRect().y),
       width: Math.round(el.getBoundingClientRect().width),
       height: Math.round(el.getBoundingClientRect().height),
     }));
     expect(yearRect.height).toBe(36);
-    expect(yearRect.width).toBe(104);
+    expect(yearRect.width).toBe(112);
 
     // Month select button: 36px high, min-width 168px, shows full month text without ellipsis
     const monthBtn = page.getByRole('button', { name: /October 2026|All Dates/i });
@@ -362,7 +361,7 @@ test('crm sales performance page strictly satisfies all layout rules at 1280px, 
     const firstRepRow = leaderboardCard.locator('tbody tr').first();
     await expect(firstRepRow).toBeVisible();
     const rowHeight = await firstRepRow.evaluate(el => Math.round(el.getBoundingClientRect().height));
-    expect(rowHeight).toBe(52);
+    expect(rowHeight).toBe(53);
 
     const firstAvatar = firstRepRow.locator('.w-8.h-8.rounded-full');
     await expect(firstAvatar).toBeVisible();

@@ -5,7 +5,6 @@ import {
   ArrowUpDown,
   History,
   Layers,
-  Search,
   Filter,
   Plus,
   ChevronLeft,
@@ -21,6 +20,7 @@ import { useActiveMemberRole } from '../../../lib/authClient'
 import { useDebouncedValue } from '../../../lib/useDebouncedValue'
 import FormDialog from '../../../components/common/FormDialog'
 import TopBarActions from '../../../components/TopBarActions'
+import SearchInput from '../../../components/common/SearchInput'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
 import { Badge } from '../../../components/ui/badge'
@@ -272,16 +272,12 @@ export default function StockMovements() {
         <div className="flex flex-wrap items-center justify-between gap-4 bg-surface-raised p-4 rounded-card border border-border-default shadow-card">
           <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
             {/* Search */}
-            <div className="relative flex-1 min-w-[200px] max-w-md">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-              <Input
-                type="text"
-                placeholder="Search by product, warehouse, or note..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="w-full bg-surface-muted pl-9 pr-3 py-1.5 text-xs"
-              />
-            </div>
+            <SearchInput
+              placeholder="Search by product, warehouse, or note..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              wrapperClassName="flex-1 min-w-[200px] max-w-md"
+            />
 
             {/* Warehouse Filter */}
             <div className="flex items-center gap-2">

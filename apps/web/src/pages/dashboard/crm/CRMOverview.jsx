@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Search,
   MoreHorizontal,
   Loader2,
   Mail,
@@ -16,6 +15,7 @@ import { formatDate, formatMoney, formatPercent, moneyToMajor } from '../../../l
 import TopBarActions from '../../../components/TopBarActions';
 import EmptyState from '../../../components/common/EmptyState';
 import FormDialog from '../../../components/common/FormDialog';
+import SearchInput from '../../../components/common/SearchInput';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Checkbox } from '../../../components/ui/checkbox';
@@ -145,21 +145,17 @@ export default function CRMOverview() {
 
       <TopBarActions>
         <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search size={14} className="absolute inset-inline-start-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-            <Input
-              type="text"
-              placeholder="Search deals..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && search.trim()) {
-                  navigate(`/dashboard/crm/deals?search=${encodeURIComponent(search.trim())}`)
-                }
-              }}
-              className="ps-9 pe-3 h-9 text-xs bg-surface-muted hover:bg-surface focus:bg-surface-raised w-[260px] max-w-full"
-            />
-          </div>
+          <SearchInput
+            placeholder="Search deals..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && search.trim()) {
+                navigate(`/dashboard/crm/deals?search=${encodeURIComponent(search.trim())}`)
+              }
+            }}
+            wrapperClassName="w-[260px] max-w-full"
+          />
 
           <Button
             type="button"

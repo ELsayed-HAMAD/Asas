@@ -226,6 +226,7 @@ model Tenant {
 
   members              Member[]
   invitations          Invitation[]
+  seatReservations     SeatReservation[]
   auditLogs            AuditLog[]
   departments          Department[]
   activityEvents       ActivityEvent[]
@@ -383,6 +384,7 @@ model Member {
   userId     String
   employeeId String?  @unique
   role       UserRole @default(MEMBER)
+  seatReservationId String?
   createdAt  DateTime @default(now())
 
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -391,6 +393,7 @@ model Member {
 
   @@unique([tenantId, userId])
   @@index([tenantId])
+  @@index([tenantId, seatReservationId])
 }
 
 model Invitation {
@@ -400,6 +403,7 @@ model Invitation {
   role      UserRole @default(MEMBER)
   status    String   @default("pending")
   inviterId String
+  seatReservationId String?
   expiresAt DateTime
   createdAt DateTime @default(now())
 
@@ -407,6 +411,23 @@ model Invitation {
   inviter User   @relation("InvitationInviter", fields: [inviterId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
+  @@index([tenantId, seatReservationId])
+}
+
+// Short-lived reservations bridge Better Auth's separate before/after database hooks so
+// concurrent invitations and membership changes cannot all pass the same seat preflight.
+model SeatReservation {
+  id           String   @id @default(cuid())
+  tenantId     String
+  invitationId String?
+  purpose      String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, invitationId])
+  @@index([tenantId, expiresAt])
 }
 
 // Append-only record of privileged actions (payroll approval, salary edits, member-role

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Search,
   ChevronDown,
   Rocket,
   Clock,
@@ -27,6 +26,7 @@ import GroupedList from '../../../components/common/GroupedList';
 import SidePanelSection from '../../../components/common/SidePanelSection';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import SearchInput from '../../../components/common/SearchInput';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
@@ -414,18 +414,14 @@ export default function ActiveSprints() {
                 className="mb-4 gap-4"
                 left={
                   <>
-                    <div className="relative flex-1 min-w-[160px] max-w-[260px]">
-                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-                      <Input
-                        type="text"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Search issues..."
-                        aria-label="Search issues"
-                        title="Search issues"
-                        className="pl-9 pr-4 h-10 text-sm border-0 rounded-[10px] bg-surface-raised text-heading placeholder:text-caption shadow-[0_1px_2px_rgba(16,24,40,0.04)] w-full"
-                      />
-                    </div>
+                    <SearchInput
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search issues..."
+                      aria-label="Search issues"
+                      title="Search issues"
+                      wrapperClassName="flex-1 min-w-[160px] max-w-[260px]"
+                    />
 
                     <Button
                       type="button"

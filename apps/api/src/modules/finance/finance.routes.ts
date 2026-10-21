@@ -410,7 +410,7 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
         })
         return invoice
       })
-      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance'), 'notifications'])
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance'), moduleKeyPrefix('notifications')])
       reply.code(201)
       return { data: invoice }
     },
@@ -838,7 +838,7 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
         })
         return invoice
       })
-      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance'), 'notifications'])
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance'), moduleKeyPrefix('notifications')])
       reply.code(201)
       return { data: invoice }
     },

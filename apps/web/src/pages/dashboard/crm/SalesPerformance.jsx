@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Search,
   Calendar,
   ChevronDown,
   Download,
@@ -8,7 +7,8 @@ import {
   TrendingUp,
   Clock,
   MoreHorizontal,
-  Loader2
+  Loader2,
+  Info
 } from 'lucide-react';
 import {
   AreaChart, Area, ResponsiveContainer, PieChart, Pie, Cell, Tooltip
@@ -19,7 +19,7 @@ import { queryKeys } from '../../../lib/queryKeys';
 import { formatCompactTableMoney, formatMoney, formatPercent, moneyToMajor } from '../../../lib/format';
 import { downloadCsv } from '../../../lib/csv';
 import { Button } from '../../../components/ui/button';
-import { Input } from '../../../components/ui/input';
+import SearchInput from '../../../components/common/SearchInput';
 import { Badge } from '../../../components/ui/badge';
 import { Progress } from '../../../components/ui/progress';
 import {
@@ -159,90 +159,84 @@ export default function SalesPerformance() {
   return (
     <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
 
-      {/* ── 2) Filter Row directly below the top bar (48px, bg-surface-raised, border-b) ── */}
-      <div className="min-h-[48px] px-6 py-1.5 bg-surface-raised border-b border-border-default flex flex-wrap items-center justify-between gap-3 shrink-0 max-[899px]:py-2">
-        {/* Left group (8px gaps, all 36px high): search (240px), year (104px), month (min 168px) */}
-        <div className="flex items-center gap-2 shrink-0 max-[899px]:w-full max-[899px]:flex-wrap">
-          {/* a) "Search..." input: width 240px (fixed, never flexible) */}
-          <div className="relative w-[240px] shrink-0">
-            <Search size={14} className="absolute inset-inline-start-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-            <Input
-              type="text"
-              placeholder="Search..."
-              value={search}
-              onChange={event => { setSearch(event.target.value); setTopDealsPage(1); }}
-              className="w-[240px] h-9 ps-9 pe-3 text-xs bg-surface-muted"
-            />
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-6 space-y-4">
+
+          {/* ── Filter Bar Controls ── */}
+          <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
+            {/* Left group: search, year, month */}
+            <div className="flex items-center gap-3 shrink-0 max-[899px]:w-full max-[899px]:flex-wrap">
+              {/* Search input */}
+              <SearchInput
+                placeholder="Search..."
+                value={search}
+                onChange={event => { setSearch(event.target.value); setTopDealsPage(1); }}
+                wrapperClassName="w-[240px] shrink-0"
+              />
+
+              {/* Year select */}
+              <Select value={String(year)} onValueChange={val => setYear(val)}>
+                <SelectTrigger
+                  aria-label="Sales performance year"
+                  className="flex items-center gap-2 h-9 w-[112px] min-w-[112px] px-3 bg-white border border-slate-200/80 rounded-xl shadow-xs text-slate-700 text-sm font-medium shrink-0 hover:bg-slate-50/50"
+                >
+                  <Calendar size={15} className="text-slate-400 shrink-0" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[...new Set([year, String(new Date().getUTCFullYear()), ...(forecast?.availableYears || []), ...Array.from({ length: 5 }, (_, index) => String(new Date().getUTCFullYear() - index))])].sort().reverse().map(value => (
+                    <SelectItem key={value} value={String(value)} className="text-xs">{value}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Month select */}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => { setDealsPeriod(value => value === 'MONTH' ? 'ALL' : 'MONTH'); setShowAllDeals(false); setTopDealsPage(1); }}
+                className="flex items-center justify-between gap-2.5 h-9 min-w-[168px] px-3 bg-white border border-slate-200/80 rounded-xl shadow-xs text-slate-700 text-sm font-medium shrink-0 hover:bg-slate-50/50"
+              >
+                <div className="flex items-center gap-2 whitespace-nowrap">
+                  <Calendar size={15} className="text-slate-400 shrink-0" />
+                  <span className="whitespace-nowrap">{dealsPeriod === 'MONTH' ? monthLabel : 'All Dates'}</span>
+                </div>
+                <ChevronDown size={14} className="text-slate-400 shrink-0" />
+              </Button>
+            </div>
+
+            {/* Right group: download icon button + Download Report button */}
+            <div className="flex items-center gap-3 shrink-0 max-[899px]:w-full max-[899px]:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={downloadReport}
+                aria-label="Download sales report"
+                className="w-9 h-9 min-w-[36px] bg-white border border-slate-200/80 rounded-xl shadow-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50/50 shrink-0"
+                title="Download sales report"
+              >
+                <Download size={16} />
+              </Button>
+
+              <Button
+                type="button"
+                onClick={downloadReport}
+                className="h-9 px-4 text-sm font-semibold text-white bg-[#0f172a] hover:bg-slate-800 rounded-xl shadow-xs whitespace-nowrap"
+              >
+                Download Report
+              </Button>
+            </div>
           </div>
 
-          {/* b) Year select: width 104px, calendar icon, shows "2026" in full */}
-          <Select value={String(year)} onValueChange={val => setYear(val)}>
-            <SelectTrigger
-              aria-label="Sales performance year"
-              className="flex items-center gap-1.5 h-9 w-[112px] min-w-[112px] px-2.5 bg-surface-muted text-heading text-xs font-medium shrink-0"
-            >
-              <Calendar size={14} className="text-muted shrink-0" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[...new Set([year, String(new Date().getUTCFullYear()), ...(forecast?.availableYears || []), ...Array.from({ length: 5 }, (_, index) => String(new Date().getUTCFullYear() - index))])].sort().reverse().map(value => (
-                <SelectItem key={value} value={String(value)} className="text-xs">{value}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* c) Month select: min-width 168px, calendar icon, shows "October 2026" in full with NO ellipsis */}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => { setDealsPeriod(value => value === 'MONTH' ? 'ALL' : 'MONTH'); setShowAllDeals(false); setTopDealsPage(1); }}
-            className="flex items-center justify-between h-9 min-w-[168px] px-2.5 text-xs font-medium bg-surface-muted text-body hover:bg-surface shrink-0 gap-2"
-          >
-            <div className="flex items-center gap-1.5 whitespace-nowrap">
-              <Calendar size={14} className="text-muted shrink-0" />
-              <span className="whitespace-nowrap">{dealsPeriod === 'MONTH' ? monthLabel : 'All Dates'}</span>
-            </div>
-            <ChevronDown size={14} className="text-caption shrink-0" />
-          </Button>
-        </div>
-
-        {/* Spacer */}
-        <div className="flex-1 hidden min-[900px]:block" />
-
-        {/* Right group (right-aligned, 8px gap): download icon button (36x36) + "Download Report" primary button (36px high, nowrap) */}
-        <div className="flex items-center gap-2 shrink-0 max-[899px]:w-full max-[899px]:justify-end">
-          {/* Download icon button (36x36) */}
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={downloadReport}
-            aria-label="Download sales report"
-            className="w-9 h-9 min-w-[36px] text-muted hover:text-heading"
-            title="Download sales report"
-          >
-            <Download size={16} />
-          </Button>
-
-          {/* "Download Report" primary button (36px high, nowrap) */}
-          <Button
-            type="button"
-            onClick={downloadReport}
-            className="h-9 px-4 text-sm font-semibold whitespace-nowrap"
-          >
-            Download Report
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto">
-        {/* ── 3) Top Note Row (12px muted text, line-height 1.5, max 2 lines, padding 12px 24px 0) ── */}
-        <p className="pt-3 px-6 pb-0 text-xs text-muted leading-relaxed max-w-full">
-          Closed outcomes: {year} (UTC). Open pipeline: current snapshot. Weekly activity counts recorded stage moves, not calls or emails.{data.undatedClosedCount > 0 ? ` ${data.undatedClosedCount} legacy closed deals have no recorded actual close date and are excluded from dated metrics.` : ''}
-        </p>
-
-        <div className="p-6 pt-4 space-y-4">
+          {/* ── Info / Disclaimer Card ── */}
+          <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs px-4 py-1 flex items-start sm:items-center gap-3">
+            <Info size={18} className="text-slate-400 shrink-0 mt-0.5 sm:mt-0" />
+            <p className="pt-3 pb-3 text-xs text-slate-500 leading-relaxed">
+              Closed outcomes: {year} (UTC). Open pipeline: current snapshot. Weekly activity counts recorded stage moves, not calls or emails.{data.undatedClosedCount > 0 ? ` ${data.undatedClosedCount} legacy closed deals have no recorded actual close date and are excluded from dated metrics.` : ''}
+            </p>
+          </div>
 
           {/* ── 4) KPIs Row (3 equal cards, grid 3 columns, gap 16px, equal height 104px) ── */}
           <div className="grid grid-cols-1 min-[1100px]:grid-cols-3 gap-4 items-stretch">

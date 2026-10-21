@@ -43,11 +43,34 @@ yarn.lock
 *.tokens
 secrets/
 credentials/
+.secrets/
+.credentials/
+private/
+auth_keys/
+certs/
+certificates/
 *.credential
 *.credentials
 id_rsa*
 id_ed25519*
 id_ecdsa*
+*.keystore
+*.jks
+*.priv
+*.private
+*.kdbx
+*.age
+
+# Cloud credentials & service accounts
+*service-account*.json
+*serviceAccount*.json
+*firebase-adminsdk*.json
+*gcp-credentials*.json
+*google-credentials*.json
+*aws-credentials*
+.aws/
+.azure/
+.gcloud/
 
 # =========================
 # Frontend Builds & Caches
@@ -179,6 +202,13 @@ $RECYCLE.BIN/
 .cline/
 .roo/
 .devin/
+.deepseek/
+.chatgpt/
+.openai/
+.anthropic/
+.qodo/
+.cody/
+.trae/
 .system_generated/
 brain/
 *.scratch.*
@@ -186,6 +216,10 @@ scratch/
 .ai/
 .prompts/
 .prompt/
+ai_artifacts/
+llm_output/
+prompts/
+prompt_history/
 # Local AI instruction, prompt, and context files. Keep these out of public repos.
 AGENTS.md
 CLAUDE.md
@@ -195,6 +229,8 @@ copilot-instructions.md
 *.instructions.md
 *.prompt.md
 *.ai.md
+*.ai.txt
+*.context.md
 *.codex.md
 *.copilot.md
 *.gemini.md
@@ -209,9 +245,19 @@ copilot-instructions.md
 .codeiumignore
 
 # =========================
-# Audit, Review, Plan & Remediation Files
+# Audit, Review, Plan, Analysis & Remediation Files
 # Keep private analysis, remediation tracking, and planning notes out of git.
 # =========================
+PROJECT-REVIEW-AND-REMEDIATION-PLAN.md
+UI_UX_REVIEW.md
+AUDIT.md
+REVIEW.md
+MIGRATION_PLAN.md
+MIGRATION_HANDOFF.md
+MIGRATION_PROGRESS.md
+REMEDIATION-PLAN-*.md
+REVIEW-*.md
+
 *AUDIT*.md
 *audit*.md
 *REVIEW*.md
@@ -225,7 +271,29 @@ copilot-instructions.md
 *COMPLETION-REPORT*.md
 *remediation*.md
 *REMEDIATION*.md
+*NOTES*.md
+*notes*.md
+*.notes.md
+*TODO*.md
+*todo*.md
+*.todo.md
+*CHECKLIST*.md
+*checklist*.md
+*ANALYSIS*.md
+*analysis*.md
+*SUMMARY*.md
+*summary*.md
+*TASK*.md
+*tasks*.md
+*TASKS*.md
+*SCRATCH*.md
+*scratch*.md
+*INVESTIGATION*.md
+*investigation*.md
 *.plan
+*.plan.json
+*.plan.txt
+*.plan.md
 *.patch
 *.diff
 
@@ -238,6 +306,10 @@ copilot-instructions.md
 !**/CONTRIBUTING.md
 !LICENSE.md
 !**/LICENSE.md
+!SECURITY.md
+!**/SECURITY.md
+!CODE_OF_CONDUCT.md
+!**/CODE_OF_CONDUCT.md
 
 # =========================
 # Scratch, Maintenance & Local Scripts

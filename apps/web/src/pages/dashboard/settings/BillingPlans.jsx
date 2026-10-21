@@ -11,6 +11,8 @@ import { Button } from '../../../components/ui/button'
 import { Badge } from '../../../components/ui/badge'
 import { Alert, AlertDescription } from '../../../components/ui/alert'
 import { PLATFORM_PLANS } from '../../../../../../packages/contracts/src/billing/catalog.ts'
+import { useActiveMemberRole } from '../../../lib/authClient'
+import { getMemberRoleName } from '../../../lib/memberRole'
 
 function money(amount, currency = 'USD') {
   const numericAmount = Number(amount)
@@ -32,6 +34,9 @@ function storageLabel(storageUsedGb) {
 export default function SettingsBilling() {
   const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
+  const { data: memberRole } = useActiveMemberRole()
+  const roleName = getMemberRoleName(memberRole)
+  const canManageBilling = roleName === 'OWNER' || roleName === 'ADMIN'
   const billingQuery = useQuery({ queryKey: queryKeys.settings.billing(), queryFn: settingsApi.getBilling })
   const plansQuery = useQuery({ queryKey: [...queryKeys.settings.billing(), 'plans'], queryFn: settingsApi.getBillingPlans })
 
@@ -76,7 +81,8 @@ export default function SettingsBilling() {
               variant="outline"
               type="button"
               onClick={() => portal.mutate()}
-              disabled={portal.isPending}
+              disabled={!canManageBilling || portal.isPending}
+              title={!canManageBilling ? 'Only workspace admins and owners can manage billing' : undefined}
               className="gap-2 text-heading h-9"
             >
               {portal.isPending ? <Loader2 size={15} className="animate-spin" /> : <CreditCard size={15} />}
@@ -221,7 +227,8 @@ export default function SettingsBilling() {
                             return
                           }
                         }}
-                        disabled={isCurrent || switchPlan.isPending || checkout.isPending || (tierPlan.id !== 'free' && !canCheckout)}
+                        disabled={!canManageBilling || isCurrent || switchPlan.isPending || checkout.isPending || (tierPlan.id !== 'free' && !canCheckout)}
+                        title={!canManageBilling ? 'Only workspace admins and owners can manage billing' : undefined}
                         className="mt-6 w-full text-xs font-semibold h-9 cursor-pointer"
                       >
                         {switchPlan.isPending ? (

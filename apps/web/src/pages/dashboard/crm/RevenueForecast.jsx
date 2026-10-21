@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Search,
   Download,
   Share2,
   CheckCircle2,
@@ -11,7 +10,7 @@ import {
   TrendingDown,
   Info,
   Loader2,
-  Target,
+  Settings,
   Trash2,
 } from 'lucide-react';
 import {
@@ -21,13 +20,13 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { crmApi } from '../../../lib/api/crm';
 import { queryKeys } from '../../../lib/queryKeys';
-import TopBarActions from '../../../components/TopBarActions';
 import { moneyToMajor, formatCompactMoney, formatMoney } from '../../../lib/format';
 import { downloadCsv } from '../../../lib/csv';
 import { useActiveMemberRole } from '../../../lib/authClient';
 import { getMemberRoleName } from '../../../lib/memberRole';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import SearchInput from '../../../components/common/SearchInput';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
@@ -118,7 +117,7 @@ export default function RevenueForecast() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#fafafa]">
+      <div className="flex h-full items-center justify-center bg-surface">
         <Loader2 className="animate-spin text-gray-400" size={24} />
       </div>
     );
@@ -126,7 +125,7 @@ export default function RevenueForecast() {
 
   if (isError || !data) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#fafafa] text-red-500">
+      <div className="flex h-full items-center justify-center bg-surface text-red-500">
         Failed to load revenue forecast.
       </div>
     );
@@ -188,67 +187,68 @@ export default function RevenueForecast() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-[#fafafa] overflow-hidden min-w-0">
+    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
+      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        {/* ── Page Toolbar Controls ── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
+          {/* Left: Search reps */}
+          <SearchInput
+            value={search}
+            onChange={event => setSearch(event.target.value)}
+            placeholder="Search reps..."
+            wrapperClassName="w-64 sm:w-72"
+          />
 
-      <TopBarActions>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <Input
-              type="text"
-              value={search}
-              onChange={event => setSearch(event.target.value)}
-              placeholder="Search reps..."
-              className="ps-9 pe-4 h-9 text-xs w-56 bg-white border-gray-200"
-            />
-          </div>
+          {/* Right: Year, Download, Manage Quotas, Share Forecast */}
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 flex-wrap sm:flex-nowrap">
+            <Select value={String(selectedYear)} onValueChange={val => setSelectedYear(val)}>
+              <SelectTrigger
+                aria-label="Forecast calendar year"
+                className="h-9 w-auto px-3.5 gap-2 bg-white text-slate-700 border border-slate-200/80 rounded-xl text-sm font-medium shadow-xs hover:bg-slate-50/50 shrink-0"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availableYears.map(year => (
+                  <SelectItem key={year} value={String(year)}>Year {year}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <div className="h-6 w-px bg-gray-200 mx-1"></div>
-
-          <Select value={String(selectedYear)} onValueChange={val => setSelectedYear(val)}>
-            <SelectTrigger aria-label="Forecast calendar year" className="h-9 w-auto gap-2 bg-white text-gray-700 border-gray-200 text-sm font-medium">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {availableYears.map(year => (
-                <SelectItem key={year} value={String(year)}>Year {year}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={exportCsv}
-            aria-label="Download forecast CSV"
-            title="Download forecast CSV"
-            className="h-8 w-8 text-gray-500 hover:text-gray-900"
-          >
-            <Download size={18} />
-          </Button>
-          {canManageQuotas && (
             <Button
               type="button"
               variant="outline"
-              size="sm"
-              onClick={openQuotaManager}
-              className="h-9 px-3 text-sm font-medium bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+              size="icon"
+              onClick={exportCsv}
+              aria-label="Download forecast CSV"
+              title="Download forecast CSV"
+              className="h-9 w-9 bg-white border border-slate-200/80 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-50/50 shadow-xs shrink-0"
             >
-              <Target size={14} className="mr-1.5" /> Manage Quotas
+              <Download className="w-4 h-4" />
             </Button>
-          )}
 
-          <Button
-            onClick={shareForecast}
-            className="h-9 px-4 text-sm font-semibold shadow-sm"
-          >
-            <Share2 size={14} className="mr-1.5" />
-            Share Forecast
-          </Button>
+            {canManageQuotas && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={openQuotaManager}
+                className="h-9 px-3.5 text-sm font-medium bg-white border border-slate-200/80 rounded-xl text-slate-700 hover:bg-slate-50/50 shadow-xs gap-2 shrink-0"
+              >
+                <Settings className="w-4 h-4 text-slate-500" />
+                Manage Quotas
+              </Button>
+            )}
+
+            <Button
+              type="button"
+              onClick={shareForecast}
+              className="h-9 px-4 text-sm font-semibold rounded-xl bg-primary hover:bg-primary-hover text-white shadow-xs gap-2 shrink-0"
+            >
+              <Share2 className="w-4 h-4" />
+              Share Forecast
+            </Button>
+          </div>
         </div>
-      </TopBarActions>
-
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
 
         {summary.excludedQuotaCount > 0 && (
           <Alert className="border-amber-200 bg-amber-50 text-amber-900">

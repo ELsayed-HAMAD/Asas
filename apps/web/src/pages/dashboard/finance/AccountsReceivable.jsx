@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Search, Send, ChevronDown,
+  Send, ChevronDown,
   FileText, Paperclip, Phone,
   CircleDot, Circle, Loader2,
   Users, Plus, Pencil, Trash2, X, Check
@@ -11,6 +11,7 @@ import { financeApi } from '../../../lib/api/finance';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatDate, formatMoney, formatCompactTableMoney } from '../../../lib/format';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import SearchInput from '../../../components/common/SearchInput';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
@@ -287,16 +288,13 @@ export default function AccountsReceivable() {
       <div className="flex flex-wrap items-center justify-between gap-3 w-full mb-5 flex-shrink-0">
         {/* Left group */}
         <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-caption pointer-events-none" />
-            <Input
-              type="text"
-              value={search}
-              onChange={event => { setSearch(event.target.value); setCustomerPage(1); }}
-              placeholder="Search customers..."
-              className="pl-9 pr-4 text-xs bg-surface-raised w-72 max-w-full shadow-card h-9"
-            />
-          </div>
+          <SearchInput
+            type="text"
+            value={search}
+            onChange={event => { setSearch(event.target.value); setCustomerPage(1); }}
+            placeholder="Search customers..."
+            wrapperClassName="w-72 max-w-full"
+          />
           <Select
             value={ageFilter}
             onValueChange={v => { setAgeFilter(v); setCustomerPage(1); }}

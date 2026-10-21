@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Building2,
@@ -27,15 +27,17 @@ export default function WorkspaceChooser() {
   const [activatingId, setActivatingId] = useState(null)
   const [error, setError] = useState('')
   const [signingOut, setSigningOut] = useState(false)
+  const autoActivationAttempted = useRef(false)
 
   const orgList = Array.isArray(organizations) ? organizations : []
 
   // If there's only 1 organization, auto-activate and navigate
   useEffect(() => {
-    if (!orgsPending && orgList.length === 1 && !activatingId) {
+    if (!orgsPending && orgList.length === 1 && !activatingId && !autoActivationAttempted.current) {
+      autoActivationAttempted.current = true
       handleSelectWorkspace(orgList[0].id)
     }
-  }, [orgsPending, orgList])
+  }, [orgsPending, orgList, activatingId])
 
   const handleSelectWorkspace = async (organizationId) => {
     setActivatingId(organizationId)
