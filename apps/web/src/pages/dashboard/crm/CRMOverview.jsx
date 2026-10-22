@@ -82,7 +82,7 @@ export default function CRMOverview() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center bg-surface">
+      <div className="flex h-full items-center justify-center bg-surface-raised">
         <Loader2 className="animate-spin text-muted" size={24} />
       </div>
     );
@@ -90,7 +90,7 @@ export default function CRMOverview() {
 
   if (isError || !data) {
     return (
-      <div className="flex flex-col h-full items-center justify-center gap-2 bg-surface text-danger">
+      <div className="flex flex-col h-full items-center justify-center gap-2 bg-surface-raised text-danger">
         <p className="text-sm font-medium">{error?.message || 'Failed to load CRM overview.'}</p>
         <Button
           type="button"
@@ -141,7 +141,7 @@ export default function CRMOverview() {
   const closedPctOfQuota = quotaMajor > 0 && perf ? (toMajor(perf.yearWonTotal) / quotaMajor) * 100 : null;
 
   return (
-    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
+    <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-0">
 
       <TopBarActions>
         <div className="flex items-center gap-2">

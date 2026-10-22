@@ -384,7 +384,7 @@ test('all dashboard routes render without page overflow at phone, tablet, and de
   const page = await context.newPage()
   page.on('pageerror', error => pageErrors.push(error.message))
   const routes = [
-    '/dashboard', '/dashboard/hr/employees', '/dashboard/hr/payroll', '/dashboard/hr/time-attendance', '/dashboard/hr/recruitment',
+    '/dashboard', '/dashboard/hr/employees', '/dashboard/hr/payroll', '/dashboard/hr/time-attendance', '/dashboard/hr/time-off', '/dashboard/hr/recruitment',
     '/dashboard/finance', '/dashboard/finance/accounts-payable', '/dashboard/finance/accounts-receivable', '/dashboard/finance/expenses',
     '/dashboard/finance/trial-balance', '/dashboard/finance/reconciliation', '/dashboard/crm', '/dashboard/crm/deals',
     '/dashboard/crm/sales-performance', '/dashboard/crm/revenue-forecast', '/dashboard/inventory', '/dashboard/inventory/movements',
@@ -1190,14 +1190,14 @@ test('payroll run selector can reach runs beyond the first page', async ({ brows
     const runSelect = page.getByRole('combobox', { name: 'Payroll run' })
     await runSelect.click()
     await expect(page.getByRole('option')).toHaveCount(25)
-    await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Next payroll run page' }).click()
     await expect.poll(() => requested.some(item => item.page === 2 && item.limit === 25)).toBe(true)
+    await page.keyboard.press('Escape')
     await expect(runSelect).toContainText('Run 26')
     await runSelect.click()
     await expect(page.getByRole('option')).toHaveCount(1)
-    await page.keyboard.press('Escape')
     await expect(page.getByText('2/2')).toBeVisible()
+    await page.keyboard.press('Escape')
   } finally {
     await context.close()
   }

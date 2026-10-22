@@ -55,7 +55,7 @@ import {
 
 const metricFontSize = (money) => {
   const label = formatMoney(money)
-  return `clamp(0.75rem, ${Math.min(14, 130 / Math.max(1, label.length))}cqw, 1.875rem)`
+  return `clamp(1rem, ${Math.min(14, 130 / Math.max(1, label.length))}cqw, 1.5rem)`
 }
 
 export default function Expenses() {
@@ -249,53 +249,53 @@ export default function Expenses() {
         )}
       </TopBarActions>
 
-      {/* ── KPIs Row (Compact, baseline-aligned) ── */}
-      <div className="px-4 sm:px-6 py-2.5 flex-shrink-0 border-b border-border-default bg-surface-muted">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* ── KPIs Row ── */}
+      <div className="px-4 sm:px-6 pt-4 pb-5 sm:pb-6 flex-shrink-0 bg-surface-raised">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Card 1: Pending Approval */}
-          <div className="border border-border-default rounded-card-sm px-3.5 py-2.5 bg-surface-raised shadow-card flex flex-col justify-between" style={{ containerType: 'inline-size' }}>
+          <div className="border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col justify-between" style={{ containerType: 'inline-size' }}>
             <p className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none">Pending Approval</p>
-            <div className="flex items-baseline justify-between gap-2 mt-1">
-              <p className="min-w-0 text-xl font-bold text-heading tracking-tight tabular-nums" style={{ fontSize: metricFontSize(pendingAmount) }}>
+            <div className="flex items-baseline justify-between gap-3 mt-2">
+              <p className="min-w-0 text-2xl font-bold text-heading tracking-tight tabular-nums leading-tight truncate" style={{ fontSize: metricFontSize(pendingAmount) }}>
                 {formatMoney(pendingAmount)}
               </p>
-              <span className="bg-surface-active text-muted px-2 py-0.5 rounded-input text-[11px] font-bold uppercase tracking-wider inline-flex items-center h-[20px] shrink-0">
+              <span className="bg-surface-active text-muted px-2 py-0.5 rounded-input text-[11px] font-bold uppercase tracking-wider inline-flex items-center h-[21px] shrink-0">
                 {pendingCount} Reports
               </span>
             </div>
-            <p className="mt-1 text-xs text-muted truncate leading-tight">
+            <p className="mt-2 text-xs text-muted truncate leading-normal">
               {pendingCount === 1 ? '1 report awaiting review' : `${pendingCount} reports awaiting review`}
             </p>
           </div>
 
           {/* Card 2: Approved Expenses */}
-          <div className="border border-border-default rounded-card-sm px-3.5 py-2.5 bg-surface-raised shadow-card flex flex-col justify-between" style={{ containerType: 'inline-size' }}>
+          <div className="border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col justify-between" style={{ containerType: 'inline-size' }}>
             <p className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none">Approved Expenses</p>
-            <div className="flex items-baseline justify-between gap-2 mt-1">
-              <p className="min-w-0 text-xl font-bold text-heading tracking-tight tabular-nums" style={{ fontSize: metricFontSize(approvedAmount) }}>
+            <div className="flex items-baseline justify-between gap-3 mt-2">
+              <p className="min-w-0 text-2xl font-bold text-heading tracking-tight tabular-nums leading-tight truncate" style={{ fontSize: metricFontSize(approvedAmount) }}>
                 {formatMoney(approvedAmount)}
               </p>
-              <span className="bg-accent-light text-accent px-2 py-0.5 rounded-input text-[11px] font-bold uppercase tracking-wider inline-flex items-center h-[20px] shrink-0">
+              <span className="bg-accent-light text-accent px-2 py-0.5 rounded-input text-[11px] font-bold uppercase tracking-wider inline-flex items-center h-[21px] shrink-0">
                 {summary.approvedCount ?? 0} Reports
               </span>
             </div>
-            <p className="mt-1 text-xs text-muted truncate leading-tight" title="Valued reimbursement journals in workspace base currency, net of linked reversals.">
+            <p className="mt-2 text-xs text-muted truncate leading-normal" title="Valued reimbursement journals in workspace base currency, net of linked reversals.">
               Reimbursed MTD: {summary.reimbursedThisMonthTotal == null ? 'unavailable' : formatMoney(summary.reimbursedThisMonthTotal)} · Prior period: {summary.reimbursedThisMonthComparison?.previousTotal == null ? 'unavailable' : formatMoney(summary.reimbursedThisMonthComparison.previousTotal)}
             </p>
           </div>
 
           {/* Card 3: Policy Violations */}
-          <div className="border border-border-default rounded-card-sm px-3.5 py-2.5 bg-surface-raised shadow-card flex flex-col justify-between" style={{ containerType: 'inline-size' }}>
+          <div className="border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col justify-between" style={{ containerType: 'inline-size' }}>
             <p className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none">Policy Violations</p>
-            <div className="flex items-baseline justify-between gap-2 mt-1">
-              <p className="min-w-0 text-xl font-bold text-heading tracking-tight tabular-nums" style={{ fontSize: metricFontSize(violationAmount) }}>
+            <div className="flex items-baseline justify-between gap-3 mt-2">
+              <p className="min-w-0 text-2xl font-bold text-danger tracking-tight tabular-nums leading-tight truncate" style={{ fontSize: metricFontSize(violationAmount) }}>
                 {formatMoney(violationAmount)}
               </p>
-              <span className="flex items-center gap-1 bg-danger-light text-danger-hover px-2 py-0.5 rounded-input text-[11px] font-bold uppercase tracking-wider inline-flex items-center h-[20px] shrink-0">
-                <AlertTriangle size={11} strokeWidth={3} /> {summary.flaggedCount ?? 0} Reports
+              <span className="flex items-center gap-1 bg-danger-light text-danger-hover px-2 py-0.5 rounded-input text-[11px] font-bold uppercase tracking-wider inline-flex items-center h-[21px] shrink-0">
+                <AlertTriangle size={12} strokeWidth={2.5} /> {summary.flaggedCount ?? 0} Reports
               </span>
             </div>
-            <p className="mt-1 text-xs text-muted truncate leading-tight">
+            <p className="mt-2 text-xs text-muted truncate leading-normal">
               {(summary.flaggedCount ?? 0) === 0 ? 'No active policy alerts' : `${summary.flaggedCount} flagged for review`}
             </p>
           </div>
@@ -303,10 +303,11 @@ export default function Expenses() {
       </div>
 
       {/* ── Main Split View ── */}
-      <div className="flex-1 min-h-0 flex flex-col min-[1100px]:flex-row overflow-y-auto min-[1100px]:overflow-hidden">
+      <div className="flex-1 min-h-0 px-4 sm:px-6 pb-4 flex flex-col overflow-y-auto min-[1100px]:overflow-hidden">
+        <div className={`grid grid-cols-1 ${selectedRecord ? 'min-[1100px]:grid-cols-3' : ''} gap-4 flex-1 min-h-0`}>
 
-        {/* Left: List Pane */}
-        <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-surface-muted min-[1100px]:border-r border-border-default p-3 gap-2.5">
+          {/* Left: List Pane */}
+          <div className={`${selectedRecord ? 'min-[1100px]:col-span-2' : ''} min-w-0 flex flex-col overflow-hidden gap-3`}>
 
           {/* List Pane Toolbar (compact height 44px) */}
           <div className="h-11 flex-shrink-0 px-3 flex items-center justify-between gap-2.5 bg-surface-raised rounded-card-sm border border-border-default shadow-card">
@@ -456,12 +457,12 @@ export default function Expenses() {
           </div>
         </div>
 
-        {/* Right: Detail Panel (rebalanced width 380px, compact padding 12px, gaps 10px) */}
+        {/* Right: Detail Panel (aligned to 1/3 column matching Policy Violations card) */}
         {selectedRecord && (
-          <div className="w-full min-[1100px]:w-[380px] min-[1100px]:flex-shrink-0 bg-surface-muted border-t min-[1100px]:border-t-0 min-[1100px]:border-l border-border-default overflow-y-auto p-3 space-y-2.5">
+          <div className="min-[1100px]:col-span-1 min-w-0 flex flex-col overflow-y-auto space-y-3">
 
             {/* Header Card (reorganized: Top: identity + amount, Below: compact action group, Separated: destructive action) */}
-            <div className="bg-surface-raised border border-border-default rounded-card-sm p-3.5 shadow-card space-y-2.5">
+            <div className="bg-surface-raised border border-border-default rounded-card p-4 shadow-card space-y-2.5">
               {/* Top: Employee identity and amount */}
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -562,7 +563,7 @@ export default function Expenses() {
             )}
 
             {/* AI Data Extraction / Expense Details Card (standardized two-column alignment) */}
-            <div className="bg-surface-raised border border-border-default rounded-card-sm p-3.5 shadow-card">
+            <div className="bg-surface-raised border border-border-default rounded-card p-4 shadow-card">
               <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-border-subtle">
                 <Sparkles size={14} className="text-accent shrink-0" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-heading">Expense details</h3>
@@ -597,7 +598,7 @@ export default function Expenses() {
             </div>
 
             {/* PDF Preview / Expense Summary Card (recovered vertical room) */}
-            <div className="bg-surface-raised border border-border-default rounded-card-sm shadow-card flex flex-col overflow-hidden">
+            <div className="bg-surface-raised border border-border-default rounded-card shadow-card flex flex-col overflow-hidden">
               <div className="flex items-center justify-between px-3.5 py-2 bg-surface-raised border-b border-border-subtle">
                 <div className="flex items-center gap-2 text-body">
                   <FileText size={14} className="text-caption" />
@@ -667,6 +668,7 @@ export default function Expenses() {
 
           </div>
         )}
+        </div>
       </div>
 
       {/* ── New Expense Dialog ── */}

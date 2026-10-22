@@ -35,6 +35,7 @@ const DashboardOverview = lazy(() => import('./pages/dashboard/DashboardOverview
 const EmployeeList = lazy(() => import('./pages/dashboard/hr/EmployeeList'))
 const Payroll = lazy(() => import('./pages/dashboard/hr/Payroll'))
 const TimeAttendance = lazy(() => import('./pages/dashboard/hr/TimeAttendance'))
+const TimeOff = lazy(() => import('./pages/dashboard/hr/TimeOff'))
 const RecruitmentPipeline = lazy(() => import('./pages/dashboard/hr/RecruitmentPipeline'))
 const FinanceOverview = lazy(() => import('./pages/dashboard/finance/FinanceOverview'))
 const AccountsPayable = lazy(() => import('./pages/dashboard/finance/AccountsPayable'))
@@ -74,7 +75,7 @@ function NotFound() {
 
 const DASHBOARD_PATHS = [
   '/dashboard',
-  '/dashboard/hr/employees', '/dashboard/hr/payroll', '/dashboard/hr/time-attendance', '/dashboard/hr/recruitment',
+  '/dashboard/hr/employees', '/dashboard/hr/payroll', '/dashboard/hr/time-attendance', '/dashboard/hr/time-off', '/dashboard/hr/recruitment',
   '/dashboard/finance', '/dashboard/finance/accounts-payable', '/dashboard/finance/accounts-receivable', '/dashboard/finance/expenses', '/dashboard/finance/trial-balance', '/dashboard/finance/reconciliation',
   '/dashboard/crm', '/dashboard/crm/deals', '/dashboard/crm/sales-performance', '/dashboard/crm/revenue-forecast',
   '/dashboard/inventory', '/dashboard/inventory/movements',
@@ -89,6 +90,7 @@ const REAL_PAGES = {
   '/dashboard/hr/employees': EmployeeList,
   '/dashboard/hr/payroll': Payroll,
   '/dashboard/hr/time-attendance': TimeAttendance,
+  '/dashboard/hr/time-off': TimeOff,
   '/dashboard/hr/recruitment': RecruitmentPipeline,
   '/dashboard/finance': FinanceOverview,
   '/dashboard/finance/accounts-payable': AccountsPayable,

@@ -117,7 +117,7 @@ export default function RevenueForecast() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center bg-surface">
+      <div className="flex h-full items-center justify-center bg-surface-raised">
         <Loader2 className="animate-spin text-gray-400" size={24} />
       </div>
     );
@@ -125,7 +125,7 @@ export default function RevenueForecast() {
 
   if (isError || !data) {
     return (
-      <div className="flex h-full items-center justify-center bg-surface text-red-500">
+      <div className="flex h-full items-center justify-center bg-surface-raised text-red-500">
         Failed to load revenue forecast.
       </div>
     );
@@ -187,7 +187,7 @@ export default function RevenueForecast() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
+    <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-0">
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {/* ── Page Toolbar Controls ── */}
         <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">

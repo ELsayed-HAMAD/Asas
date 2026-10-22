@@ -114,7 +114,7 @@ export default function Roadmap() {
   }).filter(p => !search.trim() || p.tasks.length > 0 || p.title.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
+    <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-0">
 
       {/* ── Page Header (Quiet stats on left, actions on right) ── */}
       <PageHeader
@@ -160,11 +160,11 @@ export default function Roadmap() {
             </Button>
           </div>
         }
-        className="bg-surface mb-2 px-6"
+        className="bg-surface-raised mb-2 px-6"
       />
 
       {/* ── Main Split View ── */}
-      <div className="flex-1 min-h-0 flex flex-col xl:flex-row gap-5 px-6 pb-6 overflow-hidden bg-surface">
+      <div className="flex-1 min-h-0 flex flex-col xl:flex-row gap-5 px-6 pb-6 overflow-hidden bg-surface-raised">
 
         {/* Left Column (List column): Toolbar + Phase Groups */}
         <div className="flex-1 min-w-0 h-full overflow-y-auto pr-1 scrollbar-soft">
@@ -468,7 +468,7 @@ export default function Roadmap() {
               value={taskForm.phaseId || phases[0]?.id || ''}
               onValueChange={val => setTaskForm(current => ({ ...current, phaseId: val }))}
             >
-              <SelectTrigger id="task-phase-id" className="h-9 w-full text-sm bg-surface">
+              <SelectTrigger id="task-phase-id" className="h-9 w-full text-sm bg-surface-raised">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

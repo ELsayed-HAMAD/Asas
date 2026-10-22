@@ -70,11 +70,20 @@ const COMMAND_ITEMS = [
   {
     id: 'nav-attendance',
     title: 'Time & Attendance',
-    subtitle: 'Punches, timesheets, overtime and leave requests',
+    subtitle: 'Punches, timesheets and overtime',
     category: 'Navigation',
     path: '/dashboard/hr/time-attendance',
     icon: Clock,
-    keywords: ['clock', 'hours', 'vacation', 'leave', 'timesheet'],
+    keywords: ['clock', 'hours', 'timesheet', 'punches'],
+  },
+  {
+    id: 'nav-time-off',
+    title: 'Time Off & Leave',
+    subtitle: 'Leave requests, annual balances and policies',
+    category: 'Navigation',
+    path: '/dashboard/hr/time-off',
+    icon: Calendar,
+    keywords: ['vacation', 'leave', 'time off', 'sick', 'holiday', 'balances'],
   },
   {
     id: 'nav-recruitment',

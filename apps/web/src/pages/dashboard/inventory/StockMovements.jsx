@@ -19,7 +19,6 @@ import { formatDate } from '../../../lib/format'
 import { useActiveMemberRole } from '../../../lib/authClient'
 import { useDebouncedValue } from '../../../lib/useDebouncedValue'
 import FormDialog from '../../../components/common/FormDialog'
-import TopBarActions from '../../../components/TopBarActions'
 import SearchInput from '../../../components/common/SearchInput'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
@@ -105,7 +104,8 @@ export default function StockMovements() {
 
   const rawItems = data?.items ?? []
   const summary = data?.summary
-  const pagination = data?.pagination ?? { page: 1, limit: 25, total: 0, totalPages: 1 }
+  const pagination = data?.pagination ?? { page: 1, limit: 25, total: 0, pages: 1 }
+  const totalPages = Math.max(1, pagination.pages ?? pagination.totalPages ?? 1)
   const warehouses = (Array.isArray(warehousesData) ? warehousesData : warehousesData?.items) ?? []
   const products = (Array.isArray(productsData) ? productsData : productsData?.items) ?? []
   const productOptions = selectedProduct && !products.some((product) => product.id === selectedProduct.id)
@@ -158,31 +158,8 @@ export default function StockMovements() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-surface-muted overflow-hidden">
-      {/* Top Bar */}
-      <div className="px-8 py-5 bg-surface-raised border-b border-border-default flex items-center justify-between flex-shrink-0">
-        <div>
-          <h1 className="text-xl font-bold text-heading">Stock Movements</h1>
-          <p className="text-xs text-muted mt-0.5">
-            Audit ledger of inbound receipts, outbound fulfillment, and inventory adjustments
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            onClick={openMovementDialog}
-            disabled={!canWrite}
-            title={noRoleTitle}
-            className="h-8 gap-2 px-4 text-xs font-semibold shadow-card"
-          >
-            <Plus size={14} />
-            Record Movement
-          </Button>
-          <TopBarActions />
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-8 space-y-6">
+    <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-0">
+      <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-5">
         {/* KPI Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Total In */}
@@ -269,63 +246,82 @@ export default function StockMovements() {
         </div>
 
         {/* Filter Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 bg-surface-raised p-4 rounded-card border border-border-default shadow-card">
-          <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+        <div className="bg-white/80 backdrop-blur-xl border border-slate-200/70 rounded-2xl p-3 shadow-[0_2px_10px_-3px_rgba(15,23,42,0.04)] flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          {/* Left Cluster: Search Input + Filter Dropdowns */}
+          <div className="flex flex-1 flex-wrap sm:flex-nowrap items-center gap-2.5 min-w-0">
             {/* Search */}
             <SearchInput
               placeholder="Search by product, warehouse, or note..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              wrapperClassName="flex-1 min-w-[200px] max-w-md"
+              wrapperClassName="w-full sm:w-80 lg:w-96 max-w-md shrink-0"
             />
 
-            {/* Warehouse Filter */}
-            <div className="flex items-center gap-2">
-              <Filter size={13} className="text-muted" />
+            {/* Subtle Divider */}
+            <div className="hidden sm:block h-5 w-px bg-slate-200/80 mx-1 shrink-0" />
+
+            {/* Filter Group: Warehouses (embedded funnel) + Types */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="relative flex items-center shrink-0">
+                <Select
+                  value={warehouseFilter || '__all__'}
+                  onValueChange={(val) => {
+                    setWarehouseFilter(val === '__all__' ? '' : val)
+                    setPage(1)
+                  }}
+                >
+                  <SelectTrigger
+                    aria-label="Warehouse filter"
+                    className="h-9 pl-8 pr-8 w-auto gap-2 rounded-xl bg-slate-100/75 hover:bg-slate-100 border border-slate-200/70 text-xs sm:text-sm font-medium text-slate-700 shrink-0 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50"
+                  >
+                    <SelectValue placeholder="All Warehouses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All Warehouses</SelectItem>
+                    {warehouses.map((w) => (
+                      <SelectItem key={w.name} value={w.name}>
+                        {w.name} ({w.productCount})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Filter className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 z-10" />
+              </div>
+
               <Select
-                value={warehouseFilter || '__all__'}
+                value={typeFilter || '__all__'}
                 onValueChange={(val) => {
-                  setWarehouseFilter(val === '__all__' ? '' : val)
+                  setTypeFilter(val === '__all__' ? '' : val)
                   setPage(1)
                 }}
               >
-                <SelectTrigger aria-label="Warehouse filter" className="h-8 text-xs bg-surface-muted min-w-[140px]">
-                  <SelectValue placeholder="All Warehouses" />
+                <SelectTrigger
+                  aria-label="Type filter"
+                  className="h-9 pl-3.5 pr-8 w-auto gap-2 rounded-xl bg-slate-100/75 hover:bg-slate-100 border border-slate-200/70 text-xs sm:text-sm font-medium text-slate-700 shrink-0 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50"
+                >
+                  <SelectValue placeholder="All Types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">All Warehouses</SelectItem>
-                  {warehouses.map((w) => (
-                    <SelectItem key={w.name} value={w.name}>
-                      {w.name} ({w.productCount})
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="__all__">All Types</SelectItem>
+                  <SelectItem value="IN">Inbound (IN)</SelectItem>
+                  <SelectItem value="OUT">Outbound (OUT)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Type Filter */}
-            <Select
-              value={typeFilter || '__all__'}
-              onValueChange={(val) => {
-                setTypeFilter(val === '__all__' ? '' : val)
-                setPage(1)
-              }}
-            >
-              <SelectTrigger aria-label="Type filter" className="h-8 text-xs bg-surface-muted min-w-[120px]">
-                <SelectValue placeholder="All Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All Types</SelectItem>
-                <SelectItem value="IN">Inbound (IN)</SelectItem>
-                <SelectItem value="OUT">Outbound (OUT)</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
-          {/* Quick Page Info */}
-          <div className="text-xs text-muted">
-            Showing <span className="font-semibold text-heading">{movements.length}</span> movements
-            {pagination.total > 0 && ` of ${pagination.total}`}
+          {/* Action Button */}
+          <div className="flex items-center justify-end shrink-0">
+            <Button
+              type="button"
+              onClick={openMovementDialog}
+              disabled={!canWrite}
+              title={noRoleTitle}
+              className="h-9 px-3.5 rounded-xl text-xs sm:text-sm font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 shadow-sm"
+            >
+              <Plus size={14} />
+              Record Movement
+            </Button>
           </div>
         </div>
 
@@ -441,7 +437,7 @@ export default function StockMovements() {
           {/* Table Footer / Pagination */}
           <div className="px-5 py-3 bg-surface-muted/50 border-t border-border-default flex items-center justify-between">
             <span className="text-xs text-muted">
-              Page {pagination.page} of {Math.max(1, pagination.totalPages)}
+              Page {pagination.page} of {totalPages}
             </span>
             <div className="flex items-center gap-2">
               <Button
@@ -459,8 +455,8 @@ export default function StockMovements() {
                 type="button"
                 variant="outline"
                 size="icon"
-                onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
-                disabled={page >= pagination.totalPages || isLoading}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages || isLoading}
                 className="h-7 w-7 text-heading"
                 aria-label="Next page"
               >
