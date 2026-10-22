@@ -98,7 +98,7 @@ export default function SalesPerformance() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center bg-surface">
+      <div className="flex h-full items-center justify-center bg-surface-raised">
         <Loader2 className="animate-spin text-muted" size={24} />
       </div>
     );
@@ -106,7 +106,7 @@ export default function SalesPerformance() {
 
   if (isError || !data) {
     return (
-      <div className="flex h-full items-center justify-center bg-surface text-danger">
+      <div className="flex h-full items-center justify-center bg-surface-raised text-danger">
         Failed to load sales performance.
       </div>
     );
@@ -157,7 +157,7 @@ export default function SalesPerformance() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-surface overflow-hidden min-w-0">
+    <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-0">
 
       <div className="flex-1 overflow-y-auto">
         <div className="p-6 space-y-4">

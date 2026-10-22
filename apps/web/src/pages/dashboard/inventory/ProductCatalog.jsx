@@ -380,7 +380,7 @@ export default function Inventory() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center bg-surface">
+      <div className="flex h-full items-center justify-center bg-surface-raised">
         <Loader2 className="animate-spin text-muted" size={24} />
       </div>
     );
@@ -388,7 +388,7 @@ export default function Inventory() {
 
   if (isError || !data) {
     return (
-      <div className="flex h-full items-center justify-center bg-surface text-danger">
+      <div className="flex h-full items-center justify-center bg-surface-raised text-danger">
         Failed to load product catalog.
       </div>
     );
@@ -400,7 +400,7 @@ export default function Inventory() {
   };
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-surface overflow-hidden min-w-0">
+    <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-hidden min-w-0">
 
       <TopBarActions>
         <Button
@@ -755,7 +755,7 @@ export default function Inventory() {
                       onChange={(e) => setNewSupplierName(e.target.value)}
                       placeholder="Add supplier name..."
                       disabled={!canWrite || addSupplierMutation.isPending}
-                      className="flex-1 bg-surface text-sm"
+                      className="flex-1 bg-surface-raised text-sm"
                     />
                     <Button
                       type="submit"

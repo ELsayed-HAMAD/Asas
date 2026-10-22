@@ -222,10 +222,14 @@ prompts/
 prompt_history/
 # Local AI instruction, prompt, and context files. Keep these out of public repos.
 AGENTS.md
+AGENTS.*
+AGENTS-*.md
+AGENT-*.md
 CLAUDE.md
 GEMINI.md
 COPILOT.md
 copilot-instructions.md
+*.agent.md
 *.instructions.md
 *.prompt.md
 *.ai.md
@@ -248,6 +252,14 @@ copilot-instructions.md
 # Audit, Review, Plan, Analysis & Remediation Files
 # Keep private analysis, remediation tracking, and planning notes out of git.
 # =========================
+# Common local work directories used for plans, reviews, and AI output.
+.reviews/
+.plans/
+.ai-review/
+ai-output/
+ai_artifacts/
+llm_output/
+
 PROJECT-REVIEW-AND-REMEDIATION-PLAN.md
 UI_UX_REVIEW.md
 AUDIT.md
@@ -294,6 +306,60 @@ REVIEW-*.md
 *.plan.json
 *.plan.txt
 *.plan.md
+# Also cover mixed-case names and non-Markdown exports of local review/planning notes.
+*[Rr][Ee][Vv][Ii][Ee][Ww]*.md
+*[Aa][Uu][Dd][Ii][Tt]*.md
+*[Pp][Ll][Aa][Nn]*.md
+*[Hh][Aa][Nn][Dd][Oo][Ff][Ff]*.md
+*[Pp][Rr][Oo][Gg][Rr][Ee][Ss][Ss]*.md
+*[Rr][Ee][Mm][Ee][Dd][Ii][Aa][Tt][Ii][Oo][Nn]*.md
+*[Ii][Nn][Vv][Ee][Ss][Tt][Ii][Gg][Aa][Tt][Ii][Oo][Nn]*.md
+*[Aa][Nn][Aa][Ll][Yy][Ss][Ii][Ss]*.md
+*[Nn][Oo][Tt][Ee][Ss]*.md
+*[Tt][Oo][Dd][Oo]*.md
+*[Tt][Aa][Ss][Kk][Ss]*.md
+*[Cc][Hh][Ee][Cc][Kk][Ll][Ii][Ss][Tt]*.md
+*[Rr][Ee][Vv][Ii][Ee][Ww]*.txt
+*[Rr][Ee][Vv][Ii][Ee][Ww]*.json
+*[Rr][Ee][Vv][Ii][Ee][Ww]*.yaml
+*[Rr][Ee][Vv][Ii][Ee][Ww]*.yml
+*[Rr][Ee][Vv][Ii][Ee][Ww]*.rst
+*[Rr][Ee][Vv][Ii][Ee][Ww]*.adoc
+*[Aa][Uu][Dd][Ii][Tt]*.txt
+*[Aa][Uu][Dd][Ii][Tt]*.json
+*[Aa][Uu][Dd][Ii][Tt]*.yaml
+*[Aa][Uu][Dd][Ii][Tt]*.yml
+*[Aa][Uu][Dd][Ii][Tt]*.rst
+*[Aa][Uu][Dd][Ii][Tt]*.adoc
+*[Pp][Ll][Aa][Nn]*.txt
+*[Pp][Ll][Aa][Nn]*.json
+*[Pp][Ll][Aa][Nn]*.yaml
+*[Pp][Ll][Aa][Nn]*.yml
+*[Pp][Ll][Aa][Nn]*.rst
+*[Pp][Ll][Aa][Nn]*.adoc
+*[Hh][Aa][Nn][Dd][Oo][Ff][Ff]*.txt
+*[Hh][Aa][Nn][Dd][Oo][Ff][Ff]*.json
+*[Pp][Rr][Oo][Gg][Rr][Ee][Ss][Ss]*.txt
+*[Pp][Rr][Oo][Gg][Rr][Ee][Ss][Ss]*.json
+*[Rr][Ee][Mm][Ee][Dd][Ii][Aa][Tt][Ii][Oo][Nn]*.txt
+*[Rr][Ee][Mm][Ee][Dd][Ii][Aa][Tt][Ii][Oo][Nn]*.json
+*[Ii][Nn][Vv][Ee][Ss][Tt][Ii][Gg][Aa][Tt][Ii][Oo][Nn]*.txt
+*[Aa][Nn][Aa][Ll][Yy][Ss][Ii][Ss]*.txt
+*[Nn][Oo][Tt][Ee][Ss]*.txt
+*[Tt][Oo][Dd][Oo]*.txt
+*[Tt][Aa][Ss][Kk][Ss]*.txt
+*[Cc][Hh][Ee][Cc][Kk][Ll][Ii][Ss][Tt]*.txt
+*.review.md
+*.audit.md
+*.plan.md
+*.handoff.md
+*.progress.md
+*.remediation.md
+*.investigation.md
+*.analysis.md
+*.notes.md
+*.todo.md
+*.checklist.md
 *.patch
 *.diff
 

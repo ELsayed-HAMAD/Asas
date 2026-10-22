@@ -634,48 +634,59 @@ export default function Payroll() {
                   ))}
                 </SelectContent>
               </Select>
-              <div className="flex items-center border border-border-default rounded-input text-xs bg-surface-raised shadow-card shrink-0 px-1 py-0.5">
-                <Select
-                  value={activeRun?.id || undefined}
-                  onValueChange={val => { setSelectedRunId(val); setSelectedId(null) }}
-                >
-                  <SelectTrigger aria-label="Payroll run" className="h-7 border-0 bg-transparent text-xs font-normal text-heading shadow-none focus:ring-0 max-w-40 sm:max-w-48">
-                    <SelectValue placeholder="Select payroll run" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {runs.map(item => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.label.replace(/\s*Payroll\s*/i, ' ').trim()} · {item.status}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="flex items-center gap-1 border-l border-border-default pl-1.5 ml-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    type="button"
-                    aria-label="Previous payroll run page"
-                    disabled={payrollRunPage <= 1}
-                    onClick={() => setPayrollRunPage(current => current - 1)}
-                    className="h-6 w-6 p-0 text-xs"
-                  >
-                    ‹
-                  </Button>
-                  <span className="text-[11px] text-muted">{listData?.pagination?.pages ? `${payrollRunPage}/${listData.pagination.pages}` : '0/0'}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    type="button"
-                    aria-label="Next payroll run page"
-                    disabled={payrollRunPage >= (listData?.pagination?.pages ?? 0)}
-                    onClick={() => setPayrollRunPage(current => current + 1)}
-                    className="h-6 w-6 p-0 text-xs"
-                  >
-                    ›
-                  </Button>
-                </div>
-              </div>
+              <Select
+                value={activeRun?.id || undefined}
+                onValueChange={val => { setSelectedRunId(val); setSelectedId(null) }}
+              >
+                <SelectTrigger aria-label="Payroll run" className="h-8 text-xs shrink-0 w-auto min-w-[160px] sm:min-w-[180px]">
+                  <SelectValue placeholder="Select payroll run" />
+                </SelectTrigger>
+                <SelectContent>
+                  {runs.map(item => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.label.replace(/\s*Payroll\s*/i, ' ').trim()} · {item.status}
+                    </SelectItem>
+                  ))}
+                  {listData?.pagination && listData.pagination.pages > 1 && (
+                    <div
+                      className="flex items-center justify-between p-2 border-t border-border-default text-xs text-muted"
+                      onPointerDown={e => e.stopPropagation()}
+                    >
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        type="button"
+                        aria-label="Previous payroll run page"
+                        disabled={payrollRunPage <= 1}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          setPayrollRunPage(current => current - 1)
+                        }}
+                        className="h-6 w-6 p-0 text-xs"
+                      >
+                        ‹
+                      </Button>
+                      <span className="text-[11px] text-muted">{payrollRunPage}/{listData.pagination.pages}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        type="button"
+                        aria-label="Next payroll run page"
+                        disabled={payrollRunPage >= listData.pagination.pages}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          setPayrollRunPage(current => current + 1)
+                        }}
+                        className="h-6 w-6 p-0 text-xs"
+                      >
+                        ›
+                      </Button>
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
               <span
                 title="Payroll line amounts are priced from saved salary and tax inputs when a run is created."
                 className="flex items-center gap-1.5 text-xs font-medium text-muted shrink-0"

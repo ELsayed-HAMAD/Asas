@@ -19,7 +19,7 @@ const SearchInput = React.forwardRef(function SearchInput({
   ...props
 }, ref) {
   return (
-    <div className={cn('relative flex items-center w-full sm:w-64', wrapperClassName)}>
+    <div className={cn('relative flex items-center w-full sm:w-64 shrink-0', wrapperClassName)}>
       <input
         ref={ref}
         type={type}

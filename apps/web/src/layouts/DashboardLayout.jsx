@@ -64,6 +64,7 @@ const NAV = [
       { label: 'Employee Directory', i18nKey: 'nav.employees', path: '/dashboard/hr/employees' },
       { label: 'Payroll',            i18nKey: 'nav.payroll', path: '/dashboard/hr/payroll' },
       { label: 'Time & Attendance',  i18nKey: 'nav.timeAttendance', path: '/dashboard/hr/time-attendance' },
+      { label: 'Time Off & Leave',   i18nKey: 'nav.timeOff', path: '/dashboard/hr/time-off' },
       { label: 'Recruitment',        i18nKey: 'nav.recruitment', path: '/dashboard/hr/recruitment' },
     ],
   },
@@ -147,6 +148,7 @@ const BREADCRUMB_LABELS = {
   employees:             'Employee Directory',
   payroll:               'Payroll',
   'time-attendance':     'Time & Attendance',
+  'time-off':            'Time Off & Leave',
   recruitment:           'Recruitment',
   finance:               'Finance',
   'accounts-payable':    'Accounts Payable',
@@ -178,6 +180,7 @@ const BREADCRUMB_I18N = {
   employees:             'nav.employees',
   payroll:               'nav.payroll',
   'time-attendance':     'nav.timeAttendance',
+  'time-off':            'nav.timeOff',
   recruitment:           'nav.recruitment',
   finance:               'nav.finance',
   'accounts-payable':    'nav.accountsPayable',
@@ -1107,6 +1110,9 @@ export default function DashboardLayout() {
     const i18nKey = BREADCRUMB_I18N[seg]
     return i18nKey ? t(i18nKey, { defaultValue: BREADCRUMB_LABELS[seg] || seg }) : (BREADCRUMB_LABELS[seg] || (seg.charAt(0).toUpperCase() + seg.slice(1)))
   })
+  if (pathname === '/dashboard/projects') {
+    breadcrumbs.push(t('nav.portfolio', 'Portfolio Overview'))
+  }
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const toggleCollapse = () => setSidebarCollapsed(prev => !prev)
@@ -1162,25 +1168,25 @@ export default function DashboardLayout() {
             </button>
 
             {/* Breadcrumb */}
-            <Breadcrumb aria-label="Breadcrumb" className="min-w-0 whitespace-nowrap flex-1">
-              <BreadcrumbList className="flex-nowrap gap-1 sm:gap-1">
+            <Breadcrumb aria-label="Breadcrumb" className="min-w-0 whitespace-nowrap flex-1 text-xs sm:text-sm">
+              <BreadcrumbList className="flex-nowrap gap-1 sm:gap-1.5 text-xs sm:text-sm">
                 {breadcrumbs.map((crumb, i) => {
                   const isLast = i === breadcrumbs.length - 1
                   const crumbPath = '/' + pathname.split('/').filter(Boolean).slice(0, i + 1).join('/')
                   return (
-                    <BreadcrumbItem key={i} className={`min-w-0 whitespace-nowrap gap-1 sm:gap-1 ${isLast ? 'flex-shrink-0' : 'shrink'}`}>
+                    <BreadcrumbItem key={i} className="min-w-0 whitespace-nowrap gap-1 sm:gap-1.5 shrink-0">
                       {i > 0 && (
                         <BreadcrumbSeparator className="text-faint [&>svg]:size-[13px] [&>svg]:flex-shrink-0" />
                       )}
                       {isLast ? (
                         <BreadcrumbPage
-                          className="font-semibold truncate"
+                          className="font-semibold whitespace-nowrap text-xs sm:text-sm"
                           title={typeof crumb === 'string' ? crumb : undefined}
                         >
                           {crumb}
                         </BreadcrumbPage>
                       ) : (
-                        <BreadcrumbLink asChild className="truncate max-w-[140px] text-caption">
+                        <BreadcrumbLink asChild className="whitespace-nowrap text-caption text-xs sm:text-sm">
                           <Link to={crumbPath}>{crumb}</Link>
                         </BreadcrumbLink>
                       )}
@@ -1195,7 +1201,7 @@ export default function DashboardLayout() {
           <div className="flex-1" />
 
           {/* Right group: Global search ⌘K (max 320px) + bell + portal */}
-          <div className="flex items-center justify-end gap-3 shrink-0 flex-nowrap min-w-0">
+          <div className="ml-auto flex items-center justify-end gap-3 shrink-0 flex-nowrap min-w-0">
             <div className="hidden sm:flex items-center gap-3 shrink min-w-0">
               <Button
                 variant="outline"
@@ -1214,8 +1220,7 @@ export default function DashboardLayout() {
               <NotificationPopover />
             </div>
 
-            <div id="topbar-actions-portal" className="flex min-w-0 items-center justify-end gap-2 flex-shrink-0 min-h-[36px] empty:hidden border-s border-border-default ps-3">
-            </div>
+            <div id="topbar-actions-portal" className="flex min-w-0 items-center justify-end gap-2 flex-shrink-0 empty:hidden border-s border-border-default ps-3" />
           </div>
         </header>
 

@@ -729,7 +729,7 @@ export default function DealsPipeline() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center bg-surface">
+      <div className="flex h-full items-center justify-center bg-surface-raised">
         <Loader2 className="animate-spin text-muted" size={24} />
       </div>
     );
@@ -737,7 +737,7 @@ export default function DealsPipeline() {
 
   if (isError) {
     return (
-      <div className="flex h-full items-center justify-center bg-surface text-danger">
+      <div className="flex h-full items-center justify-center bg-surface-raised text-danger">
         Failed to load deals pipeline.
       </div>
     );

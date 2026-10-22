@@ -178,19 +178,21 @@ export default function FinanceOverview() {
       {/* ── Page Toolbar (Single Row across 12-column width) ── */}
       <div className="flex flex-wrap items-center justify-between gap-3 w-full mb-5 flex-shrink-0">
         {/* Left group */}
-        <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
           <SearchInput
-            placeholder="Search..."
+            placeholder="Search transactions..."
             value={transactionSearch}
             onChange={event => setTransactionSearch(event.target.value)}
-            wrapperClassName="w-72 max-w-full"
+            wrapperClassName="w-64 sm:w-72 shrink-0"
           />
 
           <Select value={String(selectedYear)} onValueChange={val => setSelectedYear(val)}>
-            <SelectTrigger aria-label="Finance calendar year" className="flex items-center gap-2 border border-border-default text-body px-3.5 h-9 rounded-input text-xs font-medium hover:bg-surface-muted transition-colors bg-surface-raised shadow-card shrink-0">
-              <Calendar size={14} className="text-muted" />
-              <span>Year</span>
-              <SelectValue />
+            <SelectTrigger aria-label="Finance calendar year" className="h-9 text-xs font-medium w-auto min-w-[130px] bg-surface-raised shadow-card shrink-0 gap-2">
+              <div className="flex items-center gap-1.5">
+                <Calendar size={14} className="text-muted shrink-0" />
+                <span className="text-muted text-[11px] font-semibold uppercase mr-1">Year</span>
+                <SelectValue />
+              </div>
             </SelectTrigger>
             <SelectContent>
               {availableYears.map(year => (
