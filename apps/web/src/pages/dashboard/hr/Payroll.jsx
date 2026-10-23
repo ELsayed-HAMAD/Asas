@@ -20,15 +20,7 @@ import { hrApi } from '../../../lib/api/hr'
 import { queryKeys } from '../../../lib/queryKeys'
 import { formatMoney, formatCompactTableMoney, formatDate } from '../../../lib/format'
 import { downloadCsv } from '../../../lib/csv'
-import {
-  downloadFile,
-  generateNachaForRun,
-  generateSepaForRun,
-  payrollNachaFilename,
-  payrollPaymentSummaryFilename,
-  payrollPaymentSummaryRows,
-  payrollSepaFilename,
-} from '../../../lib/payrollExport'
+import { payrollPaymentSummaryFilename, payrollPaymentSummaryRows } from '../../../lib/payrollExport'
 import { clearPayrollRunDraft, payrollRunDraftStorageKey, readPayrollRunDraft, savePayrollRunDraft } from '../../../lib/payrollRunDraft'
 import { useActiveMemberRole, useActiveOrganization, useSession } from '../../../lib/authClient'
 import { getMemberRoleName } from '../../../lib/memberRole'
@@ -254,44 +246,18 @@ export default function Payroll() {
   const [isLineDialogOpen, setIsLineDialogOpen] = useState(false)
   const [lineForm, setLineForm] = useState({ baseSalary: '', missedDaysCount: '', missedDaysAmount: '', bonusLabel: '', bonusAmount: '' })
 
-  function exportLedger() {
+  function exportPayrollRegister() {
     if (activeRun?.status !== 'PAID' || !run) return
     const rows = [
       ['Payroll Run', 'Pay Date', 'Employee', 'Base Salary', 'Gross', 'Deductions', 'Net', 'Tax Detail'],
       ...records.map(line => [activeRun.label, activeRun.payDate || '', line.employee?.name, line.baseSalary || '', line.gross, line.deductions, line.net, line.taxLines.map(tax => `${tax.label}: ${tax.amount}`).join('; ')]),
     ]
-    downloadCsv(rows, `${activeRun.label.trim().replace(/[^a-z0-9-_]+/gi, '-') || 'payroll'}-ledger.csv`)
+    downloadCsv(rows, `${activeRun.label.trim().replace(/[^a-z0-9-_]+/gi, '-') || 'payroll'}-register.csv`)
   }
 
   function exportPaymentSummary() {
     if (!activeRun || !run) return
     downloadCsv(payrollPaymentSummaryRows(activeRun, records), payrollPaymentSummaryFilename(activeRun.label))
-  }
-
-  function exportNacha() {
-    if (!activeRun || !run || !records.length) return
-    try {
-      setPayrollActionError(null)
-      const nacha = generateNachaForRun(activeRun, records, {
-        name: activeOrganization?.name || 'ASAS WORKSPACE',
-      })
-      downloadFile(nacha.fileContent, payrollNachaFilename(activeRun.label), 'text/plain')
-    } catch (err) {
-      setPayrollActionError(err?.message || 'Failed to generate NACHA ACH file')
-    }
-  }
-
-  function exportSepa() {
-    if (!activeRun || !run || !records.length) return
-    try {
-      setPayrollActionError(null)
-      const sepa = generateSepaForRun(activeRun, records, {
-        name: activeOrganization?.name || 'ASAS WORKSPACE',
-      })
-      downloadFile(sepa.xmlContent, payrollSepaFilename(activeRun.label), 'application/xml')
-    } catch (err) {
-      setPayrollActionError(err?.message || 'Failed to generate SEPA XML file')
-    }
   }
 
   const approveMutation = useMutation({
@@ -781,6 +747,7 @@ export default function Payroll() {
                       </div>
                     </button>
                   </div>
+
                 </div>
               )}
             </div>
@@ -795,7 +762,7 @@ export default function Payroll() {
                 aria-expanded={exportMenuOpen}
                 aria-haspopup="true"
                 onClick={() => setExportMenuOpen(prev => !prev)}
-                title={run ? 'Export payroll files' : 'No payroll run loaded'}
+                title={run ? 'Export payroll reports' : 'No payroll run loaded'}
                 className="h-8 gap-1.5 text-xs font-medium bg-surface-raised shadow-card disabled:opacity-60 shrink-0"
               >
                 <Download size={13} />
@@ -824,40 +791,6 @@ export default function Payroll() {
                         <p className="text-[11px] text-muted leading-tight mt-0.5">Payment breakdown for current run</p>
                       </div>
                     </button>
-
-                    {activeRun?.currency === 'EUR' ? (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setExportMenuOpen(false)
-                          exportSepa()
-                        }}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-surface-muted transition-colors flex items-start gap-2.5 cursor-pointer"
-                      >
-                        <Landmark size={15} className="text-primary shrink-0 mt-0.5" />
-                        <div className="min-w-0">
-                          <p className="font-semibold text-heading leading-tight">SEPA Transfer (.xml)</p>
-                          <p className="text-[11px] text-muted leading-tight mt-0.5">ISO 20022 European bank batch</p>
-                        </div>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setExportMenuOpen(false)
-                          exportNacha()
-                        }}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-surface-muted transition-colors flex items-start gap-2.5 cursor-pointer"
-                      >
-                        <Landmark size={15} className="text-primary shrink-0 mt-0.5" />
-                        <div className="min-w-0">
-                          <p className="font-semibold text-heading leading-tight">NACHA Direct Deposit (.ach)</p>
-                          <p className="text-[11px] text-muted leading-tight mt-0.5">Standard 94-char ACH bank wire</p>
-                        </div>
-                      </button>
-                    )}
                   </div>
 
                   <div className="py-1">
@@ -867,17 +800,46 @@ export default function Payroll() {
                       disabled={!run || activeRun?.status !== 'PAID'}
                       onClick={() => {
                         setExportMenuOpen(false)
-                        exportLedger()
+                        exportPayrollRegister()
                       }}
-                      title={activeRun?.status === 'PAID' ? 'Download payroll ledger CSV' : 'Available when run is marked paid'}
+                      title={activeRun?.status === 'PAID' ? 'Download payroll register CSV' : 'Available when run is marked paid'}
                       className="w-full text-left px-3 py-2 text-xs hover:bg-surface-muted transition-colors flex items-start gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                     >
                       <FileText size={15} className="text-muted shrink-0 mt-0.5" />
                       <div className="min-w-0">
-                        <p className="font-semibold text-heading leading-tight">General Ledger (CSV)</p>
+                        <p className="font-semibold text-heading leading-tight">Payroll Register (CSV)</p>
                         <p className="text-[11px] text-muted leading-tight mt-0.5">
-                          {activeRun?.status === 'PAID' ? 'Accounting ledger entries' : 'Available when run is marked paid'}
+                          {activeRun?.status === 'PAID' ? 'Gross, deductions, net, and tax details' : 'Available when run is marked paid'}
                         </p>
+                      </div>
+                    </button>
+                  </div>
+
+                  <div className="py-1">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled
+                      title="Available after a secure ODFI profile and server-side export are configured"
+                      className="w-full text-left px-3 py-2 text-xs flex items-start gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Landmark size={15} className="text-muted shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-heading leading-tight">U.S. ACH Direct Deposit</p>
+                        <p className="text-[11px] text-muted leading-tight mt-0.5">Unavailable until a secure ODFI profile is configured</p>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled
+                      title="Available after a secure SEPA profile and current bank-accepted format are configured"
+                      className="w-full text-left px-3 py-2 text-xs flex items-start gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Landmark size={15} className="text-muted shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-heading leading-tight">SEPA Credit Transfer</p>
+                        <p className="text-[11px] text-muted leading-tight mt-0.5">Unavailable until a secure PSP profile is configured</p>
                       </div>
                     </button>
                   </div>

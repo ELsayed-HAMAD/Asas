@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { listCurrencies } from '@asas/domain/money'
+import { getAvailableTimeZones } from '../../lib/timeZones'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import {
   DollarSign,
   Sparkles,
@@ -21,28 +23,14 @@ import { Input } from '../../components/ui/input'
 import { Alert, AlertDescription } from '../../components/ui/alert'
 import { Badge } from '../../components/ui/badge'
 
-const CURRENCIES = [
-  { code: 'USD', symbol: '$', name: 'US Dollar (USD)' },
-  { code: 'EUR', symbol: '€', name: 'Euro (EUR)' },
-  { code: 'GBP', symbol: '£', name: 'British Pound (GBP)' },
-  { code: 'SAR', symbol: '﷼', name: 'Saudi Riyal (SAR)' },
-  { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham (AED)' },
-  { code: 'CAD', symbol: '$', name: 'Canadian Dollar (CAD)' },
-  { code: 'AUD', symbol: '$', name: 'Australian Dollar (AUD)' },
-  { code: 'SGD', symbol: '$', name: 'Singapore Dollar (SGD)' },
-]
-
-const TIMEZONES = [
-  { value: 'America/New_York', label: 'Eastern Time (US & Canada) — UTC-5' },
-  { value: 'America/Chicago', label: 'Central Time (US & Canada) — UTC-6' },
-  { value: 'America/Los_Angeles', label: 'Pacific Time (US & Canada) — UTC-8' },
-  { value: 'Europe/London', label: 'London, Dublin (GMT) — UTC+0' },
-  { value: 'Europe/Paris', label: 'Central European Time (Paris, Berlin) — UTC+1' },
-  { value: 'Asia/Riyadh', label: 'Arabia Standard Time (Riyadh, Doha) — UTC+3' },
-  { value: 'Asia/Dubai', label: 'Gulf Standard Time (Dubai, Abu Dhabi) — UTC+4' },
-  { value: 'Asia/Singapore', label: 'Singapore, Hong Kong — UTC+8' },
-  { value: 'Asia/Tokyo', label: 'Tokyo, Seoul — UTC+9' },
-]
+const currencyDisplayNames = new Intl.DisplayNames(undefined, { type: 'currency' })
+const CURRENCIES = listCurrencies().map(({ code }) => ({
+  code,
+  name: `${currencyDisplayNames.of(code) || code} (${code})`,
+}))
+const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+const TIMEZONES = getAvailableTimeZones(undefined, [localTimezone]).map(value => ({ value, label: value.replaceAll('_', ' ') }))
+const DEFAULT_TIMEZONE = TIMEZONES.some(({ value }) => value === localTimezone) ? localTimezone : 'UTC'
 
 const MODULES = [
   {
@@ -89,6 +77,8 @@ function authFailureMessage(error, fallback) {
 }
 
 export default function Onboarding() {
+  const [searchParams] = useSearchParams()
+  const forceCreateWorkspace = searchParams.get('new') === '1'
   const { data: activeOrganization } = useActiveOrganization()
   const { data: organizations, isPending: organizationsPending } = useListOrganizations()
   const { data: session } = useSession()
@@ -100,20 +90,24 @@ export default function Onboarding() {
 
   // Step 1: Profile
   const [companyName, setCompanyName] = useState(
-    activeOrganization?.name || (session?.user?.name ? `${session.user.name}'s Workspace` : '')
+    forceCreateWorkspace
+      ? (session?.user?.name ? `${session.user.name}'s Workspace` : '')
+      : activeOrganization?.name || (session?.user?.name ? `${session.user.name}'s Workspace` : '')
   )
   const [currency, setCurrency] = useState('USD')
-  const [timezone, setTimezone] = useState('America/New_York')
+  const [timezone, setTimezone] = useState(DEFAULT_TIMEZONE)
 
   // Sample data is explicit opt-in for a real workspace.
   const [dataMode, setDataMode] = useState('empty')
 
   useEffect(() => {
-    const suggestedName = activeOrganization?.name || (session?.user?.name ? `${session.user.name}'s Workspace` : '')
+    const suggestedName = forceCreateWorkspace
+      ? (session?.user?.name ? `${session.user.name}'s Workspace` : '')
+      : activeOrganization?.name || (session?.user?.name ? `${session.user.name}'s Workspace` : '')
     if (suggestedName) setCompanyName(current => current || suggestedName)
-  }, [activeOrganization?.name, session?.user?.name])
+  }, [activeOrganization?.name, forceCreateWorkspace, session?.user?.name])
 
-  if (activeOrganization && activeOrganization.onboardingStatus !== 'PENDING') {
+  if (!forceCreateWorkspace && activeOrganization && activeOrganization.onboardingStatus !== 'PENDING') {
     return <Navigate to="/dashboard" replace />
   }
 
@@ -148,7 +142,9 @@ export default function Onboarding() {
         : orgList.length === 1
           ? orgList[0].id
           : null
-      let currentOrgId = activeOrganization?.id || verifiedSessionOrganizationId || resumableOrganizationId
+      let currentOrgId = forceCreateWorkspace
+        ? null
+        : activeOrganization?.id || verifiedSessionOrganizationId || resumableOrganizationId
 
       if (!currentOrgId) {
         setLoadingMessage('Registering organization...')
@@ -324,7 +320,7 @@ export default function Onboarding() {
                     >
                       {CURRENCIES.map((c) => (
                         <option key={c.code} value={c.code} className="bg-surface text-heading">
-                          {c.code} — {c.name}
+                          {c.name}
                         </option>
                       ))}
                     </select>
@@ -504,7 +500,7 @@ export default function Onboarding() {
                     </div>
                     <p className="text-xs text-body-light mt-1.5 leading-relaxed">
                       Starts without demonstration records. You can then enter business information through the available
-                      workflows or use the supported data export and import tools.
+                      workflows, including CSV bank-statement reconciliation where available.
                     </p>
                   </div>
                 </button>

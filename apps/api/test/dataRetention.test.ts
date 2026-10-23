@@ -52,10 +52,9 @@ describe('Compliance & Data Retention Cleanup', () => {
     const deleteSessionsSpy = vi.fn(async () => ({ count: 12 }))
     const deleteExportsSpy = vi.fn(async () => ({ count: 3 }))
     const auditSpy = vi.fn(async () => ({}))
+    const deleteObjectSpy = vi.fn(async () => {})
 
-    const prisma = {
-      $connect: async () => {},
-      $disconnect: async () => {},
+    const tx = {
       member: {
         findUnique: async () => ({ role: 'ADMIN' }),
         findMany: async () => [{ user: { email: 'admin@example.com' } }],
@@ -63,11 +62,25 @@ describe('Compliance & Data Retention Cleanup', () => {
       tenant: { findUnique: async () => ({ id: 'tenant_1' }) },
       verification: { deleteMany: deleteTokensSpy },
       session: { deleteMany: deleteSessionsSpy },
-      exportJob: { deleteMany: deleteExportsSpy },
+      exportJob: {
+        findMany: vi.fn(async () => [{ id: 'job_1', dataScope: 'workspace', format: 'json' }]),
+        deleteMany: deleteExportsSpy,
+      },
       auditLog: { create: auditSpy },
+    }
+    const prisma = {
+      ...tx,
+      $connect: async () => {},
+      $disconnect: async () => {},
+      $transaction: vi.fn(async (callback: (client: unknown) => unknown) => callback(tx)),
     } as any
 
-    const app = await buildApp(loadEnv(), { logger: false, prisma, auth })
+    const app = await buildApp(loadEnv(), {
+      logger: false,
+      prisma,
+      auth,
+      objectStorage: { mode: 'local', delete: deleteObjectSpy, close: vi.fn() } as any,
+    })
     apps.push(app)
 
     const res = await app.inject({
@@ -89,6 +102,9 @@ describe('Compliance & Data Retention Cleanup', () => {
     expect(deleteTokensSpy).toHaveBeenCalledTimes(1)
     expect(deleteSessionsSpy).toHaveBeenCalledTimes(1)
     expect(deleteExportsSpy).toHaveBeenCalledTimes(1)
+    expect(deleteObjectSpy).toHaveBeenCalledWith('exports/tenant_1/job_1.json')
+    expect(deleteObjectSpy).toHaveBeenCalledWith('exports/job_1.json')
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1)
     expect(auditSpy).toHaveBeenCalledWith({
       data: expect.objectContaining({
         tenantId: 'tenant_1',

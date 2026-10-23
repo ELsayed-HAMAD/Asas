@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
+import { decryptBankDetail, encryptBankDetail } from '../src/services/crypto.js'
 import { captureSampleManifest, clearSamplePack, importEmployees } from '../src/modules/onboarding/samplePack.service.js'
 
 async function setup(extraData: Record<string, Array<{ id: string; [key: string]: unknown }>> = {}) {
@@ -28,7 +29,7 @@ async function setup(extraData: Record<string, Array<{ id: string; [key: string]
 describe('sample-data clearing safety', () => {
   it('resolves import currency only after claiming the tenant in the same transaction', async () => {
     const events: string[] = []
-    const create = vi.fn(async () => { events.push('employee') })
+    const create = vi.fn(async (_args: { data: Record<string, unknown> }) => { events.push('employee') })
     const outsideRead = vi.fn().mockResolvedValue({ currency: 'USD' })
     const tx = {
       tenant: {
@@ -39,10 +40,13 @@ describe('sample-data clearing safety', () => {
       employee: { create },
     }
     const prisma = { tenant: { findUnique: outsideRead }, $transaction: async (work: (tx: unknown) => Promise<unknown>) => work(tx) } as unknown as PrismaClient
-    await expect(importEmployees(prisma, 'tenant_1', { employees: [{ name: 'Ada', title: 'Engineer', salary: '10.123' }] })).resolves.toEqual({ imported: 1 })
+    await expect(importEmployees(prisma, 'tenant_1', { employees: [{ name: 'Ada', title: 'Engineer', salary: '10.123', bankRoutingNumber: '021000021' }] })).resolves.toEqual({ imported: 1 })
     expect(events).toEqual(['claim', 'currency', 'employee'])
     expect(outsideRead).not.toHaveBeenCalled()
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ salary: '10.123' }) }))
+    const employeeData = create.mock.calls[0]?.[0]
+    expect(employeeData?.data.bankRoutingNumber).not.toBe('021000021')
+    expect(decryptBankDetail(String(employeeData?.data.bankRoutingNumber), 'tenant_1', 'routingNumber')).toBe('021000021')
   })
   const currencyModels = ['employee', 'payableInvoice', 'receivableInvoice', 'expense', 'ledgerTransaction', 'cashFlowSnapshot', 'deal', 'salesQuota', 'forecastSnapshot', 'product', 'project']
   it.each(currencyModels)('preserves old %s provenance when currency metadata is null', async model => {
@@ -90,6 +94,15 @@ describe('sample-data clearing safety', () => {
     expect(result.onboardingStatus).toBe('PENDING')
     expect(deletes.product).toHaveBeenCalledWith({ where: { tenantId: 'tenant_1', id: { in: ['sample_product'] } } })
     expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), { timeout: 300000, isolationLevel: 'Serializable' })
+  })
+  it('preserves sample-reset provenance when legacy bank fields are encrypted', async () => {
+    const { prisma, data } = await setup({ employee: [{
+      id: 'sample_employee', tenantId: 'tenant_1', bankRoutingNumber: '021000021', bankAccountNumber: '1234567890',
+      bankIban: null, bankBic: null,
+    }] })
+    data.employee[0]!.bankRoutingNumber = encryptBankDetail('021000021', 'tenant_1', 'routingNumber')
+    data.employee[0]!.bankAccountNumber = encryptBankDetail('1234567890', 'tenant_1', 'accountNumber')
+    await expect(clearSamplePack(prisma, 'tenant_1')).resolves.toMatchObject({ onboardingStatus: 'PENDING' })
   })
   it('refuses legacy samples with unknown provenance', async () => {
     const { prisma, tenant, deletes } = await setup()

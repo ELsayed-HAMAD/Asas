@@ -30,6 +30,8 @@ import { buildPaginationMeta, toPrismaPage } from '@asas/contracts'
 import { invalidateAuthCacheForTenant } from '../../middlewares/rbac.js'
 import { closeStreamsForTenant } from '../../plugins/sse.js'
 import { decryptCredential, encryptCredential, maskCredential } from '../../services/crypto.js'
+import type { StripeBillingProvider } from '../../services/stripeBilling.js'
+import { getPastDueGraceEndsOn, resolveEffectivePlanLimits, resolveEffectivePlanSubscription } from '../../services/entitlements.js'
 import { AppError } from '../../utils/errors.js'
 import { probePublicHttpsEndpoint } from './integrationProbe.js'
 
@@ -452,9 +454,25 @@ export async function getBillingSettings(prisma: PrismaClient, tenantId: string,
     prisma.member.count({ where: { tenantId } }),
     prisma.tenant.findUnique({ where: { id: tenantId }, select: { stripeCustomerId: true } }),
   ])
+  const now = new Date()
+  const effectiveLimits = resolveEffectivePlanLimits(subscriptions, now)
+  const effectiveSubscription = resolveEffectivePlanSubscription(subscriptions, now)
 
   return {
     stripePortalAvailable: Boolean(tenant?.stripeCustomerId),
+    effectivePlan: {
+      planName: effectiveLimits.planName,
+      priceMonthly: effectiveSubscription?.priceMonthly.toString() ?? '0',
+      currency: effectiveSubscription?.stripeCurrency ?? 'USD',
+      billingStatus: effectiveSubscription?.status === 'PAST_DUE' ? 'PAST_DUE' : effectiveSubscription ? 'ACTIVE' : 'FREE',
+      source: effectiveLimits.source,
+      renewsOn: effectiveSubscription?.renewsOn?.toISOString() ?? null,
+      graceEndsOn: effectiveSubscription?.status === 'PAST_DUE' ? getPastDueGraceEndsOn(effectiveSubscription).toISOString() : null,
+      seatsUsed: memberCount,
+      seatLimit: effectiveLimits.seatLimit,
+      storageUsedGb: measuredStorageUsedGb,
+      storageLimitGb: effectiveLimits.storageLimitGb,
+    },
     subscriptions: subscriptions.map(row => ({
       id: row.id,
       planName: row.planName,
@@ -495,51 +513,66 @@ export async function deleteWorkspace(
   prisma: PrismaClient,
   tenantId: string,
   _userId: string,
+  stripeBilling: StripeBillingProvider | null = null,
 ): Promise<{ success: boolean }> {
-  await assertTenantExists(prisma, tenantId)
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } })
+  if (!tenant) throw new AppError(404, 'Workspace not found')
 
-  // Stage 1: Immediate Archival & Session Termination
-  await prisma.tenant.update({
-    where: { id: tenantId },
-    data: {
-      status: 'ARCHIVED',
-      archivedAt: new Date(),
-    },
+  const activeStripeSubscriptions = await prisma.subscription.findMany({
+    where: { tenantId, status: { in: ['ACTIVE', 'PAST_DUE'] }, stripeSubscriptionId: { not: null } },
+    select: { stripeSubscriptionId: true },
   })
+  const subscriptionIds = activeStripeSubscriptions.flatMap(row => row.stripeSubscriptionId ? [row.stripeSubscriptionId] : [])
+  if (subscriptionIds.length && !stripeBilling) {
+    throw new AppError(503, 'Stripe billing is unavailable. The workspace was not deleted; restore billing connectivity and retry.')
+  }
 
-  await prisma.session.updateMany({
-    where: { activeOrganizationId: tenantId },
-    data: { activeOrganizationId: null },
-  })
+  // Cancel remotely before archiving or purging. If any request fails, retain workspace data
+  // and access so the owner can retry. Cancellation is idempotent, so retries handle partial success.
+  for (const subscriptionId of subscriptionIds) {
+    try {
+      await stripeBilling!.cancelSubscription(subscriptionId)
+    } catch {
+      throw new AppError(502, 'Stripe could not confirm subscription cancellation. The workspace was not deleted; retry after billing is available.')
+    }
+  }
+
+  // Stage 1 and 2 are one local transaction. If any purge step fails, archive status,
+  // session revocation, and local billing changes roll back together so the owner can retry.
+  try {
+    await prisma.$transaction(async tx => {
+      await tx.tenant.update({
+        where: { id: tenantId },
+        data: { status: 'ARCHIVED', archivedAt: new Date() },
+      })
+      await tx.session.updateMany({ where: { activeOrganizationId: tenantId }, data: { activeOrganizationId: null } })
+      await tx.subscription.updateMany({
+        where: { tenantId, status: { in: ['ACTIVE', 'PAST_DUE'] } },
+        data: { status: 'CANCELED' },
+      })
+
+      // Elevate session setting to permit compliant administrative deletion of append-only ledgers
+      await tx.$executeRawUnsafe("SET LOCAL asas.allow_tenant_purge = 'on'")
+
+      // 1. Clean up restricted financial models
+      await tx.journalLine.deleteMany({ where: { entry: { tenantId } } })
+      await tx.journalEntry.deleteMany({ where: { tenantId } })
+      await tx.ledgerAccount.deleteMany({ where: { tenantId } })
+      await tx.exchangeRate.deleteMany({ where: { tenantId } })
+
+      // 2. Clean up invitations and memberships
+      await tx.invitation.deleteMany({ where: { tenantId } })
+      await tx.member.deleteMany({ where: { tenantId } })
+
+      // 3. Delete the tenant itself (cascading deletes will handle all remaining tables)
+      await tx.tenant.delete({ where: { id: tenantId } })
+    })
+  } catch {
+    throw new AppError(503, 'Workspace deletion could not finish. Local data and access were retained; retry when the service is available. Any Stripe cancellations are safe to retry.')
+  }
 
   invalidateAuthCacheForTenant(tenantId)
   closeStreamsForTenant(tenantId)
-
-  // Stage 2: Compliant Purge & External Cleanup
-  await prisma.subscription.updateMany({
-    where: { tenantId, status: 'ACTIVE' },
-    data: { status: 'CANCELED' },
-  })
-
-  await prisma.$transaction(async tx => {
-    // Elevate session setting to permit compliant administrative deletion of append-only ledgers
-    await tx.$executeRawUnsafe("SET LOCAL asas.allow_tenant_purge = 'on'")
-
-    // 1. Clean up restricted financial models
-    await tx.journalLine.deleteMany({ where: { entry: { tenantId } } })
-    await tx.journalEntry.deleteMany({ where: { tenantId } })
-    await tx.ledgerAccount.deleteMany({ where: { tenantId } })
-    await tx.exchangeRate.deleteMany({ where: { tenantId } })
-
-    // 2. Clean up invitations and memberships
-    await tx.invitation.deleteMany({ where: { tenantId } })
-    await tx.member.deleteMany({ where: { tenantId } })
-
-    // 3. Delete the tenant itself (cascading deletes will handle all remaining tables)
-    await tx.tenant.delete({ where: { id: tenantId } })
-  })
-
-  invalidateAuthCacheForTenant(tenantId)
 
   return { success: true }
 }

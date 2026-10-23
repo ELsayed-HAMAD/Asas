@@ -82,6 +82,17 @@ export const forecastResponseSchema = z.object({
   forecastByRep: z.array(forecastSnapshotSchema),
   /** `SalesQuota` rows, or [] when none exist for the tenant. */
   quotas: z.array(salesQuotaSchema),
+  /** Live, selected-year results grouped by the current deal owner; unlike snapshots, derived from deals. */
+  liveForecastByRep: z.array(z.object({
+    employeeId: idSchema.nullable(),
+    repName: z.string(),
+    closed: moneySchema,
+    commit: moneySchema,
+    bestCase: moneySchema,
+    quota: moneySchema.nullable(),
+    quotaAttainmentPct: z.number().nullable(),
+    openDealCount: z.int().min(0),
+  })),
   /** Open deals by close-date month, ascending. Empty when no open deal has a close date. */
   monthlyPipeline: z.array(monthlyPipelineEntrySchema),
   /** Open deals marked as COMMIT, grouped over the entire tenant by their stored close month. */

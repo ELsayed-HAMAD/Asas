@@ -1,5 +1,8 @@
-import type { PrismaClient } from '@prisma/client'
+import type { Prisma, PrismaClient } from '@prisma/client'
 import type { DataRetentionCleanupRequest, DataRetentionCleanupResponse } from '@asas/contracts'
+import { exportFileExtension } from './queue.js'
+import { exportObjectKey, type ObjectStorage } from './objectStorage.js'
+import { AppError } from '../utils/errors.js'
 
 /**
  * Compliance & Data Retention Cleanup Service.
@@ -8,9 +11,10 @@ import type { DataRetentionCleanupRequest, DataRetentionCleanupResponse } from '
  * and old export jobs beyond the configured tenant retention threshold.
  */
 export async function executeDataRetentionCleanup(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Prisma.TransactionClient,
   tenantId: string,
   options: DataRetentionCleanupRequest,
+  storage: ObjectStorage,
 ): Promise<DataRetentionCleanupResponse> {
   const now = new Date()
   const cutoffDate = new Date(now.getTime() - options.retentionDays * 24 * 60 * 60 * 1000)
@@ -50,14 +54,29 @@ export async function executeDataRetentionCleanup(
   }
 
   if (categories.includes('EXPIRED_EXPORTS')) {
-    const res = await prisma.exportJob.deleteMany({
-      where: {
-        tenantId,
-        status: { in: ['DONE', 'FAILED'] },
-        createdAt: { lt: cutoffDate },
-      },
+    const where = {
+      tenantId,
+      status: { in: ['DONE', 'FAILED'] },
+      createdAt: { lt: cutoffDate },
+    } satisfies Prisma.ExportJobWhereInput
+    const expiredJobs = await prisma.exportJob.findMany({
+      where,
+      select: { id: true, dataScope: true, format: true },
     })
-    expiredExportsCount = res.count
+    try {
+      await Promise.all(expiredJobs.map(async job => {
+        const extension = job.format || exportFileExtension(job.dataScope ?? '')
+        await storage.delete(exportObjectKey(tenantId, job.id, extension))
+        // Older local artifacts predate tenant-scoped object keys. Delete that legacy key too.
+        if (storage.mode === 'local') await storage.delete(`exports/${job.id}.${extension}`)
+      }))
+    } catch {
+      // Keep the job rows as durable retry records. Deletion is idempotent, so a retry can
+      // safely finish if some objects were already removed before another delete failed.
+      throw new AppError(503, 'Expired export files could not all be removed. Retention records were retained for a safe retry.')
+    }
+    const deleted = await prisma.exportJob.deleteMany({ where })
+    expiredExportsCount = deleted.count
   }
 
   if (categories.includes('TRANSIENT_LOGS')) {

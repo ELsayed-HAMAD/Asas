@@ -1,5 +1,6 @@
 import { Prisma, type PrismaClient } from '@prisma/client'
 import { describe, expect, it } from 'vitest'
+import { decryptBankDetail, encryptBankDetail } from '../src/services/crypto.js'
 import { AppError } from '../src/utils/errors.js'
 import {
   createEmployee,
@@ -13,6 +14,7 @@ const now = new Date('2026-01-01T00:00:00.000Z')
 
 const baseRow = {
   id: 'emp_1',
+  tenantId: 'tenant_1',
   name: 'Ada Lovelace',
   title: 'Staff Engineer',
   status: 'ACTIVE' as const,
@@ -31,6 +33,11 @@ const baseRow = {
   location: 'Remote',
   employeeNumber: 'E-001',
   email: 'ada@example.com',
+  bankRoutingNumber: null,
+  bankAccountNumber: null,
+  bankAccountType: null,
+  bankIban: null,
+  bankBic: null,
   createdAt: now,
   updatedAt: now,
 }
@@ -139,10 +146,19 @@ function stubPrisma(options: {
 
 describe('listEmployees', () => {
   it('redacts salary when the caller lacks employee.salary.read', async () => {
-    const { prisma } = stubPrisma({ employeeFindMany: [baseRow], employeeCounts: [1, 0, 1, 0] })
+    const { prisma } = stubPrisma({
+      employeeFindMany: [{
+        ...baseRow,
+        bankRoutingNumber: encryptBankDetail('021000021', 'tenant_1', 'routingNumber'),
+        bankAccountNumber: encryptBankDetail('1234567890', 'tenant_1', 'accountNumber'),
+      }],
+      employeeCounts: [1, 0, 1, 0],
+    })
     const result = await listEmployees(prisma, 'tenant_1', { page: 1, limit: 25 }, false)
 
     expect(result.items[0]?.salary).toBeNull()
+    expect(result.items[0]?.bankRoutingNumber).toBeNull()
+    expect(result.items[0]?.bankAccountNumber).toBeNull()
     expect(result.items[0]?.name).toBe('Ada Lovelace')
     expect(result.summary).toEqual({ totalHeadcount: 1, onLeaveCount: 0, hiredThisMonth: 0, hiredPreviousMonthToDate: 0, openRoles: 0 })
   })
@@ -249,6 +265,30 @@ describe('createEmployee', () => {
     )
     expect(employee.name).toBe('Ada Lovelace')
     expect((calls.createArgs as { data: { tenantId: string } }).data.tenantId).toBe('tenant_1')
+  })
+
+  it('stores bank identifiers as tenant-bound ciphertext while returning the authorized value', async () => {
+    const { prisma, calls } = stubPrisma({ employeeCreate: baseRow })
+    await createEmployee(prisma, 'tenant_1', {
+      name: 'Ada Lovelace', title: 'Staff Engineer', bankRoutingNumber: '021000021', bankAccountNumber: '1234567890',
+    }, true)
+    const data = (calls.createArgs as { data: Record<string, string | null> }).data
+    expect(data.bankRoutingNumber).not.toBe('021000021')
+    expect(data.bankAccountNumber).not.toBe('1234567890')
+    expect(decryptBankDetail(data.bankRoutingNumber, 'tenant_1', 'routingNumber')).toBe('021000021')
+    expect(decryptBankDetail(data.bankAccountNumber, 'tenant_1', 'accountNumber')).toBe('1234567890')
+  })
+
+  it('decrypts authorized employee bank details in the response mapper', async () => {
+    const row = {
+      ...baseRow,
+      bankRoutingNumber: encryptBankDetail('021000021', 'tenant_1', 'routingNumber'),
+      bankAccountNumber: encryptBankDetail('1234567890', 'tenant_1', 'accountNumber'),
+    }
+    const { prisma } = stubPrisma({ employeeFindFirst: row })
+    const employee = await getEmployee(prisma, 'tenant_1', 'emp_1', true)
+    expect(employee.bankRoutingNumber).toBe('021000021')
+    expect(employee.bankAccountNumber).toBe('1234567890')
   })
 
   it('rejects an employment end date before the hire date', async () => {

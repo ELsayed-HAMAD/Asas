@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { listCurrencies } from '@asas/domain/money'
+import { getAvailableTimeZones } from '../../../lib/timeZones'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -31,10 +32,6 @@ import { settingsApi } from '../../../lib/api/settings'
 import { queryKeys } from '../../../lib/queryKeys'
 import { useActiveMemberRole, useActiveOrganization } from '../../../lib/authClient'
 import { getMemberRoleName } from '../../../lib/memberRole'
-
-const AVAILABLE_TIMEZONES = typeof Intl.supportedValuesOf === 'function'
-  ? Intl.supportedValuesOf('timeZone')
-  : ['UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Dubai', 'Asia/Tokyo', 'Asia/Singapore']
 
 export default function SettingsGeneral() {
   const navigate = useNavigate()
@@ -75,6 +72,7 @@ export default function SettingsGeneral() {
   // Form fields are seeded from the server response (the old page used uncontrolled
   // defaultValue + a no-op Save button; now Save is a real PATCH).
   const [form, setForm] = useState({ name: '', supportEmail: '', logoUrl: '', timezone: '', currency: '', dateFormat: '', overtimeThresholdHours: '8' })
+  const availableTimezones = getAvailableTimeZones(undefined, [localTimezone, form.timezone])
   const [saved, setSaved] = useState(false)
   const [rateForm, setRateForm] = useState({ currency: '', rateToBase: '', effectiveAt: '', reference: '' })
   const fileInputRef = useRef(null)
@@ -337,7 +335,7 @@ export default function SettingsGeneral() {
                     {localTimezone && localTimezone !== 'UTC' && (
                       <SelectItem value={localTimezone}>Local System Timezone ({localTimezone})</SelectItem>
                     )}
-                    {AVAILABLE_TIMEZONES.filter(tz => tz !== 'UTC' && tz !== localTimezone).map(tz => (
+                    {availableTimezones.filter(tz => tz !== 'UTC' && tz !== localTimezone).map(tz => (
                       <SelectItem key={tz} value={tz}>
                         {tz.replaceAll('_', ' ')}
                       </SelectItem>
@@ -618,7 +616,7 @@ export default function SettingsGeneral() {
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
         title="Delete Workspace"
-        subtitle="This action is permanent and cannot be undone."
+        subtitle="This action is permanent and cannot be undone. Active Stripe subscriptions are canceled first; if billing cannot confirm cancellation, the workspace and its data are retained."
         confirmLabel={deleteMutation.isPending ? 'Deleting...' : 'Permanently Delete'}
         confirmVariant="danger"
         isConfirmDisabled={deleteConfirmName !== (settings?.name || activeOrg?.name) || deleteMutation.isPending}

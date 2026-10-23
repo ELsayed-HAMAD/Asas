@@ -11,6 +11,27 @@ afterEach(async () => {
 })
 
 describe('export object storage', () => {
+  it('dispatches a pre-created, audited export row without creating a duplicate job', async () => {
+    const create = vi.fn()
+    const updates: Record<string, unknown>[] = []
+    const queue = await createExportQueue({
+      storage,
+      store: {
+        create,
+        updateMany: async ({ data }) => { updates.push(data) },
+        getTenantId: async jobId => jobId === 'job1' ? 'tenant1' : null,
+        withStorageCapacity: async (_tenantId, _additionalBytes, write) => write(),
+      },
+    })
+    queue.register('employees', async (_data, { jobId }) => Buffer.from(jobId))
+
+    await queue.dispatch('job1', 'employees', { canReadSalary: false })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(await storage.get(exportObjectKey('tenant1', 'job1', 'xlsx'))).toEqual(Buffer.from('job1'))
+    expect(updates).toEqual([{ status: 'RUNNING', progressPct: 10 }, { status: 'DONE', progressPct: 100 }])
+  })
+
   it('stores completed export bytes under the tenant-scoped object key', async () => {
     const updates: Record<string, unknown>[] = []
     const queue = await createExportQueue({
@@ -86,5 +107,30 @@ describe('export object storage', () => {
     expect(put).not.toHaveBeenCalled()
     expect(updates.at(-1)).toEqual({ status: 'FAILED' })
     put.mockRestore()
+  })
+
+  it('marks a durable export row failed when pg-boss rejects dispatch', async () => {
+    const updates: Record<string, unknown>[] = []
+    const dispatchError = new Error('queue database is unavailable')
+    const queue = await createExportQueue({
+      url: 'postgres://queue.test',
+      storage,
+      store: {
+        create: async () => ({ id: 'job1' }),
+        updateMany: async ({ data }) => { updates.push(data) },
+        getTenantId: async () => 'tenant1',
+        withStorageCapacity: async (_tenantId, _additionalBytes, write) => write(),
+      },
+      createBossClient: () => ({
+        createQueue: async () => undefined,
+        work: async () => undefined,
+        send: async () => { throw dispatchError },
+        start: async () => undefined,
+        stop: async () => undefined,
+      }),
+    })
+
+    await expect(queue.submit('employees', {}, 'tenant1')).rejects.toBe(dispatchError)
+    expect(updates).toEqual([{ status: 'FAILED' }])
   })
 })

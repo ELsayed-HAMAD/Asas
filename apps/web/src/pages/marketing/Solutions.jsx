@@ -55,7 +55,7 @@ const SOLUTIONS = [
     ],
     architecture: {
       input: 'Attendance & Leave Requests',
-      process: 'Overtime & Tax Rule Engines',
+      process: 'Workspace Payroll Calculations',
       output: 'Payroll Records for Review',
     },
   },
@@ -113,7 +113,7 @@ const SOLUTIONS = [
       'Maintain inventory item records',
       'Record stock movements in the workspace',
       'Review on-hand quantities from saved transactions',
-      'Organize inventory records by configured locations',
+      'Label products with warehouse, aisle, and bin details',
       'Review finance and inventory records separately',
     ],
     architecture: {
@@ -153,8 +153,8 @@ export default function Solutions() {
   return (
     <MarketingPageFrame
       eyebrow="Enterprise Solutions Architecture"
-      title="Purpose-built modules unified into a single operating core"
-      description="Discover how Asas replaces fragmented point solutions with an integrated, high-velocity enterprise platform that keeps leadership and operations perfectly aligned."
+      title="Business workflows in one workspace"
+      description="Explore the current Asas product areas, the records they manage, and the practical limits to confirm before using them in production."
     >
       {/* Solution Vertical Selector Tabs */}
       <div className="flex flex-wrap gap-2 mb-10 pb-2 border-b border-border-default/80">
@@ -216,12 +216,12 @@ export default function Solutions() {
           <div className="bg-primary text-on-primary p-6 rounded-card border border-primary-hover shadow-glass hover:shadow-glow transition-premium space-y-4">
             <div className="flex items-center gap-2 text-primary-subtle text-xs font-bold uppercase tracking-wider">
               <Cpu className="w-4 h-4" />
-              <span>Pipeline Architecture</span>
+              <span>Example workflow</span>
             </div>
 
             <div className="space-y-3 pt-2">
               <div className="p-3 rounded-button bg-primary-hover border border-primary-subtle/30 shadow-xs">
-                <span className="text-[10px] font-semibold text-primary-subtle uppercase">Input Feed</span>
+                <span className="text-[10px] font-semibold text-primary-subtle uppercase">Input</span>
                 <p className="text-xs font-semibold text-on-primary mt-0.5">{currentSolution.architecture.input}</p>
               </div>
 
@@ -230,7 +230,7 @@ export default function Solutions() {
               </div>
 
               <div className="p-3 rounded-button bg-primary-hover border border-accent shadow-xs">
-                <span className="text-[10px] font-semibold text-accent-muted uppercase">Real-Time Core Engine</span>
+                <span className="text-[10px] font-semibold text-accent-muted uppercase">Workspace workflow</span>
                 <p className="text-xs font-semibold text-on-primary mt-0.5">{currentSolution.architecture.process}</p>
               </div>
 
@@ -239,7 +239,7 @@ export default function Solutions() {
               </div>
 
               <div className="p-3 rounded-button bg-primary-hover border border-success-border shadow-xs">
-                <span className="text-[10px] font-semibold text-success-bright uppercase">Executive Output</span>
+                <span className="text-[10px] font-semibold text-success-bright uppercase">Saved records and views</span>
                 <p className="text-xs font-semibold text-on-primary mt-0.5">{currentSolution.architecture.output}</p>
               </div>
             </div>
@@ -254,20 +254,21 @@ export default function Solutions() {
       {/* Grid of All Solutions */}
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-heading">Complete Module Directory</h2>
-        <p className="text-xs text-caption mt-1">Explore each interconnected domain included in the Asas suite.</p>
+        <p className="text-xs text-caption mt-1">Explore the current product areas included in Asas.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {SOLUTIONS.map((item) => {
           const CardIcon = item.icon
           return (
-            <div
+            <button
               key={item.id}
+              type="button"
               onClick={() => {
                 setActiveSolutionId(item.id)
-                window.scrollTo({ top: 200, behavior: 'smooth' })
+                window.scrollTo({ top: 200, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
               }}
-              className="bg-surface-raised rounded-card border border-border-default/80 p-6 flex flex-col justify-between hover:border-accent/40 shadow-card hover:shadow-card-hover hover-lift transition-premium cursor-pointer"
+              className="w-full text-left bg-surface-raised rounded-card border border-border-default/80 p-6 flex flex-col justify-between hover:border-accent/40 shadow-card hover:shadow-card-hover hover-lift transition-premium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
             >
               <div>
                 <div className="flex items-center gap-2 mb-3">
@@ -280,10 +281,10 @@ export default function Solutions() {
               </div>
 
               <div className="pt-3 border-t border-border-subtle flex items-center justify-between text-xs text-accent font-semibold">
-                <span>View Architecture</span>
+                <span>View workflow</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </div>
-            </div>
+            </button>
           )
         })}
       </div>

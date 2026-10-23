@@ -7,7 +7,8 @@ import {
   Pencil,
   Circle,
   Loader2,
-  Trash2,
+  Archive,
+  RotateCcw,
   X,
 } from 'lucide-react';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -141,7 +142,7 @@ function StageSwitcherCard({ stage, group, isActive, onSelect }) {
 }
 
 function ListDealRow({ deal, selected, onSelect, disabled }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id, disabled });
   return (
     <div
       ref={setNodeRef}
@@ -203,6 +204,8 @@ function DetailPanel({
   onOpenActivity,
   onEdit,
   onDelete,
+  archived,
+  onRestore,
   onStageChange,
   stageError,
   activitiesLoading,
@@ -256,14 +259,15 @@ function DetailPanel({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                disabled={!canWrite}
-                onClick={onDelete}
-                className="text-danger focus:text-danger focus:bg-danger-light"
-              >
-                <Trash2 className="mr-2 h-3.5 w-3.5" />
-                Delete Deal
-              </DropdownMenuItem>
+              {archived ? (
+                <DropdownMenuItem disabled={!canWrite} onClick={onRestore}>
+                  <RotateCcw className="mr-2 h-3.5 w-3.5" /> Restore Deal
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem disabled={!canWrite} onClick={onDelete}>
+                  <Archive className="mr-2 h-3.5 w-3.5" /> Archive Deal
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -296,8 +300,8 @@ function DetailPanel({
           variant="outline"
           size="sm"
           onClick={() => onOpenActivity('EMAIL')}
-          disabled={!canWrite}
-          title={!canWrite ? 'Requires the ADMIN role' : 'Record an email activity'}
+          disabled={!canWrite || archived}
+          title={archived ? 'Restore this deal to edit it' : !canWrite ? 'Requires the ADMIN role' : 'Record an email activity'}
           className="h-8.5 px-2.5 rounded-xl bg-white/90 hover:bg-slate-50/90 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)] inline-flex items-center justify-center gap-1.5 text-xs font-medium whitespace-nowrap transition-all text-slate-700"
         >
           <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" /> Log Email
@@ -307,8 +311,8 @@ function DetailPanel({
           variant="outline"
           size="sm"
           onClick={() => onOpenActivity('CALL')}
-          disabled={!canWrite}
-          title={!canWrite ? 'Requires the ADMIN role' : 'Record a call activity'}
+          disabled={!canWrite || archived}
+          title={archived ? 'Restore this deal to edit it' : !canWrite ? 'Requires the ADMIN role' : 'Record a call activity'}
           className="h-8.5 px-2.5 rounded-xl bg-white/90 hover:bg-slate-50/90 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)] inline-flex items-center justify-center gap-1.5 text-xs font-medium whitespace-nowrap transition-all text-slate-700"
         >
           <Phone className="w-3.5 h-3.5 text-slate-500 shrink-0" /> Log Call
@@ -318,8 +322,8 @@ function DetailPanel({
           variant="outline"
           size="sm"
           onClick={onEdit}
-          disabled={!canWrite}
-          title={!canWrite ? 'Requires the ADMIN role' : 'Edit deal'}
+          disabled={!canWrite || archived}
+          title={archived ? 'Restore this deal to edit it' : !canWrite ? 'Requires the ADMIN role' : 'Edit deal'}
           className="h-8.5 px-2.5 rounded-xl bg-white/90 hover:bg-slate-50/90 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)] inline-flex items-center justify-center gap-1.5 text-xs font-medium whitespace-nowrap transition-all text-slate-700"
         >
           <Pencil className="w-3.5 h-3.5 text-slate-500 shrink-0" /> Edit
@@ -335,12 +339,12 @@ function DetailPanel({
           <Select
             value={deal.stage}
             onValueChange={(val) => onStageChange(deal, val)}
-            disabled={!canWrite}
+            disabled={!canWrite || archived}
           >
             <SelectTrigger
               id="deal-stage"
               aria-label="Stage"
-              title={!canWrite ? 'Requires the ADMIN role' : undefined}
+              title={archived ? 'Restore this deal to move stages' : !canWrite ? 'Requires the ADMIN role' : undefined}
               className="flex-1 max-w-[240px] h-9 px-3.5 text-xs font-medium rounded-xl bg-slate-100/80 border border-slate-200/70 flex items-center justify-between text-body"
             >
               <SelectValue />
@@ -473,6 +477,7 @@ export default function DealsPipeline() {
   }, [searchParams, setSearchParams]);
   const [editDealOpen, setEditDealOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [editForm, setEditForm] = useState(EMPTY_DEAL_FORM);
   const [dealForm, setDealForm] = useState(EMPTY_DEAL_FORM);
   const [formError, setFormError] = useState(null);
@@ -522,7 +527,7 @@ export default function DealsPipeline() {
 
   // Each stage is paginated independently. Counts and totals come from the full filtered server result.
   const stageQueries = useQueries({ queries: STAGE_ORDER.map(stage => {
-    const filters = { stage, page: pageByStage[stage], limit: pageLimit, ...(deferredSearch && { search: deferredSearch }) };
+    const filters = { stage, page: pageByStage[stage], limit: pageLimit, ...(showArchived && { archived: true }), ...(deferredSearch && { search: deferredSearch }) };
     return { queryKey: queryKeys.crm.deals.list(filters), queryFn: () => crmApi.listDeals(filters) };
   }) });
   const deals = stageQueries.flatMap(query => query.data?.items ?? []);
@@ -577,13 +582,17 @@ export default function DealsPipeline() {
     onSuccess: () => { invalidateCrmDeals(); setEditDealOpen(false); },
   });
   const deleteMutation = useMutation({
-    mutationFn: (id) => crmApi.deleteDeal(id),
+    mutationFn: (id) => crmApi.archiveDeal(id),
     onSuccess: () => {
       invalidateCrmDeals();
       setDeleteConfirmOpen(false);
       setSelectedId(null);
       setPanelOpen(false);
     },
+  });
+  const restoreMutation = useMutation({
+    mutationFn: (id) => crmApi.restoreDeal(id),
+    onSuccess: () => { invalidateCrmDeals(); setSelectedId(null); setPanelOpen(false); },
   });
   const activityMutation = useMutation({
     mutationFn: () => crmApi.createDealActivity(activityDealId, { type: activityDialogType, title: activityTitle.trim(), body: activityBody.trim() || null }),
@@ -786,7 +795,11 @@ export default function DealsPipeline() {
                   wrapperClassName="flex-1 min-w-0"
                 />
 
-                <Button
+                <Button type="button" variant={showArchived ? 'default' : 'outline'} onClick={() => { setShowArchived(value => !value); setSelectedId(null); setPageByStage(Object.fromEntries(STAGE_ORDER.map(stage => [stage, 1]))); }} className="h-9 shrink-0">
+                  {showArchived ? 'Archived deals' : 'View archived'}
+                </Button>
+
+                {!showArchived && <Button
                   type="button"
                   disabled={!canWrite}
                   onClick={openNewDealDialog}
@@ -794,7 +807,7 @@ export default function DealsPipeline() {
                   className="h-9 px-5 text-sm font-semibold rounded-xl shrink-0"
                 >
                   New Deal
-                </Button>
+                </Button>}
               </div>
 
               {/* 5) LIST PANE CARD */}
@@ -845,7 +858,7 @@ export default function DealsPipeline() {
                     deal={deal}
                     selected={selectedId === deal.id}
                     onSelect={selectDeal}
-                    disabled={stageMutation.isPending || !canWrite}
+                    disabled={showArchived || stageMutation.isPending || !canWrite}
                   />
                 ))}
                 {activeGroup.deals.length === 0 && (
@@ -894,9 +907,11 @@ export default function DealsPipeline() {
               <DetailPanel
                 deal={selectedDeal}
                 canWrite={canWrite}
+                archived={showArchived}
                 onOpenActivity={openActivityDialog}
                 onEdit={openEditDeal}
                 onDelete={() => setDeleteConfirmOpen(true)}
+                onRestore={() => selectedDeal && restoreMutation.mutate(selectedDeal.id)}
                 onStageChange={moveDealToStage}
                 stageError={stageError}
                 activitiesLoading={activitiesLoading}
@@ -1150,9 +1165,9 @@ export default function DealsPipeline() {
         open={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}
         onConfirm={() => selectedDeal && deleteMutation.mutate(selectedDeal.id)}
-        title="Delete deal?"
-        description={`Are you sure you want to delete "${selectedDeal?.name}"? All associated activities and stage history will be permanently deleted.`}
-        confirmLabel="Delete deal"
+        title="Archive deal?"
+        description={`Archive "${selectedDeal?.name}" from the active pipeline? Its activities and stage history will be preserved, and you can restore it later.`}
+        confirmLabel="Archive deal"
         busy={deleteMutation.isPending}
         danger
       />

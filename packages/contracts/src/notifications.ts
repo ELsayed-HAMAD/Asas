@@ -21,6 +21,13 @@ export const notificationsListResponseSchema = z.object({
 
 export type NotificationsListResponse = z.infer<typeof notificationsListResponseSchema>
 
+export const notificationUsageSchema = z.object({
+  deliveredLast30Days: z.number().int().nonnegative(),
+  unreadLast30Days: z.number().int().nonnegative(),
+})
+
+export type NotificationUsage = z.infer<typeof notificationUsageSchema>
+
 export const notificationMarkReadSchema = z.object({
   read: z.boolean().default(true),
 })

@@ -16,10 +16,11 @@ import { requireAuthContext, requireRole } from '../../middlewares/rbac.js'
 import { requirePermission } from '../../middlewares/permissions.js'
 import { moduleKeyPrefix } from '../../plugins/sse.js'
 import { recordAuditLog } from '../../services/auditLog.js'
-import { exportContentType, exportFileExtension, type ExportHandler } from '../../services/queue.js'
+import { exportContentType, exportFileExtension, exportFileName, type ExportHandler } from '../../services/queue.js'
 import { exportObjectKey } from '../../services/objectStorage.js'
 import { renderEmployeeDirectoryXlsx, renderLedgerXlsx, renderProjectsXlsx } from '../../services/export.js'
 import type { EmployeeDirectoryRow, LedgerRow, ProjectExportRow } from '../../services/export.js'
+import { AppError } from '../../utils/errors.js'
 
 /**
  * The export surface — job-based bulk exports (employee directory, general ledger) that run
@@ -190,7 +191,7 @@ async function buildProjects(prisma: PrismaClient, tenantId: string): Promise<Bu
 }
 
 const EXCLUDED_EXPORT_MODELS = new Set(['Account', 'Session', 'TwoFactor', 'Verification'])
-const SENSITIVE_EXPORT_FIELD = /password|secret|token|credential|private.?key|api.?key|client.?secret/i
+const SENSITIVE_EXPORT_FIELD = /password|secret|token|credential|private.?key|api.?key|client.?secret|bank|iban|bic/i
 const EXPORT_USER_FIELDS = ['id', 'name', 'email', 'emailVerified', 'createdAt', 'updatedAt'] as const
 type ExportQueryDelegate = {
   findMany(args: { where: Record<string, unknown>; select: Record<string, boolean> }): Promise<Record<string, unknown>[]>
@@ -236,7 +237,7 @@ function redactNestedSecrets(value: unknown): unknown {
     .map(([field, child]) => [field, redactNestedSecrets(child)]))
 }
 
-/** Full tenant data archive. Authenticator secrets, sessions, passwords, and credentials are excluded. */
+/** Full tenant data archive. Authenticator records, credentials, and employee bank details are excluded. */
 export async function buildWorkspaceArchive(prisma: PrismaClient, tenantId: string): Promise<Buffer> {
   return prisma.$transaction(async (tx) => {
     const tenant = await tx.tenant.findUnique({ where: { id: tenantId } })
@@ -281,7 +282,7 @@ export async function buildWorkspaceArchive(prisma: PrismaClient, tenantId: stri
         workspaceName: tenant.name,
         exportedAt: new Date().toISOString(),
         modelCounts: counts,
-        redactions: 'Authentication records and secret or credential fields are omitted.',
+        redactions: 'Authentication records, secret or credential fields, and employee bank details are omitted.',
       },
       data,
     }
@@ -388,29 +389,42 @@ export async function exportRoutes(app: FastifyInstance): Promise<void> {
       const prisma = request.server.prisma
       const canReadSalary = role === 'ADMIN' || role === 'OWNER'
 
-      const jobId = await request.server.exportQueue.submit(request.body.kind, { canReadSalary }, tenantId)
-
-      await prisma.exportJob.update({
-        where: { id: jobId },
-        data: {
-          format: exportFileExtension(request.body.kind),
-          dateRange: null,
-        },
+      // Persist the requested job and its audit event together before any worker can read data.
+      // This prevents a completed export from existing without an attributable audit record.
+      const job = await prisma.$transaction(async tx => {
+        const created = await tx.exportJob.create({
+          data: {
+            tenantId,
+            filename: exportFileName(request.body.kind),
+            dataScope: request.body.kind,
+            format: exportFileExtension(request.body.kind),
+            dateRange: null,
+            status: 'QUEUED',
+          },
+        })
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'export.create',
+          targetType: 'ExportJob',
+          targetId: created.id,
+          metadata: { kind: request.body.kind },
+        })
+        return created
       })
 
-      const job = await prisma.exportJob.findFirstOrThrow({ where: { id: jobId, tenantId } })
-      await recordAuditLog(prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'export.create',
-        targetType: 'ExportJob',
-        targetId: jobId,
-        metadata: { kind: request.body.kind },
-      })
+      try {
+        await request.server.exportQueue.dispatch(job.id, request.body.kind, { canReadSalary })
+      } catch (error) {
+        request.server.ssePublish(tenantId, [moduleKeyPrefix('exports')])
+        if (error instanceof AppError) throw error
+        throw new AppError(503, 'The export request was recorded, but generation could not start or complete. Check Export History and retry when the service is available.')
+      }
+      const dispatchedJob = await prisma.exportJob.findFirstOrThrow({ where: { id: job.id, tenantId } })
       // The web caches export jobs under `queryKeys.exports` (`asas,exports`), not hr/finance.
       request.server.ssePublish(tenantId, [moduleKeyPrefix('exports')])
       reply.code(202)
-      return { data: mapExportJob(job) }
+      return { data: mapExportJob(dispatchedJob) }
     },
   )
 

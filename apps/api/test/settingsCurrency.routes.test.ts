@@ -68,6 +68,17 @@ async function setup(options: { locked?: boolean; failAudit?: boolean; missing?:
 }
 
 describe('base currency settings guards', () => {
+  it('rejects an invalid workspace timezone before any write', async () => {
+    const f = await setup()
+    try {
+      const response = await f.patch({ timezone: 'Mars/Olympus_Mons' })
+      expect(response.statusCode, response.body).toBe(400)
+      expect(f.attempts()).toBe(0)
+      expect(f.state().tenant.timezone).toBe('UTC')
+      expect(f.publish).not.toHaveBeenCalled()
+    } finally { await f.app.close() }
+  })
+
   it('allows empty-workspace currency changes with an atomic actor audit', async () => {
     const f = await setup()
     try {

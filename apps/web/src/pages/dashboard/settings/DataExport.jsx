@@ -155,7 +155,7 @@ export default function SettingsDataExport() {
 
               <p className="text-xs text-muted">
                 {scope === 'Full Workspace'
-                  ? 'Exports tenant records across business modules as JSON. Passwords, sessions, authentication data, and saved credentials are excluded; this is not a restorable database backup.'
+                  ? 'Exports tenant records across business modules as JSON. Passwords, sessions, credentials, and employee bank details are excluded; this is not a restorable database backup.'
                   : scope === 'Project Summary'
                     ? 'Creates an XLSX summary of projects, budgets, recorded spend, departments, status, and sprint counts.'
                     : scope === 'Financial Ledgers'

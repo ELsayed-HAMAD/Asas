@@ -11,6 +11,8 @@ export interface AsasEnv {
   databaseUrl: string
   /** Signs and encrypts Better Auth's session cookies. Not JWT-related — auth has shipped. */
   authSecret: string
+  /** Dedicated key for encrypting employee bank details at rest. */
+  bankDataEncryptionKey: string
   port: number
   host: string
   frontendOrigin: string
@@ -76,6 +78,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
   return {
     databaseUrl: source.DATABASE_URL ?? '',
     authSecret: source.AUTH_SECRET ?? source.BETTER_AUTH_SECRET ?? '',
+    bankDataEncryptionKey: source.BANK_DATA_ENCRYPTION_KEY?.trim() ?? '',
     port: rawPort,
     host: source.HOST || '127.0.0.1',
     frontendOrigin,
@@ -140,6 +143,9 @@ export function assertEnv(environment: AsasEnv = loadEnv()): AsasEnv {
   }
   if (environment.stripePriceIds.length && !environment.stripeSecretKey) {
     throw new Error('STRIPE_SECRET_KEY is required when STRIPE_PRICE_IDS are configured')
+  }
+  if (environment.isProduction && environment.bankDataEncryptionKey.length < 32) {
+    throw new Error('BANK_DATA_ENCRYPTION_KEY must contain at least 32 characters in production')
   }
   return environment
 }

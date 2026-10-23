@@ -1113,6 +1113,9 @@ export default function DashboardLayout() {
   if (pathname === '/dashboard/projects') {
     breadcrumbs.push(t('nav.portfolio', 'Portfolio Overview'))
   }
+  if (pathname === '/dashboard/crm') {
+    breadcrumbs.push(t('crm.overview', 'Overview'))
+  }
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const toggleCollapse = () => setSidebarCollapsed(prev => !prev)

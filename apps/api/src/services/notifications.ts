@@ -255,6 +255,25 @@ export async function listUserNotifications(
   }
 }
 
+export async function getUserNotificationUsage(
+  prisma: PrismaClient,
+  tenantId: string,
+  userId: string,
+  now = new Date(),
+) {
+  const where = {
+    tenantId,
+    userId,
+    availableAt: { lte: now },
+    createdAt: { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000), lte: now },
+  }
+  const [deliveredLast30Days, unreadLast30Days] = await Promise.all([
+    prisma.notification.count({ where }),
+    prisma.notification.count({ where: { ...where, read: false } }),
+  ])
+  return { deliveredLast30Days, unreadLast30Days }
+}
+
 export async function markNotificationRead(
   prisma: PrismaClient,
   tenantId: string,

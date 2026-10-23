@@ -29,6 +29,15 @@ export const generalSettingsSchema = z.object({
 
 export type GeneralSettings = z.infer<typeof generalSettingsSchema>
 
+const timeZoneSchema = boundedText(64).refine(value => {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value })
+    return true
+  } catch {
+    return false
+  }
+}, 'Expected a supported IANA timezone identifier')
+
 /**
  * Partial by construction: a PATCH of general settings sends only the fields the form changed.
  * `currency` is validated against `@asas/domain`'s ISO 4217 registry at the boundary, so a typo
@@ -38,7 +47,7 @@ export const generalSettingsUpdateSchema = z.object({
   name: shortTextSchema.optional(),
   supportEmail: z.email().nullable().optional(),
   logoUrl: z.url().nullable().optional(),
-  timezone: boundedText(64).optional(),
+  timezone: timeZoneSchema.optional(),
   currency: currencyCodeSchema.optional(),
   dateFormat: boundedText(32).optional(),
   overtimeThresholdHours: z.number().min(1).max(24).optional(),
@@ -104,9 +113,14 @@ export const notificationModuleSchema = z.record(z.string(), notificationPrefere
 
 export type NotificationModule = z.infer<typeof notificationModuleSchema>
 
-export const quietHoursSchema = z.object({
-  start: z.string().regex(/^\d{2}:\d{2}$/, "Expected a time such as '22:00'"),
-  end: z.string().regex(/^\d{2}:\d{2}$/, "Expected a time such as '07:00'"),
+const quietHoursTimesSchema = z.object({
+  start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Expected a valid time such as '22:00'"),
+  end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Expected a valid time such as '07:00'"),
+})
+
+export const quietHoursSchema = quietHoursTimesSchema.refine(value => value.start !== value.end, {
+  message: 'Start and end times must differ; equal times would silence notifications all day',
+  path: ['end'],
 })
 
 export type QuietHours = z.infer<typeof quietHoursSchema>
@@ -128,7 +142,12 @@ export const notificationSettingsUpdateSchema = z
         z.record(z.string(), notificationPreferencesUpdateSchema),
       )
       .optional(),
-    quietHours: quietHoursSchema.partial().optional(),
+    quietHours: quietHoursTimesSchema.partial().refine(value =>
+      value.start === undefined || value.end === undefined || value.start !== value.end,
+    {
+      message: 'Start and end times must differ; equal times would silence notifications all day',
+      path: ['end'],
+    }).optional(),
   })
   .refine(value => Object.keys(value).length > 0, { message: 'At least one setting is required' })
 
@@ -270,6 +289,19 @@ export const billingInvoiceSchema = z.object({
 
 export const billingSettingsSchema = z.object({
   stripePortalAvailable: z.boolean(),
+  effectivePlan: z.object({
+    planName: shortTextSchema,
+    priceMonthly: z.string(),
+    currency: z.string().length(3),
+    billingStatus: z.enum(['ACTIVE', 'PAST_DUE', 'FREE']),
+    source: z.enum(['subscription', 'free-fallback']),
+    renewsOn: isoDateTimeSchema.nullable(),
+    graceEndsOn: isoDateTimeSchema.nullable(),
+    seatsUsed: z.int().min(0),
+    seatLimit: z.int().min(0),
+    storageUsedGb: z.number().min(0).nullable(),
+    storageLimitGb: z.number().min(0),
+  }),
   subscriptions: z.array(subscriptionSchema),
   paymentMethods: z.array(paymentMethodSchema),
   invoices: z.array(billingInvoiceSchema),

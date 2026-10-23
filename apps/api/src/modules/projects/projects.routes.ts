@@ -109,8 +109,15 @@ export async function projectsRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request, reply) => {
-      const { tenantId } = requireAuthContext(request)
-      const project = await projectsController.createProject(request.server.prisma, tenantId, request.body)
+      const { tenantId, userId } = requireAuthContext(request)
+      const project = await request.server.prisma.$transaction(async tx => {
+        const created = await projectsController.createProject(tx, tenantId, request.body)
+        await recordAuditLog(tx, {
+          tenantId, actorId: userId, action: 'project.create', targetType: 'Project', targetId: created.id,
+          metadata: { name: created.name, status: created.status },
+        })
+        return created
+      })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('projects')])
       reply.code(201)
       return { data: project }
@@ -128,13 +135,15 @@ export async function projectsRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async request => {
-      const { tenantId } = requireAuthContext(request)
-      const project = await projectsController.updateProject(
-        request.server.prisma,
-        tenantId,
-        request.params.id,
-        request.body,
-      )
+      const { tenantId, userId } = requireAuthContext(request)
+      const project = await request.server.prisma.$transaction(async tx => {
+        const updated = await projectsController.updateProject(tx, tenantId, request.params.id, request.body)
+        await recordAuditLog(tx, {
+          tenantId, actorId: userId, action: 'project.update', targetType: 'Project', targetId: updated.id,
+          metadata: { fields: Object.keys(request.body), name: updated.name, status: updated.status },
+        })
+        return updated
+      })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('projects')])
       return { data: project }
     },
@@ -151,13 +160,11 @@ export async function projectsRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      await projectsController.deleteProject(request.server.prisma, tenantId, request.params.id)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'project.delete',
-        targetType: 'Project',
-        targetId: request.params.id,
+      await request.server.prisma.$transaction(async tx => {
+        await projectsController.deleteProject(tx, tenantId, request.params.id)
+        await recordAuditLog(tx, {
+          tenantId, actorId: userId, action: 'project.delete', targetType: 'Project', targetId: request.params.id,
+        })
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('projects')])
       reply.code(204)
@@ -257,8 +264,15 @@ export async function projectsRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request, reply) => {
-      const { tenantId } = requireAuthContext(request)
-      const sprint = await projectsController.createSprint(request.server.prisma, tenantId, request.body)
+      const { tenantId, userId } = requireAuthContext(request)
+      const sprint = await request.server.prisma.$transaction(async tx => {
+        const created = await projectsController.createSprint(tx, tenantId, request.body)
+        await recordAuditLog(tx, {
+          tenantId, actorId: userId, action: 'sprint.create', targetType: 'Sprint', targetId: created.id,
+          metadata: { name: created.name, projectId: created.projectId },
+        })
+        return created
+      })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('projects')])
       reply.code(201)
       return { data: sprint }
@@ -276,13 +290,15 @@ export async function projectsRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async request => {
-      const { tenantId } = requireAuthContext(request)
-      const sprint = await projectsController.updateSprint(
-        request.server.prisma,
-        tenantId,
-        request.params.id,
-        request.body,
-      )
+      const { tenantId, userId } = requireAuthContext(request)
+      const sprint = await request.server.prisma.$transaction(async tx => {
+        const updated = await projectsController.updateSprint(tx, tenantId, request.params.id, request.body)
+        await recordAuditLog(tx, {
+          tenantId, actorId: userId, action: 'sprint.update', targetType: 'Sprint', targetId: updated.id,
+          metadata: { fields: Object.keys(request.body), name: updated.name, status: updated.status },
+        })
+        return updated
+      })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('projects')])
       return { data: sprint }
     },
@@ -299,13 +315,11 @@ export async function projectsRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      await projectsController.deleteSprint(request.server.prisma, tenantId, request.params.id)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'sprint.delete',
-        targetType: 'Sprint',
-        targetId: request.params.id,
+      await request.server.prisma.$transaction(async tx => {
+        await projectsController.deleteSprint(tx, tenantId, request.params.id)
+        await recordAuditLog(tx, {
+          tenantId, actorId: userId, action: 'sprint.delete', targetType: 'Sprint', targetId: request.params.id,
+        })
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('projects')])
       reply.code(204)
@@ -340,8 +354,15 @@ export async function projectsRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request, reply) => {
-      const { tenantId } = requireAuthContext(request)
-      const issue = await projectsController.createIssue(request.server.prisma, tenantId, request.body)
+      const { tenantId, userId } = requireAuthContext(request)
+      const issue = await request.server.prisma.$transaction(async tx => {
+        const created = await projectsController.createIssue(tx, tenantId, request.body)
+        await recordAuditLog(tx, {
+          tenantId, actorId: userId, action: 'issue.create', targetType: 'Issue', targetId: created.id,
+          metadata: { key: created.key, title: created.title, sprintId: created.sprintId },
+        })
+        return created
+      })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('projects')])
       reply.code(201)
       return { data: issue }
@@ -359,13 +380,15 @@ export async function projectsRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async request => {
-      const { tenantId } = requireAuthContext(request)
-      const issue = await projectsController.updateIssue(
-        request.server.prisma,
-        tenantId,
-        request.params.id,
-        request.body,
-      )
+      const { tenantId, userId } = requireAuthContext(request)
+      const issue = await request.server.prisma.$transaction(async tx => {
+        const updated = await projectsController.updateIssue(tx, tenantId, request.params.id, request.body)
+        await recordAuditLog(tx, {
+          tenantId, actorId: userId, action: 'issue.update', targetType: 'Issue', targetId: updated.id,
+          metadata: { fields: Object.keys(request.body), status: updated.status, title: updated.title },
+        })
+        return updated
+      })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('projects')])
       return { data: issue }
     },
@@ -382,13 +405,11 @@ export async function projectsRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      await projectsController.deleteIssue(request.server.prisma, tenantId, request.params.id)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'issue.delete',
-        targetType: 'Issue',
-        targetId: request.params.id,
+      await request.server.prisma.$transaction(async tx => {
+        await projectsController.deleteIssue(tx, tenantId, request.params.id)
+        await recordAuditLog(tx, {
+          tenantId, actorId: userId, action: 'issue.delete', targetType: 'Issue', targetId: request.params.id,
+        })
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('projects')])
       reply.code(204)

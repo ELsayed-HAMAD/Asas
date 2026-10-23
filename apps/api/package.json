@@ -15,6 +15,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "storage:migrate-local-to-s3": "tsx scripts/migrate-local-storage-to-s3.ts",
+    "data:encrypt-employee-bank-details": "tsx scripts/encrypt-employee-bank-details.ts",
     "test": "vitest run --maxWorkers 2"
   },
   "dependencies": {

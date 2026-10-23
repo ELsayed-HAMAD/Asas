@@ -80,7 +80,7 @@ export async function createDealActivity(
   actorId: string,
   input: DealActivityWriteInput,
 ): Promise<DealActivity> {
-  const deal = await prisma.deal.findFirst({ where: { id: dealId, tenantId }, select: { id: true } })
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, tenantId, archivedAt: null }, select: { id: true } })
   if (!deal) throw new AppError(404, 'Deal not found')
   const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { name: true } })
   const row = await prisma.dealActivity.create({
@@ -120,12 +120,12 @@ export async function listAgendaItems(prisma: PrismaClient, tenantId: string): P
   return { items: rows.map(mapAgendaItem) }
 }
 
-export async function createAgendaItem(prisma: PrismaClient, tenantId: string, input: AgendaItemWriteInput): Promise<AgendaItem> {
+export async function createAgendaItem(prisma: CrmClient, tenantId: string, input: AgendaItemWriteInput): Promise<AgendaItem> {
   const row = await prisma.agendaItem.create({ data: { tenantId, title: input.title, timeLabel: input.timeLabel ?? null, priority: input.priority ?? null, done: input.done ?? false } })
   return mapAgendaItem(row)
 }
 
-export async function updateAgendaItem(prisma: PrismaClient, tenantId: string, id: string, input: AgendaItemUpdateInput): Promise<AgendaItem> {
+export async function updateAgendaItem(prisma: CrmClient, tenantId: string, id: string, input: AgendaItemUpdateInput): Promise<AgendaItem> {
   const existing = await prisma.agendaItem.findFirst({ where: { id, tenantId } })
   if (!existing) throw new AppError(404, 'Agenda item not found')
   const row = await prisma.agendaItem.update({
@@ -202,6 +202,7 @@ function mapDeal(deal: PrismaDealWithIncludes, currency: string): Deal {
     closedAt: deal.closedAt?.toISOString() ?? null,
     productLine: deal.productLine,
     forecastBucket: deal.forecastBucket,
+    archivedAt: deal.archivedAt?.toISOString() ?? null,
     createdAt: deal.createdAt.toISOString(),
     updatedAt: deal.updatedAt.toISOString(),
   }
@@ -219,7 +220,7 @@ async function stageAggregates(
 ): Promise<Map<DealStage, { count: number; total: Prisma.Decimal }>> {
   const rows = await prisma.deal.groupBy({
     by: ['stage'],
-    where: { tenantId, ...extra },
+    where: { tenantId, archivedAt: null, ...extra },
     _sum: { value: true },
     _count: { _all: true },
   })
@@ -245,7 +246,7 @@ export async function listDeals(
 ): Promise<DealListResult> {
   const currency = await getTenantCurrency(prisma, tenantId)
 
-  const where: Prisma.DealWhereInput = { tenantId }
+  const where: Prisma.DealWhereInput = { tenantId, archivedAt: query.archived ? { not: null } : null }
   if (query.stage) where.stage = query.stage
   if (query.openOnly === true) {
     if (query.stage) where.AND = [{ stage: { in: [...OPEN_STAGES] } }]
@@ -321,13 +322,14 @@ export async function getOverview(prisma: PrismaClient, tenantId: string): Promi
 
   const [stageMap, createdLast7Days, monthlyOutcomes, periodOutcomeRows, conversionRows, openCountHistory] = await Promise.all([
     stageAggregates(prisma, tenantId),
-    prisma.deal.count({ where: { tenantId, stage: { in: [...OPEN_STAGES] }, createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } }),
+    prisma.deal.count({ where: { tenantId, archivedAt: null, stage: { in: [...OPEN_STAGES] }, createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } }),
     prisma.$queryRaw<Array<{ month: string; stage: string; count: bigint }>>`
       SELECT to_char("closedAt" AT TIME ZONE ${timezone}, 'YYYY-MM') AS month,
              "stage"::text AS stage,
              count(*)::bigint AS count
       FROM "Deal"
       WHERE "tenantId" = ${tenantId}
+        AND "archivedAt" IS NULL
         AND "stage"::text IN ('CLOSED_WON', 'CLOSED_LOST')
         AND "closedAt" IS NOT NULL
       GROUP BY 1, 2
@@ -349,6 +351,7 @@ export async function getOverview(prisma: PrismaClient, tenantId: string): Promi
           AND "closedAt" < (${dateKey(previousEnd)}::date::timestamp AT TIME ZONE ${timezone}))::bigint AS "previousLostCount"
       FROM "Deal"
       WHERE "tenantId" = ${tenantId}
+        AND "archivedAt" IS NULL
         AND "stage"::text IN ('CLOSED_WON', 'CLOSED_LOST')
         AND "closedAt" >= (${dateKey(previousStart)}::date::timestamp AT TIME ZONE ${timezone})
         AND "closedAt" < (${dateKey(currentEnd)}::date::timestamp AT TIME ZONE ${timezone})
@@ -363,6 +366,7 @@ export async function getOverview(prisma: PrismaClient, tenantId: string): Promi
         SELECT history."dealId", history."toStage", min(history."occurredAt") AS "enteredAt"
         FROM "DealStageHistory" AS history
         WHERE history."tenantId" = ${tenantId}
+          AND EXISTS (SELECT 1 FROM "Deal" AS active_deal WHERE active_deal."id" = history."dealId" AND active_deal."tenantId" = history."tenantId" AND active_deal."archivedAt" IS NULL)
           AND history."isBaseline" = FALSE
           AND history."toStage" IN ('LEADS'::"DealStage", 'PROPOSAL'::"DealStage", 'NEGOTIATION'::"DealStage")
         GROUP BY history."dealId", history."toStage"
@@ -373,6 +377,7 @@ export async function getOverview(prisma: PrismaClient, tenantId: string): Promi
              count(entered."dealId") FILTER (WHERE EXISTS (
                SELECT 1 FROM "DealStageHistory" AS converted
                WHERE converted."tenantId" = ${tenantId}
+                 AND EXISTS (SELECT 1 FROM "Deal" AS active_deal WHERE active_deal."id" = converted."dealId" AND active_deal."tenantId" = converted."tenantId" AND active_deal."archivedAt" IS NULL)
                  AND converted."dealId" = entered."dealId"
                  AND converted."isBaseline" = FALSE
                  AND converted."toStage" = pair."toStage"
@@ -390,6 +395,7 @@ export async function getOverview(prisma: PrismaClient, tenantId: string): Promi
         SELECT DISTINCT ON (history."dealId") history."dealId", history."toStage", history."value"
         FROM "DealStageHistory" AS history
         WHERE history."tenantId" = ${tenantId}
+          AND EXISTS (SELECT 1 FROM "Deal" AS active_deal WHERE active_deal."id" = history."dealId" AND active_deal."tenantId" = history."tenantId" AND active_deal."archivedAt" IS NULL)
           AND history."occurredAt" < ((${dateKey(previousEnd)}::date::timestamp AT TIME ZONE ${timezone}) AT TIME ZONE 'UTC')
         ORDER BY history."dealId", history."occurredAt" DESC, history."id" DESC
       )
@@ -513,6 +519,7 @@ async function monthlyOpenPipeline(
            sum("value") AS value
     FROM "Deal"
     WHERE "tenantId" = ${tenantId}
+      AND "archivedAt" IS NULL
       AND "stage"::text IN (${Prisma.join([...OPEN_STAGES])})
       AND "closeDate" IS NOT NULL
       AND "closeDate" >= ${new Date(`${year}-01-01T00:00:00.000Z`)}
@@ -539,6 +546,7 @@ async function monthlyCommittedPipeline(
            sum("value") AS value
     FROM "Deal"
     WHERE "tenantId" = ${tenantId}
+      AND "archivedAt" IS NULL
       AND "stage"::text IN (${Prisma.join([...OPEN_STAGES])})
       AND upper("forecastBucket") = 'COMMIT'
       AND "closeDate" IS NOT NULL
@@ -562,6 +570,7 @@ async function monthlyWeightedOpenPipeline(
            sum("value" * ("winProbability"::numeric / 100)) AS value
     FROM "Deal"
     WHERE "tenantId" = ${tenantId}
+      AND "archivedAt" IS NULL
       AND "stage"::text IN (${Prisma.join([...OPEN_STAGES])})
       AND "winProbability" BETWEEN 0 AND 100
       AND "closeDate" IS NOT NULL
@@ -601,9 +610,12 @@ function quotaIdentityWhere(tenantId: string, employeeId: string | null, repName
   return {
     tenantId,
     period,
-    ...(employeeId
-      ? { employeeId }
-      : { employeeId: null, repName: { equals: repName, mode: 'insensitive' as const } }),
+    OR: employeeId
+      ? [
+          { employeeId },
+          { employeeId: null, repName: { equals: repName, mode: 'insensitive' as const } },
+        ]
+      : [{ repName: { equals: repName, mode: 'insensitive' as const } }],
   }
 }
 
@@ -700,6 +712,7 @@ export async function getForecast(prisma: PrismaClient, tenantId: string, year =
         count(*) FILTER (WHERE upper("forecastBucket") IN ('COMMIT', 'BEST_CASE'))::bigint AS "dealBestCaseCount"
       FROM "Deal"
       WHERE "tenantId" = ${tenantId}
+        AND "archivedAt" IS NULL
         AND "stage"::text IN (${Prisma.join([...OPEN_STAGES])})
         AND "closeDate" >= ${new Date(`${year}-01-01T00:00:00.000Z`)}
         AND "closeDate" < ${new Date(`${Number(year) + 1}-01-01T00:00:00.000Z`)}
@@ -720,6 +733,69 @@ export async function getForecast(prisma: PrismaClient, tenantId: string, year =
     return true
   })
   const totals = totalPipelineRows[0]
+  const yearStart = new Date(`${year}-01-01T00:00:00.000Z`)
+  const yearEnd = new Date(`${Number(year) + 1}-01-01T00:00:00.000Z`)
+  const [repDealRows, repEmployees] = await Promise.all([
+    prisma.$queryRaw<Array<{ ownerEmployeeId: string | null; closed: Prisma.Decimal; commit: Prisma.Decimal; bestCase: Prisma.Decimal; openDealCount: bigint }>>`
+      SELECT "ownerEmployeeId",
+        COALESCE(sum("value") FILTER (WHERE "stage"::text = 'CLOSED_WON' AND "closedAt" >= ${yearStart} AND "closedAt" < ${yearEnd}), 0) AS closed,
+        COALESCE(sum("value") FILTER (WHERE "stage"::text IN (${Prisma.join([...OPEN_STAGES])}) AND "closeDate" >= ${yearStart} AND "closeDate" < ${yearEnd} AND upper("forecastBucket") = 'COMMIT'), 0) AS commit,
+        COALESCE(sum("value") FILTER (WHERE "stage"::text IN (${Prisma.join([...OPEN_STAGES])}) AND "closeDate" >= ${yearStart} AND "closeDate" < ${yearEnd} AND upper("forecastBucket") IN ('COMMIT', 'BEST_CASE')), 0) AS "bestCase",
+        count(*) FILTER (WHERE "stage"::text IN (${Prisma.join([...OPEN_STAGES])}) AND "closeDate" >= ${yearStart} AND "closeDate" < ${yearEnd})::bigint AS "openDealCount"
+      FROM "Deal"
+      WHERE "tenantId" = ${tenantId}
+        AND "archivedAt" IS NULL
+        AND (("stage"::text = 'CLOSED_WON' AND "closedAt" >= ${yearStart} AND "closedAt" < ${yearEnd})
+          OR ("stage"::text IN (${Prisma.join([...OPEN_STAGES])}) AND "closeDate" >= ${yearStart} AND "closeDate" < ${yearEnd}))
+      GROUP BY "ownerEmployeeId"
+    `,
+    prisma.employee.findMany({ where: { tenantId }, select: { id: true, name: true } }),
+  ])
+  const employeeNameById = new Map(repEmployees.map(employee => [employee.id, employee.name]))
+  const employeeIdsByName = new Map<string, string[]>()
+  for (const employee of repEmployees) {
+    const nameKey = employee.name.trim().toLocaleLowerCase()
+    employeeIdsByName.set(nameKey, [...(employeeIdsByName.get(nameKey) ?? []), employee.id])
+  }
+  const liveRows = new Map<string, typeof repDealRows[number]>()
+  for (const row of repDealRows) liveRows.set(row.ownerEmployeeId ? `employee:${row.ownerEmployeeId}` : 'unassigned', row)
+  const unlinkedQuotaNameByKey = new Map<string, string>()
+  for (const quota of quotaRows.filter(item => item.period === year && item.currency === currency)) {
+    const quotaNameKey = quota.repName.trim().toLocaleLowerCase()
+    const matchingEmployeeIds = employeeIdsByName.get(quotaNameKey) ?? []
+    const uniquelyMatchedEmployeeId = matchingEmployeeIds.length === 1 ? matchingEmployeeIds[0]! : null
+    const employeeId = quota.employeeId ?? uniquelyMatchedEmployeeId
+    const key = employeeId ? `employee:${employeeId}` : `name:${quotaNameKey}`
+    if (!employeeId) unlinkedQuotaNameByKey.set(key, quota.repName.trim())
+    if (!liveRows.has(key)) liveRows.set(key, {
+      ownerEmployeeId: employeeId,
+      closed: new Prisma.Decimal(0), commit: new Prisma.Decimal(0), bestCase: new Prisma.Decimal(0), openDealCount: 0n,
+    })
+  }
+  const liveForecastByRep = [...liveRows.entries()].map(([key, row]) => {
+    const repName = row.ownerEmployeeId ? employeeNameById.get(row.ownerEmployeeId) ?? 'Former employee'
+      : key.startsWith('name:') ? `${unlinkedQuotaNameByKey.get(key) ?? key.slice('name:'.length)} (unlinked quota)` : 'Unassigned'
+    const quota = quotaRows.find(item => item.period === year && item.currency === currency && (
+      row.ownerEmployeeId ? item.employeeId === row.ownerEmployeeId || (
+        item.employeeId === null
+        && item.repName.trim().toLocaleLowerCase() === (employeeNameById.get(row.ownerEmployeeId) ?? '').trim().toLocaleLowerCase()
+        && (employeeIdsByName.get(item.repName.trim().toLocaleLowerCase()) ?? []).length === 1
+      )
+        : key.startsWith('name:') ? item.employeeId === null && item.repName.trim().toLocaleLowerCase() === key.slice('name:'.length)
+          : false
+    ))
+    const closed = toMoneyWire(row.closed ?? (row as any).closed ?? new Prisma.Decimal(0), currency)!
+    const quotaMoney = quota ? toMoneyWire(quota.quota, currency)! : null
+    return {
+      employeeId: row.ownerEmployeeId, repName, closed,
+      commit: toMoneyWire(row.commit ?? (row as any).commit ?? new Prisma.Decimal(0), currency)!,
+      bestCase: toMoneyWire(row.bestCase ?? (row as any).bestcase ?? new Prisma.Decimal(0), currency)!,
+      quota: quotaMoney,
+      quotaAttainmentPct: !key.startsWith('name:') && quotaMoney && quotaMoney.amount > 0
+        ? Number(((closed.amount / quotaMoney.amount) * 100).toFixed(1)) : null,
+      openDealCount: Number(row.openDealCount),
+    }
+  })
   const totalPipeline = toMoneyWire(totals?.value ?? new Prisma.Decimal(0), currency)?.amount ?? 0
   const weightedPipeline = toMoneyWire(totals?.weightedValue ?? new Prisma.Decimal(0), currency)!
   const unweightedPipeline = toMoneyWire(totals?.unweightedValue ?? new Prisma.Decimal(0), currency)!
@@ -763,6 +839,7 @@ export async function getForecast(prisma: PrismaClient, tenantId: string, year =
       quota: quota.currency ? toMoneyWire(quota.quota, quota.currency) : null,
       createdAt: quota.createdAt.toISOString(),
     })),
+    liveForecastByRep,
     monthlyPipeline,
     monthlyCommit,
     monthlyWeightedPipeline,
@@ -814,6 +891,7 @@ export async function getSalesPerformance(
            sum("value") AS value
     FROM "Deal"
     WHERE "tenantId" = ${tenantId}
+      AND "archivedAt" IS NULL
       AND "stage"::text = 'CLOSED_WON'
       AND "closedAt" >= ${yearStart} AND "closedAt" < ${yearEnd}
     GROUP BY to_char("closedAt", 'YYYY-MM')
@@ -823,6 +901,7 @@ export async function getSalesPerformance(
     SELECT AVG(EXTRACT(EPOCH FROM ("closedAt" - "createdAt")) / 86400)::float8 AS value
     FROM "Deal"
     WHERE "tenantId" = ${tenantId} AND "stage"::text = 'CLOSED_WON'
+      AND "archivedAt" IS NULL
       AND "closedAt" >= ${yearStart} AND "closedAt" < ${yearEnd}
       AND "closedAt" >= "createdAt"
   `
@@ -830,11 +909,12 @@ export async function getSalesPerformance(
     SELECT EXTRACT(YEAR FROM "closedAt")::int AS "closedYear", COALESCE(sum("value"), 0) AS value
     FROM "Deal"
     WHERE "tenantId" = ${tenantId}
+      AND "archivedAt" IS NULL
       AND "stage"::text = 'CLOSED_WON'
       AND "closedAt" >= ${previousYearStart} AND "closedAt" < ${yearEnd}
     GROUP BY EXTRACT(YEAR FROM "closedAt")
   `
-  const undatedClosedCount = await prisma.deal.count({ where: { tenantId, stage: { in: [...CLOSED_STAGES] }, closedAt: null } })
+  const undatedClosedCount = await prisma.deal.count({ where: { tenantId, archivedAt: null, stage: { in: [...CLOSED_STAGES] }, closedAt: null } })
   const activityRows = await prisma.$queryRaw<Array<{ week: string; active: bigint; won: bigint; lost: bigint }>>`
     WITH weeks AS (
       SELECT generate_series(${firstWeek}::timestamp, ${lastWeek}::timestamp, INTERVAL '1 week') AS week_start
@@ -845,6 +925,7 @@ export async function getSalesPerformance(
       count(DISTINCT history."dealId") FILTER (WHERE history."toStage"::text = 'CLOSED_LOST')::bigint AS lost
     FROM weeks
     LEFT JOIN "DealStageHistory" AS history ON history."tenantId" = ${tenantId}
+      AND EXISTS (SELECT 1 FROM "Deal" AS active_deal WHERE active_deal."id" = history."dealId" AND active_deal."tenantId" = history."tenantId" AND active_deal."archivedAt" IS NULL)
       AND history."occurredAt" >= weeks.week_start AND history."occurredAt" < weeks.week_start + INTERVAL '1 week'
       AND history."occurredAt" >= ${yearStart} AND history."occurredAt" < ${yearEnd}
     GROUP BY weeks.week_start
@@ -864,7 +945,7 @@ export async function getSalesPerformance(
   const [byOwner, employees] = await Promise.all([
     prisma.deal.groupBy({
       by: ['ownerEmployeeId', 'stage'],
-      where: { tenantId, OR: [
+      where: { tenantId, archivedAt: null, OR: [
         { stage: { in: [...OPEN_STAGES] } },
         { stage: { in: [...CLOSED_STAGES] }, closedAt: { gte: yearStart, lt: yearEnd } },
       ] },
@@ -877,9 +958,10 @@ export async function getSalesPerformance(
     WITH weeks AS (
       SELECT generate_series(${firstWeek}::timestamp, ${lastWeek}::timestamp, INTERVAL '1 week') AS week_start
     ), owners AS (
-      SELECT DISTINCT "ownerEmployeeId" FROM "Deal" WHERE "tenantId" = ${tenantId}
+      SELECT DISTINCT "ownerEmployeeId" FROM "Deal" WHERE "tenantId" = ${tenantId} AND "archivedAt" IS NULL
       UNION
       SELECT DISTINCT "ownerEmployeeId" FROM "DealStageHistory" WHERE "tenantId" = ${tenantId}
+        AND EXISTS (SELECT 1 FROM "Deal" AS active_deal WHERE active_deal."id" = "DealStageHistory"."dealId" AND active_deal."tenantId" = "DealStageHistory"."tenantId" AND active_deal."archivedAt" IS NULL)
         AND "occurredAt" >= ${firstWeek} AND "occurredAt" >= ${yearStart} AND "occurredAt" < ${yearEnd}
     )
     SELECT owners."ownerEmployeeId",
@@ -889,6 +971,7 @@ export async function getSalesPerformance(
       count(DISTINCT history."dealId") FILTER (WHERE history."toStage"::text = 'CLOSED_LOST')::bigint AS lost
     FROM owners CROSS JOIN weeks
     LEFT JOIN "DealStageHistory" AS history ON history."tenantId" = ${tenantId}
+      AND EXISTS (SELECT 1 FROM "Deal" AS active_deal WHERE active_deal."id" = history."dealId" AND active_deal."tenantId" = history."tenantId" AND active_deal."archivedAt" IS NULL)
       AND history."ownerEmployeeId" IS NOT DISTINCT FROM owners."ownerEmployeeId"
       AND history."occurredAt" >= weeks.week_start AND history."occurredAt" < weeks.week_start + INTERVAL '1 week'
       AND history."occurredAt" >= ${yearStart} AND history."occurredAt" < ${yearEnd}
@@ -1082,13 +1165,14 @@ export async function updateDeal(
   if ('$transaction' in prisma) return prisma.$transaction(tx => updateDeal(tx, tenantId, id, input, actorId))
   // Lock before reading the old stage so concurrent moves record a truthful transition chain.
   const locked = await prisma.$queryRaw<Array<{ id: string }>>`
-    SELECT "id" FROM "Deal" WHERE "id" = ${id} AND "tenantId" = ${tenantId} FOR UPDATE
+    SELECT "id" FROM "Deal" WHERE "id" = ${id} AND "tenantId" = ${tenantId} AND "archivedAt" IS NULL FOR UPDATE
   `
   if (locked.length === 0) throw new AppError(404, 'Deal not found')
-  const existing = await prisma.deal.findFirst({ where: { id, tenantId } })
+  const existing = await prisma.deal.findFirst({ where: { id, tenantId, archivedAt: null } })
   if (!existing) throw new AppError(404, 'Deal not found')
 
   const changedStage = input.stage !== undefined && input.stage !== existing.stage
+  const changedOwner = input.ownerEmployeeId !== undefined && input.ownerEmployeeId !== existing.ownerEmployeeId
   const occurredAt = new Date()
   const currency = await getTenantCurrency(prisma, tenantId)
   const changedValue = input.value !== undefined && !dealValueToDecimal(input.value, currency).equals(existing.value)
@@ -1113,20 +1197,38 @@ export async function updateDeal(
     },
     include: dealInclude,
   })
-  if (changedStage || changedValue) await prisma.dealStageHistory.create({ data: {
+  if (changedStage || changedValue || changedOwner) await prisma.dealStageHistory.create({ data: {
     tenantId, dealId: deal.id, fromStage: existing.stage, toStage: deal.stage, occurredAt,
     actorId, ownerEmployeeId: deal.ownerEmployeeId, value: deal.value,
   } })
   return mapDeal(deal, currency)
 }
 
-export async function deleteDeal(
+export async function archiveDeal(
   prisma: CrmClient,
   tenantId: string,
   id: string,
+  actorId: string,
 ): Promise<void> {
-  if ('$transaction' in prisma) return prisma.$transaction(tx => deleteDeal(tx, tenantId, id))
-  const existing = await prisma.deal.findFirst({ where: { id, tenantId } })
+  if ('$transaction' in prisma) return prisma.$transaction(tx => archiveDeal(tx, tenantId, id, actorId))
+  const existing = await prisma.deal.findFirst({ where: { id, tenantId, archivedAt: null } })
   if (!existing) throw new AppError(404, 'Deal not found')
-  await prisma.deal.delete({ where: { id_tenantId: { id, tenantId } } })
+  const archivedAt = new Date()
+  await prisma.deal.update({ where: { id_tenantId: { id, tenantId } }, data: { archivedAt } })
+  await prisma.dealStageHistory.create({ data: {
+    tenantId, dealId: id, fromStage: existing.stage, toStage: existing.stage, occurredAt: archivedAt,
+    actorId, ownerEmployeeId: existing.ownerEmployeeId, value: existing.value,
+  } })
+}
+
+export async function restoreDeal(prisma: CrmClient, tenantId: string, id: string, actorId: string): Promise<void> {
+  if ('$transaction' in prisma) return prisma.$transaction(tx => restoreDeal(tx, tenantId, id, actorId))
+  const existing = await prisma.deal.findFirst({ where: { id, tenantId, archivedAt: { not: null } } })
+  if (!existing) throw new AppError(404, 'Archived deal not found')
+  const restoredAt = new Date()
+  await prisma.deal.update({ where: { id_tenantId: { id, tenantId } }, data: { archivedAt: null } })
+  await prisma.dealStageHistory.create({ data: {
+    tenantId, dealId: id, fromStage: existing.stage, toStage: existing.stage, occurredAt: restoredAt,
+    actorId, ownerEmployeeId: existing.ownerEmployeeId, value: existing.value,
+  } })
 }

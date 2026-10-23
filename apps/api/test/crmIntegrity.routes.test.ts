@@ -12,7 +12,7 @@ const base = {
   id, tenantId: 'tenant_1', name: 'Deal', stage: 'NEGOTIATION', value: new Prisma.Decimal('100'),
   companyId: null, company: null, ownerEmployeeId: null, owner: null, winProbability: 1,
   closeDate: new Date('2026-12-01T00:00:00Z'), closedAt: null as Date | null,
-  productLine: null, forecastBucket: null, createdAt: new Date('2026-01-01T00:00:00Z'), updatedAt: stamp,
+  productLine: null, forecastBucket: null, archivedAt: null as Date | null, createdAt: new Date('2026-01-01T00:00:00Z'), updatedAt: stamp,
 }
 
 /** Staged rollback/composition test, not a simulation of PostgreSQL concurrency. */
@@ -40,19 +40,17 @@ async function setup(options: { failHistory?: boolean; failAudit?: boolean; role
         return options.foreignDeal ? [] : [{ id }]
       },
       deal: {
-        findFirst: async ({ where }: { where: { id: string; tenantId: string } }) => {
+        findFirst: async ({ where }: { where: { id: string; tenantId: string; archivedAt?: null | { not: null } } }) => {
           events.push('read')
-          expect(where).toEqual({ id, tenantId: 'tenant_1' })
+          expect(where).toMatchObject({ id, tenantId: 'tenant_1' })
+          if (where.archivedAt === null && staged.deal.archivedAt) return null
+          if (where.archivedAt && !staged.deal.archivedAt) return null
           return staged.deal
         },
         create: async ({ data }: { data: Record<string, unknown> }) => { write(); staged.deal = { ...staged.deal, ...data } as typeof base; return staged.deal },
         update: async ({ where, data }: { where: unknown; data: Record<string, unknown> }) => {
           expect(where).toEqual({ id_tenantId: { id, tenantId: 'tenant_1' } })
           write(); staged.deal = { ...staged.deal, ...data } as typeof base; return staged.deal
-        },
-        delete: async ({ where }: { where: unknown }) => {
-          expect(where).toEqual({ id_tenantId: { id, tenantId: 'tenant_1' } })
-          write(); staged.deal = null as unknown as typeof base; return staged.deal
         },
       },
       dealStageHistory: { create: async ({ data }: { data: Record<string, unknown> }) => {
@@ -72,8 +70,9 @@ async function setup(options: { failHistory?: boolean; failAudit?: boolean; role
   app.decorate('ssePublish', publish)
   await app.register(crmRoutes)
   const patch = (payload: object) => app.inject({ method: 'PATCH', url: `/deals/${id}`, payload })
-  const del = () => app.inject({ method: 'DELETE', url: `/deals/${id}` })
-  return { app, patch, del, transaction, publish, events, state: () => state, attempts: () => attempts }
+  const archive = () => app.inject({ method: 'DELETE', url: `/deals/${id}` })
+  const restore = () => app.inject({ method: 'POST', url: `/deals/${id}/restore` })
+  return { app, patch, archive, restore, transaction, publish, events, state: () => state, attempts: () => attempts }
 }
 
 afterEach(() => { vi.useRealTimers() })
@@ -145,6 +144,18 @@ describe('CRM outcome integrity', () => {
       expect(f.state().history[1]).toMatchObject({ fromStage: 'CLOSED_WON', toStage: 'CLOSED_WON', ownerEmployeeId: null, value: new Prisma.Decimal('300') })
     } finally { await f.app.close() }
   })
+  it('records an owner-only reassignment as a same-stage history event', async () => {
+    const f = await setup()
+    try {
+      const response = await f.patch({ ownerEmployeeId: id })
+      expect(response.statusCode, response.body).toBe(200)
+      expect(f.state().history).toHaveLength(1)
+      expect(f.state().history[0]).toMatchObject({
+        fromStage: 'NEGOTIATION', toStage: 'NEGOTIATION', ownerEmployeeId: id,
+        value: new Prisma.Decimal('100'), actorId: 'admin_1',
+      })
+    } finally { await f.app.close() }
+  })
   it('does not invent a closure for an ordinary edit', async () => {
     const f = await setup()
     try {
@@ -190,14 +201,16 @@ describe('CRM outcome integrity', () => {
       expect(f.transaction).not.toHaveBeenCalled()
     } finally { await f.app.close() }
   })
-  it('deletes deal atomically with audit log and SSE', async () => {
+  it('archives deal atomically and preserves its history with audit log and SSE', async () => {
     const f = await setup()
     try {
-      const response = await f.del()
+      const response = await f.archive()
       expect(response.statusCode).toBe(204)
+      expect(f.state().deal.archivedAt).toBeInstanceOf(Date)
+      expect(f.state().history).toContainEqual(expect.objectContaining({ tenantId: 'tenant_1', dealId: id, actorId: 'admin_1', fromStage: 'NEGOTIATION', toStage: 'NEGOTIATION' }))
       expect(f.state().audits).toEqual([
         expect.objectContaining({
-          action: 'crm.deal.delete',
+          action: 'crm.deal.archive',
           targetType: 'Deal',
           targetId: id,
         }),
@@ -205,10 +218,29 @@ describe('CRM outcome integrity', () => {
       expect(f.publish).toHaveBeenCalledWith('tenant_1', ['asas,crm'])
     } finally { await f.app.close() }
   })
-  it('blocks member from deleting a deal', async () => {
+  it.each(['history', 'audit'])('rolls back archival when its %s record cannot be saved', async failure => {
+    const f = await setup({ failHistory: failure === 'history', failAudit: failure === 'audit' })
+    try {
+      expect((await f.archive()).statusCode).toBe(500)
+      expect(f.state()).toMatchObject({ deal: { archivedAt: null }, history: [], audits: [], writes: 0 })
+      expect(f.publish).not.toHaveBeenCalled()
+    } finally { await f.app.close() }
+  })
+  it('restores an archived deal without replacing its existing history', async () => {
+    const f = await setup()
+    try {
+      expect((await f.archive()).statusCode).toBe(204)
+      const priorHistory = f.state().history.length
+      expect((await f.restore()).statusCode).toBe(204)
+      expect(f.state().deal.archivedAt).toBeNull()
+      expect(f.state().history).toHaveLength(priorHistory + 1)
+      expect(f.state().audits.map(audit => audit.action)).toEqual(['crm.deal.archive', 'crm.deal.restore'])
+    } finally { await f.app.close() }
+  })
+  it('blocks member from archiving a deal', async () => {
     const f = await setup({ role: 'MEMBER' })
     try {
-      expect((await f.del()).statusCode).toBe(403)
+      expect((await f.archive()).statusCode).toBe(403)
       expect(f.transaction).not.toHaveBeenCalled()
     } finally { await f.app.close() }
   })

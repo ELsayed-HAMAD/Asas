@@ -29,7 +29,6 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { requireAuthContext, requireRole } from '../../middlewares/rbac.js'
 import { requirePermission } from '../../middlewares/permissions.js'
-import { recordAuditLog } from '../../services/auditLog.js'
 import { moduleKeyPrefix } from '../../plugins/sse.js'
 import * as inventoryController from './inventory.controller.js'
 
@@ -100,15 +99,7 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async request => {
     const { tenantId, userId } = requireAuthContext(request)
-    const items = await inventoryController.addProductSupplier(request.server.prisma, tenantId, request.params.id, request.body.name)
-    await recordAuditLog(request.server.prisma, {
-      tenantId,
-      actorId: userId,
-      action: 'inventory.product.supplier.add',
-      targetType: 'Product',
-      targetId: request.params.id,
-      metadata: { supplierName: request.body.name },
-    })
+    const items = await inventoryController.addProductSupplier(request.server.prisma, tenantId, request.params.id, request.body.name, userId)
     request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
     return { data: { items } }
   })
@@ -121,15 +112,7 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async request => {
     const { tenantId, userId } = requireAuthContext(request)
-    const items = await inventoryController.removeProductSupplier(request.server.prisma, tenantId, request.params.id, request.params.supplierId)
-    await recordAuditLog(request.server.prisma, {
-      tenantId,
-      actorId: userId,
-      action: 'inventory.product.supplier.remove',
-      targetType: 'Product',
-      targetId: request.params.id,
-      metadata: { supplierId: request.params.supplierId },
-    })
+    const items = await inventoryController.removeProductSupplier(request.server.prisma, tenantId, request.params.id, request.params.supplierId, userId)
     request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
     return { data: { items } }
   })
@@ -151,15 +134,7 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
     schema: { body: purchaseOrderWriteSchema, response: { 201: envelope(purchaseOrderSchema), ...errorResponses } },
   }, async (request, reply) => {
     const { tenantId, userId } = requireAuthContext(request)
-    const order = await inventoryController.createPurchaseOrder(request.server.prisma, tenantId, request.body)
-    await recordAuditLog(request.server.prisma, {
-      tenantId,
-      actorId: userId,
-      action: 'inventory.purchase-order.create',
-      targetType: 'PurchaseOrder',
-      targetId: order.id,
-      metadata: { productId: order.productId, quantity: order.quantity },
-    })
+    const order = await inventoryController.createPurchaseOrder(request.server.prisma, tenantId, request.body, userId)
     request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
     reply.code(201)
     return { data: order }
@@ -173,14 +148,7 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async request => {
     const { tenantId, userId } = requireAuthContext(request)
-    const order = await inventoryController.approvePurchaseOrder(request.server.prisma, tenantId, request.params.id)
-    await recordAuditLog(request.server.prisma, {
-      tenantId,
-      actorId: userId,
-      action: 'inventory.purchase-order.approve',
-      targetType: 'PurchaseOrder',
-      targetId: order.id,
-    })
+    const order = await inventoryController.approvePurchaseOrder(request.server.prisma, tenantId, request.params.id, userId)
     request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
     return { data: order }
   })
@@ -193,15 +161,7 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async request => {
     const { tenantId, userId } = requireAuthContext(request)
-    const order = await inventoryController.receivePurchaseOrder(request.server.prisma, tenantId, request.params.id)
-    await recordAuditLog(request.server.prisma, {
-      tenantId,
-      actorId: userId,
-      action: 'inventory.purchase-order.receive',
-      targetType: 'PurchaseOrder',
-      targetId: order.id,
-      metadata: { productId: order.productId, quantity: order.quantity },
-    })
+    const order = await inventoryController.receivePurchaseOrder(request.server.prisma, tenantId, request.params.id, userId)
     request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
     return { data: order }
   })
@@ -214,14 +174,7 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async request => {
     const { tenantId, userId } = requireAuthContext(request)
-    const order = await inventoryController.cancelPurchaseOrder(request.server.prisma, tenantId, request.params.id)
-    await recordAuditLog(request.server.prisma, {
-      tenantId,
-      actorId: userId,
-      action: 'inventory.purchase-order.cancel',
-      targetType: 'PurchaseOrder',
-      targetId: order.id,
-    })
+    const order = await inventoryController.cancelPurchaseOrder(request.server.prisma, tenantId, request.params.id, userId)
     request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
     return { data: order }
   })
@@ -237,14 +190,7 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      const product = await inventoryController.createProduct(request.server.prisma, tenantId, request.body)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'inventory.product.create',
-        targetType: 'Product',
-        targetId: product.id,
-      })
+      const product = await inventoryController.createProduct(request.server.prisma, tenantId, request.body, userId)
       request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
       reply.code(201)
       return { data: product }
@@ -268,15 +214,8 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
         tenantId,
         request.params.id,
         request.body,
+        userId,
       )
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'inventory.product.update',
-        targetType: 'Product',
-        targetId: product.id,
-        metadata: { fields: Object.keys(request.body) },
-      })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
       return { data: product }
     },
@@ -291,14 +230,7 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async request => {
     const { tenantId, userId } = requireAuthContext(request)
-    const product = await inventoryController.setProductArchived(request.server.prisma, tenantId, request.params.id, request.body)
-    await recordAuditLog(request.server.prisma, {
-      tenantId,
-      actorId: userId,
-      action: request.body.archived ? 'inventory.product.archive' : 'inventory.product.restore',
-      targetType: 'Product',
-      targetId: product.id,
-    })
+    const product = await inventoryController.setProductArchived(request.server.prisma, tenantId, request.params.id, request.body, userId)
     request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
     return { data: product }
   })
@@ -314,14 +246,7 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      await inventoryController.deleteProduct(request.server.prisma, tenantId, request.params.id)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'inventory.product.archive',
-        targetType: 'Product',
-        targetId: request.params.id,
-      })
+      await inventoryController.deleteProduct(request.server.prisma, tenantId, request.params.id, userId)
       request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
       reply.code(204)
     },
@@ -405,15 +330,8 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
         request.server.prisma,
         tenantId,
         request.body,
+        userId,
       )
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'inventory.stock.record',
-        targetType: 'StockMovement',
-        targetId: movement.id,
-        metadata: { productId: movement.productId, delta: movement.delta },
-      })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
       reply.code(201)
       return { data: movement }

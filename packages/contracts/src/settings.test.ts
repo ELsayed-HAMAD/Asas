@@ -5,6 +5,8 @@ import {
   generalSettingsUpdateSchema,
   integrationUpdateSchema,
   integrationWriteSchema,
+  notificationSettingsUpdateSchema,
+  quietHoursSchema,
 } from './settings/index.js'
 
 describe('workspace FX contracts', () => {
@@ -30,6 +32,26 @@ describe('workspace overtime settings', () => {
     for (const overtimeThresholdHours of [0, 24.1, -1, '8']) {
       expect(generalSettingsUpdateSchema.safeParse({ overtimeThresholdHours }).success).toBe(false)
     }
+  })
+})
+
+describe('workspace timezone settings', () => {
+  it('accepts supported IANA timezone identifiers and rejects invalid values', () => {
+    expect(generalSettingsUpdateSchema.parse({ timezone: 'Africa/Cairo' })).toEqual({ timezone: 'Africa/Cairo' })
+    expect(generalSettingsUpdateSchema.parse({ timezone: 'UTC' })).toEqual({ timezone: 'UTC' })
+    expect(generalSettingsUpdateSchema.safeParse({ timezone: 'Mars/Olympus_Mons' }).success).toBe(false)
+    expect(generalSettingsUpdateSchema.safeParse({ timezone: '   ' }).success).toBe(false)
+  })
+})
+
+describe('notification quiet-hours settings', () => {
+  it('accepts valid windows and rejects impossible times or a full-day mute', () => {
+    expect(quietHoursSchema.safeParse({ start: '22:00', end: '07:00' }).success).toBe(true)
+    expect(quietHoursSchema.safeParse({ start: '13:00', end: '15:00' }).success).toBe(true)
+    expect(quietHoursSchema.safeParse({ start: '25:00', end: '07:00' }).success).toBe(false)
+    expect(quietHoursSchema.safeParse({ start: '22:00', end: '22:00' }).success).toBe(false)
+    expect(notificationSettingsUpdateSchema.safeParse({ quietHours: { start: '22:00', end: '22:00' } }).success).toBe(false)
+    expect(notificationSettingsUpdateSchema.safeParse({ quietHours: { start: '21:30' } }).success).toBe(true)
   })
 })
 

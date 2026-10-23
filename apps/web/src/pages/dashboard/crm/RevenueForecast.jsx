@@ -29,8 +29,6 @@ import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import SearchInput from '../../../components/common/SearchInput';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
-import { Badge } from '../../../components/ui/badge';
-import { Progress } from '../../../components/ui/progress';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
 import {
   Table,
@@ -131,7 +129,7 @@ export default function RevenueForecast() {
     );
   }
 
-  const { forecastByRep, quotas, monthlyPipeline, summary } = data;
+  const { liveForecastByRep, quotas, monthlyPipeline, summary } = data;
   const closedWon = perf?.yearWonTotal ?? null;
   const currency = summary.totalQuota?.currency || 'USD'
 
@@ -167,16 +165,15 @@ export default function RevenueForecast() {
   // Expected shortfall = quota − closed-won (display arithmetic on two server aggregates).
   const expectedShortfall = quotaMajor > 0 && closedWon != null ? Math.max(0, quotaMajor - wonMajor) : null;
 
-  // Quota row per rep, joined by repName (the only rep identity forecastByRep carries).
   const availableYears = [...new Set([selectedYear, ...(data.availableYears || [])])].sort((a, b) => b.localeCompare(a))
   const formatCurrency = (num) => formatCompactMoney(num, currency)
   const formatExactCurrency = (num) => formatMoney(num, { currency })
-  const visibleReps = forecastByRep.filter(rep => rep.repName.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
+  const visibleReps = liveForecastByRep.filter(rep => rep.repName.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
   const displayedReps = showAllReps || search.trim() ? visibleReps : visibleReps.slice(0, 5)
   const exportCsv = () => {
     const rows = [
       ['Rep', 'Period', `Closed (${currency})`, `Commit (${currency})`, `Best Case (${currency})`, 'Quota attainment (%)'],
-      ...visibleReps.map(rep => [rep.repName, rep.period, toMajor(rep.closed), toMajor(rep.commit), toMajor(rep.bestCase), rep.quotaPct]),
+      ...visibleReps.map(rep => [rep.repName, selectedYear, toMajor(rep.closed), toMajor(rep.commit), toMajor(rep.bestCase), rep.quotaAttainmentPct]),
     ]
     downloadCsv(rows, `revenue-forecast-${new Date().toISOString().slice(0, 10)}.csv`)
   }
@@ -188,23 +185,25 @@ export default function RevenueForecast() {
 
   return (
     <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-0">
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
-        {/* ── Page Toolbar Controls ── */}
-        <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+        {/* ── 1. Top Filter & Action Toolbar (Standard Apple-Glass Bar) ── */}
+        <div className="bg-white/85 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-2.5 shadow-[0_2px_10px_-3px_rgba(15,23,42,0.04)] flex flex-wrap items-center justify-between gap-2.5">
           {/* Left: Search reps */}
           <SearchInput
             value={search}
             onChange={event => setSearch(event.target.value)}
             placeholder="Search reps..."
-            wrapperClassName="w-64 sm:w-72"
+            aria-label="Search reps"
+            wrapperClassName="w-full sm:w-64 md:w-72 shrink-0"
+            className="h-9 text-sm"
           />
 
           {/* Right: Year, Download, Manage Quotas, Share Forecast */}
-          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
             <Select value={String(selectedYear)} onValueChange={val => setSelectedYear(val)}>
               <SelectTrigger
                 aria-label="Forecast calendar year"
-                className="h-9 w-auto px-3.5 gap-2 bg-white text-slate-700 border border-slate-200/80 rounded-xl text-sm font-medium shadow-xs hover:bg-slate-50/50 shrink-0"
+                className="h-9 w-auto px-3.5 gap-2 bg-slate-100/75 hover:bg-slate-100 text-slate-700 border border-slate-200/70 rounded-xl text-xs sm:text-sm font-medium shadow-none shrink-0 cursor-pointer"
               >
                 <SelectValue />
               </SelectTrigger>
@@ -222,7 +221,7 @@ export default function RevenueForecast() {
               onClick={exportCsv}
               aria-label="Download forecast CSV"
               title="Download forecast CSV"
-              className="h-9 w-9 bg-white border border-slate-200/80 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-50/50 shadow-xs shrink-0"
+              className="w-9 h-9 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-600 hover:text-slate-900 shadow-sm shrink-0 cursor-pointer"
             >
               <Download className="w-4 h-4" />
             </Button>
@@ -232,7 +231,7 @@ export default function RevenueForecast() {
                 type="button"
                 variant="outline"
                 onClick={openQuotaManager}
-                className="h-9 px-3.5 text-sm font-medium bg-white border border-slate-200/80 rounded-xl text-slate-700 hover:bg-slate-50/50 shadow-xs gap-2 shrink-0"
+                className="h-9 px-3.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/80 text-xs sm:text-sm font-semibold text-slate-700 shadow-sm gap-2 shrink-0 cursor-pointer"
               >
                 <Settings className="w-4 h-4 text-slate-500" />
                 Manage Quotas
@@ -242,7 +241,7 @@ export default function RevenueForecast() {
             <Button
               type="button"
               onClick={shareForecast}
-              className="h-9 px-4 text-sm font-semibold rounded-xl bg-primary hover:bg-primary-hover text-white shadow-xs gap-2 shrink-0"
+              className="h-9 px-4 rounded-xl text-xs sm:text-sm font-semibold shadow-sm gap-2 shrink-0 cursor-pointer"
             >
               <Share2 className="w-4 h-4" />
               Share Forecast
@@ -251,188 +250,232 @@ export default function RevenueForecast() {
         </div>
 
         {summary.excludedQuotaCount > 0 && (
-          <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+          <Alert className="border-amber-200 bg-amber-50 text-amber-900 rounded-xl">
             <AlertDescription className="text-xs font-medium">
               {summary.excludedQuotaCount} quota row(s) with a nonannual period or unknown/foreign currency are excluded from annual base-currency totals.
             </AlertDescription>
           </Alert>
         )}
 
-        {/* ── KPIs Grid ── */}
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        {/* ── 2. Row 1: Elevate the 4 KPI Cards ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
-          {/* Closed Won */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col justify-between min-h-[8.5rem] h-full">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Closed Won ({selectedYear})</p>
-              <CheckCircle2 size={16} className="text-gray-400" />
+          {/* Card 1: Closed Won */}
+          <div className="bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col justify-between min-h-[124px]">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Closed Won ({selectedYear})</p>
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 flex items-center justify-center shrink-0">
+                <CheckCircle2 size={16} />
+              </div>
             </div>
-            <div className="mt-auto pt-2">
-              <p className="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">{closedWon == null ? '—' : formatCurrency(wonMajor)}</p>
-              <Progress
-                value={wonPctToQuota == null ? 0 : Math.min(100, wonPctToQuota)}
-                className="w-full bg-gray-200 h-1.5 mb-1.5"
-                indicatorClassName="bg-[#10b981]"
-              />
-              <div className="flex justify-between items-center text-[10px] text-gray-500 font-medium">
+            <p className="text-2xl font-bold tracking-tight text-slate-900 my-1 tabular-nums">
+              {closedWon == null ? '—' : formatCurrency(wonMajor)}
+            </p>
+            <div className="mt-auto pt-1">
+              <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 rounded-full transition-all"
+                  style={{ width: `${wonPctToQuota == null ? 0 : Math.min(100, wonPctToQuota)}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1.5 font-medium">
                 <span>{wonPctToQuota == null ? 'No quota set' : `${Math.round(wonPctToQuota)}% to Quota`}</span>
                 <span>{quotaMajor === 0 ? 'No goal' : `${formatCurrency(quotaMajor)} Goal`}</span>
               </div>
             </div>
           </div>
 
-          {/* Committed */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col justify-between min-h-[8.5rem] h-full">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Committed</p>
-              <Handshake size={16} className="text-[#3b82f6]" />
+          {/* Card 2: Committed */}
+          <div className="bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col justify-between min-h-[124px]">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Committed</p>
+              <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200/60 text-indigo-600 flex items-center justify-center shrink-0">
+                <Handshake size={16} />
+              </div>
             </div>
-            <div className="mt-auto pt-2">
-              <p className="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">{committedTotal === 0 ? '—' : formatCurrency(committedTotal)}</p>
-              <Badge className="bg-[#eff6ff] text-[#1d4ed8] border-transparent font-bold text-[10px] px-2.5 py-1">
-                <div className="w-1.5 h-1.5 bg-[#3b82f6] rounded-full mr-1.5 shrink-0" />
+            <p className="text-2xl font-bold tracking-tight text-slate-900 my-1 tabular-nums">
+              {committedTotal === 0 ? '—' : formatCurrency(committedTotal)}
+            </p>
+            <div className="mt-auto pt-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold w-fit bg-blue-50 text-blue-700 border border-blue-200/60">
+                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full shrink-0" />
                 High Confidence · {summary.dealCommitCount} {summary.dealCommitCount === 1 ? 'deal' : 'deals'}
-              </Badge>
+              </div>
             </div>
           </div>
 
-          {/* Best Case */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col justify-between min-h-[8.5rem] h-full">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Best Case (Upside)</p>
-              <TrendingUp size={16} className="text-[#eab308]" />
+          {/* Card 3: Best Case */}
+          <div className="bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col justify-between min-h-[124px]">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Best Case (Upside)</p>
+              <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200/60 text-amber-600 flex items-center justify-center shrink-0">
+                <TrendingUp size={16} />
+              </div>
             </div>
-            <div className="mt-auto pt-2">
-              <p className="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">{bestCaseTotal === 0 ? '—' : formatCurrency(bestCaseTotal)}</p>
-              <Badge className="bg-[#fefce8] text-[#a16207] border-transparent font-bold text-[10px] px-2.5 py-1">
-                <div className="w-1.5 h-1.5 bg-[#eab308] rounded-full mr-1.5 shrink-0" />
+            <p className="text-2xl font-bold tracking-tight text-slate-900 my-1 tabular-nums">
+              {bestCaseTotal === 0 ? '—' : formatCurrency(bestCaseTotal)}
+            </p>
+            <div className="mt-auto pt-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold w-fit bg-amber-50 text-amber-800 border border-amber-200/60">
+                <span className="w-1.5 h-1.5 bg-amber-500 rounded-full shrink-0" />
                 Medium Confidence · {summary.dealBestCaseCount} {summary.dealBestCaseCount === 1 ? 'deal' : 'deals'}
-              </Badge>
+              </div>
             </div>
           </div>
 
-          {/* Pipeline Coverage */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col justify-between min-h-[8.5rem] h-full">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Pipeline Coverage</p>
-              <Filter size={16} className="text-gray-400" />
+          {/* Card 4: Pipeline Coverage */}
+          <div className="bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col justify-between min-h-[124px]">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Pipeline Coverage</p>
+              <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200/60 text-slate-600 flex items-center justify-center shrink-0">
+                <Filter size={16} />
+              </div>
             </div>
-            <div className="mt-auto pt-2">
-              <p className="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">{coverage == null ? '—' : `${coverage.toFixed(1)}x`}</p>
-              <span className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium">
-                <Info size={12} className="text-gray-400" />
-                {coverage == null ? 'Set a quota to measure coverage' : 'Open pipeline ÷ quota'}
-              </span>
-              <span className="block text-[10px] text-gray-500 font-medium">
-                Weighted pipeline: {formatCurrency(weightedTotal)}
-                {summary.unweightedDealCount > 0 && ` · ${summary.unweightedDealCount} deal(s), ${formatCurrency(toMajor(summary.unweightedPipeline))}, excluded (missing/invalid probability)`}
-              </span>
+            <p className="text-2xl font-bold tracking-tight text-slate-900 my-1 tabular-nums">
+              {coverage == null ? '—' : `${coverage.toFixed(1)}x`}
+            </p>
+            <div className="mt-auto pt-1">
+              <div className="bg-slate-50/80 border border-slate-200/60 rounded-xl px-2.5 py-1.5 text-[11px] text-slate-500 leading-tight space-y-0.5">
+                <div className="flex items-center gap-1.5">
+                  <Info size={12} className="text-slate-400 shrink-0" />
+                  <span>{coverage == null ? 'Set a quota to measure coverage' : 'Open pipeline ÷ quota'}</span>
+                </div>
+                <div className="truncate">
+                  <span className="font-semibold text-slate-700">Weighted pipeline: {formatCurrency(weightedTotal)}</span>
+                  {summary.unweightedDealCount > 0 && ` · ${summary.unweightedDealCount} deal(s), ${formatCurrency(toMajor(summary.unweightedPipeline))}, excluded (missing/invalid probability)`}
+                </div>
+              </div>
             </div>
           </div>
 
         </div>
 
-        {/* ── Main Chart: Closed Won and Open Pipeline ── */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 flex flex-col w-full overflow-x-auto">
+        {/* ── 3. Row 2: Fix Revenue by Close Month Chart Proportions & Bar Widths ── */}
+        <div className="bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col w-full">
 
           {/* Chart Header & Legend */}
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-bold text-gray-900">Revenue by Close Month</h2>
-            <div className="flex items-center gap-4 text-xs font-semibold text-gray-600">
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-[#0f172a]"></div> Closed Won</div>
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-[#a5b4fc]"></div> Commit</div>
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-[#e5e7eb]"></div> Other Open</div>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <h2 className="text-base font-bold text-slate-900">Revenue by Close Month</h2>
+            <div className="bg-slate-100/80 border border-slate-200/60 rounded-xl px-3 py-1.5 flex items-center gap-4 text-xs font-medium text-slate-600 shrink-0">
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-[#0f172a]" /> Closed Won</div>
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-[#a5b4fc]" /> Commit</div>
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-[#e5e7eb]" /> Other Open</div>
             </div>
           </div>
 
-          {/* Closed won, committed, and remaining open deals grouped by close month. */}
-          <div className="w-full h-[360px] relative">
+          {/* Closed won, committed, and remaining open deals grouped by close month */}
+          <div className="w-full h-[230px] sm:h-[250px] relative">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280', fontWeight: 500 }} dy={8} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af', fontWeight: 500 }} tickFormatter={(v) => formatCompactMoney(v, summary.totalQuota?.currency || 'USD')} />
+              <BarChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }} maxBarSize={56}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis
+                  dataKey="month"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                  dy={8}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 500 }}
+                  tickFormatter={(v) => formatCompactMoney(v, summary.totalQuota?.currency || 'USD')}
+                />
                 <Tooltip
-                  contentStyle={{ borderRadius: 10, border: '1px solid #e5e7eb', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', fontSize: 13 }}
+                  contentStyle={{
+                    borderRadius: 12,
+                    border: '1px solid rgba(226, 232, 240, 0.8)',
+                    boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.08)',
+                    fontSize: 12,
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    backdropFilter: 'blur(8px)',
+                  }}
                   formatter={(value, name) => {
                     if (value === 0) return [null, name === 'closed' ? 'Closed' : name === 'commit' ? 'Commit' : 'Pipeline'];
-                    const label = name === 'closed' ? 'Closed' : name === 'commit' ? 'Commit' : 'Pipeline'
-                    return [formatCompactMoney(value, summary.totalQuota?.currency || 'USD'), label]
+                    const label = name === 'closed' ? 'Closed' : name === 'commit' ? 'Commit' : 'Pipeline';
+                    return [formatCompactMoney(value, summary.totalQuota?.currency || 'USD'), label];
                   }}
-                  labelStyle={{ fontWeight: 600, color: '#111827' }}
+                  labelStyle={{ fontWeight: 600, color: '#0f172a' }}
                 />
-                <Bar dataKey="closed" stackId="a" fill="#0f172a" radius={[0, 0, 0, 0]} animationDuration={1000} />
-                <Bar dataKey="commit" stackId="a" fill="#a5b4fc" radius={[0, 0, 0, 0]} animationDuration={1000} />
-                <Bar dataKey="pipeline" stackId="a" fill="#e5e7eb" radius={[4, 4, 0, 0]} animationDuration={1000} />
+                <Bar dataKey="closed" stackId="a" fill="#0f172a" maxBarSize={56} animationDuration={1000} />
+                <Bar dataKey="commit" stackId="a" fill="#a5b4fc" maxBarSize={56} animationDuration={1000} />
+                <Bar dataKey="pipeline" stackId="a" fill="#e5e7eb" radius={[6, 6, 0, 0]} maxBarSize={56} animationDuration={1000} />
               </BarChart>
             </ResponsiveContainer>
             {chartData.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-400">
+              <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-400">
                 No open deals with a close date yet.
               </div>
             )}
           </div>
         </div>
 
-        {/* ── Bottom Row ── */}
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        {/* ── 4. Row 3: Forecast by Rep & Fixed Expected Shortfall Card ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
 
-          {/* Forecast by Rep Table — real ForecastSnapshot rows */}
-          <div className="col-span-1 xl:col-span-8 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col overflow-x-auto">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900">Forecast by Rep</h2>
+          {/* Left Card: Forecast by Rep Table */}
+          <div className="col-span-1 lg:col-span-8 bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col justify-between overflow-x-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-bold text-slate-900">Forecast by Rep</h2>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowAllReps(value => !value)}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-800 h-7 px-2"
+                className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 h-7 px-2 cursor-pointer"
               >
                 {showAllReps ? 'Show Top 5' : `View All (${visibleReps.length})`}
               </Button>
             </div>
             <Table className="w-full min-w-[650px] text-left border-collapse">
-              <TableHeader className="bg-white border-0">
+              <TableHeader className="bg-slate-50/90 border-y border-slate-200/70">
                 <TableRow className="border-0 hover:bg-transparent">
-                  <TableHead className="px-6 py-3 h-auto text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 rtl:text-left">Rep</TableHead>
-                  <TableHead className="px-6 py-3 h-auto text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 text-right">Closed</TableHead>
-                  <TableHead className="px-6 py-3 h-auto text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 text-right">Commit</TableHead>
-                  <TableHead className="px-6 py-3 h-auto text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 text-right">Best Case</TableHead>
-                  <TableHead className="px-6 py-3 h-auto text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 text-right w-32">To Quota</TableHead>
+                  <TableHead className="py-2.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 rtl:text-left">Rep</TableHead>
+                  <TableHead className="py-2.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-right">Closed</TableHead>
+                  <TableHead className="py-2.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-right">Commit</TableHead>
+                  <TableHead className="py-2.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-right">Best Case</TableHead>
+                  <TableHead className="py-2.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-right w-32">To Quota</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody className="divide-y divide-gray-100">
+              <TableBody className="divide-y divide-slate-100">
                 {displayedReps.length === 0 ? (
                   <TableRow className="border-0 hover:bg-transparent">
-                    <TableCell colSpan={5} className="px-6 py-10 text-center text-sm text-gray-400">
-                      No forecast snapshots recorded yet.
+                    <TableCell colSpan={5} className="py-2">
+                      <div className="my-2 bg-slate-50/60 border border-dashed border-slate-200/80 rounded-xl py-6 text-center text-xs text-slate-400">
+                        No owned deals with a close date in {selectedYear} yet.
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
                   displayedReps.map((rep) => {
-                    const quotaRow = quotas.find(q => q.repName === rep.repName && q.period === rep.period && q.quota?.currency === currency);
-                    const quotaVal = quotaRow ? toMajor(quotaRow.quota) : null;
-                    const repQuotaPct = rep.quotaPct != null ? rep.quotaPct : (quotaVal && toMajor(rep.closed) > 0 ? Math.min(100, (toMajor(rep.closed) / quotaVal) * 100) : null);
+                    const repQuotaPct = rep.quotaAttainmentPct;
                     return (
-                      <TableRow key={rep.id} className="hover:bg-gray-50 border-0">
-                        <TableCell className="px-6 py-4 flex items-center gap-3">
-                          <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden shrink-0 border border-gray-200">
-                            <span className="text-[10px] font-bold text-gray-500">
-                              {rep.repName.split(/\s+/).filter(Boolean).map((p) => p[0]).slice(0, 2).join('').toUpperCase()}
-                            </span>
+                      <TableRow key={rep.id} className="hover:bg-slate-50/70 border-0 transition-colors">
+                        <TableCell className="px-3 py-3 flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden shrink-0 border border-slate-200/80 text-[10px] font-bold text-slate-600">
+                            {rep.repName.split(/\s+/).filter(Boolean).map((p) => p[0]).slice(0, 2).join('').toUpperCase()}
                           </div>
-                          <span className="text-sm font-semibold text-gray-900">{rep.repName}</span>
+                          <span className="text-xs sm:text-sm font-semibold text-slate-800">{rep.repName}</span>
                         </TableCell>
-                        <TableCell className="px-6 py-4 text-right text-sm font-bold text-gray-900 tabular-nums" title={formatExactCurrency(toMajor(rep.closed))}>{formatCurrency(toMajor(rep.closed))}</TableCell>
-                        <TableCell className="px-6 py-4 text-right text-sm text-gray-600 font-medium tabular-nums" title={formatExactCurrency(toMajor(rep.commit))}>{formatCurrency(toMajor(rep.commit))}</TableCell>
-                        <TableCell className="px-6 py-4 text-right text-sm text-gray-600 font-medium tabular-nums" title={formatExactCurrency(toMajor(rep.bestCase))}>{formatCurrency(toMajor(rep.bestCase))}</TableCell>
-                        <TableCell className="px-6 py-4">
+                        <TableCell className="px-3 py-3 text-right text-xs sm:text-sm font-bold text-slate-900 tabular-nums" title={formatExactCurrency(toMajor(rep.closed))}>
+                          {formatCurrency(toMajor(rep.closed))}
+                        </TableCell>
+                        <TableCell className="px-3 py-3 text-right text-xs sm:text-sm text-slate-600 font-medium tabular-nums" title={formatExactCurrency(toMajor(rep.commit))}>
+                          {formatCurrency(toMajor(rep.commit))}
+                        </TableCell>
+                        <TableCell className="px-3 py-3 text-right text-xs sm:text-sm text-slate-600 font-medium tabular-nums" title={formatExactCurrency(toMajor(rep.bestCase))}>
+                          {formatCurrency(toMajor(rep.bestCase))}
+                        </TableCell>
+                        <TableCell className="px-3 py-3">
                           <div className="flex items-center justify-end gap-2">
-                            <Progress
-                              value={repQuotaPct == null ? 0 : Math.min(100, repQuotaPct)}
-                              className="w-12 bg-gray-200 h-1.5"
-                              indicatorClassName={repQuotaPct >= 100 ? 'bg-emerald-500' : 'bg-blue-500'}
-                            />
-                            <span className="text-xs font-semibold text-gray-600 w-8 text-right">{repQuotaPct == null ? '—' : `${Math.round(repQuotaPct)}%`}</span>
+                            <div className="w-12 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${repQuotaPct >= 100 ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                                style={{ width: `${repQuotaPct == null ? 0 : Math.min(100, repQuotaPct)}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-semibold text-slate-600 w-8 text-right tabular-nums">
+                              {repQuotaPct == null ? '—' : `${Math.round(repQuotaPct)}%`}
+                            </span>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -443,33 +486,57 @@ export default function RevenueForecast() {
             </Table>
           </div>
 
-          {/* Alerts & Shortfall */}
-          <div className="col-span-1 xl:col-span-4 flex flex-col gap-4">
+          {/* Right Column: Alerts & Fixed Expected Shortfall Card */}
+          <div className="col-span-1 lg:col-span-4 flex flex-col gap-4 justify-between">
 
             {expectedShortfall > 0 && (
-              <Alert className="border-[#fde047] bg-[#fef9c3] text-[#854d0e] flex items-center gap-3 shadow-sm">
-                <AlertTriangle className="h-5 w-5 text-[#a16207] shrink-0" />
-                <AlertDescription className="text-sm font-bold">
+              <Alert className="border-amber-200 bg-amber-50 text-amber-900 rounded-xl p-3 flex items-center gap-3 shadow-xs">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                <AlertDescription className="text-xs font-semibold">
                   Pipeline is below quota by {formatCurrency(expectedShortfall)}.
                 </AlertDescription>
               </Alert>
             )}
 
-            {/* Expected Shortfall Card — real: quota − closed-won */}
-            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex-1 flex flex-col justify-center relative overflow-hidden">
-              <div className="flex items-center gap-2 mb-4 relative z-10">
-                <TrendingDown size={16} className="text-gray-400" />
-                <h3 className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Expected Shortfall</h3>
-              </div>
-              <div className="flex items-baseline gap-2 relative z-10">
-                <p className="text-5xl font-black text-[#dc2626] tracking-tight tabular-nums">{expectedShortfall == null ? '—' : formatCurrency(expectedShortfall)}</p>
-                <span className="text-xs font-semibold text-gray-500 mb-1">vs Quota</span>
+            {/* Expected Shortfall Card */}
+            <div className="bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] relative overflow-hidden flex flex-col justify-between flex-1 min-h-[180px]">
+              {/* Top Header Row */}
+              <div className="flex items-center justify-between gap-2 relative z-10">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  Expected Shortfall
+                </h3>
+                <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 flex items-center justify-center shrink-0">
+                  <TrendingDown size={16} />
+                </div>
               </div>
 
-              {/* Subtle background decoration to match image flair */}
-              <div className="absolute -bottom-4 -left-4 opacity-10">
-                 <TrendingDown size={100} className="text-[#dc2626]" />
+              {/* Metric and Pill */}
+              <div className="my-2 relative z-10">
+                <div className="flex items-baseline gap-2.5 flex-wrap">
+                  <span className="text-3xl sm:text-4xl font-extrabold tracking-tight text-rose-600 tabular-nums">
+                    {expectedShortfall == null ? '—' : formatCurrency(expectedShortfall)}
+                  </span>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-200/60">
+                    vs Quota
+                  </span>
+                </div>
               </div>
+
+              {/* Bottom Recessed Status Bar */}
+              <div className="relative z-10 mt-auto pt-2">
+                <div className="h-1.5 w-full rounded-full bg-rose-100 overflow-hidden">
+                  <div
+                    className="h-full bg-rose-500 rounded-full transition-all"
+                    style={{ width: expectedShortfall != null && quotaMajor > 0 ? `${Math.min(100, (expectedShortfall / quotaMajor) * 100)}%` : '0%' }}
+                  />
+                </div>
+              </div>
+
+              {/* Watermark Trend Icon in Bottom-Right */}
+              <TrendingDown
+                size={96}
+                className="pointer-events-none absolute -right-3 -bottom-3 text-rose-500/10 select-none"
+              />
             </div>
 
           </div>

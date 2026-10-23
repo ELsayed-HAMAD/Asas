@@ -83,6 +83,8 @@ describe('getBillingSettings', () => {
             id: 'sub_1',
             planName: 'Pro Tier',
             priceMonthly: 499,
+            stripeCurrency: 'USD',
+            stripeSubscriptionId: 'stripe_sub_1',
             status: 'ACTIVE',
             renewsOn: new Date('2026-11-01T00:00:00.000Z'),
             seatsUsed: 1,
@@ -105,9 +107,39 @@ describe('getBillingSettings', () => {
     expect(result.subscriptions[0].seatsUsed).toBe(12)
     expect(result.subscriptions[0].seatLimit).toBe(50)
     expect(result.stripePortalAvailable).toBe(false)
+    expect(result.effectivePlan).toMatchObject({
+      planName: 'Pro Tier', priceMonthly: '499', currency: 'USD', billingStatus: 'ACTIVE',
+      source: 'subscription', seatsUsed: 12, seatLimit: 50, storageLimitGb: 100,
+    })
     expect(result.subscriptions[0].storageUsedGb).toBeNull()
     const measured = await getBillingSettings(prisma, 'tenant_1', 0.125)
     expect(measured.subscriptions[0].storageUsedGb).toBe(0.125)
+  })
+
+  it('exposes the exact paid grace-period entitlement and falls back to Free when grace expires', async () => {
+    const subscription = {
+      id: 'sub_grace', planName: 'Paid Growth', priceMonthly: { toString: () => '29.00' }, stripeCurrency: 'USD',
+      stripeSubscriptionId: 'stripe_sub_grace', status: 'PAST_DUE', renewsOn: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000), seatsUsed: 4, seatLimit: 15, storageLimitGb: 25,
+    }
+    const prisma = {
+      subscription: { findMany: vi.fn().mockResolvedValue([subscription]) },
+      paymentMethod: { findMany: vi.fn().mockResolvedValue([]) },
+      billingInvoice: { findMany: vi.fn().mockResolvedValue([]) },
+      member: { count: vi.fn().mockResolvedValue(4) },
+      tenant: { findUnique: vi.fn().mockResolvedValue({ stripeCustomerId: 'cus_1' }) },
+    } as unknown as PrismaClient
+    const { getBillingSettings } = await import('../src/modules/settings/settings.service.js')
+
+    const inGrace = await getBillingSettings(prisma, 'tenant_1', 2)
+    expect(inGrace.effectivePlan).toMatchObject({ planName: 'Paid Growth', billingStatus: 'PAST_DUE', source: 'subscription', seatLimit: 15, storageLimitGb: 25, storageUsedGb: 2 })
+    expect(new Date(inGrace.effectivePlan.graceEndsOn!).getTime()).toBeGreaterThan(Date.now())
+
+    subscription.renewsOn = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000)
+    subscription.updatedAt = subscription.renewsOn
+    const expired = await getBillingSettings(prisma, 'tenant_1', 2)
+    expect(expired.effectivePlan).toMatchObject({ planName: 'Free Starter', priceMonthly: '0', billingStatus: 'FREE', source: 'free-fallback', seatLimit: 5, storageLimitGb: 5, storageUsedGb: 2 })
+    expect(expired.effectivePlan.graceEndsOn).toBeNull()
   })
 })
 
@@ -121,18 +153,19 @@ describe('deleteWorkspace', () => {
       exchangeRate: { deleteMany: vi.fn().mockResolvedValue({ count: 2 }) },
       invitation: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
       member: { deleteMany: vi.fn().mockResolvedValue({ count: 3 }) },
-      tenant: { delete: vi.fn().mockResolvedValue({ id: 'tenant_1' }) },
+      tenant: {
+        update: vi.fn().mockResolvedValue({ id: 'tenant_1', status: 'ARCHIVED' }),
+        delete: vi.fn().mockResolvedValue({ id: 'tenant_1' }),
+      },
+      session: { updateMany: vi.fn().mockResolvedValue({ count: 2 }) },
+      subscription: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
     }
     const prisma = {
       tenant: {
-        findUnique: vi.fn().mockResolvedValue({ id: 'tenant_1' }),
-        update: vi.fn().mockResolvedValue({ id: 'tenant_1', status: 'ARCHIVED' }),
-      },
-      session: {
-        updateMany: vi.fn().mockResolvedValue({ count: 2 }),
+        findUnique: vi.fn().mockResolvedValue({ id: 'tenant_1', stripeCustomerId: null }),
       },
       subscription: {
-        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findMany: vi.fn().mockResolvedValue([]),
       },
       $transaction: vi.fn().mockImplementation(async (callback) => callback(tx)),
     } as unknown as PrismaClient
@@ -142,17 +175,17 @@ describe('deleteWorkspace', () => {
 
     expect(prisma.tenant.findUnique).toHaveBeenCalledWith({ where: { id: 'tenant_1' }, select: { id: true } })
     // Stage 1: Archival
-    expect(prisma.tenant.update).toHaveBeenCalledWith({
+    expect(tx.tenant.update).toHaveBeenCalledWith({
       where: { id: 'tenant_1' },
       data: expect.objectContaining({ status: 'ARCHIVED' }),
     })
-    expect(prisma.session.updateMany).toHaveBeenCalledWith({
+    expect(tx.session.updateMany).toHaveBeenCalledWith({
       where: { activeOrganizationId: 'tenant_1' },
       data: { activeOrganizationId: null },
     })
     // Stage 2: Compliant Purge
-    expect(prisma.subscription.updateMany).toHaveBeenCalledWith({
-      where: { tenantId: 'tenant_1', status: 'ACTIVE' },
+    expect(tx.subscription.updateMany).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant_1', status: { in: ['ACTIVE', 'PAST_DUE'] } },
       data: { status: 'CANCELED' },
     })
     expect(tx.$executeRawUnsafe).toHaveBeenCalledWith("SET LOCAL asas.allow_tenant_purge = 'on'")
@@ -177,6 +210,123 @@ describe('deleteWorkspace', () => {
     const { deleteWorkspace } = await import('../src/modules/settings/settings.service.js')
     await expect(deleteWorkspace(prisma, 'tenant_nonexistent', 'user_1')).rejects.toThrow('Workspace not found')
     expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('retains the workspace if Stripe cannot be reached to cancel an active subscription', async () => {
+    const purge = vi.fn()
+    const prisma = {
+      tenant: { findUnique: vi.fn().mockResolvedValue({ id: 'tenant_1' }) },
+      subscription: { findMany: vi.fn().mockResolvedValue([{ stripeSubscriptionId: 'sub_1' }]) },
+      $transaction: purge,
+    } as unknown as PrismaClient
+    const { deleteWorkspace } = await import('../src/modules/settings/settings.service.js')
+
+    await expect(deleteWorkspace(prisma, 'tenant_1', 'user_1')).rejects.toMatchObject({ statusCode: 503 })
+    expect(purge).not.toHaveBeenCalled()
+  })
+
+  it('stops before archival and data purge when Stripe cancellation fails', async () => {
+    const purge = vi.fn()
+    const cancelSubscription = vi.fn().mockRejectedValue(new Error('Stripe unavailable'))
+    const prisma = {
+      tenant: { findUnique: vi.fn().mockResolvedValue({ id: 'tenant_1' }) },
+      subscription: { findMany: vi.fn().mockResolvedValue([{ stripeSubscriptionId: 'sub_1' }]) },
+      $transaction: purge,
+    } as unknown as PrismaClient
+    const { deleteWorkspace } = await import('../src/modules/settings/settings.service.js')
+
+    await expect(deleteWorkspace(prisma, 'tenant_1', 'user_1', { cancelSubscription } as never)).rejects.toMatchObject({ statusCode: 502 })
+    expect(cancelSubscription).toHaveBeenCalledWith('sub_1')
+    expect(purge).not.toHaveBeenCalled()
+  })
+
+  it('cancels every current Stripe subscription before it archives and purges the workspace', async () => {
+    const txTenantUpdate = vi.fn()
+    const cancelSubscription = vi.fn().mockResolvedValue({ status: 'canceled' })
+    const tx = {
+      $executeRawUnsafe: vi.fn().mockResolvedValue(1),
+      journalLine: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      journalEntry: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      ledgerAccount: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      exchangeRate: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      invitation: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      member: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      tenant: { update: txTenantUpdate, delete: vi.fn() },
+      session: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      subscription: { updateMany: vi.fn().mockResolvedValue({ count: 2 }) },
+    }
+    const prisma = {
+      tenant: { findUnique: vi.fn().mockResolvedValue({ id: 'tenant_1' }) },
+      subscription: {
+        findMany: vi.fn().mockResolvedValue([{ stripeSubscriptionId: 'sub_1' }, { stripeSubscriptionId: 'sub_2' }]),
+      },
+      $transaction: vi.fn().mockImplementation(async callback => callback(tx)),
+    } as unknown as PrismaClient
+    const { deleteWorkspace } = await import('../src/modules/settings/settings.service.js')
+
+    await deleteWorkspace(prisma, 'tenant_1', 'user_1', { cancelSubscription } as never)
+    expect(cancelSubscription).toHaveBeenNthCalledWith(1, 'sub_1')
+    expect(cancelSubscription).toHaveBeenNthCalledWith(2, 'sub_2')
+    expect(cancelSubscription.mock.invocationCallOrder[1]).toBeLessThan(txTenantUpdate.mock.invocationCallOrder[0])
+    expect(tx.tenant.update.mock.invocationCallOrder[0]).toBeLessThan(tx.session.updateMany.mock.invocationCallOrder[0])
+    expect(tx.session.updateMany.mock.invocationCallOrder[0]).toBeLessThan(tx.subscription.updateMany.mock.invocationCallOrder[0])
+    expect(tx.subscription.updateMany.mock.invocationCallOrder[0]).toBeLessThan(tx.$executeRawUnsafe.mock.invocationCallOrder[0])
+  })
+
+  it('rolls back all local deletion stages on purge failure and safely retries remote cancellation', async () => {
+    let tenantExists = true
+    let tenantStatus = 'ACTIVE'
+    let activeOrganizationId: string | null = 'tenant_1'
+    let subscriptionStatus = 'ACTIVE'
+    let transactionCount = 0
+    const tx = {
+      $executeRawUnsafe: vi.fn().mockResolvedValue(1),
+      journalLine: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      journalEntry: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      ledgerAccount: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      exchangeRate: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      invitation: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      member: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      tenant: {
+        update: vi.fn(async ({ data }) => { tenantStatus = data.status }),
+        delete: vi.fn(async () => { tenantExists = false }),
+      },
+      session: { updateMany: vi.fn(async () => { activeOrganizationId = null; return { count: 1 } }) },
+      subscription: { updateMany: vi.fn(async () => { subscriptionStatus = 'CANCELED'; return { count: 1 } }) },
+    }
+    const prisma = {
+      tenant: { findUnique: vi.fn(async () => tenantExists ? { id: 'tenant_1' } : null) },
+      subscription: { findMany: vi.fn(async () => subscriptionStatus === 'ACTIVE' ? [{ stripeSubscriptionId: 'sub_live' }] : []) },
+      $transaction: vi.fn(async callback => {
+        transactionCount += 1
+        const before = { tenantStatus, activeOrganizationId, subscriptionStatus, tenantExists }
+        try {
+          const result = await callback(tx)
+          if (transactionCount === 1) throw new Error('local purge failed')
+          return result
+        } catch (error) {
+          tenantStatus = before.tenantStatus
+          activeOrganizationId = before.activeOrganizationId
+          subscriptionStatus = before.subscriptionStatus
+          tenantExists = before.tenantExists
+          throw error
+        }
+      }),
+    } as unknown as PrismaClient
+    const cancelSubscription = vi.fn().mockResolvedValue({ status: 'canceled' })
+    const { deleteWorkspace } = await import('../src/modules/settings/settings.service.js')
+
+    await expect(deleteWorkspace(prisma, 'tenant_1', 'user_1', { cancelSubscription } as never)).rejects.toMatchObject({
+      statusCode: 503,
+      message: expect.stringContaining('Local data and access were retained'),
+    })
+    expect({ tenantExists, tenantStatus, activeOrganizationId, subscriptionStatus }).toEqual({
+      tenantExists: true, tenantStatus: 'ACTIVE', activeOrganizationId: 'tenant_1', subscriptionStatus: 'ACTIVE',
+    })
+
+    await expect(deleteWorkspace(prisma, 'tenant_1', 'user_1', { cancelSubscription } as never)).resolves.toEqual({ success: true })
+    expect(cancelSubscription).toHaveBeenCalledTimes(2)
+    expect(tenantExists).toBe(false)
   })
 })
 

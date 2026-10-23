@@ -33,32 +33,32 @@ export function listProductSuppliers(prisma: PrismaClient, tenantId: string, pro
   return service.listProductSuppliers(prisma, tenantId, productId)
 }
 
-export function addProductSupplier(prisma: PrismaClient, tenantId: string, productId: string, name: string): Promise<ProductSupplier[]> {
-  return service.addProductSupplier(prisma, tenantId, productId, name)
+export function addProductSupplier(prisma: PrismaClient, tenantId: string, productId: string, name: string, actorId: string): Promise<ProductSupplier[]> {
+  return service.addProductSupplier(prisma, tenantId, productId, name, actorId)
 }
 
-export function removeProductSupplier(prisma: PrismaClient, tenantId: string, productId: string, supplierId: string): Promise<ProductSupplier[]> {
-  return service.removeProductSupplier(prisma, tenantId, productId, supplierId)
+export function removeProductSupplier(prisma: PrismaClient, tenantId: string, productId: string, supplierId: string, actorId: string): Promise<ProductSupplier[]> {
+  return service.removeProductSupplier(prisma, tenantId, productId, supplierId, actorId)
 }
 
-export function createPurchaseOrder(prisma: PrismaClient, tenantId: string, input: PurchaseOrderWriteInput): Promise<PurchaseOrder> {
-  return service.createPurchaseOrder(prisma, tenantId, input)
+export function createPurchaseOrder(prisma: PrismaClient, tenantId: string, input: PurchaseOrderWriteInput, actorId: string): Promise<PurchaseOrder> {
+  return service.createPurchaseOrder(prisma, tenantId, input, actorId)
 }
 
 export function listPurchaseOrders(prisma: PrismaClient, tenantId: string, query?: PurchaseOrderListQuery): Promise<PurchaseOrder[]> {
   return service.listPurchaseOrders(prisma, tenantId, query)
 }
 
-export function approvePurchaseOrder(prisma: PrismaClient, tenantId: string, id: string): Promise<PurchaseOrder> {
-  return service.approvePurchaseOrder(prisma, tenantId, id)
+export function approvePurchaseOrder(prisma: PrismaClient, tenantId: string, id: string, actorId: string): Promise<PurchaseOrder> {
+  return service.approvePurchaseOrder(prisma, tenantId, id, actorId)
 }
 
-export function receivePurchaseOrder(prisma: PrismaClient, tenantId: string, id: string): Promise<PurchaseOrder> {
-  return service.receivePurchaseOrder(prisma, tenantId, id)
+export function receivePurchaseOrder(prisma: PrismaClient, tenantId: string, id: string, actorId: string): Promise<PurchaseOrder> {
+  return service.receivePurchaseOrder(prisma, tenantId, id, actorId)
 }
 
-export function cancelPurchaseOrder(prisma: PrismaClient, tenantId: string, id: string): Promise<PurchaseOrder> {
-  return service.cancelPurchaseOrder(prisma, tenantId, id)
+export function cancelPurchaseOrder(prisma: PrismaClient, tenantId: string, id: string, actorId: string): Promise<PurchaseOrder> {
+  return service.cancelPurchaseOrder(prisma, tenantId, id, actorId)
 }
 
 // ── Products ─────────────────────────────────────────────────────────────────────
@@ -75,16 +75,17 @@ export function getProduct(prisma: PrismaClient, tenantId: string, id: string): 
   return service.getProduct(prisma, tenantId, id)
 }
 
-export function setProductArchived(prisma: PrismaClient, tenantId: string, id: string, input: ProductArchiveInput): Promise<Product> {
-  return service.setProductArchived(prisma, tenantId, id, input)
+export function setProductArchived(prisma: PrismaClient, tenantId: string, id: string, input: ProductArchiveInput, actorId: string): Promise<Product> {
+  return service.setProductArchived(prisma, tenantId, id, input, actorId)
 }
 
 export function createProduct(
   prisma: PrismaClient,
   tenantId: string,
   input: ProductWriteInput,
+  actorId: string,
 ): Promise<Product> {
-  return service.createProduct(prisma, tenantId, input)
+  return service.createProduct(prisma, tenantId, input, actorId)
 }
 
 export function updateProduct(
@@ -92,12 +93,13 @@ export function updateProduct(
   tenantId: string,
   id: string,
   input: ProductUpdateInput,
+  actorId: string,
 ): Promise<Product> {
-  return service.updateProduct(prisma, tenantId, id, input)
+  return service.updateProduct(prisma, tenantId, id, input, actorId)
 }
 
-export function deleteProduct(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
-  return service.deleteProduct(prisma, tenantId, id)
+export function deleteProduct(prisma: PrismaClient, tenantId: string, id: string, actorId: string): Promise<void> {
+  return service.deleteProduct(prisma, tenantId, id, actorId)
 }
 
 // ── Stock levels & alerts (unpaginated, derived in SQL) ───────────────────────────
@@ -128,6 +130,7 @@ export function recordStockMovement(
   prisma: PrismaClient,
   tenantId: string,
   input: StockMovementWriteInput,
+  actorId: string,
 ): Promise<StockMovementRecorded> {
-  return service.recordStockMovement(prisma, tenantId, input)
+  return service.recordStockMovement(prisma, tenantId, input, actorId)
 }

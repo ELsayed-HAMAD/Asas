@@ -25,7 +25,7 @@ function money(amount, currency = 'USD') {
 }
 
 function storageLabel(storageUsedGb) {
-  if (storageUsedGb == null) return '0 MB used'
+  if (storageUsedGb == null) return 'Usage unavailable'
   if (storageUsedGb < 0.001) return `${Math.round(storageUsedGb * 1_000_000)} KB used`
   if (storageUsedGb < 1) return `${(storageUsedGb * 1000).toFixed(1)} MB used`
   return `${storageUsedGb.toFixed(2)} GB used`
@@ -40,7 +40,8 @@ export default function SettingsBilling() {
   const billingQuery = useQuery({ queryKey: queryKeys.settings.billing(), queryFn: settingsApi.getBilling })
   const plansQuery = useQuery({ queryKey: [...queryKeys.settings.billing(), 'plans'], queryFn: settingsApi.getBillingPlans })
 
-  const subscription = billingQuery.data?.subscriptions?.find(item => item.status === 'ACTIVE') ?? billingQuery.data?.subscriptions?.[0]
+  const effectivePlan = billingQuery.data?.effectivePlan
+  const billingLoaded = billingQuery.isSuccess && Boolean(effectivePlan)
 
   const checkout = useMutation({
     mutationFn: settingsApi.createBillingCheckout,
@@ -61,7 +62,7 @@ export default function SettingsBilling() {
   })
 
   const notice = useMemo(() => {
-    if (searchParams.get('checkout') === 'success') return 'Checkout completed. Your plan will update as soon as Stripe confirms the subscription.'
+    if (searchParams.get('checkout') === 'success') return 'Checkout completed. Your plan will update as soon as Stripe confirms the effectivePlan.'
     if (searchParams.get('checkout') === 'cancelled') return 'Checkout was cancelled. No plan change was made.'
     return ''
   }, [searchParams])
@@ -69,7 +70,8 @@ export default function SettingsBilling() {
   const error = checkout.error?.message || portal.error?.message || switchPlan.error?.message || ''
 
   // Current active tier identifier
-  const currentPlanName = subscription?.planName?.toLowerCase() || 'free'
+  const freePlan = PLATFORM_PLANS.find(plan => plan.id === 'free')
+  const currentPlanName = effectivePlan?.planName.toLowerCase() ?? ''
   const isFree = currentPlanName.includes('free')
 
   return (
@@ -115,6 +117,16 @@ export default function SettingsBilling() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
+          {billingQuery.isError && (
+            <Alert variant="destructive">
+              <AlertDescription>Current plan and entitlement details could not be loaded. Plan changes are disabled until billing status is available. {billingQuery.error?.message || ''}</AlertDescription>
+            </Alert>
+          )}
+          {plansQuery.isError && (
+            <Alert>
+              <AlertDescription>Live billing prices could not be loaded. Showing the published plan catalog; paid checkout is unavailable until billing reconnects.</AlertDescription>
+            </Alert>
+          )}
 
           {/* Current Plan Overview Card */}
           <section aria-labelledby="current-plan-title" className="rounded-card border border-border-default bg-surface-raised p-5 shadow-card md:p-6">
@@ -126,26 +138,28 @@ export default function SettingsBilling() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 id="current-plan-title" className="text-lg font-bold text-heading">
-                      {subscription?.planName || 'Free Starter'}
+                      {effectivePlan?.planName || (billingQuery.isLoading ? 'Loading billing status…' : 'Billing status unavailable')}
                     </h2>
-                    <Badge variant="outline" className="bg-success-light text-success-text border-success-border text-xs">
-                      Active
-                    </Badge>
+                    {effectivePlan && (
+                      <Badge variant="outline" className={effectivePlan.billingStatus === 'ACTIVE' ? 'bg-success-light text-success-text border-success-border text-xs' : 'text-xs'}>
+                        {effectivePlan.billingStatus === 'PAST_DUE' ? 'Past due · grace period' : isFree ? 'Free' : 'Active'}
+                      </Badge>
+                    )}
                   </div>
 
                   <p className="mt-1 text-sm text-body-light">
-                    {subscription
-                      ? `${money(subscription.priceMonthly, subscription.currency || 'USD')} / month`
-                      : '$0 / month forever'}
+                    {effectivePlan
+                      ? `${money(effectivePlan.priceMonthly, effectivePlan.currency || 'USD')} / month`
+                      : billingLoaded ? '$0 / month' : '— / month'}
                     {' · '}
-                    <span className="font-semibold text-heading">{subscription?.seatsUsed ?? 1}</span> of{' '}
-                    <span>{subscription?.seatLimit ?? 5}</span> seats allocated
+                    <span className="font-semibold text-heading">{effectivePlan?.seatsUsed ?? '—'}</span> of{' '}
+                    <span>{effectivePlan?.seatLimit ?? (billingLoaded ? freePlan?.seatLimit ?? '—' : '—')}</span> seats allocated
                     {' · '}
-                    <span>{storageLabel(subscription?.storageUsedGb)} of {subscription?.storageLimitGb ?? 5} GB</span>
+                    <span>{storageLabel(effectivePlan?.storageUsedGb)} of {effectivePlan?.storageLimitGb ?? (billingLoaded ? freePlan?.storageLimitGb ?? '—' : '—')} GB</span>
                   </p>
 
-                  {subscription?.renewsOn && (
-                    <p className="mt-1 text-xs text-muted">Renews on {new Date(subscription.renewsOn).toLocaleDateString()}</p>
+                  {(effectivePlan?.renewsOn || effectivePlan?.graceEndsOn) && (
+                    <p className="mt-1 text-xs text-muted">{effectivePlan.billingStatus === 'PAST_DUE' ? 'Paid access grace period ends' : 'Renews'} on {new Date(effectivePlan.billingStatus === 'PAST_DUE' ? effectivePlan.graceEndsOn : effectivePlan.renewsOn).toLocaleDateString()}</p>
                   )}
                 </div>
               </div>
@@ -171,7 +185,7 @@ export default function SettingsBilling() {
             ) : (
               <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                 {(plansQuery.data?.tiers || PLATFORM_PLANS).map((tierPlan) => {
-                  const isCurrent = currentPlanName.includes(tierPlan.name.toLowerCase()) || (tierPlan.id === 'free' && isFree)
+                  const isCurrent = billingLoaded && (currentPlanName.includes(tierPlan.name.toLowerCase()) || (tierPlan.id === 'free' && isFree))
                   const checkoutPlan = (plansQuery.data?.items || []).find(item =>
                     item.seatLimit === tierPlan.seatLimit && item.storageLimitGb === tierPlan.storageLimitGb,
                   )
@@ -227,7 +241,7 @@ export default function SettingsBilling() {
                             return
                           }
                         }}
-                        disabled={!canManageBilling || isCurrent || switchPlan.isPending || checkout.isPending || (tierPlan.id !== 'free' && !canCheckout)}
+                        disabled={!billingLoaded || !canManageBilling || isCurrent || switchPlan.isPending || checkout.isPending || (tierPlan.id !== 'free' && !canCheckout)}
                         title={!canManageBilling ? 'Only workspace admins and owners can manage billing' : undefined}
                         className="mt-6 w-full text-xs font-semibold h-9 cursor-pointer"
                       >
