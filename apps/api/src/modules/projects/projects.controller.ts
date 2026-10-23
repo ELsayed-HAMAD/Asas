@@ -56,7 +56,7 @@ export function getProject(prisma: PrismaClient, tenantId: string, id: string): 
 }
 
 export function createProject(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   input: ProjectWriteInput,
 ): Promise<Project> {
@@ -64,7 +64,7 @@ export function createProject(
 }
 
 export function updateProject(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   id: string,
   input: ProjectUpdateInput,
@@ -72,7 +72,7 @@ export function updateProject(
   return service.updateProject(prisma, tenantId, id, input)
 }
 
-export function deleteProject(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
+export function deleteProject(prisma: ProjectsClient, tenantId: string, id: string): Promise<void> {
   return service.deleteProject(prisma, tenantId, id)
 }
 
@@ -108,12 +108,12 @@ export function getSprint(prisma: PrismaClient, tenantId: string, id: string): P
   return service.getSprint(prisma, tenantId, id)
 }
 
-export function createSprint(prisma: PrismaClient, tenantId: string, input: SprintWriteInput): Promise<Sprint> {
+export function createSprint(prisma: ProjectsClient, tenantId: string, input: SprintWriteInput): Promise<Sprint> {
   return service.createSprint(prisma, tenantId, input)
 }
 
 export function updateSprint(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   id: string,
   input: SprintUpdateInput,
@@ -121,7 +121,7 @@ export function updateSprint(
   return service.updateSprint(prisma, tenantId, id, input)
 }
 
-export function deleteSprint(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
+export function deleteSprint(prisma: ProjectsClient, tenantId: string, id: string): Promise<void> {
   return service.deleteSprint(prisma, tenantId, id)
 }
 
@@ -135,12 +135,12 @@ export function getIssue(prisma: PrismaClient, tenantId: string, id: string): Pr
   return service.getIssue(prisma, tenantId, id)
 }
 
-export function createIssue(prisma: PrismaClient, tenantId: string, input: IssueWriteInput): Promise<Issue> {
+export function createIssue(prisma: ProjectsClient, tenantId: string, input: IssueWriteInput): Promise<Issue> {
   return service.createIssue(prisma, tenantId, input)
 }
 
 export function updateIssue(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   id: string,
   input: IssueUpdateInput,
@@ -148,7 +148,7 @@ export function updateIssue(
   return service.updateIssue(prisma, tenantId, id, input)
 }
 
-export function deleteIssue(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
+export function deleteIssue(prisma: ProjectsClient, tenantId: string, id: string): Promise<void> {
   return service.deleteIssue(prisma, tenantId, id)
 }
 
@@ -216,15 +216,15 @@ export function listRoadmap(prisma: PrismaClient, tenantId: string): Promise<Roa
 }
 
 export function createRoadmapPhase(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   input: RoadmapPhaseWriteInput,
-): Promise<void> {
+): Promise<string> {
   return service.createRoadmapPhase(prisma, tenantId, input)
 }
 
 export function updateRoadmapPhase(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   id: string,
   input: RoadmapPhaseWriteInput,
@@ -232,20 +232,20 @@ export function updateRoadmapPhase(
   return service.updateRoadmapPhase(prisma, tenantId, id, input)
 }
 
-export function deleteRoadmapPhase(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
+export function deleteRoadmapPhase(prisma: ProjectsClient, tenantId: string, id: string): Promise<void> {
   return service.deleteRoadmapPhase(prisma, tenantId, id)
 }
 
 export function createRoadmapTask(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   input: RoadmapTaskWriteInput,
-): Promise<void> {
+): Promise<string> {
   return service.createRoadmapTask(prisma, tenantId, input)
 }
 
 export function updateRoadmapTask(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   id: string,
   input: RoadmapTaskUpdateInput,
@@ -253,6 +253,6 @@ export function updateRoadmapTask(
   return service.updateRoadmapTask(prisma, tenantId, id, input)
 }
 
-export function deleteRoadmapTask(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
+export function deleteRoadmapTask(prisma: ProjectsClient, tenantId: string, id: string): Promise<void> {
   return service.deleteRoadmapTask(prisma, tenantId, id)
 }

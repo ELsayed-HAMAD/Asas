@@ -13,6 +13,7 @@ function movementSetup(count = 1) {
       id: 'move_1', productId: 'product_1', delta: -3, note: null,
       createdAt: new Date(), product: { name: 'Product', warehouse: null },
     }) },
+    auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit_1' }) },
   }
   const prisma = {
     product: { findFirst: vi.fn().mockResolvedValue({ id: 'product_1', stock: 10 }) },
@@ -24,17 +25,30 @@ function movementSetup(count = 1) {
 describe('stock integrity', () => {
   it('enforces stock availability in the write and returns the updated stock, not the stale read', async () => {
     const { prisma, tx } = movementSetup()
-    const result = await recordStockMovement(prisma, 'tenant_1', { productId: 'product_1', delta: -3 })
+    const result = await recordStockMovement(prisma, 'tenant_1', { productId: 'product_1', delta: -3 }, 'user_1')
     expect(tx.product.updateMany).toHaveBeenCalledWith({
       where: { id: 'product_1', tenantId: 'tenant_1', archivedAt: null, stock: { gte: 3 } },
       data: { stock: { increment: -3 } },
     })
     expect(result.newStock).toBe(2)
+    expect(tx.auditLog.create).toHaveBeenCalledWith({ data: {
+      tenantId: 'tenant_1', actorId: 'user_1', action: 'inventory.stock.record',
+      targetType: 'StockMovement', targetId: 'move_1', metadata: JSON.stringify({ productId: 'product_1', delta: -3 }),
+    } })
   })
   it('does not create a movement when an atomic decrement loses the stock race', async () => {
     const { prisma, tx } = movementSetup(0)
-    await expect(recordStockMovement(prisma, 'tenant_1', { productId: 'product_1', delta: -3 })).rejects.toMatchObject({ statusCode: 409 })
+    await expect(recordStockMovement(prisma, 'tenant_1', { productId: 'product_1', delta: -3 }, 'user_1')).rejects.toMatchObject({ statusCode: 409 })
     expect(tx.stockMovement.create).not.toHaveBeenCalled()
+  })
+  it('fails the stock transaction when audit persistence fails', async () => {
+    const { prisma, tx } = movementSetup()
+    tx.auditLog.create.mockRejectedValueOnce(new Error('audit unavailable'))
+
+    await expect(recordStockMovement(prisma, 'tenant_1', { productId: 'product_1', delta: -3 }, 'user_1'))
+      .rejects.toThrow('audit unavailable')
+    expect(tx.stockMovement.create).toHaveBeenCalledTimes(1)
+    expect(tx.auditLog.create).toHaveBeenCalledTimes(1)
   })
   it('returns positive OUT totals and applies filters to counts and aggregates', async () => {
     const stockMovement = {

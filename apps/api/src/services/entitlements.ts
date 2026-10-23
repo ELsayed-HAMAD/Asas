@@ -30,8 +30,12 @@ const BYTES_PER_GB = 1_000_000_000
 const SEAT_RESERVATION_TTL_MS = 10 * 60 * 1000
 
 function isWithinPastDueGrace(subscription: Subscription, now: Date): boolean {
+  return now.getTime() <= getPastDueGraceEndsOn(subscription).getTime()
+}
+
+export function getPastDueGraceEndsOn(subscription: Subscription): Date {
   const reference = subscription.renewsOn ?? subscription.updatedAt
-  return now.getTime() <= reference.getTime() + PAST_DUE_GRACE_MS
+  return new Date(reference.getTime() + PAST_DUE_GRACE_MS)
 }
 
 /**
@@ -44,38 +48,12 @@ export function resolveEffectivePlanLimits(
   subscriptions: readonly Subscription[],
   now = new Date(),
 ): EffectivePlanLimits {
-  const activePaid = subscriptions.find(row => row.status === 'ACTIVE' && row.stripeSubscriptionId !== null)
-  if (activePaid) {
+  const subscription = resolveEffectivePlanSubscription(subscriptions, now)
+  if (subscription) {
     return {
-      planName: activePaid.planName,
-      seatLimit: activePaid.seatLimit,
-      storageLimitGb: Number(activePaid.storageLimitGb),
-      status: 'ACTIVE',
-      source: 'subscription',
-    }
-  }
-
-  const gracePaid = subscriptions.find(row =>
-    row.status === 'PAST_DUE' && row.stripeSubscriptionId !== null && isWithinPastDueGrace(row, now),
-  )
-  if (gracePaid) {
-    return {
-      planName: gracePaid.planName,
-      seatLimit: gracePaid.seatLimit,
-      storageLimitGb: Number(gracePaid.storageLimitGb),
-      status: 'ACTIVE',
-      source: 'subscription',
-    }
-  }
-
-  const activeFree = subscriptions.find(row =>
-    row.status === 'ACTIVE' && row.stripeSubscriptionId === null && row.planName === FREE_PLAN.name,
-  )
-  if (activeFree) {
-    return {
-      planName: FREE_PLAN.name,
-      seatLimit: FREE_PLAN.seatLimit,
-      storageLimitGb: FREE_PLAN.storageLimitGb,
+      planName: subscription.planName,
+      seatLimit: subscription.seatLimit,
+      storageLimitGb: Number(subscription.storageLimitGb),
       status: 'ACTIVE',
       source: 'subscription',
     }
@@ -88,6 +66,24 @@ export function resolveEffectivePlanLimits(
     status: 'ACTIVE',
     source: 'free-fallback',
   }
+}
+
+export function resolveEffectivePlanSubscription(
+  subscriptions: readonly Subscription[],
+  now = new Date(),
+): Subscription | null {
+  const activePaid = subscriptions.find(row => row.status === 'ACTIVE' && row.stripeSubscriptionId !== null)
+  if (activePaid) return activePaid
+
+  const gracePaid = subscriptions.find(row =>
+    row.status === 'PAST_DUE' && row.stripeSubscriptionId !== null && isWithinPastDueGrace(row, now),
+  )
+  if (gracePaid) return gracePaid
+
+  const activeFree = subscriptions.find(row =>
+    row.status === 'ACTIVE' && row.stripeSubscriptionId === null && row.planName === FREE_PLAN.name,
+  )
+  return activeFree ?? null
 }
 
 async function effectivePlanLimits(

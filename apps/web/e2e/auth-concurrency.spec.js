@@ -152,7 +152,7 @@ test('marketing navigation opens useful pages and displays configured prices res
     await page.getByRole('navigation', { name: 'Main navigation' })
       .getByRole('link', { name: 'Solutions', exact: true })
       .click()
-    await expect(page.getByRole('heading', { name: 'Purpose-built modules unified into a single operating core' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Business workflows in one workspace' })).toBeVisible()
     await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Pricing', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Predictable plans tailored to your operating scale' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Standard Growth', exact: true })).toBeVisible()
@@ -180,7 +180,12 @@ test('workspace admin can launch hosted plan checkout from Billing & Plans', asy
   await mockAuth(context, account, async route => {
     const path = new URL(route.request().url()).pathname
     if (path.endsWith('/settings/billing')) {
-      return json(route, { data: { stripePortalAvailable: false, subscriptions: [], paymentMethods: [], invoices: [] } })
+      return json(route, { data: {
+        stripePortalAvailable: false,
+        effectivePlan: { planName: 'Free Starter', priceMonthly: '0', currency: 'USD', billingStatus: 'FREE', source: 'free-fallback', renewsOn: null, graceEndsOn: null, seatsUsed: 1, seatLimit: 5, storageUsedGb: 0, storageLimitGb: 5 },
+        subscriptions: [{ id: 'expired_paid', planName: 'Paid Scale', priceMonthly: '99.00', currency: 'USD', priceId: 'price_expired', status: 'PAST_DUE', renewsOn: '2026-01-01T00:00:00.000Z', seatsUsed: 9, seatLimit: 50, storageUsedGb: 20, storageLimitGb: 100 }],
+        paymentMethods: [], invoices: [],
+      } })
     }
     if (path.endsWith('/billing/plans')) {
       return json(route, { data: {
@@ -206,6 +211,8 @@ test('workspace admin can launch hosted plan checkout from Billing & Plans', asy
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/dashboard/settings/billing')
       await page.getByRole('heading', { name: 'Available platform plans' }).waitFor()
+      await expect(page.locator('#current-plan-title')).toHaveText('Free Starter')
+      await expect(page.getByText('1 of 5 seats allocated')).toBeVisible()
       const dimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }))
       expect(dimensions.content, `Billing page should fit the ${width}px viewport`).toBeLessThanOrEqual(dimensions.viewport)
       await expect(page.getByRole('tab', { name: 'Billing & Plans' })).toHaveAttribute('data-state', 'active')
@@ -213,6 +220,32 @@ test('workspace admin can launch hosted plan checkout from Billing & Plans', asy
     await page.getByRole('button', { name: 'Continue to checkout' }).click()
     await expect(page).toHaveURL('https://checkout.stripe.com/test-session')
     await expect(page).toHaveTitle('Hosted checkout test')
+  } finally {
+    await context.close()
+  }
+})
+
+test('billing settings do not invent Free plan status when the billing API fails', async ({ browser }) => {
+  const account = { id: 'billing_unavailable', name: 'Billing Status User', email: 'billing.unavailable@example.test', emailVerified: true, role: 'ADMIN' }
+  const context = await browser.newContext()
+  await mockAuth(context, account, async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/settings/billing')) return json(route, { error: { message: 'Billing service unavailable' } }, 503)
+    if (path.endsWith('/billing/plans')) return json(route, { data: {
+      enabled: false, stripeConfigured: false, defaultPlanId: 'free', tiers: [
+        { id: 'free', name: 'Free Starter', tagline: 'Free', priceMonthly: 0, priceAnnual: 0, currency: 'USD', seatLimit: 5, storageLimitGb: 5 },
+      ], items: [],
+    } })
+    return json(route, { data: {} })
+  })
+  const page = await context.newPage()
+  try {
+    await signIn(page, account)
+    await page.goto('/dashboard/settings/billing')
+    await expect(page.getByText(/Current plan and entitlement details could not be loaded/)).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Billing status unavailable' })).toBeVisible()
+    await expect(page.getByText('$0 / month forever')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Switch to Free' })).toBeDisabled()
   } finally {
     await context.close()
   }
@@ -238,7 +271,9 @@ test('workspace members see Settings write controls disabled across notification
     }] } })
     if (path.endsWith('/webhook-logs')) return json(route, { data: { items: [] } })
     if (path.endsWith('/settings/billing')) return json(route, { data: {
-      stripePortalAvailable: true, subscriptions: [], paymentMethods: [], invoices: [],
+      stripePortalAvailable: true,
+      effectivePlan: { planName: 'Free Starter', priceMonthly: '0', currency: 'USD', billingStatus: 'FREE', source: 'free-fallback', renewsOn: null, graceEndsOn: null, seatsUsed: 1, seatLimit: 5, storageUsedGb: 0, storageLimitGb: 5 },
+      subscriptions: [], paymentMethods: [], invoices: [],
     } })
     if (path.endsWith('/exports/jobs')) return json(route, { data: {
       items: [{ id: 'export_1', kind: 'workspace', status: 'DONE', progressPct: 100, downloadUrl: '/api/v1/exports/jobs/export_1/download', filename: 'workspace.json', createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:01:00.000Z' }],
@@ -259,7 +294,11 @@ test('workspace members see Settings write controls disabled across notification
   try {
     await signIn(page, account)
 
+    await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/dashboard/settings/notifications')
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+    await expect.poll(() => page.locator('nav[aria-label="Settings navigation"]').evaluate(nav => nav.scrollWidth > nav.clientWidth)).toBe(true)
+    await expect(page.getByRole('tab', { name: 'Data Export' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Save Preferences' })).toBeDisabled()
     await expect(page.getByRole('switch').first()).toBeDisabled()
     await expect(page.locator('input[type="time"]').first()).toBeDisabled()
@@ -738,6 +777,7 @@ test('two workspaces can manage billing concurrently without seeing each other\'
         if (path.endsWith('/settings/billing')) {
           return json(route, { data: {
             stripePortalAvailable: true,
+            effectivePlan: { planName: `${account.name} Plan`, priceMonthly: '10.00', currency: 'USD', billingStatus: 'ACTIVE', source: 'subscription', renewsOn: null, graceEndsOn: null, seatsUsed: 2, seatLimit: 10, storageUsedGb: 1, storageLimitGb: 100 },
             subscriptions: [{ id: `sub_${account.id}`, planName: `${account.name} Plan`, priceMonthly: '10.00', currency: 'USD', priceId: 'price_basic', status: 'ACTIVE', renewsOn: null, seatsUsed: 2, seatLimit: 10, storageUsedGb: 1, storageLimitGb: 100 }],
             paymentMethods: [{ id: `pm_${account.id}`, brand: account.brand, last4: account.card, expires: '08/2030' }],
             invoices: [],

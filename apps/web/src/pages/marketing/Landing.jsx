@@ -14,6 +14,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useSession } from '../../lib/authClient'
+import { PLATFORM_PLANS } from '../../../../../packages/contracts/src/billing/catalog.ts'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
 import MarketingNavbar from '../../components/marketing/MarketingNavbar'
@@ -129,6 +130,19 @@ export default function Landing() {
             },
           )
         })
+
+        gsap.utils.toArray('[data-gsap-parallax]', heroRef.current).forEach((element, index) => {
+          gsap.to(element, {
+            yPercent: index === 0 ? 18 : -12,
+            ease: 'none',
+            scrollTrigger: {
+              trigger: heroRef.current,
+              start: 'top top',
+              end: 'bottom top',
+              scrub: 0.7,
+            },
+          })
+        })
       }, pageRef)
     }
     void loadAnimations()
@@ -179,8 +193,8 @@ export default function Landing() {
         className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-20 text-center overflow-hidden"
       >
         {/* Subtle Ambient Background Orbs */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-accent/5 rounded-full blur-3xl pointer-events-none -z-10 animate-float" />
-        <div className="absolute top-1/3 left-1/4 w-[300px] h-[300px] bg-primary/5 rounded-full blur-3xl pointer-events-none -z-10" />
+        <div data-gsap-parallax className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-accent/5 rounded-full blur-3xl pointer-events-none -z-10 animate-float" />
+        <div data-gsap-parallax className="absolute top-1/3 left-1/4 w-[300px] h-[300px] bg-primary/5 rounded-full blur-3xl pointer-events-none -z-10" />
 
         {/* Release Pill */}
         <div ref={badgeRef} className="inline-block mb-6">
@@ -666,7 +680,7 @@ export default function Landing() {
             Transparent Pricing
           </Badge>
           <h2 className="text-3xl sm:text-5xl font-extrabold text-heading tracking-tight">
-            Predictable plans that scale with your revenue.
+            Plans that scale with your team and storage.
           </h2>
           <p className="text-body-light text-base sm:text-lg max-w-2xl mx-auto mt-4">
             Every workspace starts with the <strong className="text-heading font-semibold">Free plan</strong>.
@@ -674,154 +688,73 @@ export default function Landing() {
           </p>
         </div>
 
-        {/* 4 Tier Pricing Matrix */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* Free Starter */}
-          <div className="bg-surface-raised rounded-card border border-border-default/80 p-6 flex flex-col justify-between hover:border-border-strong hover-lift transition-premium shadow-card hover:shadow-card-hover">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-bold text-heading text-lg">Free Starter</h3>
-                <Badge variant="outline" className="bg-surface-muted text-body text-[10px] border-border-default shadow-xs">
-                  Default
-                </Badge>
-              </div>
-              <p className="text-xs text-caption mb-6">For founding teams evaluating core workflows.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+          {PLATFORM_PLANS.map((plan) => {
+            const highlighted = Boolean(plan.popular)
+            const isFree = plan.id === 'free'
+            const price = new Intl.NumberFormat('en-US', {
+              style: 'currency',
+              currency: plan.currency,
+              maximumFractionDigits: 0,
+            }).format(plan.priceMonthly)
 
-              <div className="mb-6">
-                <span className="text-4xl font-extrabold text-heading">$0</span>
-                <span className="text-xs text-caption ml-1">/ month forever</span>
-              </div>
-
-              <div className="space-y-3 text-xs text-body-light">
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-success flex-shrink-0" />
-                  <span>Up to 5 Team Seats</span>
+            return (
+              <div
+                key={plan.id}
+                className={`rounded-card p-6 flex flex-col justify-between hover-lift transition-premium relative ${
+                  highlighted
+                    ? 'bg-primary text-on-primary border-2 border-accent shadow-glass hover:shadow-glow'
+                    : 'bg-surface-raised border border-border-default/80 hover:border-border-strong shadow-card hover:shadow-card-hover'
+                }`}
+              >
+                {highlighted && (
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-accent text-on-primary text-[10px] font-bold uppercase tracking-wider px-3 py-0.5 rounded-full shadow-card">
+                    Most Popular
+                  </span>
+                )}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className={`font-bold text-lg ${highlighted ? 'text-on-primary' : 'text-heading'}`}>{plan.name}</h3>
+                    {isFree && (
+                      <Badge variant="outline" className="bg-surface-muted text-body text-[10px] border-border-default shadow-xs">
+                        Default
+                      </Badge>
+                    )}
+                  </div>
+                  <p className={`text-xs mb-6 ${highlighted ? 'text-primary-subtle' : 'text-caption'}`}>{plan.tagline}</p>
+                  <div className="mb-6">
+                    <span className={`text-4xl font-extrabold ${highlighted ? 'text-on-primary' : 'text-heading'}`}>{price}</span>
+                    <span className={`text-xs ml-1 ${highlighted ? 'text-primary-subtle' : 'text-caption'}`}>
+                      {isFree ? '/ month forever' : '/ month'}
+                    </span>
+                  </div>
+                  <ul className={`space-y-3 text-xs ${highlighted ? 'text-primary-light' : 'text-body-light'}`}>
+                    <li className="flex items-center gap-2">
+                      <Check className={`w-4 h-4 flex-shrink-0 ${highlighted ? 'text-success-bright' : 'text-success'}`} />
+                      <span>Up to {plan.seatLimit.toLocaleString()} team members</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className={`w-4 h-4 flex-shrink-0 ${highlighted ? 'text-success-bright' : 'text-success'}`} />
+                      <span>{plan.storageLimitGb.toLocaleString()} GB storage allowance</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className={`w-4 h-4 flex-shrink-0 ${highlighted ? 'text-success-bright' : 'text-success'}`} />
+                      <span>Access to current product modules</span>
+                    </li>
+                  </ul>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-success flex-shrink-0" />
-                  <span>5 GB storage allowance</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-success flex-shrink-0" />
-                  <span>Access to current product modules</span>
-                </div>
+                <Button
+                  asChild
+                  variant={highlighted ? 'default' : isFree ? 'default' : 'outline'}
+                  className={`w-full mt-8 text-xs h-10 rounded-button shadow-card hover-lift transition-micro active:scale-[0.98] ${
+                    highlighted || isFree ? 'bg-accent hover:bg-accent-hover text-on-primary' : 'border-border-default/80 bg-surface-raised hover:bg-surface-muted text-heading'
+                  }`}
+                >
+                  <Link to="/register">{isFree ? 'Start Free Now' : 'Start on Free'}</Link>
+                </Button>
               </div>
-            </div>
-
-            <Button asChild className="w-full mt-8 bg-primary hover:bg-primary-hover text-on-primary text-xs h-10 rounded-button shadow-card hover-lift transition-micro active:scale-[0.98]">
-              <Link to="/register">Start Free Now</Link>
-            </Button>
-          </div>
-
-          {/* Growth Starter */}
-          <div className="bg-surface-raised rounded-card border border-border-default/80 p-6 flex flex-col justify-between hover:border-border-strong hover-lift transition-premium shadow-card hover:shadow-card-hover">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-bold text-heading text-lg">Standard Growth</h3>
-              </div>
-              <p className="text-xs text-caption mb-6">A larger seat and storage allowance for growing teams.</p>
-
-              <div className="mb-6">
-                <span className="text-4xl font-extrabold text-heading">
-                  $29
-                </span>
-                <span className="text-xs text-caption ml-1">/ month</span>
-              </div>
-
-              <div className="space-y-3 text-xs text-body-light">
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-success flex-shrink-0" />
-                  <span>Up to 15 team members</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-success flex-shrink-0" />
-                  <span>25 GB storage allowance</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-success flex-shrink-0" />
-                  <span>Access to current product modules</span>
-                </div>
-              </div>
-            </div>
-
-            <Button asChild variant="outline" className="w-full mt-8 border-border-default/80 bg-surface-raised hover:bg-surface-muted text-heading text-xs h-10 rounded-button shadow-card hover-lift transition-micro active:scale-[0.98]">
-              <Link to="/register">Start on Free</Link>
-            </Button>
-          </div>
-
-          {/* Pro (Highlighted) */}
-          <div className="bg-primary text-on-primary rounded-card border-2 border-accent p-6 flex flex-col justify-between shadow-glass hover:shadow-glow hover-lift transition-premium relative">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-accent text-on-primary text-[10px] font-bold uppercase tracking-wider px-3 py-0.5 rounded-full shadow-card">
-              Most Popular
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2 mt-2">
-                <h3 className="font-bold text-on-primary text-lg">Professional Scale</h3>
-              </div>
-              <p className="text-xs text-primary-subtle mb-6">More capacity for established teams.</p>
-
-              <div className="mb-6">
-                <span className="text-4xl font-extrabold text-on-primary">
-                  $79
-                </span>
-                <span className="text-xs text-primary-subtle ml-1">/ month</span>
-              </div>
-
-              <div className="space-y-3 text-xs text-primary-light">
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-success-bright flex-shrink-0" />
-                  <span>Up to 50 team members</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-success-bright flex-shrink-0" />
-                  <span>100 GB storage allowance</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-success-bright flex-shrink-0" />
-                  <span>Access to current product modules</span>
-                </div>
-              </div>
-            </div>
-
-            <Button asChild className="w-full mt-8 bg-accent hover:bg-accent-hover text-on-primary text-xs h-10 rounded-button shadow-card hover-lift transition-micro active:scale-[0.98]">
-              <Link to="/register">Start on Free</Link>
-            </Button>
-          </div>
-
-          {/* Enterprise Custom */}
-          <div className="bg-surface-raised rounded-card border border-border-default/80 p-6 flex flex-col justify-between hover:border-border-strong hover-lift transition-premium shadow-card hover:shadow-card-hover">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-bold text-heading text-lg">Enterprise Bespoke</h3>
-              </div>
-              <p className="text-xs text-caption mb-6">The largest published seat and storage allowance.</p>
-
-              <div className="mb-6">
-                <span className="text-3xl font-extrabold text-heading">$199</span>
-                <span className="text-xs text-caption block mt-1">/ month</span>
-              </div>
-
-              <div className="space-y-3 text-xs text-body-light">
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-success flex-shrink-0" />
-                  <span>Up to 250 team members</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-success flex-shrink-0" />
-                  <span>1,000 GB storage allowance</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-success flex-shrink-0" />
-                  <span>Access to current product modules</span>
-                </div>
-              </div>
-            </div>
-
-            <Button asChild variant="outline" className="w-full mt-8 border-border-default/80 bg-surface-raised hover:bg-surface-muted text-heading text-xs h-10 rounded-button shadow-card hover-lift transition-micro active:scale-[0.98]">
-              <Link to="/register">Start on the Free plan</Link>
-            </Button>
-          </div>
+            )
+          })}
         </div>
       </section>
 
@@ -850,7 +783,7 @@ export default function Landing() {
               variant="outline"
               className="border-primary-subtle text-on-primary hover:bg-primary-hover text-sm h-12 px-6 rounded-button"
             >
-              <Link to="/solutions">View Architecture Details</Link>
+              <Link to="/solutions">Explore product workflows</Link>
             </Button>
           </div>
         </div>

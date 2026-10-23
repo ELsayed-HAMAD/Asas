@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   decryptCredential,
+  decryptBankDetail,
+  encryptBankDetail,
   encryptCredential,
   isEncrypted,
   maskCredential,
@@ -80,6 +82,17 @@ describe('Finding 5: Enterprise Credential Encryption Service (AES-256-GCM)', ()
     expect(masked).toBe('ghp_…cdef')
     expect(masked).not.toContain('v1:')
     expect(masked).not.toContain('1234567890')
+  })
+
+  it('encrypts bank details with tenant and field binding and supports legacy backfill reads', () => {
+    const key = 'bank-data-encryption-key-for-tests-32-chars'
+    const encrypted = encryptBankDetail('021000021', tenantId, 'routingNumber', key)
+    expect(encrypted).not.toContain('021000021')
+    expect(encrypted).toMatch(/^b1:[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/)
+    expect(decryptBankDetail(encrypted, tenantId, 'routingNumber', key)).toBe('021000021')
+    expect(() => decryptBankDetail(encrypted, 'another-tenant', 'routingNumber', key)).toThrow()
+    expect(() => decryptBankDetail(encrypted, tenantId, 'accountNumber', key)).toThrow()
+    expect(decryptBankDetail('legacy-plaintext-account', tenantId, 'accountNumber', key)).toBe('legacy-plaintext-account')
   })
 })
 

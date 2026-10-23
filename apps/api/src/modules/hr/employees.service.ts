@@ -10,6 +10,7 @@ import { buildPaginationMeta, toPrismaPage } from '@asas/contracts'
 import { AppError } from '../../utils/errors.js'
 import { monthToDateComparisonPeriods, tenantToday } from '../../utils/dates.js'
 import { recordAuditLog } from '../../services/auditLog.js'
+import { decryptBankDetail, encryptBankDetail } from '../../services/crypto.js'
 
 const employeeInclude = {
   department: true,
@@ -57,11 +58,11 @@ function mapEmployee(employee: PrismaEmployeeWithIncludes, canReadSalary: boolea
     location: employee.location,
     employeeNumber: employee.employeeNumber,
     email: employee.email,
-    bankRoutingNumber: canReadSalary ? (employee.bankRoutingNumber ?? null) : null,
-    bankAccountNumber: canReadSalary ? (employee.bankAccountNumber ?? null) : null,
+    bankRoutingNumber: canReadSalary ? decryptBankDetail(employee.bankRoutingNumber, employee.tenantId, 'routingNumber') : null,
+    bankAccountNumber: canReadSalary ? decryptBankDetail(employee.bankAccountNumber, employee.tenantId, 'accountNumber') : null,
     bankAccountType: canReadSalary ? (employee.bankAccountType ?? null) : null,
-    bankIban: canReadSalary ? (employee.bankIban ?? null) : null,
-    bankBic: canReadSalary ? (employee.bankBic ?? null) : null,
+    bankIban: canReadSalary ? decryptBankDetail(employee.bankIban, employee.tenantId, 'iban') : null,
+    bankBic: canReadSalary ? decryptBankDetail(employee.bankBic, employee.tenantId, 'bic') : null,
     createdAt: employee.createdAt.toISOString(),
     updatedAt: employee.updatedAt.toISOString(),
   }
@@ -209,11 +210,11 @@ export async function createEmployee(
       location: input.location ?? null,
       employeeNumber: input.employeeNumber ?? null,
       email: input.email ?? null,
-      bankRoutingNumber: input.bankRoutingNumber ?? null,
-      bankAccountNumber: input.bankAccountNumber ?? null,
+      bankRoutingNumber: input.bankRoutingNumber ? encryptBankDetail(input.bankRoutingNumber, tenantId, 'routingNumber') : null,
+      bankAccountNumber: input.bankAccountNumber ? encryptBankDetail(input.bankAccountNumber, tenantId, 'accountNumber') : null,
       bankAccountType: input.bankAccountType ?? null,
-      bankIban: input.bankIban ?? null,
-      bankBic: input.bankBic ?? null,
+      bankIban: input.bankIban ? encryptBankDetail(input.bankIban, tenantId, 'iban') : null,
+      bankBic: input.bankBic ? encryptBankDetail(input.bankBic, tenantId, 'bic') : null,
       },
       include: employeeInclude,
     })
@@ -298,11 +299,11 @@ export async function updateEmployee(
       ...(input.location !== undefined && { location: input.location }),
       ...(input.employeeNumber !== undefined && { employeeNumber: input.employeeNumber }),
       ...(input.email !== undefined && { email: input.email }),
-      ...(input.bankRoutingNumber !== undefined && { bankRoutingNumber: input.bankRoutingNumber }),
-      ...(input.bankAccountNumber !== undefined && { bankAccountNumber: input.bankAccountNumber }),
+      ...(input.bankRoutingNumber !== undefined && { bankRoutingNumber: input.bankRoutingNumber ? encryptBankDetail(input.bankRoutingNumber, tenantId, 'routingNumber') : null }),
+      ...(input.bankAccountNumber !== undefined && { bankAccountNumber: input.bankAccountNumber ? encryptBankDetail(input.bankAccountNumber, tenantId, 'accountNumber') : null }),
       ...(input.bankAccountType !== undefined && { bankAccountType: input.bankAccountType }),
-      ...(input.bankIban !== undefined && { bankIban: input.bankIban }),
-      ...(input.bankBic !== undefined && { bankBic: input.bankBic }),
+      ...(input.bankIban !== undefined && { bankIban: input.bankIban ? encryptBankDetail(input.bankIban, tenantId, 'iban') : null }),
+      ...(input.bankBic !== undefined && { bankBic: input.bankBic ? encryptBankDetail(input.bankBic, tenantId, 'bic') : null }),
       },
     })
     if (salaryChangedAt && input.salaryEffectiveFrom && rateSalary !== null) {

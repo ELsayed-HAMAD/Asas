@@ -6,6 +6,7 @@ import { Prisma, type PrismaClient } from '@prisma/client'
 import type { ImportEmployeesRequest } from '@asas/contracts'
 import { computePayrollLine, Money, type TaxRate } from '@asas/domain'
 import { recordAuditLog } from '../../services/auditLog.js'
+import { decryptBankDetail, encryptBankDetail } from '../../services/crypto.js'
 import { AppError } from '../../utils/errors.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -298,11 +299,11 @@ export async function applyEnterpriseSamplePack(
           location: emp.location ?? null,
           employeeNumber: emp.employeeNumber ?? null,
           email: emp.email ?? null,
-          bankRoutingNumber: '021000021',
-          bankAccountNumber: `1000${(employeeIds.size + 1).toString().padStart(6, '0')}`,
+          bankRoutingNumber: encryptBankDetail('021000021', tenantId, 'routingNumber'),
+          bankAccountNumber: encryptBankDetail(`1000${(employeeIds.size + 1).toString().padStart(6, '0')}`, tenantId, 'accountNumber'),
           bankAccountType: 'CHECKING',
-          bankIban: 'DE89370400440532013000',
-          bankBic: 'DEUTDEFF',
+          bankIban: encryptBankDetail('DE89370400440532013000', tenantId, 'iban'),
+          bankBic: encryptBankDetail('DEUTDEFF', tenantId, 'bic'),
         },
       })
       employeeIds.set(emp.key, created?.id ?? `emp_${employeeIds.size + 1}`)
@@ -852,6 +853,16 @@ export async function captureSampleManifest(tx: Prisma.TransactionClient, tenant
         if (row[field] === null) delete row[field]
       }
       if (model === 'deal' && Array.isArray(row.stageHistory) && row.stageHistory.length === 0) delete row.stageHistory
+      if (model === 'employee') {
+        for (const [field, aadField] of [
+          ['bankRoutingNumber', 'routingNumber'],
+          ['bankAccountNumber', 'accountNumber'],
+          ['bankIban', 'iban'],
+          ['bankBic', 'bic'],
+        ] as const) {
+          if (typeof row[field] === 'string') row[field] = decryptBankDetail(row[field] as string, tenantId, aadField)
+        }
+      }
     }
     const serialized = canonicalJson(normalized)
     manifest[model] = { ids: rows.map(row => row.id), hash: createHash('sha256').update(JSON.stringify(serialized)).digest('hex') }
@@ -972,11 +983,11 @@ export async function importEmployees(
             : null,
           employeeNumber: row.employeeNumber ?? null,
           hiredAt: parseDate(row.hiredAt),
-          bankRoutingNumber: row.bankRoutingNumber ?? null,
-          bankAccountNumber: row.bankAccountNumber ?? null,
+          bankRoutingNumber: row.bankRoutingNumber ? encryptBankDetail(row.bankRoutingNumber, tenantId, 'routingNumber') : null,
+          bankAccountNumber: row.bankAccountNumber ? encryptBankDetail(row.bankAccountNumber, tenantId, 'accountNumber') : null,
           bankAccountType: row.bankAccountType ?? null,
-          bankIban: row.bankIban ?? null,
-          bankBic: row.bankBic ?? null,
+          bankIban: row.bankIban ? encryptBankDetail(row.bankIban, tenantId, 'iban') : null,
+          bankBic: row.bankBic ? encryptBankDetail(row.bankBic, tenantId, 'bic') : null,
         },
       })
       if (created?.salary != null && tx.employeeSalaryHistory) {

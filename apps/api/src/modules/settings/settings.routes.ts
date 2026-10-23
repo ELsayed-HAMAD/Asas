@@ -32,6 +32,7 @@ import { getTenantStorageBytes } from '../../services/objectStorage.js'
 import { ensureAutomaticBackupsUnavailable } from './settings.service.js'
 import { executeDataRetentionCleanup } from '../../services/dataRetention.js'
 import { moduleKeyPrefix } from '../../plugins/sse.js'
+import { AppError } from '../../utils/errors.js'
 import * as settingsController from './settings.controller.js'
 
 /**
@@ -122,8 +123,8 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request) => {
       const { tenantId, userId } = requireAuthContext(request)
+      const result = await settingsController.deleteWorkspace(request.server.prisma, tenantId, userId, request.server.stripeBilling)
       request.log.info({ tenantId, userId, action: 'organization.delete' }, 'Workspace deleted')
-      const result = await settingsController.deleteWorkspace(request.server.prisma, tenantId, userId)
       return { data: result }
     },
   )
@@ -309,19 +310,27 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     },
     async request => {
       const { tenantId, userId } = requireAuthContext(request)
-      const result = await settingsController.testIntegration(
-        request.server.prisma,
-        tenantId,
-        request.params.id,
-      )
+      const integration = await request.server.prisma.integration.findFirst({
+        where: { id: request.params.id, tenantId },
+        select: { id: true },
+      })
+      if (!integration) throw new AppError(404, 'Integration not found')
+
+      // Persist the actor's probe attempt before performing an external network side effect.
+      // If the audit store is unavailable, do not send the endpoint a request.
       await recordAuditLog(request.server.prisma, {
         tenantId,
         actorId: userId,
         action: 'settings.integration.test',
         targetType: 'Integration',
-        targetId: request.params.id,
-        metadata: { statusCode: result.log.statusCode, event: result.log.event },
+        targetId: integration.id,
+        metadata: { event: 'ping', status: 'REQUESTED' },
       })
+      const result = await settingsController.testIntegration(
+        request.server.prisma,
+        tenantId,
+        request.params.id,
+      )
       request.server.ssePublish(tenantId, [moduleKeyPrefix('settings')])
       return { data: result }
     },
@@ -372,16 +381,19 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     },
     async request => {
       const { tenantId, userId } = requireAuthContext(request)
-      const result = await executeDataRetentionCleanup(request.server.prisma, tenantId, request.body)
-      await recordAuditLog(request.server.prisma, {
-        tenantId,
-        actorId: userId,
-        action: 'compliance.dataRetention.cleanup',
-        targetType: 'DataRetention',
-        metadata: {
-          retentionDays: request.body.retentionDays,
-          purgedCounts: result.purgedCounts,
-        },
+      const result = await request.server.prisma.$transaction(async tx => {
+        const cleanup = await executeDataRetentionCleanup(tx, tenantId, request.body, request.server.objectStorage)
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: 'compliance.dataRetention.cleanup',
+          targetType: 'DataRetention',
+          metadata: {
+            retentionDays: request.body.retentionDays,
+            purgedCounts: cleanup.purgedCounts,
+          },
+        })
+        return cleanup
       })
       request.server.ssePublish(tenantId, [moduleKeyPrefix('settings')])
       return { data: result }

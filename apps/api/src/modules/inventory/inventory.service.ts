@@ -41,6 +41,7 @@ import type {
 import { buildPaginationMeta, stockLevelToStatus, toPrismaPage } from '@asas/contracts'
 import { AppError } from '../../utils/errors.js'
 import { monthToDateComparisonPeriods, tenantToday } from '../../utils/dates.js'
+import { recordAuditLog } from '../../services/auditLog.js'
 
 // ── Stock derivation (SQL, single round trip) ──────────────────────────────────
 
@@ -117,19 +118,24 @@ export async function addProductSupplier(
   tenantId: string,
   productId: string,
   name: string,
+  actorId: string,
 ): Promise<ProductSupplier[]> {
-  const product = await prisma.product.findFirst({ where: { id: productId, tenantId }, select: { id: true } })
-  if (!product) throw new AppError(404, 'Product not found')
+  await prisma.$transaction(async tx => {
+    const product = await tx.product.findFirst({ where: { id: productId, tenantId }, select: { id: true } })
+    if (!product) throw new AppError(404, 'Product not found')
 
-  let supplier = await prisma.supplier.findFirst({ where: { tenantId, name } })
-  if (!supplier) {
-    supplier = await prisma.supplier.create({ data: { tenantId, name } })
-  }
+    let supplier = await tx.supplier.findFirst({ where: { tenantId, name } })
+    if (!supplier) supplier = await tx.supplier.create({ data: { tenantId, name } })
 
-  await prisma.productSupplier.upsert({
-    where: { productId_supplierId: { productId, supplierId: supplier.id } },
-    create: { productId, supplierId: supplier.id },
-    update: {},
+    await tx.productSupplier.upsert({
+      where: { productId_supplierId: { productId, supplierId: supplier.id } },
+      create: { productId, supplierId: supplier.id },
+      update: {},
+    })
+    await recordAuditLog(tx, {
+      tenantId, actorId, action: 'inventory.product.supplier.add', targetType: 'Product', targetId: productId,
+      metadata: { supplierName: name },
+    })
   })
 
   return listProductSuppliers(prisma, tenantId, productId)
@@ -140,18 +146,25 @@ export async function removeProductSupplier(
   tenantId: string,
   productId: string,
   supplierId: string,
+  actorId: string,
 ): Promise<ProductSupplier[]> {
-  const product = await prisma.product.findFirst({ where: { id: productId, tenantId }, select: { id: true } })
-  if (!product) throw new AppError(404, 'Product not found')
+  await prisma.$transaction(async tx => {
+    const product = await tx.product.findFirst({ where: { id: productId, tenantId }, select: { id: true } })
+    if (!product) throw new AppError(404, 'Product not found')
 
-  await prisma.productSupplier.deleteMany({
-    where: { productId, supplierId },
+    const deleted = await tx.productSupplier.deleteMany({ where: { productId, supplierId } })
+    if (deleted.count > 0) {
+      await recordAuditLog(tx, {
+        tenantId, actorId, action: 'inventory.product.supplier.remove', targetType: 'Product', targetId: productId,
+        metadata: { supplierId },
+      })
+    }
   })
 
   return listProductSuppliers(prisma, tenantId, productId)
 }
 
-export async function createPurchaseOrder(prisma: PrismaClient, tenantId: string, input: PurchaseOrderWriteInput): Promise<PurchaseOrder> {
+export async function createPurchaseOrder(prisma: PrismaClient, tenantId: string, input: PurchaseOrderWriteInput, actorId: string): Promise<PurchaseOrder> {
   return prisma.$transaction(async tx => {
     const product = await tx.product.findFirst({ where: { id: input.productId, tenantId, archivedAt: null }, select: { id: true } })
     if (!product) throw new AppError(404, 'Product not found')
@@ -161,6 +174,10 @@ export async function createPurchaseOrder(prisma: PrismaClient, tenantId: string
     })
     const line = order.lines[0]
     if (!line) throw new AppError(500, 'Purchase order line was not created')
+    await recordAuditLog(tx, {
+      tenantId, actorId, action: 'inventory.purchase-order.create', targetType: 'PurchaseOrder', targetId: order.id,
+      metadata: { productId: line.product.id, quantity: line.quantity },
+    })
     return {
       id: order.id,
       status: 'DRAFT',
@@ -210,6 +227,7 @@ export async function approvePurchaseOrder(
   prisma: PrismaClient,
   tenantId: string,
   id: string,
+  actorId: string,
 ): Promise<PurchaseOrder> {
   const order = await prisma.purchaseOrder.findFirst({
     where: { id, tenantId },
@@ -234,6 +252,9 @@ export async function approvePurchaseOrder(
       include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
     })
     const line = updated.lines[0]
+    await recordAuditLog(tx, {
+      tenantId, actorId, action: 'inventory.purchase-order.approve', targetType: 'PurchaseOrder', targetId: updated.id,
+    })
     return {
       id: updated.id,
       status: 'APPROVED',
@@ -252,6 +273,7 @@ export async function receivePurchaseOrder(
   prisma: PrismaClient,
   tenantId: string,
   id: string,
+  actorId: string,
 ): Promise<PurchaseOrder> {
   const order = await prisma.purchaseOrder.findFirst({
     where: { id, tenantId },
@@ -301,6 +323,14 @@ export async function receivePurchaseOrder(
     }
 
     const line = updatedOrder.lines[0]
+    await recordAuditLog(tx, {
+      tenantId,
+      actorId,
+      action: 'inventory.purchase-order.receive',
+      targetType: 'PurchaseOrder',
+      targetId: updatedOrder.id,
+      metadata: { productId: line?.product.id ?? '', quantity: line?.quantity ?? 0 },
+    })
     return {
       id: updatedOrder.id,
       status: 'RECEIVED',
@@ -319,6 +349,7 @@ export async function cancelPurchaseOrder(
   prisma: PrismaClient,
   tenantId: string,
   id: string,
+  actorId: string,
 ): Promise<PurchaseOrder> {
   const order = await prisma.purchaseOrder.findFirst({
     where: { id, tenantId },
@@ -346,6 +377,9 @@ export async function cancelPurchaseOrder(
       include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
     })
     const line = updated.lines[0]
+    await recordAuditLog(tx, {
+      tenantId, actorId, action: 'inventory.purchase-order.cancel', targetType: 'PurchaseOrder', targetId: updated.id,
+    })
     return {
       id: updated.id,
       status: 'CANCELLED',
@@ -481,12 +515,31 @@ export async function getProduct(prisma: PrismaClient, tenantId: string, id: str
   return mapProduct(product, derivedStock(product, stockMap.get(id)))
 }
 
-export async function setProductArchived(prisma: PrismaClient, tenantId: string, id: string, input: ProductArchiveInput): Promise<Product> {
-  const result = await prisma.product.updateMany({
-    where: { id, tenantId },
-    data: { archivedAt: input.archived ? new Date() : null },
+function isProductSkuUniqueViolation(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') return false
+  const target = error.meta?.target
+  if (Array.isArray(target)) return target.includes('sku') && target.includes('tenantId')
+  return typeof target === 'string' && /tenantId.*sku|sku.*tenantId/i.test(target)
+}
+
+function throwSkuConflict(error: unknown): never {
+  if (isProductSkuUniqueViolation(error)) throw new AppError(409, 'A product with this SKU already exists')
+  throw error
+}
+
+export async function setProductArchived(prisma: PrismaClient, tenantId: string, id: string, input: ProductArchiveInput, actorId: string): Promise<Product> {
+  await prisma.$transaction(async tx => {
+    const result = await tx.product.updateMany({
+      where: { id, tenantId },
+      data: { archivedAt: input.archived ? new Date() : null },
+    })
+    if (!result.count) throw new AppError(404, 'Product not found')
+    await recordAuditLog(tx, {
+      tenantId, actorId,
+      action: input.archived ? 'inventory.product.archive' : 'inventory.product.restore',
+      targetType: 'Product', targetId: id,
+    })
   })
-  if (!result.count) throw new AppError(404, 'Product not found')
   return getProduct(prisma, tenantId, id)
 }
 
@@ -494,12 +547,15 @@ export async function createProduct(
   prisma: PrismaClient,
   tenantId: string,
   input: ProductWriteInput,
+  actorId: string,
 ): Promise<Product> {
   const skuExists = await prisma.product.findFirst({ where: { tenantId, sku: input.sku } })
   if (skuExists) throw new AppError(409, 'A product with this SKU already exists')
 
   const initialStock = input.stock ?? 0
-  const product = await prisma.$transaction(async tx => {
+  let product: PrismaProduct
+  try {
+    product = await prisma.$transaction(async tx => {
     const created = await tx.product.create({
       data: {
         tenantId,
@@ -525,8 +581,18 @@ export async function createProduct(
         },
       })
     }
+    await recordAuditLog(tx, {
+      tenantId,
+      actorId,
+      action: 'inventory.product.create',
+      targetType: 'Product',
+      targetId: created.id,
+    })
     return created
-  })
+    })
+  } catch (error) {
+    throwSkuConflict(error)
+  }
 
   return mapProduct(product, initialStock)
 }
@@ -536,6 +602,7 @@ export async function updateProduct(
   tenantId: string,
   id: string,
   input: ProductUpdateInput,
+  actorId: string,
 ): Promise<Product> {
   const existing = await prisma.product.findFirst({ where: { id, tenantId } })
   if (!existing) throw new AppError(404, 'Product not found')
@@ -545,29 +612,46 @@ export async function updateProduct(
     if (skuExists) throw new AppError(409, 'A product with this SKU already exists')
   }
 
-  const product = await prisma.product.update({
-    where: { id },
-    data: {
-      ...(input.name !== undefined && { name: input.name }),
-      ...(input.sku !== undefined && { sku: input.sku }),
-      ...(input.price !== undefined && { price: input.price }),
-      ...(input.warehouse !== undefined && { warehouse: input.warehouse }),
-      ...(input.aisle !== undefined && { aisle: input.aisle }),
-      ...(input.bin !== undefined && { bin: input.bin }),
-      ...(input.avgMonthlyUsage !== undefined && { avgMonthlyUsage: input.avgMonthlyUsage }),
-      ...(input.leadTimeDays !== undefined && { leadTimeDays: input.leadTimeDays }),
-      ...(input.minThreshold !== undefined && { minThreshold: input.minThreshold }),
-    },
-  })
+  let product: PrismaProduct
+  try {
+    product = await prisma.$transaction(async tx => {
+    const updated = await tx.product.update({
+      where: { id },
+      data: {
+        ...(input.name !== undefined && { name: input.name }),
+        ...(input.sku !== undefined && { sku: input.sku }),
+        ...(input.price !== undefined && { price: input.price }),
+        ...(input.warehouse !== undefined && { warehouse: input.warehouse }),
+        ...(input.aisle !== undefined && { aisle: input.aisle }),
+        ...(input.bin !== undefined && { bin: input.bin }),
+        ...(input.avgMonthlyUsage !== undefined && { avgMonthlyUsage: input.avgMonthlyUsage }),
+        ...(input.leadTimeDays !== undefined && { leadTimeDays: input.leadTimeDays }),
+        ...(input.minThreshold !== undefined && { minThreshold: input.minThreshold }),
+      },
+    })
+    await recordAuditLog(tx, {
+      tenantId, actorId, action: 'inventory.product.update', targetType: 'Product', targetId: id,
+      metadata: { fields: Object.keys(input) },
+    })
+    return updated
+    })
+  } catch (error) {
+    throwSkuConflict(error)
+  }
 
   const stockMap = await stockByProduct(prisma, tenantId)
   return mapProduct(product, derivedStock(product, stockMap.get(id)))
 }
 
-export async function deleteProduct(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
-  const existing = await prisma.product.findFirst({ where: { id, tenantId } })
-  if (!existing) throw new AppError(404, 'Product not found')
-  await prisma.product.update({ where: { id }, data: { archivedAt: new Date() } })
+export async function deleteProduct(prisma: PrismaClient, tenantId: string, id: string, actorId: string): Promise<void> {
+  await prisma.$transaction(async tx => {
+    const existing = await tx.product.findFirst({ where: { id, tenantId }, select: { id: true } })
+    if (!existing) throw new AppError(404, 'Product not found')
+    await tx.product.update({ where: { id }, data: { archivedAt: new Date() } })
+    await recordAuditLog(tx, {
+      tenantId, actorId, action: 'inventory.product.archive', targetType: 'Product', targetId: id,
+    })
+  })
 }
 
 // ── Stock levels & alerts (unpaginated, derived) ───────────────────────────────
@@ -763,6 +847,7 @@ export async function recordStockMovement(
   prisma: PrismaClient,
   tenantId: string,
   input: StockMovementWriteInput,
+  actorId: string,
 ): Promise<StockMovementRecorded> {
   const product = await prisma.product.findFirst({ where: { id: input.productId, tenantId, archivedAt: null } })
   if (!product) throw new AppError(404, 'Product not found')
@@ -785,6 +870,14 @@ export async function recordStockMovement(
         note: input.note ?? null,
       },
       include: { product: { select: { name: true, warehouse: true } } },
+    })
+    await recordAuditLog(tx, {
+      tenantId,
+      actorId,
+      action: 'inventory.stock.record',
+      targetType: 'StockMovement',
+      targetId: movement.id,
+      metadata: { productId: movement.productId, delta: movement.delta },
     })
     return { movement, newStock: updated.stock }
   })

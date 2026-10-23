@@ -35,6 +35,7 @@ export interface StripeBillingProvider {
   createPortal(customerId: string, returnUrl: string): Promise<string>
   verifyWebhook(payload: Buffer, signature: string, secret: string): Stripe.Event
   retrieveSubscription(id: string): Promise<Stripe.Subscription>
+  cancelSubscription(id: string): Promise<Stripe.Subscription>
   retrievePrice(id: string): Promise<Stripe.Price>
   retrieveInvoice(id: string): Promise<Stripe.Invoice>
   listCustomerPaymentMethods(customerId: string): Promise<Stripe.PaymentMethod[]>
@@ -96,6 +97,11 @@ export function createStripeBillingProvider(secretKey: string, configuredPriceId
     },
     retrieveSubscription(id) {
       return stripe.subscriptions.retrieve(id, { expand: ['items.data.price.product'] })
+    },
+    async cancelSubscription(id) {
+      const current = await stripe.subscriptions.retrieve(id)
+      if (current.status === 'canceled') return current
+      return stripe.subscriptions.cancel(id)
     },
     retrievePrice(id) {
       return stripe.prices.retrieve(id, { expand: ['product'] })

@@ -21,14 +21,18 @@ yarn.lock
 
 # =========================
 # Environment Variables & Secrets
-# Keep only sanitized templates under version control.
+# Keep only sanitized templates (.env.example) under version control.
 # =========================
 .env
 .env.*
 *.env
 *.env.*
+*.env.local
+*.env.*.local
 !.env.example
 !.env.*.example
+
+# Private Keys, Certificates & Crypto Assets
 *.pem
 *.key
 *.p12
@@ -37,10 +41,23 @@ yarn.lock
 *.cer
 *.csr
 *.der
+*.keystore
+*.jks
+*.priv
+*.private
+*.kdbx
+*.age
+*.gpg
+*.asc
+secring.*
+
+# Secret & Credential Stores
 *.secret
 *.secrets
 *.token
 *.tokens
+*.credential
+*.credentials
 secrets/
 credentials/
 .secrets/
@@ -49,19 +66,11 @@ private/
 auth_keys/
 certs/
 certificates/
-*.credential
-*.credentials
 id_rsa*
 id_ed25519*
 id_ecdsa*
-*.keystore
-*.jks
-*.priv
-*.private
-*.kdbx
-*.age
 
-# Cloud credentials & service accounts
+# Cloud Credentials & Service Accounts
 *service-account*.json
 *serviceAccount*.json
 *firebase-adminsdk*.json
@@ -100,7 +109,7 @@ out/
 *.local
 
 # =========================
-# Monorepo task cache
+# Monorepo Task Cache
 # =========================
 .turbo/
 *.tsbuildinfo
@@ -122,7 +131,7 @@ target/
 bin/
 obj/
 
-# Local databases, runtime data, and uploaded files
+# Local databases, runtime data, dumps, and uploaded files
 *.db
 *.db-journal
 *.sqlite
@@ -132,6 +141,11 @@ obj/
 *.sqlite-shm
 *.rdb
 dump.rdb
+*.dump
+*.backup
+*.bak
+*.sql.gz
+*.sql.tar
 uploads/
 storage/
 tmp/
@@ -152,7 +166,7 @@ allure-results/
 allure-report/
 
 # =========================
-# Editor directories and files
+# Editor Directories and Files
 # =========================
 .vscode/*
 !.vscode/extensions.json
@@ -186,7 +200,10 @@ $RECYCLE.BIN/
 # =========================
 .zwork/
 .claude/
+.claude.json
+claude.json
 .agents/
+.agent/
 .codex/
 .opencode/
 .zed/
@@ -213,22 +230,34 @@ $RECYCLE.BIN/
 brain/
 *.scratch.*
 scratch/
+.scratch/
 .ai/
 .prompts/
 .prompt/
+ai-output/
 ai_artifacts/
 llm_output/
 prompts/
 prompt_history/
-# Local AI instruction, prompt, and context files. Keep these out of public repos.
+
+# Local AI instruction, prompt, and context files
 AGENTS.md
 AGENTS.*
 AGENTS-*.md
 AGENT-*.md
 CLAUDE.md
+CLAUDE.*
+claude.md
+claude-*.md
 GEMINI.md
+gemini.md
+gemini-*.md
+CHATGPT.md
+chatgpt.md
 COPILOT.md
+copilot.md
 copilot-instructions.md
+.github/copilot-instructions.md
 *.agent.md
 *.instructions.md
 *.prompt.md
@@ -239,8 +268,11 @@ copilot-instructions.md
 *.copilot.md
 *.gemini.md
 *.chatgpt.md
+*.claude.md
 .cursorrules
+*.cursorrules
 .windsurfrules
+*.windsurfrules
 .aider*.*
 .continue*.*
 .clinerules*
@@ -255,10 +287,12 @@ copilot-instructions.md
 # Common local work directories used for plans, reviews, and AI output.
 .reviews/
 .plans/
+.audits/
 .ai-review/
-ai-output/
-ai_artifacts/
-llm_output/
+plans/
+reviews/
+audits/
+analysis/
 
 PROJECT-REVIEW-AND-REMEDIATION-PLAN.md
 UI_UX_REVIEW.md
@@ -270,6 +304,7 @@ MIGRATION_PROGRESS.md
 REMEDIATION-PLAN-*.md
 REVIEW-*.md
 
+# Pattern matching for Markdown docs (case variations)
 *AUDIT*.md
 *audit*.md
 *REVIEW*.md
@@ -306,19 +341,34 @@ REVIEW-*.md
 *.plan.json
 *.plan.txt
 *.plan.md
-# Also cover mixed-case names and non-Markdown exports of local review/planning notes.
+
+# Case-insensitive bracket patterns covering markdown variants (.md, .markdown)
 *[Rr][Ee][Vv][Ii][Ee][Ww]*.md
+*[Rr][Ee][Vv][Ii][Ee][Ww]*.markdown
 *[Aa][Uu][Dd][Ii][Tt]*.md
+*[Aa][Uu][Dd][Ii][Tt]*.markdown
 *[Pp][Ll][Aa][Nn]*.md
+*[Pp][Ll][Aa][Nn]*.markdown
 *[Hh][Aa][Nn][Dd][Oo][Ff][Ff]*.md
+*[Hh][Aa][Nn][Dd][Oo][Ff][Ff]*.markdown
 *[Pp][Rr][Oo][Gg][Rr][Ee][Ss][Ss]*.md
+*[Pp][Rr][Oo][Gg][Rr][Ee][Ss][Ss]*.markdown
 *[Rr][Ee][Mm][Ee][Dd][Ii][Aa][Tt][Ii][Oo][Nn]*.md
+*[Rr][Ee][Mm][Ee][Dd][Ii][Aa][Tt][Ii][Oo][Nn]*.markdown
 *[Ii][Nn][Vv][Ee][Ss][Tt][Ii][Gg][Aa][Tt][Ii][Oo][Nn]*.md
+*[Ii][Nn][Vv][Ee][Ss][Tt][Ii][Gg][Aa][Tt][Ii][Oo][Nn]*.markdown
 *[Aa][Nn][Aa][Ll][Yy][Ss][Ii][Ss]*.md
+*[Aa][Nn][Aa][Ll][Yy][Ss][Ii][Ss]*.markdown
 *[Nn][Oo][Tt][Ee][Ss]*.md
+*[Nn][Oo][Tt][Ee][Ss]*.markdown
 *[Tt][Oo][Dd][Oo]*.md
+*[Tt][Oo][Dd][Oo]*.markdown
 *[Tt][Aa][Ss][Kk][Ss]*.md
+*[Tt][Aa][Ss][Kk][Ss]*.markdown
 *[Cc][Hh][Ee][Cc][Kk][Ll][Ii][Ss][Tt]*.md
+*[Cc][Hh][Ee][Cc][Kk][Ll][Ii][Ss][Tt]*.markdown
+
+# Non-Markdown exports of local review/planning notes (.txt, .json, .yaml, .rst, etc.)
 *[Rr][Ee][Vv][Ii][Ee][Ww]*.txt
 *[Rr][Ee][Vv][Ii][Ee][Ww]*.json
 *[Rr][Ee][Vv][Ii][Ee][Ww]*.yaml
@@ -372,10 +422,22 @@ REVIEW-*.md
 !**/CONTRIBUTING.md
 !LICENSE.md
 !**/LICENSE.md
+!LICENSE
+!**/LICENSE
 !SECURITY.md
 !**/SECURITY.md
 !CODE_OF_CONDUCT.md
 !**/CODE_OF_CONDUCT.md
+
+# Explicitly protect project source code from documentation patterns
+!*.js
+!*.jsx
+!*.ts
+!*.tsx
+!*.css
+!*.html
+!*.prisma
+!*.sql
 
 # =========================
 # Scratch, Maintenance & Local Scripts

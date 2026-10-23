@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { listCurrencies } from '@asas/domain/money';
-import { formatMoney, formatCompactMoney, formatCompactTableMoney, formatDate, getFormatDefaults, moneyToMajor, setFormatDefaults } from '../src/lib/format.js';
+import { formatMoney, formatCompactMoney, formatCompactTableMoney, formatCompactCurrency, formatFullCurrency, formatDate, getFormatDefaults, moneyToMajor, setFormatDefaults } from '../src/lib/format.js';
 
 test('every currency uses the same minor-unit exponent as the backend', () => {
   for (const currency of listCurrencies()) {
@@ -72,4 +72,21 @@ test('caller date options and timezone override workspace date defaults', () => 
   const options = { month: 'short', day: 'numeric', year: 'numeric' };
   const expected = new Intl.DateTimeFormat('en-US', { ...options, timeZone: 'Asia/Tokyo' }).format(new Date('2026-01-01T16:00:00.000Z'));
   assert.equal(formatDate('2026-01-01T16:00:00.000Z', { ...options, timeZone: 'Asia/Tokyo' }), expected);
+});
+
+test('formatCompactCurrency formats executive KPI summary cards and dashboard widgets compactly with exact rules', () => {
+  assert.equal(formatCompactCurrency(4268079), '$4.27M');
+  assert.equal(formatCompactCurrency(74104), '$74.1K');
+  assert.equal(formatCompactCurrency(527127), '$527.1K');
+  assert.equal(formatCompactCurrency(9536201), '$9.54M');
+  assert.equal(formatCompactCurrency({ amount: 426807900, currency: 'USD' }), '$4.27M');
+  assert.equal(formatCompactCurrency({ amount: 7410400, currency: 'USD' }), '$74.1K');
+  assert.equal(formatCompactCurrency({ amount: 52712700, currency: 'USD' }), '$527.1K');
+  assert.equal(formatCompactCurrency({ amount: 953620100, currency: 'USD' }), '$9.54M');
+  assert.equal(formatCompactCurrency(850), '$850');
+  assert.equal(formatCompactCurrency(0), '$0');
+  assert.equal(formatCompactCurrency(null), '—');
+
+  assert.equal(formatFullCurrency({ amount: 426807900, currency: 'USD' }), '$4,268,079.00');
+  assert.equal(formatFullCurrency({ amount: 52712700, currency: 'USD' }), '$527,127.00');
 });

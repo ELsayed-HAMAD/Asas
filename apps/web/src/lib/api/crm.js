@@ -5,9 +5,8 @@ import { http } from '../api/http'
  * `/api/v1/crm` (routes: `apps/api/src/modules/crm/crm.routes.ts`). Money values arrive as
  * `{ amount: <minor units>, currency }` wire objects and go straight to `formatMoney`.
  *
- * Mutations: `POST /deals` and `PATCH /deals/:id` are the only write routes the server exposes
- * (guarded by the `deal.write` permission). Each page wires only the buttons it can honestly
- * drive; the rest stay visually intact but disabled.
+ * Mutations use tenant-scoped CRM permissions. Deal removal is reversible archival so activity
+ * and stage history remain available for audit and can be restored later.
  */
 export const crmApi = {
   listAgenda: () => http.get('/crm/agenda'),
@@ -40,5 +39,6 @@ export const crmApi = {
   createDeal: (body) => http.post('/crm/deals', { body }),
 
   updateDeal: (id, body) => http.patch(`/crm/deals/${id}`, { body }),
-  deleteDeal: (id) => http.delete(`/crm/deals/${id}`),
+  archiveDeal: (id) => http.delete(`/crm/deals/${id}`),
+  restoreDeal: (id) => http.post(`/crm/deals/${id}/restore`),
 }

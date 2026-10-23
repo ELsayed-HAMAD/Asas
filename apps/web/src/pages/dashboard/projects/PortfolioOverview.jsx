@@ -17,7 +17,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { projectsApi } from '../../../lib/api/projects';
 import { hrApi } from '../../../lib/api/hr';
 import { queryKeys } from '../../../lib/queryKeys';
-import { formatCompactTableMoney, formatDate, formatMoney } from '../../../lib/format';
+import { formatCompactTableMoney, formatDate, formatMoney, formatCompactCurrency, formatFullCurrency } from '../../../lib/format';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import SearchInput from '../../../components/common/SearchInput';
@@ -171,7 +171,8 @@ export default function PortfolioOverview() {
   const totalProjects = summary?.totalProjects ?? projects.length;
   const totalBudget = summary?.totalBudget ?? null;
   const budgetUtilization = summary?.utilizationPct ?? null;
-  const totalBudgetText = formatMoney(totalBudget, { maximumFractionDigits: 0 });
+  const totalBudgetText = formatCompactCurrency(totalBudget);
+  const fullTotalBudgetText = formatFullCurrency(totalBudget);
   const totalBudgetFontSize = `clamp(0.75rem, ${(130 / Math.max(1, totalBudgetText.length)).toFixed(2)}cqw, 1.75rem)`;
   const selectedBudgetUtil = selectedProject?.utilizationPct ?? null;
 
@@ -247,7 +248,7 @@ export default function PortfolioOverview() {
               <Wallet className="w-4 h-4" />
             </div>
             <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 pe-10">Total Budget</p>
-            <p className="text-2xl text-[28px] font-bold tracking-tight text-slate-900 my-1 tabular-nums truncate" title={totalBudgetText} style={{ fontSize: totalBudgetFontSize }}>{totalBudgetText}</p>
+            <p className="text-2xl text-[28px] font-bold tracking-tight text-slate-900 my-1 tabular-nums truncate cursor-help" title={fullTotalBudgetText} style={{ fontSize: totalBudgetFontSize }}>{totalBudgetText}</p>
             <div className="h-1.5 w-full rounded-full bg-slate-200/80" />
           </div>
         </div>

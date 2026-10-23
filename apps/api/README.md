@@ -17,6 +17,12 @@ Copy `.env.example` to `.env` first and set `DATABASE_URL` and `AUTH_SECRET`.
 
 For email delivery, configure `RESEND_API_KEY` and a verified `MAIL_FROM` address. When `QUEUE_URL` is set, email is dispatched through the pg-boss `emails` queue with retries; otherwise it is delivered inline. Without a Resend key, email sends fail explicitly rather than being recorded as successful. Keep provider credentials in the deployment secret store, not in source control.
 
+### Employee bank-data encryption
+
+Employee routing/account numbers, IBANs, and BICs are encrypted with AES-256-GCM before writes, bound to their tenant and field, and decrypted only in the existing ADMIN-gated employee and payroll responses. Set a dedicated `BANK_DATA_ENCRYPTION_KEY` of at least 32 characters in every production API environment and keep it stable in the deployment secret manager. The API refuses production startup without it. Do not rotate or replace the key without a planned decrypt-and-reencrypt migration; a lost key makes encrypted bank details unrecoverable.
+
+After every API instance has been upgraded to write encrypted values, backfill legacy plaintext rows from the repository root with `pnpm --filter @asas/api data:encrypt-employee-bank-details`. The operation is idempotent, processes records in batches, and uses compare-and-set writes so a concurrent employee edit is reported instead of overwritten; rerun after resolving the reported row. Legacy reads remain compatible during this rollout. New employee imports and sample-data setup also encrypt bank fields. Full workspace JSON archives omit bank identifiers and state that exclusion in the archive metadata and Settings UI.
+
 ### Resend deployment and acceptance
 
 1. Verify the sending domain in Resend and create an API key with email send access.

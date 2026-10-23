@@ -443,8 +443,8 @@ export default function MembersRoles() {
               Roles & Permissions
             </h3>
             <p className="text-xs text-body-light leading-relaxed mb-6">
-              Asas provides three distinct permission levels to maintain separation of duties across
-              departments and financial records.
+              Workspace roles control who can manage people and settings, work with operational records,
+              and access sensitive finance and HR data. Approval controls add separation of duties to key workflows.
             </p>
           </div>
 
@@ -477,8 +477,9 @@ export default function MembersRoles() {
                 <h4 className="text-sm font-bold text-heading">Member</h4>
               </div>
               <p className="text-xs text-body-light leading-relaxed">
-                Standard access to participate in projects, view assigned modules, submit timesheets,
-                and log activity without administrative privileges.
+                Can use member-accessible workspace features, participate in projects, and access personal
+                self-service records without administrative privileges. Module-by-module access assignment
+                is not currently available.
               </p>
             </div>
           </div>

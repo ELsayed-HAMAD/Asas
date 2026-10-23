@@ -21,9 +21,10 @@ describe('getForecast', () => {
         findMany: vi.fn().mockResolvedValue([
           { id: 'c2234567', employeeId: 'c3234567', repName: 'Rep One', period: '2026-Q1', quota: new Prisma.Decimal('110'), currency: 'USD', createdAt: stamp(3) },
           { id: 'c2234568', employeeId: 'c3234567', repName: 'Rep One', period: '2026-Q1', quota: new Prisma.Decimal('100'), currency: 'USD', createdAt: stamp(2) },
-          { id: 'c2234569', employeeId: 'c3234567', repName: 'Rep One', period: '2026', quota: new Prisma.Decimal('200'), currency: 'USD', createdAt: stamp(1) },
+          { id: 'c2234569', employeeId: null, repName: 'Rep One', period: '2026', quota: new Prisma.Decimal('200'), currency: 'USD', createdAt: stamp(1) },
         ]),
       },
+      employee: { findMany: vi.fn().mockResolvedValue([{ id: 'c3234567', name: 'Rep One' }]) },
       $queryRaw: vi.fn()
         .mockResolvedValueOnce([]) // monthly open pipeline
         .mockResolvedValueOnce([]) // monthly commit pipeline
@@ -38,6 +39,13 @@ describe('getForecast', () => {
           dealBestCase: new Prisma.Decimal('40'),
           dealCommitCount: 2n,
           dealBestCaseCount: 3n,
+        }])
+        .mockResolvedValueOnce([{
+          ownerEmployeeId: 'c3234567',
+          closed: new Prisma.Decimal('80'),
+          commit: new Prisma.Decimal('15'),
+          bestCase: new Prisma.Decimal('25'),
+          openDealCount: 4n,
         }]),
     } as unknown as PrismaClient
 
@@ -49,6 +57,14 @@ describe('getForecast', () => {
     expect(result.availableYears).toEqual(['2025', '2026'])
     expect(result.forecastByRep.map(row => row.id)).toEqual(['c1234567', 'c1234569'])
     expect(result.quotas.map(row => row.id)).toEqual(['c2234567', 'c2234569'])
+    expect(result.liveForecastByRep).toEqual([{
+      employeeId: 'c3234567', repName: 'Rep One',
+      closed: { amount: 8000, currency: 'USD' },
+      commit: { amount: 1500, currency: 'USD' },
+      bestCase: { amount: 2500, currency: 'USD' },
+      quota: { amount: 20000, currency: 'USD' },
+      quotaAttainmentPct: 40, openDealCount: 4,
+    }])
     expect(result.summary.totalQuota).toEqual({ amount: 20000, currency: 'USD' })
     expect(result.summary.excludedQuotaCount).toBe(1)
     expect(result.summary.totalCommit).toEqual({ amount: 8500, currency: 'USD' })
@@ -71,5 +87,35 @@ describe('getForecast', () => {
     expect(aggregateSql).toContain("IN ('COMMIT', 'BEST_CASE')")
     expect(aggregateSql).toContain('count(*) FILTER (WHERE upper("forecastBucket") = \'COMMIT\')::bigint AS "dealCommitCount"')
     expect(aggregateSql).toContain('count(*) FILTER (WHERE upper("forecastBucket") IN (\'COMMIT\', \'BEST_CASE\'))::bigint AS "dealBestCaseCount"')
+    const repSql = rawQueries[5]![0].join(' ')
+    expect(repSql).toContain('GROUP BY "ownerEmployeeId"')
+    expect(repSql).toContain("upper(" + '"forecastBucket"' + ") = 'COMMIT'")
+  })
+
+  it('does not assign a name-only quota to an arbitrary employee when names are ambiguous', async () => {
+    const prisma = {
+      tenant: { findUnique: vi.fn().mockResolvedValue({ currency: 'USD' }) },
+      forecastSnapshot: { findMany: vi.fn().mockResolvedValue([]) },
+      salesQuota: { findMany: vi.fn().mockResolvedValue([
+        { id: 'c2234567', employeeId: null, repName: 'Rep One', period: '2026', quota: new Prisma.Decimal('100'), currency: 'USD', createdAt: stamp(1) },
+      ]) },
+      employee: { findMany: vi.fn().mockResolvedValue([
+        { id: 'c3234567', name: 'Rep One' }, { id: 'c4234567', name: 'rep one' },
+      ]) },
+      $queryRaw: vi.fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ year: '2026' }])
+        .mockResolvedValueOnce([{ value: new Prisma.Decimal(0), weightedValue: new Prisma.Decimal(0), unweightedValue: new Prisma.Decimal(0), unweightedCount: 0n, dealCommit: new Prisma.Decimal(0), dealBestCase: new Prisma.Decimal(0), dealCommitCount: 0n, dealBestCaseCount: 0n }])
+        .mockResolvedValueOnce([{ ownerEmployeeId: 'c3234567', closed: new Prisma.Decimal(50), commit: new Prisma.Decimal(0), bestCase: new Prisma.Decimal(0), openDealCount: 0n }]),
+    } as unknown as PrismaClient
+
+    const result = await getForecast(prisma, 'tenant_1', '2026')
+
+    expect(result.liveForecastByRep).toEqual([
+      expect.objectContaining({ employeeId: 'c3234567', repName: 'Rep One', quota: null, quotaAttainmentPct: null }),
+      expect.objectContaining({ employeeId: null, repName: 'Rep One (unlinked quota)', quota: { amount: 10000, currency: 'USD' }, quotaAttainmentPct: null }),
+    ])
   })
 })

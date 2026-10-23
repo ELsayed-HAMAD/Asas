@@ -4,14 +4,16 @@ import {
   idParamSchema,
   notificationMarkReadSchema,
   notificationsListResponseSchema,
+  notificationUsageSchema,
 } from '@asas/contracts'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
-import { requireAuthContext } from '../../middlewares/rbac.js'
+import { requireAuthContext, requireRole } from '../../middlewares/rbac.js'
 import { moduleKeyPrefix } from '../../plugins/sse.js'
 import {
   deleteNotification,
+  getUserNotificationUsage,
   listUserNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -21,8 +23,21 @@ export async function notificationRoutes(app: FastifyInstance): Promise<void> {
   const server = app.withTypeProvider<ZodTypeProvider>()
 
   server.get(
+    '/stats',
+    {
+      preHandler: requireRole('MEMBER'),
+      schema: { response: { 200: envelope(notificationUsageSchema), ...errorResponses } },
+    },
+    async request => {
+      const { tenantId, userId } = requireAuthContext(request)
+      return { data: await getUserNotificationUsage(request.server.prisma, tenantId, userId) }
+    },
+  )
+
+  server.get(
     '/',
     {
+      preHandler: requireRole('MEMBER'),
       schema: {
         response: {
           200: envelope(notificationsListResponseSchema),
@@ -40,6 +55,7 @@ export async function notificationRoutes(app: FastifyInstance): Promise<void> {
   server.patch(
     '/:id/read',
     {
+      preHandler: requireRole('MEMBER'),
       schema: {
         params: idParamSchema,
         body: notificationMarkReadSchema.optional(),
@@ -61,6 +77,7 @@ export async function notificationRoutes(app: FastifyInstance): Promise<void> {
   server.post(
     '/mark-all-read',
     {
+      preHandler: requireRole('MEMBER'),
       schema: {
         response: {
           200: envelope(z.object({ success: z.boolean() })),
@@ -79,6 +96,7 @@ export async function notificationRoutes(app: FastifyInstance): Promise<void> {
   server.delete(
     '/:id',
     {
+      preHandler: requireRole('MEMBER'),
       schema: {
         params: idParamSchema,
         response: {

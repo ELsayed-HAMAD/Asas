@@ -1,9 +1,10 @@
 import { http } from '../api/http'
 
 /**
- * Onboarding API client. The 3-path flow (empty / sample / import) is the supported start
- * path; `clearSampleData` lets a `SAMPLE_LOADED` workspace be wiped so onboarding can run
- * again (see the API's `DELETE /onboarding/sample-data`).
+ * Onboarding API client. The API supports empty, sample, and employee-import paths; the current
+ * onboarding UI only exposes empty and sample setup. `importEmployees` remains available for a
+ * future reviewed file-import flow. `clearSampleData` lets a `SAMPLE_LOADED` workspace be wiped
+ * so onboarding can run again (see the API's `DELETE /onboarding/sample-data`).
  */
 export const onboardingApi = {
   status: () => http.get('/onboarding/status'),

@@ -194,7 +194,7 @@ export default function VerifyEmail() {
       {/* Instructions list */}
       <div className="p-3.5 mb-6 rounded-button bg-surface-muted/50 border border-border-subtle text-left text-xs text-muted space-y-1.5">
         <p className="font-medium text-body">Next steps:</p>
-        <p>1. Open the email from <strong>Asas</strong> (<code className="text-[11px]">onboarding@resend.dev</code>).</p>
+        <p>1. Open the verification email from <strong>Asas</strong>. The sender address is set by this deployment.</p>
         <p>2. Click the <strong>Verify Email</strong> button inside.</p>
         <p>3. If you do not see it within a minute, check your Spam or Junk folder.</p>
       </div>

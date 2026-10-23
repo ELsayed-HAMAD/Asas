@@ -58,7 +58,7 @@ const ACTIVE_STATUSES = ['ON_TRACK', 'DELAYED', 'AT_RISK'] as const
 // ── Money + date helpers ─────────────────────────────────────────────────────────
 
 /** Resolve the tenant's reporting currency, or 404 if the tenant row is gone. */
-async function getTenantCurrency(prisma: PrismaClient, tenantId: string): Promise<string> {
+async function getTenantCurrency(prisma: ProjectsClient, tenantId: string): Promise<string> {
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } })
   if (!tenant) throw new AppError(404, 'Workspace not found')
   return tenant.currency
@@ -122,7 +122,7 @@ type ProjectWithIncludes = {
 type ProjectSpend = { projectId: string | null; spent: Prisma.Decimal; unvaluedSettlementCount: number; unassignedSettlementCount: number }
 
 /** Spend from posted settlements in workspace base currency, net of recorded reversals. */
-async function loadProjectSpend(prisma: PrismaClient, tenantId: string, projectIds?: string[]): Promise<Map<string, ProjectSpend> & { totals?: ProjectSpend }> {
+async function loadProjectSpend(prisma: ProjectsClient, tenantId: string, projectIds?: string[]): Promise<Map<string, ProjectSpend> & { totals?: ProjectSpend }> {
   const payableProjectFilter = projectIds === undefined ? Prisma.empty : Prisma.sql`AND p."projectId" = ANY(${projectIds}::text[])`
   const expenseProjectFilter = projectIds === undefined ? Prisma.empty : Prisma.sql`AND e."projectId" = ANY(${projectIds}::text[])`
   const rows = await prisma.$queryRaw<Array<{ projectId: string | null; isTotal: boolean; spent: Prisma.Decimal; unvaluedSettlementCount: bigint; unassignedSettlementCount: bigint }>>`
@@ -514,7 +514,7 @@ export async function getSprint(prisma: PrismaClient, tenantId: string, id: stri
 }
 
 async function assertProjectInTenant(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   projectId: string | null | undefined,
 ): Promise<void> {
@@ -524,7 +524,7 @@ async function assertProjectInTenant(
 }
 
 export async function createSprint(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   input: SprintWriteInput,
 ): Promise<Sprint> {
@@ -547,7 +547,7 @@ export async function createSprint(
 }
 
 export async function updateSprint(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   id: string,
   input: SprintUpdateInput,
@@ -585,7 +585,7 @@ export async function updateSprint(
   })
 }
 
-export async function deleteSprint(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
+export async function deleteSprint(prisma: ProjectsClient, tenantId: string, id: string): Promise<void> {
   const existing = await prisma.sprint.findFirst({ where: { id, tenantId } })
   if (!existing) throw new AppError(404, 'Sprint not found')
   await prisma.sprint.delete({ where: { id_tenantId: { id, tenantId } } })
@@ -696,7 +696,7 @@ export async function getIssue(prisma: PrismaClient, tenantId: string, id: strin
 }
 
 async function assertSprintInTenant(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   sprintId: string | null | undefined,
 ): Promise<string | null> {
@@ -707,7 +707,7 @@ async function assertSprintInTenant(
 }
 
 async function assertIssueProjectInTenant(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   projectId: string | null | undefined,
 ): Promise<void> {
@@ -716,7 +716,7 @@ async function assertIssueProjectInTenant(
   if (!project) throw new AppError(400, 'Project does not belong to this workspace')
 }
 
-export async function createIssue(prisma: PrismaClient, tenantId: string, input: IssueWriteInput): Promise<Issue> {
+export async function createIssue(prisma: ProjectsClient, tenantId: string, input: IssueWriteInput): Promise<Issue> {
   const sprintProjectId = await assertSprintInTenant(prisma, tenantId, input.sprintId)
   if (input.projectId && sprintProjectId && input.projectId !== sprintProjectId) {
     throw new AppError(400, 'Issue project must match its sprint project')
@@ -747,7 +747,7 @@ export async function createIssue(prisma: PrismaClient, tenantId: string, input:
 }
 
 export async function updateIssue(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   id: string,
   input: IssueUpdateInput,
@@ -791,7 +791,7 @@ export async function updateIssue(
   return mapIssue(issue)
 }
 
-export async function deleteIssue(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
+export async function deleteIssue(prisma: ProjectsClient, tenantId: string, id: string): Promise<void> {
   const existing = await prisma.issue.findFirst({ where: { id, tenantId } })
   if (!existing) throw new AppError(404, 'Issue not found')
   await prisma.issue.delete({ where: { id_tenantId: { id, tenantId } } })
@@ -940,7 +940,7 @@ export async function removeIssueAssignee(
 // ── Project writes ──────────────────────────────────────────────────────────────
 
 export async function createProject(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   input: ProjectWriteInput,
 ): Promise<Project> {
@@ -965,7 +965,7 @@ export async function createProject(
 }
 
 export async function updateProject(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   id: string,
   input: ProjectUpdateInput,
@@ -993,14 +993,13 @@ export async function updateProject(
   return mapProject(project, currency, spend.get(project.id))
 }
 
-export async function deleteProject(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
+export async function deleteProject(prisma: ProjectsClient, tenantId: string, id: string): Promise<void> {
+  if ('$transaction' in prisma) return prisma.$transaction(tx => deleteProject(tx, tenantId, id))
   const existing = await prisma.project.findFirst({ where: { id, tenantId } })
   if (!existing) throw new AppError(404, 'Project not found')
-  await prisma.$transaction(async tx => {
-    await tx.payableInvoice.updateMany({ where: { tenantId, projectId: id }, data: { projectId: null } })
-    await tx.expense.updateMany({ where: { tenantId, projectId: id }, data: { projectId: null } })
-    await tx.project.delete({ where: { id_tenantId: { id, tenantId } } })
-  })
+  await prisma.payableInvoice.updateMany({ where: { tenantId, projectId: id }, data: { projectId: null } })
+  await prisma.expense.updateMany({ where: { tenantId, projectId: id }, data: { projectId: null } })
+  await prisma.project.delete({ where: { id_tenantId: { id, tenantId } } })
 }
 
 // ── Roadmap (the Gantt) ─────────────────────────────────────────────────────────
@@ -1053,7 +1052,7 @@ export async function listRoadmap(prisma: PrismaClient, tenantId: string): Promi
 }
 
 async function assertPhaseInTenant(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   phaseId: string,
 ): Promise<void> {
@@ -1062,18 +1061,19 @@ async function assertPhaseInTenant(
 }
 
 export async function createRoadmapPhase(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   input: RoadmapPhaseWriteInput,
-): Promise<void> {
+): Promise<string> {
   const max = await prisma.roadmapPhase.aggregate({ where: { tenantId }, _max: { sortOrder: true } })
-  await prisma.roadmapPhase.create({
+  const phase = await prisma.roadmapPhase.create({
     data: { tenantId, title: input.title, sortOrder: input.sortOrder ?? (max._max.sortOrder ?? -1) + 1 },
   })
+  return phase.id
 }
 
 export async function updateRoadmapPhase(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   id: string,
   input: RoadmapPhaseWriteInput,
@@ -1088,18 +1088,18 @@ export async function updateRoadmapPhase(
   })
 }
 
-export async function deleteRoadmapPhase(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
+export async function deleteRoadmapPhase(prisma: ProjectsClient, tenantId: string, id: string): Promise<void> {
   await assertPhaseInTenant(prisma, tenantId, id)
   await prisma.roadmapPhase.delete({ where: { id } })
 }
 
 export async function createRoadmapTask(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   input: RoadmapTaskWriteInput,
-): Promise<void> {
+): Promise<string> {
   await assertPhaseInTenant(prisma, tenantId, input.phaseId)
-  await prisma.roadmapTask.create({
+  const task = await prisma.roadmapTask.create({
     data: {
       tenantId,
       phaseId: input.phaseId,
@@ -1113,10 +1113,11 @@ export async function createRoadmapTask(
       barColor: input.barColor ?? null,
     },
   })
+  return task.id
 }
 
 export async function updateRoadmapTask(
-  prisma: PrismaClient,
+  prisma: ProjectsClient,
   tenantId: string,
   id: string,
   input: RoadmapTaskUpdateInput,
@@ -1142,7 +1143,7 @@ export async function updateRoadmapTask(
   })
 }
 
-export async function deleteRoadmapTask(prisma: PrismaClient, tenantId: string, id: string): Promise<void> {
+export async function deleteRoadmapTask(prisma: ProjectsClient, tenantId: string, id: string): Promise<void> {
   const existing = await prisma.roadmapTask.findFirst({ where: { id, tenantId } })
   if (!existing) throw new AppError(404, 'Roadmap task not found')
   await prisma.roadmapTask.delete({ where: { id } })

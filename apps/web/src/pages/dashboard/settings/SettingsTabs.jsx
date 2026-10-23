@@ -17,16 +17,16 @@ export default function SettingsTabs() {
   const activeTab = tabs.find(t => t.path === pathname)?.path || '/dashboard/settings'
 
   return (
-    <nav aria-label="Settings navigation" className="bg-surface-raised border-b border-border-default z-10 flex-shrink-0 pt-2 px-4 md:px-8">
+    <nav aria-label="Settings navigation" className="bg-surface-raised border-b border-border-default z-10 flex-shrink-0 pt-2 px-4 md:px-8 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <Tabs value={activeTab} onValueChange={(val) => navigate(val)}>
-        <TabsList className="h-auto bg-transparent p-0 justify-start gap-x-4 md:gap-x-8 rounded-none border-0">
+        <TabsList className="h-auto min-w-max flex-nowrap bg-transparent p-0 justify-start gap-x-4 md:gap-x-8 rounded-none border-0">
           {tabs.map((tab) => {
             const isActive = pathname === tab.path
             return (
               <TabsTrigger
                 key={tab.path}
                 value={tab.path}
-                className="relative pb-3 pt-0 px-0 rounded-none bg-transparent shadow-none text-sm font-medium transition-colors text-muted hover:text-body data-[state=active]:bg-transparent data-[state=active]:text-heading data-[state=active]:shadow-none cursor-pointer"
+                className="relative whitespace-nowrap pb-3 pt-0 px-0 rounded-none bg-transparent shadow-none text-sm font-medium transition-colors text-muted hover:text-body data-[state=active]:bg-transparent data-[state=active]:text-heading data-[state=active]:shadow-none cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
               >
                 {tab.name}
                 {isActive && (

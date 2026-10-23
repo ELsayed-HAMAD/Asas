@@ -21,6 +21,7 @@ export const settingsApi = {
   createBillingPortal: () => http.post('/billing/portal'),
   /** GET /settings/notifications → { modules, quietHours, quietHoursDefaulted }. */
   getNotifications: () => http.get('/settings/notifications'),
+  getNotificationUsage: () => http.get('/notifications/stats'),
 
   /**
    * PATCH /settings/notifications — partial update. Accepts `{ modules }`, `{ quietHours }`, or

@@ -69,6 +69,8 @@ export interface ExportQueue {
   register(kind: string, handler: ExportHandler): void
   /** Create the row (QUEUED), then run — now, or on the queue. Returns the created row id. */
   submit(kind: string, data: unknown, tenantId: string): Promise<string>
+  /** Dispatch a job row that was created atomically with its audit record by the caller. */
+  dispatch(jobId: string, kind: string, data: unknown): Promise<void>
   start(): Promise<void>
   close(): Promise<void>
 }
@@ -89,6 +91,10 @@ export function exportFilePath(jobId: string, extension: string): string {
 /** The file extension a kind renders to — the download endpoint needs it to address the file. */
 export function exportFileExtension(kind: string): string {
   return (KIND_FILENAME[kind] ?? { extension: 'xlsx' }).extension
+}
+
+export function exportFileName(kind: string): string {
+  return (KIND_FILENAME[kind] ?? { filename: `${kind}.xlsx` }).filename
 }
 
 export function exportContentType(kind: string): string {
@@ -112,6 +118,8 @@ export interface CreateExportQueueOptions {
   url?: string | undefined
   store: ExportJobStore
   storage: ObjectStorage
+  /** Override the queue transport in tests or alternate deployments. */
+  createBossClient?: (url: string) => BossClient
 }
 
 export async function createExportQueue(options: CreateExportQueueOptions): Promise<ExportQueue> {
@@ -121,8 +129,12 @@ export async function createExportQueue(options: CreateExportQueueOptions): Prom
 
   if (url) {
     // Loaded lazily so the inline path (dev/CI/tests) never imports or connects to pg-boss.
-    const PgBoss = require('pg-boss') as new (cfg: unknown) => BossClient
-    boss = new PgBoss({ connectionString: url, schema: 'asas_boss' })
+    if (options.createBossClient) {
+      boss = options.createBossClient(url)
+    } else {
+      const PgBoss = require('pg-boss') as new (cfg: unknown) => BossClient
+      boss = new PgBoss({ connectionString: url, schema: 'asas_boss' })
+    }
     await boss.start()
   }
 
@@ -155,6 +167,26 @@ export async function createExportQueue(options: CreateExportQueueOptions): Prom
     }
   }
 
+  async function dispatch(jobId: string, kind: string, data: unknown): Promise<void> {
+    const payload: JobPayload = { jobId, kind, data }
+    if (!boss) {
+      await runJob(payload)
+      return
+    }
+    try {
+      await boss.send(BOSS_QUEUE, payload, { retryLimit: 2 })
+    } catch (error) {
+      // The row is durable. Record a dispatch failure instead of leaving the UI polling a job
+      // that no worker can ever receive. The caller owns job creation and its audit transaction.
+      try {
+        await updateRow(jobId, { status: 'FAILED' })
+      } catch {
+        // Preserve the transport error; the original QUEUED row remains visible for ops.
+      }
+      throw error instanceof Error ? error : new Error(String(error))
+    }
+  }
+
   return {
     mode: boss ? 'boss' : 'inline',
     register(kind, handler) {
@@ -163,20 +195,14 @@ export async function createExportQueue(options: CreateExportQueueOptions): Prom
     async submit(kind, data, tenantId) {
       const row = await store.create({
         tenantId,
-        filename: (KIND_FILENAME[kind] ?? { filename: `${kind}.xlsx` }).filename,
+        filename: exportFileName(kind),
         dataScope: kind,
         status: 'QUEUED',
       })
-      const payload: JobPayload = { jobId: row.id, kind, data }
-      if (!boss) {
-        // Inline: run in this tick. A handler failure marks the row FAILED and re-throws, so
-        // the creating request sees it (a boss-mode failure only surfaces via the row).
-        await runJob(payload)
-        return row.id
-      }
-      await boss.send(BOSS_QUEUE, payload, { retryLimit: 2 })
+      await dispatch(row.id, kind, data)
       return row.id
     },
+    dispatch,
     async start() {
       if (!boss) return
       await boss.createQueue(BOSS_QUEUE, { retryLimit: 2 })

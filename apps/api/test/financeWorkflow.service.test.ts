@@ -22,6 +22,7 @@ function setup(status: string, createdById: string | null = null) {
   }
   const tx = {
     $queryRaw: vi.fn().mockResolvedValue([{ id: row.id }]), payableInvoice: delegate, receivableInvoice: delegate, expense: delegate,
+    member: { count: vi.fn().mockResolvedValue(2) },
     ledgerAccount: { upsert: vi.fn(async ({ create }: { create: Record<string, unknown> }) => ({ id: String(create.code) })) },
     journalEntry: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({ id: 'journal_1' })) },
     journalLine: { createMany: vi.fn(async () => ({ count: 2 })) },
@@ -101,6 +102,15 @@ describe('finance workflow integrity', () => {
       const { prisma, delegate } = setup('PENDING', 'creator')
       await expect(change(prisma, 'tenant_1', 'doc_1', 'APPROVED', 'creator')).rejects.toMatchObject({ statusCode: 403 })
       expect(delegate.update).not.toHaveBeenCalled()
+    }
+  })
+  it('allows a sole workspace member to approve their own payable or expense', async () => {
+    for (const change of [updatePayableStatus, updateExpenseStatus]) {
+      const { prisma, tx, delegate } = setup('PENDING', 'creator')
+      tx.member.count.mockResolvedValue(1)
+      await change(prisma, 'tenant_1', 'doc_1', 'APPROVED', 'creator')
+      expect(tx.member.count).toHaveBeenCalledWith({ where: { tenantId: 'tenant_1' } })
+      expect(delegate.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'APPROVED', approvedById: 'creator' }) }))
     }
   })
   it('records independent approval attribution', async () => {

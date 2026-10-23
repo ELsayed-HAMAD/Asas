@@ -14,7 +14,7 @@ import { Switch } from '../../../components/ui/switch';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../components/ui/card';
 import { settingsApi } from '../../../lib/api/settings';
 import { queryKeys } from '../../../lib/queryKeys';
-import { useActiveMemberRole } from '../../../lib/authClient';
+import { useActiveMemberRole, useActiveOrganization, useSession } from '../../../lib/authClient';
 import { getMemberRoleName } from '../../../lib/memberRole';
 
 /**
@@ -64,6 +64,9 @@ const getPreviewData = (event) => {
 export default function SettingsNotifications() {
   const queryClient = useQueryClient();
   const { data: memberRole } = useActiveMemberRole();
+  const { data: activeOrganization } = useActiveOrganization();
+  const { data: session } = useSession();
+  const usageQueryKey = [...queryKeys.notifications.user(`${activeOrganization?.id ?? 'no-workspace'}:${session?.user?.id ?? 'signed-out'}`), 'usage'];
   const roleName = getMemberRoleName(memberRole);
   const canManageSettings = roleName === 'OWNER' || roleName === 'ADMIN';
   const [previewEvent, setPreviewEvent] = useState('invoice');
@@ -73,6 +76,12 @@ export default function SettingsNotifications() {
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.settings.notifications(),
     queryFn: settingsApi.getNotifications,
+  });
+  const { data: usage, isError: usageError } = useQuery({
+    queryKey: usageQueryKey,
+    queryFn: settingsApi.getNotificationUsage,
+    enabled: Boolean(activeOrganization?.id && session?.user?.id),
+    refetchInterval: 30000,
   });
 
   const updateMutation = useMutation({
@@ -266,18 +275,19 @@ export default function SettingsNotifications() {
 
         </div>
 
-        {/* Right: Live Preview Panel */}
+        {/* Right: Example and usage panel */}
         <div className="w-full xl:w-[360px] xl:flex-shrink-0 bg-surface-raised border-t xl:border-t-0 xl:border-l border-border-default flex flex-col z-10">
 
           <div className="xl:flex-1 xl:overflow-y-auto p-8 space-y-8">
 
-            {/* Live Preview Container */}
+            {/* Illustrative notification preview */}
             <div>
-              <h2 className="text-lg font-bold text-heading mb-6">Live Preview</h2>
+              <h2 className="text-lg font-bold text-heading mb-1">Example notification</h2>
+              <p className="text-xs text-muted mb-5">Illustrative only. This preview is not sent to a user.</p>
 
               <div className="bg-gradient-to-b from-surface-muted to-surface-strong border border-border-default rounded-card p-6 shadow-panel h-80 flex flex-col justify-center">
 
-                {/* Simulated Notification Card */}
+                {/* This sample is illustrative and is never sent. */}
                 <div className="bg-surface-raised rounded-card-sm shadow-elevated p-5 border border-border-subtle">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
@@ -286,7 +296,7 @@ export default function SettingsNotifications() {
                       </div>
                       <span className="text-[11px] font-semibold text-body">Asas</span>
                     </div>
-                    <span className="text-[10px] font-medium text-caption">Just Now</span>
+                    <span className="text-[10px] font-medium text-caption">Example</span>
                   </div>
 
                   <h3 className="text-sm font-bold text-heading leading-tight mb-2">
@@ -304,22 +314,22 @@ export default function SettingsNotifications() {
 
               </div>
             </div>
-
-            {/* Notification volume is not exposed by the current API. */}
             <div className="bg-surface-raised border border-border-default rounded-card-sm p-6 shadow-card">
-              <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-6">30-Day Volume</h3>
+              <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-6">In-app activity · 30 days</h3>
+              <p className="text-xs text-muted mb-6">For your active workspace and account.</p>
 
               <div className="space-y-4">
                 <div className="flex justify-between items-end border-b border-border-subtle pb-4">
-                  <span className="text-sm font-medium text-body-light">Total Sent</span>
-                  <span className="text-lg font-black text-heading tracking-tight">—</span>
+                  <span className="text-sm font-medium text-body-light">Delivered in app</span>
+                  <span className="text-lg font-black text-heading tracking-tight">{usageError ? '-' : usage?.deliveredLast30Days ?? '...'}</span>
                 </div>
 
                 <div className="flex justify-between items-end">
-                  <span className="text-sm font-medium text-body-light">Unread In-App</span>
-                  <span className="text-lg font-black text-heading tracking-tight">—</span>
+                  <span className="text-sm font-medium text-body-light">Unread in app</span>
+                  <span className="text-lg font-black text-heading tracking-tight">{usageError ? '-' : usage?.unreadLast30Days ?? '...'}</span>
                 </div>
               </div>
+              {usageError && <p className="mt-4 text-xs text-danger">Usage totals could not be loaded.</p>}
             </div>
 
           </div>

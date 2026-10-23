@@ -39,6 +39,7 @@ function runRow(status: string, taxRates?: unknown): Row {
 function lineRow(overrides: Partial<Row> = {}): Row {
   return {
     id: 'line_1',
+    tenantId: TENANT,
     employeeId: 'emp_1',
     baseSalary: dec('100000.00'),
     missedDaysCount: null,
@@ -197,6 +198,16 @@ describe('payroll.service', () => {
     }), TENANT, RUN_ID)
 
     expect(run.lines[0]?.employee.departmentName).toBe('Finance')
+  })
+  it('does not expose employee bank details in ordinary payroll run responses', async () => {
+    const run = await getPayrollRun(stubPrisma({
+      lines: [lineRow({ employee: {
+        id: 'emp_1', name: 'Ada Lovelace', title: 'Engineer',
+        bankRoutingNumber: 'encrypted-routing', bankAccountNumber: 'encrypted-account', bankAccountType: 'CHECKING',
+        bankIban: 'encrypted-iban', bankBic: 'encrypted-bic',
+      } })],
+    }), TENANT, RUN_ID)
+    expect(run.lines[0]?.employee).toEqual({ id: 'emp_1', name: 'Ada Lovelace', title: 'Engineer', departmentName: null })
   })
   it('uses recorded currency and earning dates on payslips after workspace settings change', async () => {
     const doc = await getPayslipDoc(stubPrisma({ currency: 'JPY', payrollRunFindFirst: {

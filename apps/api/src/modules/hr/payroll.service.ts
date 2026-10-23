@@ -23,6 +23,7 @@ type PayrollClient = PrismaClient | Prisma.TransactionClient
 /** A `PayrollLine` row joined with its employee and tax lines, straight out of Prisma. */
 type LineWithIncludes = {
   id: string
+  tenantId: string
   employeeId: string
   baseSalary: Prisma.Decimal | null
   sourceSalary?: Prisma.Decimal | null
@@ -42,11 +43,6 @@ type LineWithIncludes = {
     name: string
     title: string
     department?: { name: string } | null
-    bankRoutingNumber?: string | null
-    bankAccountNumber?: string | null
-    bankAccountType?: string | null
-    bankIban?: string | null
-    bankBic?: string | null
   }
   taxLines: { id: string; label: string; amount: Prisma.Decimal; override: boolean }[]
 }
@@ -221,11 +217,6 @@ function mapLine(line: LineWithIncludes): PayrollLine {
       name: line.employee.name,
       title: line.employee.title,
       departmentName: line.employee.department?.name ?? null,
-      bankRoutingNumber: line.employee.bankRoutingNumber ?? null,
-      bankAccountNumber: line.employee.bankAccountNumber ?? null,
-      bankAccountType: line.employee.bankAccountType ?? null,
-      bankIban: line.employee.bankIban ?? null,
-      bankBic: line.employee.bankBic ?? null,
     },
     baseSalary: line.baseSalary?.toString() ?? null,
     sourceSalary: line.sourceSalary?.toString() ?? null,
@@ -298,11 +289,6 @@ export async function getPayrollRun(prisma: PayrollClient, tenantId: string, run
             name: true,
             title: true,
             department: { select: { name: true } },
-            bankRoutingNumber: true,
-            bankAccountNumber: true,
-            bankAccountType: true,
-            bankIban: true,
-            bankBic: true,
           },
         },
         taxLines: true,

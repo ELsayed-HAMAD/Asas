@@ -45,6 +45,7 @@ export const dealSchema = z.object({
   closedAt: isoDateTimeSchema.nullable(),
   productLine: z.string().nullable(),
   forecastBucket: z.string().nullable(),
+  archivedAt: isoDateTimeSchema.nullable(),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 })
@@ -62,6 +63,8 @@ export const dealListQuerySchema = paginationQuerySchema.extend({
   closedFrom: isoDateSchema.optional(),
   closedBefore: isoDateSchema.optional(),
   sort: z.enum(['RECENT', 'VALUE_DESC']).optional(),
+  /** Include archived records only; normal pipeline queries exclude them. */
+  archived: booleanQueryParamSchema.optional(),
   search: boundedText(200, 0).optional(),
 })
 

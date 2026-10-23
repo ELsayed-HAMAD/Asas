@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from '@prisma/client'
+import type { StripeBillingProvider } from '../../services/stripeBilling.js'
 import type {
   GeneralSettings,
   GeneralSettingsUpdateInput,
@@ -98,8 +99,8 @@ export function getBilling(prisma: PrismaClient, tenantId: string, measuredStora
   return settingsService.getBillingSettings(prisma, tenantId, measuredStorageUsedGb)
 }
 
-export function deleteWorkspace(prisma: PrismaClient, tenantId: string, userId: string): Promise<{ success: boolean }> {
-  return settingsService.deleteWorkspace(prisma, tenantId, userId)
+export function deleteWorkspace(prisma: PrismaClient, tenantId: string, userId: string, stripeBilling: StripeBillingProvider | null): Promise<{ success: boolean }> {
+  return settingsService.deleteWorkspace(prisma, tenantId, userId, stripeBilling)
 }
 
 export function anonymizeEntity(

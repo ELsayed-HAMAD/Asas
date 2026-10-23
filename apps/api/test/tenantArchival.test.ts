@@ -145,22 +145,9 @@ describe('Finding 16: End-to-End Journal Integrity vs Compliant Tenant Purge', (
           const res = await db.query('SELECT "id" FROM "Tenant" WHERE "id" = $1', [where.id])
           return res.rows[0] || null
         },
-        update: async ({ where, data }: any) => {
-          await db.query('UPDATE "Tenant" SET "status" = $1, "archivedAt" = NOW() WHERE "id" = $2', [data.status, where.id])
-          return { id: where.id }
-        },
-      },
-      session: {
-        updateMany: async ({ where, data }: any) => {
-          await db.query('UPDATE "Session" SET "activeOrganizationId" = $1 WHERE "activeOrganizationId" = $2', [data.activeOrganizationId, where.activeOrganizationId])
-          return { count: 1 }
-        },
       },
       subscription: {
-        updateMany: async ({ where, data }: any) => {
-          await db.query('UPDATE "Subscription" SET "status" = $1 WHERE "tenantId" = $2', [data.status, where.tenantId])
-          return { count: 1 }
-        },
+        findMany: async () => [],
       },
       $transaction: async (fn: any) => {
         // Execute inside transaction block
@@ -169,6 +156,28 @@ describe('Finding 16: End-to-End Journal Integrity vs Compliant Tenant Purge', (
           const tx = {
             $executeRawUnsafe: async (sql: string) => {
               await db.exec(sql)
+            },
+            tenant: {
+              update: async ({ where, data }: any) => {
+                await db.query('UPDATE "Tenant" SET "status" = $1, "archivedAt" = NOW() WHERE "id" = $2', [data.status, where.id])
+                return { id: where.id }
+              },
+              delete: async ({ where }: any) => {
+                await db.query('DELETE FROM "Tenant" WHERE "id" = $1', [where.id])
+                return { id: where.id }
+              },
+            },
+            session: {
+              updateMany: async ({ where, data }: any) => {
+                await db.query('UPDATE "Session" SET "activeOrganizationId" = $1 WHERE "activeOrganizationId" = $2', [data.activeOrganizationId, where.activeOrganizationId])
+                return { count: 1 }
+              },
+            },
+            subscription: {
+              updateMany: async ({ where, data }: any) => {
+                await db.query('UPDATE "Subscription" SET "status" = $1 WHERE "tenantId" = $2', [data.status, where.tenantId])
+                return { count: 1 }
+              },
             },
             journalLine: {
               deleteMany: async ({ where }: any) => {
@@ -204,12 +213,6 @@ describe('Finding 16: End-to-End Journal Integrity vs Compliant Tenant Purge', (
               deleteMany: async ({ where }: any) => {
                 await db.query('DELETE FROM "Member" WHERE "tenantId" = $1', [where.tenantId])
                 return { count: 1 }
-              },
-            },
-            tenant: {
-              delete: async ({ where }: any) => {
-                await db.query('DELETE FROM "Tenant" WHERE "id" = $1', [where.id])
-                return { id: where.id }
               },
             },
           }

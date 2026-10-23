@@ -6,7 +6,7 @@ import type { Auth } from '../src/auth.js'
 import { errorHandler } from '../src/middlewares/errorHandler.js'
 import { settingsRoutes } from '../src/modules/settings/settings.routes.js'
 
-async function setup(options: { role?: string; unauthenticated?: boolean } = {}) {
+async function setup(options: { role?: string; unauthenticated?: boolean; stripeBilling?: unknown; activeStripeSubscription?: string } = {}) {
   const app = Fastify()
   app.setValidatorCompiler(validatorCompiler)
   app.setSerializerCompiler(serializerCompiler)
@@ -33,8 +33,11 @@ async function setup(options: { role?: string; unauthenticated?: boolean } = {})
     member: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     tenant: {
       findUnique: vi.fn().mockResolvedValue({ id: 'tenant_1' }),
+      update: vi.fn().mockResolvedValue({ id: 'tenant_1', status: 'ARCHIVED' }),
       delete: vi.fn().mockResolvedValue({ id: 'tenant_1' }),
     },
+    session: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    subscription: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     notificationPreference: {
       upsert: vi.fn().mockResolvedValue({}),
       findMany: vi.fn().mockResolvedValue([]),
@@ -61,18 +64,15 @@ async function setup(options: { role?: string; unauthenticated?: boolean } = {})
     },
     tenant: {
       findUnique: vi.fn().mockResolvedValue({ id: 'tenant_1' }),
-      update: vi.fn().mockResolvedValue({ id: 'tenant_1', status: 'ARCHIVED' }),
-    },
-    session: {
-      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     subscription: {
-      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findMany: vi.fn().mockResolvedValue(options.activeStripeSubscription ? [{ stripeSubscriptionId: options.activeStripeSubscription }] : []),
     },
     $transaction: vi.fn().mockImplementation(async (callback) => callback(tx)),
   } as unknown as PrismaClient
 
   app.decorate('prisma', prisma)
+  app.decorate('stripeBilling', options.stripeBilling ?? null)
   app.decorate('ssePublish', vi.fn())
   await app.register(settingsRoutes)
   return { app, prisma, tx }
@@ -103,6 +103,21 @@ describe('DELETE /workspace', () => {
     expect(res.statusCode).toBe(200)
     expect(res.json()).toEqual({ data: { success: true } })
     expect(tx.tenant.delete).toHaveBeenCalledWith({ where: { id: 'tenant_1' } })
+  })
+
+  it('retains workspace data when Stripe cannot confirm cancellation', async () => {
+    const cancelSubscription = vi.fn().mockRejectedValue(new Error('Stripe unavailable'))
+    const { app, tx } = await setup({
+      role: 'OWNER',
+      activeStripeSubscription: 'sub_live',
+      stripeBilling: { cancelSubscription },
+    })
+    const res = await app.inject({ method: 'DELETE', url: '/workspace' })
+    expect(res.statusCode, res.body).toBe(502)
+    expect(cancelSubscription).toHaveBeenCalledWith('sub_live')
+    expect(tx.tenant.update).not.toHaveBeenCalled()
+    expect(tx.tenant.delete).not.toHaveBeenCalled()
+    await app.close()
   })
 })
 

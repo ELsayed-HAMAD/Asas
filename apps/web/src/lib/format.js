@@ -83,6 +83,49 @@ export function formatCompactMoney(value, currency = defaultCurrency, locale = d
  * Formats a currency amount compactly for tables (e.g. $1.3M, $45.2K, $850).
  * Values under 1,000 keep standard currency precision. Values >= 1,000 use compact notation.
  */
+/**
+ * Formats a currency amount compactly for executive KPI summary cards and dashboard widgets:
+ * - Values >= 1,000,000 use up to 2 decimal places (e.g. $4.27M, $9.54M).
+ * - Values between 1,000 and 999,999 use 1 decimal place (e.g. $74.1K, $527.1K).
+ * - Values below 1,000 use standard currency formatting (e.g. $850, $0).
+ * Handles money wire objects ({ amount, currency }), major numeric values, and strings.
+ */
+export function formatCompactCurrency(value, currency = defaultCurrency, locale = defaultLocale) {
+  if (value == null) return '—'
+  try {
+    const code = getCurrency(isMoneyWire(value) ? value.currency : currency).code
+    const number = isMoneyWire(value) ? moneyToMajor(value) : Number(value)
+    if (!Number.isFinite(number)) return '—'
+
+    const abs = Math.abs(number)
+    if (abs < 1000) {
+      return new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: code,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      }).format(number)
+    }
+
+    const maxDigits = abs >= 1_000_000 ? 2 : 1
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: code,
+      notation: 'compact',
+      maximumFractionDigits: maxDigits,
+    }).format(number)
+  } catch {
+    return '—'
+  }
+}
+
+/**
+ * Formats a full unformatted currency string with exact cents for tooltip/title display.
+ */
+export function formatFullCurrency(value, options = {}) {
+  return formatMoney(value, { minimumFractionDigits: 2, maximumFractionDigits: 2, ...options })
+}
+
 export function formatCompactTableMoney(value, options = {}) {
   if (value == null) return '—'
   const numeric = isMoneyWire(value) ? moneyToMajor(value) : Number(value)

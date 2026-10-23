@@ -93,8 +93,12 @@ function assertTransition<T extends string>(map: Record<T, readonly T[]>, from: 
   if (!map[from].includes(to)) throw new AppError(409, `Cannot move a ${from.toLowerCase()} record to ${to.toLowerCase()}`)
 }
 
-function assertIndependentApproval(createdById: string | null, userId: string): void {
-  if (createdById && createdById === userId) throw new AppError(403, 'A different administrator must approve this record')
+async function assertIndependentApproval(prisma: FinanceClient, tenantId: string, createdById: string | null, userId: string): Promise<void> {
+  if (!createdById || createdById !== userId) return
+  // Match payroll's maker-checker policy: a sole-member workspace has no second
+  // approver, while multi-member workspaces must keep approval independent.
+  const memberCount = await prisma.member.count({ where: { tenantId } })
+  if (memberCount > 1) throw new AppError(403, 'A different administrator must approve this record')
 }
 
 /** All financial edits lock the same tenant-scoped document row, including status changes. */
@@ -514,7 +518,7 @@ export async function updatePayableStatus(
   return withDocumentLock(prisma, 'PayableInvoice', tenantId, id, async tx => {
     const existing = await tx.payableInvoice.findFirstOrThrow({ where: { id, tenantId } })
     assertTransition(PAYABLE_TRANSITIONS, existing.status, status)
-    if (status === 'APPROVED') assertIndependentApproval(existing.createdById, userId)
+    if (status === 'APPROVED') await assertIndependentApproval(tx, tenantId, existing.createdById, userId)
     if (status === 'REJECTED') await reverseInvoiceRecognitionIfPresent(tx, { tenantId, sourceId: id, sourceType: 'AP_RECOGNITION', actorId: userId, reason: 'Payable rejected' })
     const invoice = await tx.payableInvoice.update({
       where: { id_tenantId: { id, tenantId } },
@@ -1399,7 +1403,7 @@ export async function updateExpenseStatus(
   return withDocumentLock(prisma, 'Expense', tenantId, id, async tx => {
     const existing = await tx.expense.findFirstOrThrow({ where: { id, tenantId } })
     assertTransition(EXPENSE_TRANSITIONS, existing.status, status)
-    if (status === 'APPROVED') assertIndependentApproval(existing.createdById, userId)
+    if (status === 'APPROVED') await assertIndependentApproval(tx, tenantId, existing.createdById, userId)
     if (status === 'REJECTED') {
       await reverseExpenseRecognitionIfPresent(tx, { tenantId, expenseId: id, reason: 'Expense rejected', actorId: userId, postedAt: new Date() })
     }

@@ -29,6 +29,19 @@ export function payrollSepaFilename(label) {
   return `${safeLabel}-credit-transfer.xml`
 }
 
+function requireValue(value, label) {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`Payroll payment file requires configured ${label}`)
+  }
+  return value.trim()
+}
+
+function requirePaidRun(run, currency) {
+  if (run?.status !== 'PAID') throw new Error('Payroll payment files can only be generated for a paid run')
+  if (run.currency !== currency) throw new Error(`Payroll payment file requires a ${currency} payroll run`)
+  return requireValue(run.payDate, 'pay date')
+}
+
 /**
  * Downloads a raw text/binary string as a file using a Blob with auto URL revocation.
  */
@@ -47,42 +60,45 @@ export function downloadFile(content, filename, mimeType = 'text/plain') {
 }
 
 /**
- * Generates an RFC-compliant 94-character fixed-width NACHA ACH Direct Deposit file for a paid payroll run.
+ * Generates a NACHA file from an explicitly configured company/bank profile and complete employee bank details.
+ * This legacy client-side helper is not wired into Payroll; production generation belongs on the server.
  */
 export function generateNachaForRun(run, lines, companyOptions = {}) {
-  const currency = run.currency || 'USD'
-  const effectiveDate = run.payDate || new Date().toISOString().slice(0, 10)
+  const effectiveDate = requirePaidRun(run, 'USD')
 
   const company = {
-    name: companyOptions.name || 'ASAS WORKSPACE',
-    identification: companyOptions.identification || '1234567890',
-    originatingRoutingNumber: companyOptions.originatingRoutingNumber || '021000021',
-    originatingBankName: companyOptions.originatingBankName || 'ORIGINATING BANK',
-    destinationBankName: companyOptions.destinationBankName || 'FEDACH OPERATOR',
+    name: requireValue(companyOptions.name, 'ACH originator name'),
+    identification: requireValue(companyOptions.identification, 'ACH originator identification'),
+    originatingRoutingNumber: requireValue(companyOptions.originatingRoutingNumber, 'ODFI routing number'),
+    originatingBankName: requireValue(companyOptions.originatingBankName, 'ODFI name'),
+    destinationBankName: requireValue(companyOptions.destinationBankName, 'ACH operator/destination name'),
   }
 
-  if (companyOptions.requireBankDetails) {
-    const missing = lines.filter(l => !l.employee?.bankRoutingNumber || !l.employee?.bankAccountNumber)
-    if (missing.length > 0) {
-      throw new Error(`Direct deposit ACH file cannot be generated: the following employees are missing bank routing or account numbers: ${missing.map(l => l.employee?.name || l.employeeId).join(', ')}`)
-    }
+  if (!Array.isArray(lines) || lines.length === 0) throw new Error('ACH file requires at least one payroll line')
+  const missing = lines.filter(line => !line.employee?.bankRoutingNumber || !line.employee?.bankAccountNumber || !line.employee?.bankAccountType)
+  if (missing.length > 0) {
+    throw new Error(`Direct deposit ACH file cannot be generated: employees are missing bank routing number, account number, or account type: ${missing.map(line => line.employee?.name || line.employeeId || 'unknown employee').join(', ')}`)
   }
 
-  const entries = lines.map((line, idx) => {
-    const netAmount = Money.fromDecimal(line.net || '0', currency)
+  const entries = lines.map(line => {
+    const netAmount = Money.fromDecimal(requireValue(line.net, `net pay for ${line.employee?.name || line.employeeId}`), 'USD')
     const emp = line.employee || {}
-    const empName = emp.name || `Employee ${idx + 1}`
-    const routingNumber = emp.bankRoutingNumber || companyOptions.defaultReceivingRouting || '011000015'
-    const accountNumber = emp.bankAccountNumber || `ACC${(line.employeeId || idx).toString().replace(/[^0-9]/g, '').slice(-12).padStart(6, '0')}`
-    const accountType = (emp.bankAccountType || 'CHECKING').toUpperCase()
+    const empName = requireValue(emp.name, 'employee name')
+    const employeeId = requireValue(line.employeeId, `employee ID for ${empName}`)
+    const routingNumber = requireValue(emp.bankRoutingNumber, `ACH routing number for ${empName}`)
+    const accountNumber = requireValue(emp.bankAccountNumber, `ACH account number for ${empName}`)
+    const accountType = requireValue(emp.bankAccountType, `ACH account type for ${empName}`).toUpperCase()
+    if (accountType !== 'CHECKING' && accountType !== 'SAVINGS') {
+      throw new Error(`Unsupported ACH account type for ${empName}: ${accountType}`)
+    }
 
     return {
-      employeeId: line.employeeId || `EMP-${idx + 1}`,
+      employeeId,
       employeeName: empName,
       routingNumber,
       accountNumber,
       amountCents: netAmount.minorUnits,
-      accountType: accountType === 'SAVINGS' ? 'SAVINGS' : 'CHECKING',
+      accountType,
     }
   })
 
@@ -94,33 +110,33 @@ export function generateNachaForRun(run, lines, companyOptions = {}) {
 }
 
 /**
- * Generates an ISO 20022 pain.001.001.03 SEPA Credit Transfer XML file for EUR payroll runs.
+ * Generates a legacy SEPA file only from an explicitly configured debtor profile and complete IBAN data.
+ * This legacy client-side helper is not wired into Payroll; production generation belongs on the server.
  */
 export function generateSepaForRun(run, lines, initiatorOptions = {}) {
-  const executionDate = run.payDate || new Date().toISOString().slice(0, 10)
+  const executionDate = requirePaidRun(run, 'EUR')
 
   const initiator = {
-    name: initiatorOptions.name || 'ASAS WORKSPACE',
-    iban: initiatorOptions.iban || 'DE89370400440532013000',
-    bic: initiatorOptions.bic || 'DEUTDEFF',
+    name: requireValue(initiatorOptions.name, 'SEPA debtor name'),
+    iban: requireValue(initiatorOptions.iban, 'SEPA debtor IBAN'),
+    bic: requireValue(initiatorOptions.bic, 'SEPA debtor BIC'),
   }
 
-  if (initiatorOptions.requireBankDetails) {
-    const missing = lines.filter(l => !l.employee?.bankIban)
-    if (missing.length > 0) {
-      throw new Error(`SEPA credit transfer XML cannot be generated: the following employees are missing IBAN: ${missing.map(l => l.employee?.name || l.employeeId).join(', ')}`)
-    }
+  if (!Array.isArray(lines) || lines.length === 0) throw new Error('SEPA file requires at least one payroll line')
+  const missing = lines.filter(line => !line.employee?.bankIban)
+  if (missing.length > 0) {
+    throw new Error(`SEPA credit transfer XML cannot be generated: employees are missing IBAN: ${missing.map(line => line.employee?.name || line.employeeId || 'unknown employee').join(', ')}`)
   }
 
-  const entries = lines.map((line, idx) => {
-    const netAmount = Money.fromDecimal(line.net || '0', 'EUR')
+  const entries = lines.map(line => {
+    const netAmount = Money.fromDecimal(requireValue(line.net, `net pay for ${line.employee?.name || line.employeeId}`), 'EUR')
     const emp = line.employee || {}
-    const empName = emp.name || `Employee ${idx + 1}`
-    const iban = (emp.bankIban || initiatorOptions.defaultCreditorIban || 'FR1420041010050500013M02606').replace(/\s+/g, '').toUpperCase()
-    const bic = (emp.bankBic || initiatorOptions.defaultCreditorBic || '').replace(/\s+/g, '').toUpperCase()
+    const empName = requireValue(emp.name, 'employee name')
+    const iban = requireValue(emp.bankIban, `SEPA creditor IBAN for ${empName}`).replace(/\s+/g, '').toUpperCase()
+    const bic = (emp.bankBic || '').replace(/\s+/g, '').toUpperCase()
 
     return {
-      endToEndId: `SALARY-${(line.id || line.employeeId || idx).slice(0, 25)}`,
+      endToEndId: `SALARY-${requireValue(line.id || line.employeeId, `payroll line ID for ${empName}`).slice(0, 25)}`,
       employeeName: empName,
       iban,
       bic: bic || undefined,

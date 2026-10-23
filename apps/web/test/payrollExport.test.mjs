@@ -36,16 +36,19 @@ test('payroll payment summary filename cannot include path or special characters
   assert.equal(payrollSepaFilename('../../October Payroll!'), 'October-Payroll-credit-transfer.xml')
 })
 
-test('generateNachaForRun produces a valid 94-char fixed-width ACH file for a paid run', () => {
-  const run = { label: 'October Run', payDate: '2026-10-31', currency: 'USD' }
+test('generateNachaForRun requires a paid USD run, configured ODFI profile, and complete recipient details', () => {
+  const run = { label: 'October Run', payDate: '2026-10-31', currency: 'USD', status: 'PAID' }
   const lines = [
-    { employeeId: 'emp_1', employee: { name: 'John Doe' }, net: '3500.00' },
-    { employeeId: 'emp_2', employee: { name: 'Jane Smith' }, net: '4250.75' },
+    { employeeId: 'emp_1', employee: { name: 'John Doe', bankRoutingNumber: '021000021', bankAccountNumber: '123456789', bankAccountType: 'CHECKING' }, net: '3500.00' },
+    { employeeId: 'emp_2', employee: { name: 'Jane Smith', bankRoutingNumber: '021000021', bankAccountNumber: '987654321', bankAccountType: 'SAVINGS' }, net: '4250.75' },
   ]
 
   const result = generateNachaForRun(run, lines, {
     name: 'Asas Corp',
     identification: '1234567890',
+    originatingRoutingNumber: '021000021',
+    originatingBankName: 'Test ODFI',
+    destinationBankName: 'Test ACH Operator',
   })
 
   assert.equal(result.entryCount, 2)
@@ -57,10 +60,10 @@ test('generateNachaForRun produces a valid 94-char fixed-width ACH file for a pa
   }
 })
 
-test('generateSepaForRun produces valid pain.001.001.03 XML with control sums', () => {
-  const run = { label: 'Euro Run', payDate: '2026-10-31', currency: 'EUR' }
+test('legacy generateSepaForRun requires a paid EUR run and explicit debtor/creditor details', () => {
+  const run = { label: 'Euro Run', payDate: '2026-10-31', currency: 'EUR', status: 'PAID' }
   const lines = [
-    { id: 'line_1', employeeId: 'emp_1', employee: { name: 'Pierre & Marie' }, net: '2500.50' },
+    { id: 'line_1', employeeId: 'emp_1', employee: { name: 'Pierre & Marie', bankIban: 'FR1420041010050500013M02606' }, net: '2500.50' },
   ]
 
   const result = generateSepaForRun(run, lines, {
@@ -75,8 +78,8 @@ test('generateSepaForRun produces valid pain.001.001.03 XML with control sums', 
   assert.ok(result.xmlContent.includes('pain.001.001.03'))
 })
 
-test('generateNachaForRun uses real employee bank credentials when present', () => {
-  const run = { label: 'US Payroll', payDate: '2026-10-31', currency: 'USD' }
+test('generateNachaForRun uses supplied employee bank credentials and explicit ODFI fields', () => {
+  const run = { label: 'US Payroll', payDate: '2026-10-31', currency: 'USD', status: 'PAID' }
   const lines = [
     {
       employeeId: 'emp_1',
@@ -90,27 +93,39 @@ test('generateNachaForRun uses real employee bank credentials when present', () 
     },
   ]
 
-  const result = generateNachaForRun(run, lines, { name: 'Acme Inc', requireBankDetails: true })
+  const result = generateNachaForRun(run, lines, {
+    name: 'Acme Inc',
+    identification: '1234567890',
+    originatingRoutingNumber: '021000021',
+    originatingBankName: 'Test ODFI',
+    destinationBankName: 'Test ACH Operator',
+  })
   assert.equal(result.entryCount, 1)
   assert.equal(result.totalAmountCents, 500000n)
   assert.ok(result.fileContent.includes('02100002'))
   assert.ok(result.fileContent.includes('987654321'))
 })
 
-test('generateNachaForRun enforces requireBankDetails and throws descriptive error if missing', () => {
-  const run = { label: 'US Payroll', payDate: '2026-10-31', currency: 'USD' }
+test('generateNachaForRun rejects missing employee bank fields', () => {
+  const run = { label: 'US Payroll', payDate: '2026-10-31', currency: 'USD', status: 'PAID' }
   const lines = [
     { employeeId: 'emp_1', employee: { name: 'Ada Lovelace' }, net: '5000.00' },
   ]
 
   assert.throws(
-    () => generateNachaForRun(run, lines, { requireBankDetails: true }),
-    /missing bank routing or account numbers: Ada Lovelace/,
+    () => generateNachaForRun(run, lines, {
+      name: 'Acme Inc',
+      identification: '1234567890',
+      originatingRoutingNumber: '021000021',
+      originatingBankName: 'Test ODFI',
+      destinationBankName: 'Test ACH Operator',
+    }),
+    /employees are missing bank routing number, account number, or account type: Ada Lovelace/,
   )
 })
 
-test('generateSepaForRun uses real employee IBAN when present', () => {
-  const run = { label: 'Euro Payroll', payDate: '2026-10-31', currency: 'EUR' }
+test('generateSepaForRun uses supplied employee IBAN when present', () => {
+  const run = { label: 'Euro Payroll', payDate: '2026-10-31', currency: 'EUR', status: 'PAID' }
   const lines = [
     {
       id: 'line_1',
@@ -124,20 +139,20 @@ test('generateSepaForRun uses real employee IBAN when present', () => {
     },
   ]
 
-  const result = generateSepaForRun(run, lines, { name: 'Acme EU', requireBankDetails: true })
+  const result = generateSepaForRun(run, lines, { name: 'Acme EU', iban: 'FR1420041010050500013M02606', bic: 'BNPAFRPPXXX' })
   assert.equal(result.transactionCount, 1)
   assert.ok(result.xmlContent.includes('DE89370400440532013000'))
   assert.ok(result.xmlContent.includes('DEUTDEFF'))
 })
 
-test('generateSepaForRun enforces requireBankDetails and throws descriptive error if missing', () => {
-  const run = { label: 'Euro Payroll', payDate: '2026-10-31', currency: 'EUR' }
+test('generateSepaForRun rejects missing employee IBAN', () => {
+  const run = { label: 'Euro Payroll', payDate: '2026-10-31', currency: 'EUR', status: 'PAID' }
   const lines = [
     { id: 'line_1', employeeId: 'emp_1', employee: { name: 'Marie Curie' }, net: '4000.00' },
   ]
 
   assert.throws(
-    () => generateSepaForRun(run, lines, { requireBankDetails: true }),
-    /missing IBAN: Marie Curie/,
+    () => generateSepaForRun(run, lines, { name: 'Acme EU', iban: 'FR1420041010050500013M02606', bic: 'BNPAFRPPXXX' }),
+    /employees are missing IBAN: Marie Curie/,
   )
 })

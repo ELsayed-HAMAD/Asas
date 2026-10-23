@@ -3,6 +3,7 @@ import {
   calculateSecondsUntilQuietHoursEnd,
   createInAppNotification,
   deleteNotification,
+  getUserNotificationUsage,
   isWithinQuietHours,
   listUserNotifications,
   markAllNotificationsRead,
@@ -13,6 +14,23 @@ import {
 afterEach(() => vi.useRealTimers())
 
 describe('Finding 6: Notification Preferences & Quiet Hours', () => {
+  it('returns real 30-day in-app usage scoped to the active tenant and user', async () => {
+    const count = vi.fn().mockResolvedValueOnce(8).mockResolvedValueOnce(3)
+    const prisma = { notification: { count } } as any
+    const now = new Date('2026-10-23T12:00:00.000Z')
+
+    await expect(getUserNotificationUsage(prisma, 'tenant_1', 'user_1', now)).resolves.toEqual({
+      deliveredLast30Days: 8,
+      unreadLast30Days: 3,
+    })
+    const expectedWhere = {
+      tenantId: 'tenant_1', userId: 'user_1', availableAt: { lte: now },
+      createdAt: { gte: new Date('2026-09-23T12:00:00.000Z'), lte: now },
+    }
+    expect(count).toHaveBeenNthCalledWith(1, { where: expectedWhere })
+    expect(count).toHaveBeenNthCalledWith(2, { where: { ...expectedWhere, read: false } })
+  })
+
   it('keeps notification read and delete actions scoped to the requesting user', async () => {
     const prisma = {
       notification: {

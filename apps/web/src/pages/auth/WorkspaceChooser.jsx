@@ -129,7 +129,7 @@ export default function WorkspaceChooser() {
                   You are not currently a member of any workspace.
                 </p>
                 <Button asChild className="h-9">
-                  <Link to="/onboarding">Create Your First Workspace</Link>
+                  <Link to="/onboarding?new=1">Create Your First Workspace</Link>
                 </Button>
               </div>
             ) : (
@@ -204,7 +204,7 @@ export default function WorkspaceChooser() {
               variant="outline"
               className="w-full h-11 border-dashed hover:border-primary hover:bg-primary/5 flex items-center justify-center gap-2 text-sm font-medium"
             >
-              <Link to="/onboarding">
+              <Link to="/onboarding?new=1">
                 <Plus size={16} />
                 Create New Workspace
               </Link>

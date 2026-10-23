@@ -103,12 +103,22 @@ export function updateDeal(
   return service.updateDeal(prisma, tenantId, id, input, actorId)
 }
 
-export function deleteDeal(
+export function archiveDeal(
   prisma: PrismaClient | Prisma.TransactionClient,
   tenantId: string,
   id: string,
+  actorId: string,
 ): Promise<void> {
-  return service.deleteDeal(prisma, tenantId, id)
+  return service.archiveDeal(prisma, tenantId, id, actorId)
+}
+
+export function restoreDeal(
+  prisma: PrismaClient | Prisma.TransactionClient,
+  tenantId: string,
+  id: string,
+  actorId: string,
+): Promise<void> {
+  return service.restoreDeal(prisma, tenantId, id, actorId)
 }
 
 export function createDealActivity(
@@ -125,10 +135,10 @@ export function listAgenda(prisma: PrismaClient, tenantId: string): Promise<{ it
   return service.listAgendaItems(prisma, tenantId)
 }
 
-export function createAgenda(prisma: PrismaClient, tenantId: string, input: AgendaItemWriteInput): Promise<AgendaItem> {
+export function createAgenda(prisma: PrismaClient | Prisma.TransactionClient, tenantId: string, input: AgendaItemWriteInput): Promise<AgendaItem> {
   return service.createAgendaItem(prisma, tenantId, input)
 }
 
-export function updateAgenda(prisma: PrismaClient, tenantId: string, id: string, input: AgendaItemUpdateInput): Promise<AgendaItem> {
+export function updateAgenda(prisma: PrismaClient | Prisma.TransactionClient, tenantId: string, id: string, input: AgendaItemUpdateInput): Promise<AgendaItem> {
   return service.updateAgendaItem(prisma, tenantId, id, input)
 }
