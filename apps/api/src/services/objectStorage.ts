@@ -65,12 +65,17 @@ export function exportObjectKey(tenantId: string, jobId: string, extension: stri
   return assertSafeObjectKey(`exports/${tenantId}/${jobId}.${extension}`)
 }
 
+export function tenantLogoKey(tenantId: string, logoId: string, extension: 'png' | 'jpg' | 'webp' | 'svg'): string {
+  return assertSafeObjectKey(`tenants/${tenantId}/branding/${logoId}.${extension}`)
+}
+
 export function tenantStoragePrefixes(tenantId: string): string[] {
   const tenantSegment = assertSafeObjectKey(`tenants/${tenantId}/scope`).split('/')[1]!
   return [
     `resumes/${tenantSegment}/`,
     `exports/${tenantSegment}/`,
     `staging/resumes/${tenantSegment}/`,
+    `tenants/${tenantSegment}/branding/`,
   ]
 }
 

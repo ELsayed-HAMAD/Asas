@@ -9,6 +9,8 @@ import {
   payableListQuerySchema,
   receivableListQuerySchema,
   receivableInvoiceSchema,
+  payableInvoiceSchema,
+  journalSourceTypeSchema,
 } from './index.js'
 
 const vendorId = 'clxxxxxxxxxxxxxxxxxxxxxxx'
@@ -24,10 +26,51 @@ describe('finance boundary validation', () => {
     expect(receivableListQuerySchema.safeParse({ statusGroup: 'UNPAID' }).success).toBe(false)
   })
   it('requires a nonnegative server-computed daysPastDue value on receivables', () => {
-    const invoice = { id: vendorId, customerId: vendorId, customer: 'Customer', number: null, amount: { amount: 100, currency: 'USD' }, dueDate: '2026-10-12T00:00:00.000Z', status: 'CURRENT', createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z' }
+    const invoice = { id: vendorId, customerId: vendorId, customer: 'Customer', number: null, amount: { amount: 100, currency: 'USD' }, dueDate: '2026-10-12T00:00:00.000Z', status: 'CURRENT', date: '2026-09-28T00:00:00.000Z', createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z' }
     expect(receivableInvoiceSchema.safeParse({ ...invoice, daysPastDue: 0 }).success).toBe(true)
     expect(receivableInvoiceSchema.safeParse({ ...invoice, daysPastDue: -1 }).success).toBe(false)
     expect(receivableInvoiceSchema.safeParse(invoice).success).toBe(false)
+  })
+  it('preserves migration source face and paid totals without requiring them on ordinary invoices', () => {
+    const ar = { id: vendorId, customerId: vendorId, customer: 'Customer', number: null, amount: { amount: 80, currency: 'USD' }, dueDate: null, daysPastDue: 0, status: 'CURRENT', date: '2026-09-28T00:00:00.000Z', createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z' }
+    expect(receivableInvoiceSchema.parse(ar)).toMatchObject({ sourceOriginalAmount: null, sourcePaidAmount: null })
+    expect(receivableInvoiceSchema.parse({ ...ar, sourceOriginalAmount: { amount: 100, currency: 'USD' }, sourcePaidAmount: { amount: 20, currency: 'USD' } })).toMatchObject({ sourceOriginalAmount: { amount: 100, currency: 'USD' }, sourcePaidAmount: { amount: 20, currency: 'USD' } })
+    const ap = { id: vendorId, vendorId, vendor: 'Vendor', projectId: null, invoiceNumber: null, date: '2026-10-01T00:00:00.000Z', dueDate: null, amount: { amount: 80, currency: 'USD' }, status: 'PENDING', lineItemCount: 0, createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z' }
+    expect(payableInvoiceSchema.parse(ap)).toMatchObject({ sourceOriginalAmount: null, sourcePaidAmount: null })
+  })
+  it('accepts unique optional inventory fulfillment lines and never accepts a client cost', () => {
+    const input = {
+      customerId: vendorId,
+      amount: '10',
+      inventoryLines: [{ productId: vendorId, quantity: 2, unitCost: '1.00' }],
+    }
+    const parsed = receivableWriteSchema.parse(input)
+    expect(parsed.inventoryLines).toEqual([{ productId: vendorId, quantity: 2 }])
+    expect(parsed.inventoryLines?.[0]).not.toHaveProperty('unitCost')
+    expect(receivableWriteSchema.safeParse({ customerId: vendorId, amount: '10', inventoryLines: [] }).success).toBe(true)
+    expect(receivableWriteSchema.safeParse({ customerId: vendorId, amount: '10', inventoryLines: [{ productId: vendorId, quantity: 0 }] }).success).toBe(false)
+    expect(receivableWriteSchema.safeParse({
+      customerId: vendorId,
+      amount: '10',
+      inventoryLines: [{ productId: vendorId, quantity: 1 }, { productId: vendorId, quantity: 1 }],
+    }).success).toBe(false)
+  })
+  it('parses fulfilled invoice evidence and keeps total-only invoices backward compatible', () => {
+    const ar = { id: vendorId, customerId: vendorId, customer: 'Customer', number: null, amount: { amount: 80, currency: 'USD' }, dueDate: null, daysPastDue: 0, status: 'CURRENT', date: '2026-09-28T00:00:00.000Z', createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z' }
+    const line = {
+      id: vendorId, productId: vendorId, productName: 'Widget', sku: 'W-1', quantity: 2,
+      costValue: { amount: 2200, currency: 'USD' }, stockMovementId: vendorId, valuationEventId: vendorId,
+      journalEntryId: null, reversedAt: null, reversalStockMovementId: null,
+      reversalValuationEventId: null, reversalJournalEntryId: null,
+      createdAt: '2026-10-01T00:00:00.000Z',
+    }
+    expect(receivableInvoiceSchema.parse(ar).inventoryLines).toEqual([])
+    expect(receivableInvoiceSchema.parse({ ...ar, inventoryLines: [line] }).inventoryLines).toEqual([line])
+  })
+  it('recognizes inventory journals in the posted-journal contract', () => {
+    expect(journalSourceTypeSchema.parse('INVENTORY_RECEIPT')).toBe('INVENTORY_RECEIPT')
+    expect(journalSourceTypeSchema.parse('INVENTORY_ISSUE')).toBe('INVENTORY_ISSUE')
+    expect(journalSourceTypeSchema.parse('INVENTORY_REVERSAL')).toBe('INVENTORY_REVERSAL')
   })
   it('requires a bounded nonblank reason for cancellation', () => {
     for (const reason of ['', '   ', 'x'.repeat(2001)]) {

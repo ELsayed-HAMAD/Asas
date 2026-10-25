@@ -153,11 +153,17 @@ test('expenses page strictly satisfies all layout rules at 1280px, 1440px and 19
         expect(visibleRows).toBeGreaterThanOrEqual(9)
       }
 
-      // 7. Verify rebalanced detail panel width is 380px
-      const detailPanel = page.locator('div.w-full.min-\\[1100px\\]\\:w-\\[380px\\]')
+      // 7. Verify the detail panel occupies the third column of the split view
+      const detailPanel = page.getByTestId('expense-detail-panel')
       await expect(detailPanel).toBeVisible()
-      const panelWidth = await detailPanel.evaluate(el => Math.round(el.getBoundingClientRect().width))
-      expect(panelWidth).toBe(380)
+      const panelLayout = await detailPanel.evaluate(el => {
+        const parent = el.parentElement
+        return {
+          width: Math.round(el.getBoundingClientRect().width),
+          parentWidth: Math.round(parent.getBoundingClientRect().width),
+        }
+      })
+      expect(Math.abs(panelLayout.width - (panelLayout.parentWidth - 32) / 3)).toBeLessThanOrEqual(2)
 
       // 8. Verify action buttons in detail panel are 36px high and nowrap
       const approveBtn = page.getByRole('button', { name: 'Approve' })

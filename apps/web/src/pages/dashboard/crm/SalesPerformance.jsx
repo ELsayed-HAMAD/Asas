@@ -171,7 +171,7 @@ export default function SalesPerformance() {
                 placeholder="Search..."
                 value={search}
                 onChange={event => { setSearch(event.target.value); setTopDealsPage(1); }}
-                wrapperClassName="w-[240px] shrink-0"
+                wrapperClassName="w-[240px] sm:w-[240px] shrink-0"
               />
 
               {/* Year select */}

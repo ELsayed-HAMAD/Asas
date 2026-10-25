@@ -24,3 +24,39 @@ export function downloadCsv(rows, filename, options) {
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 }
+
+/** Parse a bounded, header-based CSV import without coercing source values. */
+export function parseCsvImport(text, { maxRows = 500, recordLabel = 'records', limitPrefix = 'This import' } = {}) {
+  const records = []
+  let row = [], cell = '', quoted = false
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]
+    if (quoted) {
+      if (char === '"' && text[i + 1] === '"') { cell += '"'; i++ }
+      else if (char === '"') quoted = false
+      else cell += char
+    } else if (char === '"') quoted = true
+    else if (char === ',') { row.push(cell); cell = '' }
+    else if (char === '\n') { row.push(cell.replace(/\r$/, '')); records.push(row); row = []; cell = '' }
+    else cell += char
+  }
+  if (quoted) throw new Error('This CSV has an unfinished quoted value. Check the file and try again.')
+  if (cell.length || row.length) { row.push(cell.replace(/\r$/, '')); records.push(row) }
+  const nonempty = records.filter(record => record.some(value => value.trim() !== ''))
+  if (nonempty.length < 2) throw new Error(`The CSV needs a header row and at least one ${recordLabel.replace(/s$/, '')}.`)
+  const headers = nonempty[0].map((value, index) => value.replace(/^\uFEFF/, '').trim() || `Column ${index + 1}`)
+  const rows = nonempty.slice(1).map(record => headers.map((_, index) => record[index] ?? ''))
+  if (rows.length > maxRows) throw new Error(`${limitPrefix} supports up to ${maxRows} ${recordLabel} at a time.`)
+  return { headers, rows }
+}
+
+export function normalizeCsvHeader(value) {
+  return String(value ?? '').trim().toLowerCase().replaceAll(/[_-]+/g, ' ').replaceAll(/\s+/g, ' ')
+}
+
+export function inferCsvColumnMapping(headers, fields) {
+  return Object.fromEntries(fields.map(field => {
+    const index = headers.findIndex(header => field.aliases.includes(normalizeCsvHeader(header)))
+    return [field.key, index < 0 ? '' : String(index)]
+  }))
+}

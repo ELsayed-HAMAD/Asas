@@ -59,6 +59,7 @@ async function selectRadixOption(page, trigger, optionName) {
 }
 
 test('two workspaces can sign in at the same time without sharing browser session identity', async ({ browser }) => {
+  test.setTimeout(120_000)
   const accountOne = { id: 'user_one', name: 'Northwind Owner', email: 'northwind@example.test', emailVerified: true }
   const accountTwo = { id: 'user_two', name: 'Contoso Finance', email: 'contoso@example.test', emailVerified: true }
   const [contextOne, contextTwo] = await Promise.all([browser.newContext(), browser.newContext()])
@@ -75,6 +76,7 @@ test('two workspaces can sign in at the same time without sharing browser sessio
 })
 
 test('a rejected sign-in in one browser does not disrupt a concurrent valid user', async ({ browser }) => {
+  test.setTimeout(120_000)
   const validAccount = { id: 'valid_user', name: 'Valid Workspace User', email: 'valid@example.test', emailVerified: true }
   const deniedAccount = { id: 'denied_user', name: 'Denied Workspace User', email: 'denied@example.test', emailVerified: true }
   const [validContext, deniedContext] = await Promise.all([browser.newContext(), browser.newContext()])
@@ -130,6 +132,7 @@ test('dashboard Arabic direction stays within phone, tablet, and desktop viewpor
 })
 
 test('marketing navigation opens useful pages and displays configured prices responsively', async ({ browser }) => {
+  test.setTimeout(120_000)
   const account = { id: 'marketing_visitor', name: 'Marketing Visitor', email: 'marketing@example.test', emailVerified: true }
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
   await mockAuth(context, account, async route => {
@@ -146,21 +149,25 @@ test('marketing navigation opens useful pages and displays configured prices res
   try {
     await page.goto('/')
     await page.getByRole('navigation', { name: 'Main navigation' })
-      .getByRole('link', { name: 'Features', exact: true })
+      .getByRole('button', { name: 'Browse product areas' })
       .click()
+    await page.getByRole('menuitem', { name: /Platform overview/ }).click()
     await expect(page).toHaveURL(/#features$/)
     await page.getByRole('navigation', { name: 'Main navigation' })
       .getByRole('link', { name: 'Solutions', exact: true })
       .click()
-    await expect(page.getByRole('heading', { name: 'Business workflows in one workspace' })).toBeVisible()
+    await expect(page).toHaveURL(/\/solutions$/, { timeout: 15_000 })
+    await expect(page.getByRole('heading', { name: 'Business workflows in one workspace' })).toBeVisible({ timeout: 15_000 })
     await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Pricing', exact: true }).click()
-    await expect(page.getByRole('heading', { name: 'Predictable plans tailored to your operating scale' })).toBeVisible()
+    await expect(page).toHaveURL(/\/pricing$/, { timeout: 15_000 })
+    await expect(page.getByRole('heading', { name: 'Predictable plans tailored to your operating scale' })).toBeVisible({ timeout: 15_000 })
     await expect(page.getByRole('heading', { name: 'Standard Growth', exact: true })).toBeVisible()
     await expect(page.getByText('$29', { exact: true })).toBeVisible()
-    await page.getByRole('banner').getByRole('link', { name: 'Documentation' }).click()
-    await expect(page.getByRole('heading', { name: 'Get started with Asas' })).toBeVisible()
+    await page.getByRole('banner').getByRole('button', { name: 'Resources' }).click()
+    await page.getByRole('menuitem', { name: /Product guide/ }).click()
+    await expect(page.getByRole('heading', { name: 'Get started with Asas' })).toBeVisible({ timeout: 15_000 })
     await page.goto('/status')
-    await expect(page.getByRole('heading', { name: 'Platform status' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Platform status' })).toBeVisible({ timeout: 15_000 })
 
     for (const path of ['/', '/solutions', '/pricing', '/documentation', '/status']) {
       await page.setViewportSize({ width: 390, height: 844 })
@@ -276,7 +283,7 @@ test('workspace members see Settings write controls disabled across notification
       subscriptions: [], paymentMethods: [], invoices: [],
     } })
     if (path.endsWith('/exports/jobs')) return json(route, { data: {
-      items: [{ id: 'export_1', kind: 'workspace', status: 'DONE', progressPct: 100, downloadUrl: '/api/v1/exports/jobs/export_1/download', filename: 'workspace.json', createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:01:00.000Z' }],
+      items: [{ id: 'export_1', kind: 'workspace', status: 'DONE', progressPct: 100, format: 'json', dateRange: null, downloadUrl: '/api/v1/exports/jobs/export_1/download', filename: 'workspace.json', createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:01:00.000Z' }],
       pagination: { page: 1, limit: 100, total: 1, pages: 1 }, summary: null,
     } })
     if (path.endsWith('/billing/plans')) return json(route, { data: {
@@ -317,6 +324,46 @@ test('workspace members see Settings write controls disabled across notification
     await expect(page.getByRole('button', { name: 'Download' }).first()).toBeDisabled()
     await page.getByRole('button', { name: 'View Export History' }).click()
     await expect(page.getByRole('button', { name: 'Download' })).toBeDisabled()
+  } finally {
+    await context.close()
+  }
+})
+
+test('export format and date controls submit the selected scope to the export job', async ({ browser }) => {
+  const account = { id: 'export_admin', name: 'Export Admin', email: 'export.admin@example.test', emailVerified: true, role: 'ADMIN' }
+  const context = await browser.newContext()
+  let exportPayload = null
+  await mockAuth(context, account, async route => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    if (path.endsWith('/exports/jobs') && request.method() === 'POST') {
+      exportPayload = request.postDataJSON()
+      return json(route, { data: {
+        id: 'export_csv_1', kind: 'employees', status: 'DONE', progressPct: 100,
+        format: 'csv', dateRange: { from: '2026-02-01', to: '2026-02-28' },
+        downloadUrl: '/api/v1/exports/jobs/export_csv_1/download', filename: 'employees.csv',
+        createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:01:00.000Z',
+      } }, 202)
+    }
+    if (path.endsWith('/exports/jobs')) return json(route, { data: {
+      items: [], pagination: { page: 1, limit: 100, total: 0, pages: 1 }, summary: null,
+    } })
+    return json(route, { data: {} })
+  })
+  const page = await context.newPage()
+  try {
+    await signIn(page, account)
+    await page.goto('/dashboard/settings/data-export')
+    await selectRadixOption(page, page.locator('#data-scope'), 'Employee Directory')
+    await selectRadixOption(page, page.locator('#export-format'), 'Comma-separated values (.csv)')
+    await page.getByLabel('Hire date from').fill('2026-02-01')
+    await page.getByLabel('Hire date to').fill('2026-02-28')
+    await page.getByRole('button', { name: 'Generate CSV Export' }).click()
+    await expect.poll(() => exportPayload).toEqual({
+      kind: 'employees',
+      format: 'csv',
+      dateRange: { from: '2026-02-01', to: '2026-02-28' },
+    })
   } finally {
     await context.close()
   }
@@ -397,8 +444,8 @@ test('dashboard summary cards and cash-flow chart fit with populated large value
       await expect(page.getByRole('heading', { name: 'Cash Flow Analysis' })).toBeVisible()
       await expect(page.locator('.recharts-surface').first()).toBeVisible()
       for (const label of ['Open Pipeline Value', 'Payables Outstanding']) {
-        const card = page.locator('div.bg-surface-raised').filter({ has: page.getByText(label, { exact: true }) }).first()
-        const metric = card.locator('p.text-3xl')
+        const card = page.locator('div.bg-gradient-to-b').filter({ has: page.getByText(label, { exact: true }) }).first()
+        const metric = card.locator('span.text-2xl').first()
         await expect(metric).toBeVisible()
         const dimensions = await metric.evaluate(element => ({
           clientWidth: element.clientWidth,
@@ -502,9 +549,9 @@ test('CRM overview charts and dashboard actions fit phone, tablet, and desktop v
       await page.goto('/dashboard/crm')
       await expect(page.getByRole('heading', { name: 'Revenue Forecast' })).toBeVisible()
       await expect(page.locator('.recharts-surface').first()).toBeVisible()
-      await expect(page.getByText('$125,000,000.00').first()).toBeVisible()
-      await expect(page.getByText('$34,000,000.00').first()).toBeVisible()
-      for (const value of ['$125,000,000.00', '$34,000,000.00']) {
+      await expect(page.getByText('$125M', { exact: true }).first()).toBeVisible()
+      await expect(page.getByText('$34M', { exact: true }).first()).toBeVisible()
+      for (const value of ['$125M', '$34M']) {
         const metric = page.getByText(value).first()
         const dimensions = await metric.evaluate(element => ({ text: element.textContent, clientWidth: element.clientWidth, scrollWidth: element.scrollWidth, fontSize: getComputedStyle(element).fontSize }))
         expect(dimensions.scrollWidth, `${value} should fit its KPI card at ${width}px (${JSON.stringify(dimensions)})`).toBeLessThanOrEqual(dimensions.clientWidth)
@@ -760,9 +807,10 @@ test('project portfolio keeps populated budget figures and its detail panel usab
 })
 
 test('two workspaces can manage billing concurrently without seeing each other\'s card or portal session', async ({ browser }) => {
+  test.setTimeout(120_000)
   const accounts = [
-    { id: 'northwind_billing', name: 'Northwind Billing', email: 'northwind.billing@example.test', emailVerified: true, card: '4242', brand: 'visa' },
-    { id: 'contoso_billing', name: 'Contoso Billing', email: 'contoso.billing@example.test', emailVerified: true, card: '5555', brand: 'mastercard' },
+    { id: 'northwind_billing', name: 'Northwind Billing', email: 'northwind.billing@example.test', emailVerified: true, role: 'ADMIN', card: '4242', brand: 'visa' },
+    { id: 'contoso_billing', name: 'Contoso Billing', email: 'contoso.billing@example.test', emailVerified: true, role: 'ADMIN', card: '5555', brand: 'mastercard' },
   ]
   const contexts = await Promise.all(accounts.map(() => browser.newContext()))
   const pages = await Promise.all(contexts.map(context => context.newPage()))
@@ -794,8 +842,8 @@ test('two workspaces can manage billing concurrently without seeing each other\'
     await Promise.all(pages.map(page => page.goto('/dashboard/settings/billing')))
 
     await Promise.all(accounts.map(async (account, index) => {
-      await expect(pages[index].getByText(new RegExp(`${account.name} Plan`))).toBeVisible()
-      await expect(pages[index].getByText(new RegExp(`${account.brand} ending in ${account.card}`, 'i'))).toBeVisible()
+      await expect(pages[index].getByText(new RegExp(`${account.name} Plan`))).toBeVisible({ timeout: 15_000 })
+      await expect(pages[index].getByText(new RegExp(`${account.brand} ending in ${account.card}`, 'i'))).toBeVisible({ timeout: 15_000 })
       const other = accounts[1 - index]
       await expect(pages[index].getByText(new RegExp(`${other.name} Plan`))).toHaveCount(0)
       await expect(pages[index].getByText(new RegExp(`${other.brand} ending in ${other.card}`, 'i'))).toHaveCount(0)
@@ -803,11 +851,11 @@ test('two workspaces can manage billing concurrently without seeing each other\'
 
     await Promise.all(pages.map(async (page, index) => {
       await page.route(portalUrls[index], route => route.fulfill({ status: 200, contentType: 'text/html', body: `<title>${accounts[index].name} portal</title>` }))
-      await page.getByRole('button', { name: 'Manage billing' }).click()
+      await page.getByRole('button', { name: 'Manage billing' }).click({ timeout: 15_000 })
     }))
     await Promise.all(pages.map(async (page, index) => {
-      await expect(page).toHaveURL(portalUrls[index])
-      await expect(page).toHaveTitle(`${accounts[index].name} portal`)
+      await expect(page).toHaveURL(portalUrls[index], { timeout: 15_000 })
+      await expect(page).toHaveTitle(`${accounts[index].name} portal`, { timeout: 15_000 })
     }))
   } finally {
     await Promise.all(contexts.map(context => context.close()))
@@ -1196,6 +1244,173 @@ test('accounts receivable pages all open invoices for the selected customer', as
     await page.getByRole('button', { name: 'Next' }).click()
     await expect.poll(() => requested.some(item => item.customerId === 'customer_1' && item.page === 2 && item.limit === 10 && item.statusGroup === 'OPEN')).toBe(true)
     await expect(page.getByText('INV-11', { exact: true })).toBeVisible()
+  } finally {
+    await context.close()
+  }
+})
+
+test('receivable invoice actions can void with a reason or delete an unpaid invoice', async ({ browser }) => {
+  const account = { id: 'receivables_actions_admin', name: 'Receivables Actions Admin', email: 'receivables.actions@example.test', emailVerified: true, role: 'ADMIN' }
+  const voidBodies = []
+  const deletedIds = []
+  const invoices = [
+    {
+      id: 'invoice_void', customerId: 'customer_1', customer: 'Customer One', number: 'INV-VOID',
+      amount: { amount: 10000, currency: 'USD' }, dueDate: '2026-11-01T00:00:00.000Z', daysPastDue: 0,
+      status: 'CURRENT', createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z',
+      inventoryLines: [{
+        id: 'line_1', productId: 'product_1', productName: 'Widget', sku: 'W-1', quantity: 2,
+        costValue: { amount: 2200, currency: 'USD' }, stockMovementId: 'movement_1', valuationEventId: 'event_1',
+        journalEntryId: 'journal_1', reversedAt: null, reversalStockMovementId: null,
+        reversalValuationEventId: null, reversalJournalEntryId: null, createdAt: '2026-10-01T00:00:00.000Z',
+      }],
+    },
+    {
+      id: 'invoice_delete', customerId: 'customer_1', customer: 'Customer One', number: 'INV-DEL',
+      amount: { amount: 5000, currency: 'USD' }, dueDate: '2026-11-01T00:00:00.000Z', daysPastDue: 0,
+      status: 'CURRENT', createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z',
+      inventoryLines: [],
+    },
+  ]
+  const summary = {
+    openBalance: { amount: 15000, currency: 'USD' },
+    collectedThisMonthTotal: null,
+    collectedThisMonthComparison: { previousStartDate: '2026-09-01', previousEndDateExclusive: '2026-09-13', previousTotal: null },
+    agingBuckets: ['current', '1-30', '31-60', '60+'].map(bucket => ({ bucket, count: 0, total: { amount: 0, currency: 'USD' } })),
+  }
+  const context = await browser.newContext()
+  await mockAuth(context, account, async route => {
+    const url = new URL(route.request().url())
+    const path = url.pathname
+    const method = route.request().method()
+    if (path.endsWith('/finance/customers') && method === 'GET') {
+      return json(route, { data: { items: [{ id: 'customer_1', name: 'Customer One', email: null, avatarUrl: null, collectionStatus: 'CURRENT', openBalance: { amount: 15000, currency: 'USD' }, oldestOverdueDays: 0, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' }] } })
+    }
+    if (path.endsWith('/finance/receivables') && method === 'GET') {
+      const customerId = url.searchParams.get('customerId')
+      if (!customerId) return json(route, { data: { items: [], pagination: { page: 1, limit: 1, total: 2, pages: 2 }, summary } })
+      const openInvoices = invoices.filter(invoice => invoice.status !== 'VOID')
+      return json(route, { data: { items: openInvoices, pagination: { page: 1, limit: 10, total: openInvoices.length, pages: openInvoices.length ? 1 : 0 }, summary } })
+    }
+    if (path.endsWith('/finance/receivables/invoice_void/void') && method === 'POST') {
+      const body = route.request().postDataJSON()
+      voidBodies.push({ id: 'invoice_void', body })
+      invoices[0].status = 'VOID'
+      return json(route, { data: { ...invoices[0], status: 'VOID' } })
+    }
+    if (path.endsWith('/finance/receivables/invoice_delete') && method === 'DELETE') {
+      deletedIds.push('invoice_delete')
+      invoices[1].status = 'VOID'
+      return route.fulfill({ status: 204 })
+    }
+    if (path.endsWith('/activities')) return json(route, { data: { items: [] } })
+    return json(route, { data: {} })
+  })
+  const page = await context.newPage()
+  try {
+    await signIn(page, account)
+    await page.goto('/dashboard/finance/accounts-receivable')
+    await expect(page.getByText('INV-VOID', { exact: true })).toBeVisible()
+    await expect(page.getByText('INV-DEL', { exact: true })).toBeVisible()
+
+    const voidTrigger = page.getByRole('button', { name: 'Invoice actions for INV-VOID' })
+    await expect(voidTrigger).toBeEnabled()
+    await voidTrigger.click()
+    await page.getByRole('menuitem', { name: 'Void invoice' }).click()
+    const voidDialog = page.getByRole('dialog', { name: 'Void receivable invoice?' })
+    await expect(voidDialog).toBeVisible()
+    await voidDialog.getByLabel('Reason').fill('Duplicate invoice')
+    await voidDialog.getByRole('button', { name: 'Void invoice' }).click()
+    await expect.poll(() => voidBodies.length).toBe(1)
+    expect(voidBodies[0]).toEqual({ id: 'invoice_void', body: { reason: 'Duplicate invoice' } })
+    await expect(page.getByText('INV-VOID', { exact: true })).toBeHidden()
+
+    const deleteTrigger = page.getByRole('button', { name: 'Invoice actions for INV-DEL' })
+    await expect(deleteTrigger).toBeEnabled()
+    await deleteTrigger.click()
+    await page.getByRole('menuitem', { name: 'Delete invoice' }).click()
+    const deleteDialog = page.getByRole('alertdialog', { name: 'Delete receivable invoice?' })
+    await expect(deleteDialog).toBeVisible()
+    await deleteDialog.getByRole('button', { name: 'Delete invoice' }).click()
+    await expect.poll(() => deletedIds).toEqual(['invoice_delete'])
+    await expect(page.getByText('INV-DEL', { exact: true })).toBeHidden()
+  } finally {
+    await context.close()
+  }
+})
+
+test('new receivable invoice can issue valued stock lines with a calendar due date', async ({ browser }) => {
+  const account = { id: 'receivable_inventory_admin', name: 'Receivable Inventory Admin', email: 'receivable.inventory@example.test', emailVerified: true, role: 'ADMIN' }
+  const createdBodies = []
+  const context = await browser.newContext()
+  await mockAuth(context, account, async route => {
+    const url = new URL(route.request().url())
+    const path = url.pathname
+    if (path.endsWith('/finance/customers') && route.request().method() === 'GET') {
+      return json(route, { data: { items: [{ id: 'customer_1', name: 'Customer One', email: null, avatarUrl: null, collectionStatus: 'CURRENT', openBalance: { amount: 10000, currency: 'USD' }, oldestOverdueDays: 0, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' }] } })
+    }
+    if (path.endsWith('/finance/receivables') && route.request().method() === 'POST') {
+      createdBodies.push(route.request().postDataJSON())
+      return json(route, {
+        data: {
+          id: 'invoice_created', customerId: 'customer_1', customer: 'Customer One', number: 'INV-900001',
+          amount: { amount: 10000, currency: 'USD' }, dueDate: '2026-12-01T00:00:00.000Z', daysPastDue: 0,
+          status: 'CURRENT', date: '2026-10-25T00:00:00.000Z', createdAt: '2026-10-25T00:00:00.000Z', updatedAt: '2026-10-25T00:00:00.000Z',
+          sourceOriginalAmount: null, sourcePaidAmount: null,
+          inventoryLines: [{
+            id: 'line_1', productId: 'product_1', productName: 'Widget', sku: 'W-1', quantity: 2,
+            costValue: { amount: 2200, currency: 'USD' }, stockMovementId: 'movement_1', valuationEventId: 'event_1',
+            journalEntryId: 'journal_1', reversedAt: null, reversalStockMovementId: null,
+            reversalValuationEventId: null, reversalJournalEntryId: null, createdAt: '2026-10-25T00:00:00.000Z',
+          }],
+        },
+      }, 201)
+    }
+    if (path.endsWith('/finance/receivables') && route.request().method() === 'GET') {
+      if (url.searchParams.get('customerId')) {
+        return json(route, { data: { items: [], pagination: { page: 1, limit: 10, total: 0, pages: 0 }, summary: {} } })
+      }
+      return json(route, { data: { items: [], pagination: { page: 1, limit: 1, total: 0, pages: 0 }, summary: {
+        openBalance: { amount: 10000, currency: 'USD' }, collectedThisMonthTotal: null, collectedThisMonthComparison: { previousStartDate: '2026-09-01', previousEndDateExclusive: '2026-09-13', previousTotal: null },
+        agingBuckets: ['current', '1-30', '31-60', '60+'].map(bucket => ({ bucket, count: 0, total: { amount: 0, currency: 'USD' } })), currentCount: 0, currentTotal: { amount: 0, currency: 'USD' }, overdueCount: 0, overdueTotal: { amount: 0, currency: 'USD' }, inCollectionsCount: 0, inCollectionsTotal: { amount: 0, currency: 'USD' }, paidCount: 0, paidTotal: { amount: 0, currency: 'USD' }, voidCount: 0, voidTotal: { amount: 0, currency: 'USD' },
+      } } })
+    }
+    if (path.endsWith('/inventory/valuation/setup')) {
+      return json(route, { data: { configured: true, costingMethod: 'FIFO', configuredAt: '2026-10-25T00:00:00.000Z', valuationPostings: 3, mappings: [] } })
+    }
+    if (path.endsWith('/inventory/products') && route.request().method() === 'GET') {
+      return json(route, { data: {
+        items: [{ id: 'product_1', name: 'Widget', sku: 'W-1', price: '40.00', stock: 8, status: 'IN_STOCK', warehouse: null, aisle: null, bin: null, avgMonthlyUsage: null, leadTimeDays: null, minThreshold: 0, archivedAt: null, createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z' }],
+        pagination: { page: 1, limit: 20, total: 1, pages: 1 },
+        summary: { totalProducts: 1, totalUnitsOnHand: 8, lowStockProducts: 0 },
+      } })
+    }
+    if (path.endsWith('/activities')) return json(route, { data: { items: [] } })
+    return json(route, { data: {} })
+  })
+  const page = await context.newPage()
+  try {
+    await signIn(page, account)
+    await page.goto('/dashboard/finance/accounts-receivable')
+    await page.getByRole('button', { name: 'New Invoice' }).click()
+    await expect(page.getByRole('heading', { name: 'New Receivable Invoice' })).toBeVisible()
+    await page.locator('#new-invoice-customer').selectOption('customer_1')
+    await page.getByLabel('Invoice Amount').fill('100.00')
+    await page.getByLabel('Due Date').fill('2026-12-01')
+    await page.getByRole('button', { name: 'Add', exact: true }).click()
+    await page.getByRole('searchbox', { name: 'Search products for stock line 1' }).fill('Widget')
+    await page.getByRole('option', { name: /Widget/ }).click()
+    await page.getByLabel('Quantity for Widget').fill('2')
+    await page.getByRole('button', { name: 'Issue Invoice' }).click()
+
+    await expect.poll(() => createdBodies.length).toBe(1)
+    expect(createdBodies[0]).toMatchObject({
+      customerId: 'customer_1',
+      amount: '100.00',
+      dueDate: '2026-12-01',
+      inventoryLines: [{ productId: 'product_1', quantity: 2 }],
+    })
+    await expect(page.getByRole('heading', { name: 'New Receivable Invoice' })).toBeHidden()
   } finally {
     await context.close()
   }

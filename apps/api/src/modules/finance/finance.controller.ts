@@ -191,7 +191,12 @@ export function updateReceivableStatus(
   return service.updateReceivableStatus(prisma, tenantId, id, status, userId)
 }
 
-export function deleteReceivable(prisma: FinanceClient, tenantId: string, id: string, actorId: string | null = null): Promise<void> {
+export function deleteReceivable(
+  prisma: FinanceClient,
+  tenantId: string,
+  id: string,
+  actorId: string | null = null,
+): Promise<{ inventoryLinesReturned: number }> {
   return service.deleteReceivable(prisma, tenantId, id, actorId)
 }
 

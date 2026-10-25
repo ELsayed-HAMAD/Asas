@@ -112,3 +112,22 @@ describe('POST /settings/integrations/:id/test', () => {
     }
   })
 })
+
+describe('POST /settings/integrations', () => {
+  it('rejects token-like values because custom integrations currently accept endpoint URLs only', async () => {
+    const f = await setup()
+    try {
+      const response = await f.app.inject({
+        method: 'POST',
+        url: '/api/v1/settings/integrations',
+        headers: { cookie: 'better-auth.session_token=integration-test-token' },
+        payload: { name: 'Custom webhook', credential: 'api_token_without_endpoint' },
+      })
+
+      expect(response.statusCode).toBe(400)
+      expect(f.integrationFindFirst).not.toHaveBeenCalled()
+    } finally {
+      await f.app.close()
+    }
+  })
+})

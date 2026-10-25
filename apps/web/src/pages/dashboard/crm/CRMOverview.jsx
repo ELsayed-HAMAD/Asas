@@ -202,7 +202,7 @@ export default function CRMOverview() {
         {/* ── Row 1: 3-Tier Apple-Glass KPI Cards ── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
           {/* Card 1: Total Pipeline */}
-          <div className="relative overflow-hidden bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col justify-between min-h-[124px]">
+          <div className="relative overflow-hidden bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] grid grid-rows-[auto_1fr_auto] min-h-[124px]">
             {/* Background Subtle Sparkline */}
             <div className="absolute inset-x-0 bottom-0 h-6 pointer-events-none z-0 opacity-40">
               <ResponsiveContainer width="100%" height="100%">
@@ -220,36 +220,34 @@ export default function CRMOverview() {
             </div>
 
             {/* Content */}
-            <div className="relative z-10 flex flex-col h-full justify-between">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total Pipeline</p>
-                <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 flex items-center justify-center shrink-0">
-                  <TrendingUp size={16} />
-                </div>
+            <div className="relative z-10 flex items-center justify-between gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total Pipeline</p>
+              <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 flex items-center justify-center shrink-0">
+                <TrendingUp size={16} />
               </div>
+            </div>
 
-              <div className="my-1">
-                <p
-                  className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums cursor-help"
-                  title={pipelineValueLabel}
-                >
-                  {pipelineCompactValue}
-                </p>
-              </div>
-
+            <div className="relative z-10 my-1">
               <p
-                className="text-[11px] text-slate-500 leading-tight pt-1.5 border-t border-slate-100"
-                title={`Prior-month value (as of ${pipeline.openTotalComparison?.previousAsOfDate ?? pipeline.openCountComparison?.previousAsOfDate}) ${pipeline.openTotalComparison?.previousTotal == null ? 'unavailable' : formatMoney(pipeline.openTotalComparison.previousTotal)}`}
+                className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums cursor-help"
+                title={pipelineValueLabel}
               >
-                Prior-month value (as of {pipeline.openTotalComparison?.previousAsOfDate ?? pipeline.openCountComparison?.previousAsOfDate}) {pipeline.openTotalComparison?.previousTotal == null
-                  ? 'unavailable'
-                  : formatMoney(pipeline.openTotalComparison.previousTotal)}
+                {pipelineCompactValue}
               </p>
             </div>
+
+            <p
+              className="relative z-10 text-[11px] text-slate-500 leading-tight pt-1.5 border-t border-slate-100"
+              title={`Prior-month value (as of ${pipeline.openTotalComparison?.previousAsOfDate ?? pipeline.openCountComparison?.previousAsOfDate}) ${pipeline.openTotalComparison?.previousTotal == null ? 'unavailable' : formatMoney(pipeline.openTotalComparison.previousTotal)}`}
+            >
+              Prior-month value (as of {pipeline.openTotalComparison?.previousAsOfDate ?? pipeline.openCountComparison?.previousAsOfDate}) {pipeline.openTotalComparison?.previousTotal == null
+                ? 'unavailable'
+                : formatMoney(pipeline.openTotalComparison.previousTotal)}
+            </p>
           </div>
 
           {/* Card 2: Win Rate */}
-          <div className="relative overflow-hidden bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col justify-between min-h-[124px]">
+          <div className="relative overflow-hidden bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] grid grid-rows-[auto_1fr_auto] min-h-[124px]">
             {/* Background Subtle Sparkline */}
             <div className="absolute inset-x-0 bottom-0 h-6 pointer-events-none z-0 opacity-40">
               <ResponsiveContainer width="100%" height="100%">
@@ -267,31 +265,29 @@ export default function CRMOverview() {
             </div>
 
             {/* Content */}
-            <div className="relative z-10 flex flex-col h-full justify-between">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Win Rate</p>
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Percent size={16} />
-                </div>
+            <div className="relative z-10 flex items-center justify-between gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Win Rate</p>
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 flex items-center justify-center shrink-0">
+                <Percent size={16} />
               </div>
+            </div>
 
-              <div className="my-1">
-                <p className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
-                  {formatPercent(data.winRate)}
-                </p>
-              </div>
-
-              <p
-                className="text-[11px] text-slate-500 leading-tight pt-1.5 border-t border-slate-100"
-                title={`MTD ${formatPercent(currentPeriodWinRate)} · Prior period ${monthlyWinRateDelta == null ? formatPercent(previousPeriodWinRate) : `${monthlyWinRateDelta > 0 ? '+' : ''}${monthlyWinRateDelta.toFixed(1)} pts`}`}
-              >
-                MTD {formatPercent(currentPeriodWinRate)} · Prior period {monthlyWinRateDelta == null ? formatPercent(previousPeriodWinRate) : `${monthlyWinRateDelta > 0 ? '+' : ''}${monthlyWinRateDelta.toFixed(1)} pts`}
+            <div className="relative z-10 my-1">
+              <p className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
+                {formatPercent(data.winRate)}
               </p>
             </div>
+
+            <p
+              className="relative z-10 text-[11px] text-slate-500 leading-tight pt-1.5 border-t border-slate-100"
+              title={`MTD ${formatPercent(currentPeriodWinRate)} · Prior period ${monthlyWinRateDelta == null ? formatPercent(previousPeriodWinRate) : `${monthlyWinRateDelta > 0 ? '+' : ''}${monthlyWinRateDelta.toFixed(1)} pts`}`}
+            >
+              MTD {formatPercent(currentPeriodWinRate)} · Prior period {monthlyWinRateDelta == null ? formatPercent(previousPeriodWinRate) : `${monthlyWinRateDelta > 0 ? '+' : ''}${monthlyWinRateDelta.toFixed(1)} pts`}
+            </p>
           </div>
 
           {/* Card 3: Active Deals */}
-          <div className="bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col justify-between min-h-[124px]">
+          <div className="bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] grid grid-rows-[auto_1fr_auto] min-h-[124px]">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Active Deals</p>
               <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-600 flex items-center justify-center shrink-0">
@@ -312,13 +308,13 @@ export default function CRMOverview() {
           </div>
 
           {/* Card 4: Closed Won */}
-          <div className="bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col justify-between min-h-[124px]">
+          <div className="bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] grid grid-rows-[auto_1fr_auto] min-h-[124px]">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 truncate">
                 Closed Won ({perf?.year ?? currentYear})
               </p>
               <div className="flex items-center gap-1.5">
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200/60">
+                <span className="inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold leading-none bg-slate-100 text-slate-600 border border-slate-200/60 whitespace-nowrap">
                   {perf ? `${perf.summary.totalWonCount} deals` : '0 deals'}
                 </span>
                 <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200/70 text-slate-600 flex items-center justify-center shrink-0">

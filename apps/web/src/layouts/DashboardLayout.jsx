@@ -102,6 +102,7 @@ const NAV = [
     children: [
       { label: 'Product Catalog', i18nKey: 'nav.productCatalog', path: '/dashboard/inventory' },
       { label: 'Stock Movements', i18nKey: 'nav.stockMovements', path: '/dashboard/inventory/movements' },
+      { label: 'Valuation', i18nKey: 'nav.inventoryValuation', path: '/dashboard/inventory/valuation' },
     ],
   },
   {
@@ -161,6 +162,7 @@ const BREADCRUMB_LABELS = {
   'revenue-forecast':    'Revenue Forecast',
   inventory:             'Inventory',
   movements:             'Stock Movements',
+  valuation:             'Valuation',
   projects:              'Projects',
   sprints:               'Active Sprints',
   roadmap:               'Roadmap',
@@ -193,6 +195,7 @@ const BREADCRUMB_I18N = {
   'revenue-forecast':    'nav.revenueForecast',
   inventory:             'nav.inventory',
   movements:             'nav.stockMovements',
+  valuation:             'nav.inventoryValuation',
   projects:              'nav.projects',
   sprints:               'nav.activeSprints',
   roadmap:               'nav.roadmap',
@@ -1115,6 +1118,9 @@ export default function DashboardLayout() {
   }
   if (pathname === '/dashboard/crm') {
     breadcrumbs.push(t('crm.overview', 'Overview'))
+  }
+  if (pathname === '/dashboard/finance') {
+    breadcrumbs.push(t('finance.overview', 'Overview'))
   }
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)

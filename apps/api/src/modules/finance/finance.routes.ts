@@ -823,14 +823,14 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
           action: 'finance.receivable.create',
           targetType: 'ReceivableInvoice',
           targetId: invoice.id,
-          metadata: { amount: invoice.amount },
+          metadata: { amount: invoice.amount, inventoryLineCount: invoice.inventoryLines.length },
         })
         await notifyWorkspaceRoles(tx, {
           tenantId,
           roles: ['OWNER', 'ADMIN'],
           excludeUserId: userId,
           title: 'New receivable invoice',
-          message: `A customer invoice${invoice.number ? ` ${invoice.number}` : ''} was created.`,
+          message: `A customer invoice${invoice.number ? ` ${invoice.number}` : ''} was created${invoice.inventoryLines.length > 0 ? ` with ${invoice.inventoryLines.length} stock fulfillment line${invoice.inventoryLines.length === 1 ? '' : 's'}` : ''}.`,
           type: 'INFO',
           link: '/dashboard/finance/accounts-receivable',
           module: 'finance',
@@ -838,7 +838,11 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
         })
         return invoice
       })
-      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance'), moduleKeyPrefix('notifications')])
+      request.server.ssePublish(tenantId, [
+        moduleKeyPrefix('finance'),
+        moduleKeyPrefix('notifications'),
+        ...(invoice.inventoryLines.length > 0 ? [moduleKeyPrefix('inventory')] : []),
+      ])
       reply.code(201)
       return { data: invoice }
     },
@@ -925,17 +929,22 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
-      await request.server.prisma.$transaction(async tx => {
-        await financeController.deleteReceivable(tx, tenantId, request.params.id, userId)
+      const result = await request.server.prisma.$transaction(async tx => {
+        const inventory = await financeController.deleteReceivable(tx, tenantId, request.params.id, userId)
         await recordAuditLog(tx, {
           tenantId,
           actorId: userId,
           action: 'finance.receivable.delete',
           targetType: 'ReceivableInvoice',
           targetId: request.params.id,
+          metadata: { inventoryLinesReturned: inventory.inventoryLinesReturned },
         })
+        return inventory
       })
-      request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
+      request.server.ssePublish(tenantId, [
+        moduleKeyPrefix('finance'),
+        ...(result.inventoryLinesReturned > 0 ? [moduleKeyPrefix('inventory')] : []),
+      ])
       reply.code(204)
     },
   )
@@ -949,17 +958,21 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async request => {
     const { tenantId, userId } = requireAuthContext(request)
-    const invoice = await request.server.prisma.$transaction(async tx => {
+    const result = await request.server.prisma.$transaction(async tx => {
       const invoice = await financeService.voidReceivable(tx, tenantId, request.params.id, request.body.reason, userId)
+      const inventoryLinesReturned = invoice.inventoryLines.filter(line => line.reversedAt !== null).length
       await recordAuditLog(tx, {
         tenantId, actorId: userId, action: 'finance.receivable.void',
         targetType: 'ReceivableInvoice', targetId: invoice.id,
-        metadata: { status: invoice.status, reason: request.body.reason },
+        metadata: { status: invoice.status, reason: request.body.reason, inventoryLinesReturned },
       })
-      return invoice
+      return { invoice, inventoryLinesReturned }
     })
-    request.server.ssePublish(tenantId, [moduleKeyPrefix('finance')])
-    return { data: invoice }
+    request.server.ssePublish(tenantId, [
+      moduleKeyPrefix('finance'),
+      ...(result.inventoryLinesReturned > 0 ? [moduleKeyPrefix('inventory')] : []),
+    ])
+    return { data: result.invoice }
   })
 
   // ── Expenses ────────────────────────────────────────────────────────────────

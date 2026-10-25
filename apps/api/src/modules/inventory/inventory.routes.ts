@@ -5,6 +5,12 @@ import {
   errorResponses,
   idParamSchema,
   idSchema,
+  inventoryOpeningValuationResultSchema,
+  inventoryOpeningValuationWriteSchema,
+  inventoryUnvaluedProductListResponseSchema,
+  inventoryValuationReportSchema,
+  inventoryValuationSetupSchema,
+  inventoryValuationSetupWriteSchema,
   noContentSchema,
   productListQuerySchema,
   productListResponseSchema,
@@ -162,7 +168,7 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
   }, async request => {
     const { tenantId, userId } = requireAuthContext(request)
     const order = await inventoryController.receivePurchaseOrder(request.server.prisma, tenantId, request.params.id, userId)
-    request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
+    request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory'), moduleKeyPrefix('finance')])
     return { data: order }
   })
 
@@ -191,7 +197,7 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const { tenantId, userId } = requireAuthContext(request)
       const product = await inventoryController.createProduct(request.server.prisma, tenantId, request.body, userId)
-      request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory'), moduleKeyPrefix('finance')])
       reply.code(201)
       return { data: product }
     },
@@ -332,9 +338,85 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
         request.body,
         userId,
       )
-      request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory')])
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory'), moduleKeyPrefix('finance')])
       reply.code(201)
       return { data: movement }
+    },
+  )
+
+  // ── Valuation policy, opening position, and reconciliation ─────────────────
+
+  server.get(
+    '/valuation/setup',
+    {
+      preHandler: requireRole('MEMBER'),
+      schema: { response: { 200: envelope(inventoryValuationSetupSchema), ...errorResponses } },
+    },
+    async request => {
+      const { tenantId } = requireAuthContext(request)
+      const setup = await inventoryController.getValuationSetup(request.server.prisma, tenantId)
+      return { data: setup }
+    },
+  )
+
+  server.put(
+    '/valuation/setup',
+    {
+      preHandler: requirePermission('inventory.write'),
+      schema: {
+        body: inventoryValuationSetupWriteSchema,
+        response: { 200: envelope(inventoryValuationSetupSchema), ...errorResponses },
+      },
+    },
+    async request => {
+      const { tenantId, userId } = requireAuthContext(request)
+      const setup = await inventoryController.saveValuationSetup(request.server.prisma, tenantId, request.body, userId)
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory'), moduleKeyPrefix('finance')])
+      return { data: setup }
+    },
+  )
+
+  server.post(
+    '/valuation/openings',
+    {
+      preHandler: requirePermission('inventory.write'),
+      schema: {
+        body: inventoryOpeningValuationWriteSchema,
+        response: { 201: envelope(inventoryOpeningValuationResultSchema), ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const { tenantId, userId } = requireAuthContext(request)
+      const result = await inventoryController.openInventoryValuation(request.server.prisma, tenantId, request.body, userId)
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory'), moduleKeyPrefix('finance')])
+      reply.code(201)
+      return { data: result }
+    },
+  )
+
+  server.get(
+    '/valuation/report',
+    {
+      preHandler: requireRole('MEMBER'),
+      schema: { response: { 200: envelope(inventoryValuationReportSchema), ...errorResponses } },
+    },
+    async request => {
+      const { tenantId } = requireAuthContext(request)
+      const report = await inventoryController.getValuationReport(request.server.prisma, tenantId)
+      return { data: report }
+    },
+  )
+
+  server.get(
+    '/valuation/unvalued-products',
+    {
+      preHandler: requireRole('MEMBER'),
+      schema: { response: { 200: envelope(inventoryUnvaluedProductListResponseSchema), ...errorResponses } },
+    },
+    async request => {
+      const { tenantId } = requireAuthContext(request)
+      const items = await inventoryController.listUnvaluedProducts(request.server.prisma, tenantId)
+      return { data: { items } }
     },
   )
 }

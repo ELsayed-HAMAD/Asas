@@ -52,6 +52,7 @@ export default function ConfirmDialog({
   return (
     <Root open={isDialogOpen} onOpenChange={(val) => { if (!val && !busy) onClose?.() }}>
       <Content
+        aria-labelledby="confirm-dialog-title"
         className="w-full max-w-md bg-surface-raised rounded-card border border-border-default shadow-elevated p-6"
         onOpenAutoFocus={() => {
           returnFocusTo.current = document.activeElement

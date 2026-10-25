@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../../components/ui/select';
+import { reasonsFor } from '../../../lib/inventoryReasons';
 
 export default function Inventory() {
   const navigate = useNavigate();
@@ -59,6 +60,7 @@ export default function Inventory() {
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [purchaseOrderOpen, setPurchaseOrderOpen] = useState(false);
   const [purchaseQuantity, setPurchaseQuantity] = useState('1');
+  const [purchaseUnitCost, setPurchaseUnitCost] = useState('');
   const [purchaseOrderError, setPurchaseOrderError] = useState('');
   const [createdOrder, setCreatedOrder] = useState(null);
 
@@ -121,6 +123,14 @@ export default function Inventory() {
   });
   const purchaseOrders = ordersData?.items ?? [];
 
+  // Inventory valuation policy - determines whether opening stock, movements, and purchase
+  // orders must carry an explicit cost.
+  const { data: valuationSetup } = useQuery({
+    queryKey: queryKeys.inventory.valuationSetup(),
+    queryFn: () => inventoryApi.getValuationSetup(),
+  });
+  const valuationConfigured = valuationSetup?.configured === true;
+
   const queryClient = useQueryClient();
   const { data: activeMemberRole } = useActiveMemberRole();
   // Server requires ADMIN for every write (MEMBER gets 403). Gate the write controls so a
@@ -135,13 +145,14 @@ export default function Inventory() {
     sku: '',
     price: '',
     stock: '',
+    unitCost: '',
     minThreshold: '',
     warehouse: '',
   });
   const [productError, setProductError] = useState('');
 
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
-  const [movementForm, setMovementForm] = useState({ kind: 'receive', qty: '', note: '' });
+  const [movementForm, setMovementForm] = useState({ kind: 'receive', qty: '', note: '', reason: 'PURCHASE_RECEIPT', unitCost: '' });
   const [movementError, setMovementError] = useState('');
   // Server-side on-hand count after the last successful movement (newStock) — surfaced next
   // to the Adjust Stock button until the list refetch lands.
@@ -177,7 +188,11 @@ export default function Inventory() {
     onError: (error) => setMovementError(error?.message || 'Could not record movement.'),
   });
   const purchaseOrderMutation = useMutation({
-    mutationFn: () => inventoryApi.createPurchaseOrder({ productId: selectedProduct.id, quantity: Number(purchaseQuantity) }),
+    mutationFn: () => inventoryApi.createPurchaseOrder({
+      productId: selectedProduct.id,
+      quantity: Number(purchaseQuantity),
+      ...(purchaseUnitCost.trim() !== '' && { unitCost: purchaseUnitCost.trim() }),
+    }),
     onSuccess: order => {
       setCreatedOrder(order);
       setPurchaseOrderOpen(false);
@@ -249,7 +264,7 @@ export default function Inventory() {
   }, [selectedId]);
 
   const openCreateDialog = () => {
-    setProductForm({ name: '', sku: '', price: '', stock: '', minThreshold: '', warehouse: '' });
+    setProductForm({ name: '', sku: '', price: '', stock: '', unitCost: '', minThreshold: '', warehouse: '' });
     setProductError('');
     setProductDialog({ open: true, mode: 'create', product: null });
   };
@@ -271,6 +286,7 @@ export default function Inventory() {
       // stock is not editable on update (it changes only through stock movements) — but the
       // form still carries a key so the shared shape stays stable; it is never rendered or sent.
       stock: String(product?.stock ?? ''),
+      unitCost: '',
       minThreshold: product?.minThreshold != null ? String(product.minThreshold) : '',
       warehouse: product?.warehouse ?? '',
     });
@@ -340,6 +356,21 @@ export default function Inventory() {
     }
 
     if (isCreate) {
+      const initialStock = body.stock ?? 0;
+      const unitCost = productForm.unitCost.trim();
+      if (valuationConfigured && initialStock > 0) {
+        if (unitCost === '') {
+          setProductError('Unit cost is required for starting stock because inventory valuation is configured.');
+          return;
+        }
+        body.unitCost = unitCost;
+      } else if (unitCost !== '') {
+        setProductError('Unit cost only applies to an initial stock quantity greater than zero.');
+        return;
+      }
+    }
+
+    if (isCreate) {
       createProductMutation.mutate(body);
     } else {
       updateProductMutation.mutate({ id: productDialog.product?.id, patch: body });
@@ -347,7 +378,7 @@ export default function Inventory() {
   };
 
   const openAdjustDialog = () => {
-    setMovementForm({ kind: 'receive', qty: '', note: '' });
+    setMovementForm({ kind: 'receive', qty: '', note: '', reason: 'PURCHASE_RECEIPT', unitCost: '' });
     setMovementError('');
     setAdjustDialogOpen(true);
   };
@@ -371,10 +402,25 @@ export default function Inventory() {
       setMovementError(`Only ${selectedProduct.stock} unit${selectedProduct.stock === 1 ? '' : 's'} on hand — cannot issue ${qtyN}.`);
       return;
     }
+    const isReceive = movementForm.kind === 'receive';
+    if (valuationConfigured) {
+      if (isReceive && movementForm.unitCost.trim() === '') {
+        setMovementError('Unit cost is required because this workspace values inventory.');
+        return;
+      }
+      if (!isReceive && !movementForm.reason) {
+        setMovementError('Select a reason so the cost posts to the right ledger account.');
+        return;
+      }
+    }
     recordMovementMutation.mutate({
       productId: selectedProduct.id,
-      delta: movementForm.kind === 'receive' ? qtyN : -qtyN,
+      delta: isReceive ? qtyN : -qtyN,
       note: movementForm.note.trim() === '' ? null : movementForm.note.trim(),
+      ...(valuationConfigured && {
+        reason: movementForm.reason,
+        ...(isReceive && { unitCost: movementForm.unitCost.trim() }),
+      }),
     });
   };
 
@@ -429,7 +475,7 @@ export default function Inventory() {
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search..."
               aria-label="Search products"
-              wrapperClassName="w-full min-[900px]:w-auto min-[900px]:flex-1 min-w-[200px] shrink-0"
+              wrapperClassName="w-full sm:w-full min-[900px]:w-auto min-[900px]:flex-1 min-w-[200px] shrink-0"
             />
 
             <Select
@@ -810,7 +856,7 @@ export default function Inventory() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => { setPurchaseQuantity('1'); setPurchaseOrderError(''); setPurchaseOrderOpen(true); }}
+                      onClick={() => { setPurchaseQuantity('1'); setPurchaseUnitCost(''); setPurchaseOrderError(''); setPurchaseOrderOpen(true); }}
                       disabled={!canWrite || Boolean(selectedProduct.archivedAt)}
                       className="h-7 px-2 text-xs font-semibold text-primary hover:text-primary-hover gap-1.5"
                     >
@@ -1046,7 +1092,7 @@ export default function Inventory() {
                 {/* Row 2: Create Purchase Order, full width */}
                 <Button
                   type="button"
-                  onClick={() => { setPurchaseQuantity('1'); setPurchaseOrderError(''); setPurchaseOrderOpen(true); }}
+                  onClick={() => { setPurchaseQuantity('1'); setPurchaseUnitCost(''); setPurchaseOrderError(''); setPurchaseOrderOpen(true); }}
                   disabled={!canWrite || Boolean(selectedProduct.archivedAt)}
                   title={selectedProduct.archivedAt ? 'Restore this product before creating an order' : canWrite ? undefined : noRoleTitle}
                   className="w-full h-9 gap-2 text-sm font-semibold whitespace-nowrap"
@@ -1147,6 +1193,23 @@ export default function Inventory() {
                 />
               </div>
             )}
+            {productDialog.mode === 'create' && valuationConfigured && Number(productForm.stock || 0) > 0 && (
+              <div>
+                <label className="block text-xs font-bold text-heading mb-1.5">Initial unit cost</label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={productForm.unitCost}
+                  onChange={(e) => setProductForm((f) => ({ ...f, unitCost: e.target.value }))}
+                  placeholder="e.g. 12.50"
+                  className="w-full"
+                />
+                <p className="mt-1.5 text-[11px] text-muted">
+                  The acquisition cost of the starting quantity. It posts the opening value to Inventory and
+                  Inventory opening equity; the selling price is never used as cost.
+                </p>
+              </div>
+            )}
             <div>
               <label className="block text-xs font-bold text-heading mb-1.5">Warehouse</label>
               <Input
@@ -1170,6 +1233,10 @@ export default function Inventory() {
         <FormDialog open={purchaseOrderOpen} onClose={() => !purchaseOrderMutation.isPending && setPurchaseOrderOpen(false)} title="Create purchase order" subtitle={selectedProduct ? `Create a draft order for ${selectedProduct.name}.` : undefined} busy={purchaseOrderMutation.isPending} onConfirm={() => {
           const quantity = Number(purchaseQuantity);
           if (!Number.isSafeInteger(quantity) || quantity < 1) { setPurchaseOrderError('Quantity must be a whole number greater than 0.'); return; }
+          if (valuationConfigured && purchaseUnitCost.trim() === '') {
+            setPurchaseOrderError('Unit cost is required because this workspace values inventory. Receiving the order would otherwise be blocked.');
+            return;
+          }
           setPurchaseOrderError('');
           purchaseOrderMutation.mutate();
         }} confirmLabel="Create draft order">
@@ -1177,6 +1244,22 @@ export default function Inventory() {
             Quantity
             <Input type="number" min={1} step={1} value={purchaseQuantity} onChange={event => setPurchaseQuantity(event.target.value)} className="mt-1 w-full" />
           </label>
+          {valuationConfigured && (
+            <label className="block text-sm font-medium text-body">
+              Unit cost
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={purchaseUnitCost}
+                onChange={event => setPurchaseUnitCost(event.target.value)}
+                placeholder="e.g. 12.50"
+                className="mt-1 w-full"
+              />
+              <span className="mt-1 block text-[11px] font-normal text-muted">
+                Used to value the receipt into inventory. The selling price is never used as cost.
+              </span>
+            </label>
+          )}
           {purchaseOrderError && (
             <Alert variant="destructive" className="mt-3 py-2 px-3 text-xs">
               <AlertDescription>{purchaseOrderError}</AlertDescription>
@@ -1227,7 +1310,7 @@ export default function Inventory() {
                     name="movement-kind"
                     value="receive"
                     checked={movementForm.kind === 'receive'}
-                    onChange={() => setMovementForm((f) => ({ ...f, kind: 'receive' }))}
+                    onChange={() => setMovementForm((f) => ({ ...f, kind: 'receive', reason: 'PURCHASE_RECEIPT' }))}
                     className="accent-primary"
                   />
                   Receive stock
@@ -1244,7 +1327,7 @@ export default function Inventory() {
                     name="movement-kind"
                     value="issue"
                     checked={movementForm.kind === 'issue'}
-                    onChange={() => setMovementForm((f) => ({ ...f, kind: 'issue' }))}
+                    onChange={() => setMovementForm((f) => ({ ...f, kind: 'issue', reason: 'SALE' }))}
                     className="accent-primary"
                   />
                   Issue stock
@@ -1263,6 +1346,41 @@ export default function Inventory() {
                 className="w-full"
               />
             </div>
+            {valuationConfigured && (
+              <div>
+                <label className="block text-xs font-bold text-heading mb-1.5">
+                  {movementForm.kind === 'receive' ? 'Unit cost' : 'Reason'}
+                </label>
+                {movementForm.kind === 'receive' && (
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={movementForm.unitCost}
+                    onChange={(e) => setMovementForm((f) => ({ ...f, unitCost: e.target.value }))}
+                    placeholder="e.g. 12.50"
+                    className="mb-2 w-full"
+                  />
+                )}
+                <Select
+                  value={movementForm.reason}
+                  onValueChange={(value) => setMovementForm((f) => ({ ...f, reason: value }))}
+                >
+                  <SelectTrigger aria-label="Movement reason" className="w-full text-sm">
+                    <SelectValue placeholder="Select a reason..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {reasonsFor(movementForm.kind).map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1.5 text-[11px] text-muted">
+                  {movementForm.kind === 'receive'
+                    ? 'The exact acquisition cost per unit. The selling price is never used as cost.'
+                    : 'The reason decides whether cost leaves through cost of goods sold, shrinkage, or a supplier return.'}
+                </p>
+              </div>
+            )}
             <div>
               <label className="block text-xs font-bold text-heading mb-1.5">Note</label>
               <Input

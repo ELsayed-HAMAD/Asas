@@ -56,7 +56,7 @@ afterEach(async () => {
 })
 
 describe('billing storage usage', () => {
-  it('measures tenant resume, export and staging objects and returns the live seat count', async () => {
+  it('measures tenant resume, export, staging and branding objects and returns the live seat count', async () => {
     const fixture = await makeApp()
     apps.push(fixture)
     const response = await fixture.app.inject({ method: 'GET', url: '/api/v1/settings/billing' })
@@ -65,8 +65,9 @@ describe('billing storage usage', () => {
       'exports/tenant_1/',
       'resumes/tenant_1/',
       'staging/resumes/tenant_1/',
+      'tenants/tenant_1/branding/',
     ])
-    expect(response.json().data.subscriptions[0]).toMatchObject({ seatsUsed: 5, storageUsedGb: 3584 / 1_000_000_000 })
+    expect(response.json().data.subscriptions[0]).toMatchObject({ seatsUsed: 5, storageUsedGb: 4096 / 1_000_000_000 })
   })
 
   it('reports unknown usage instead of substituting a default when bucket listing fails', async () => {

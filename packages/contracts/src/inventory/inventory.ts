@@ -17,6 +17,7 @@ import { productStockStatusSchema } from '../enums.generated.js'
 import { idSchema, isoDateSchema, isoDateTimeSchema, boundedText, shortTextSchema, longTextSchema } from '../primitives/ids.js'
 import { decimalStringSchema } from '../primitives/money.js'
 import { collection, paginated, paginationQuerySchema } from '../primitives/pagination.js'
+import { inventoryCostReasonSchema } from '../enums.generated.js'
 
 /** Wire label for a movement's direction, derived from the sign of `delta`. */
 export const stockMovementTypeSchema = z.enum(['IN', 'OUT'])
@@ -64,6 +65,11 @@ export type AddProductSupplierInput = z.infer<typeof addProductSupplierSchema>
 export const purchaseOrderWriteSchema = z.object({
   productId: idSchema,
   quantity: z.int().min(1),
+  /**
+   * Acquisition cost per unit. Required before receipt when the workspace has configured
+   * perpetual inventory valuation; preserved as NULL for quantity-only historical orders.
+   */
+  unitCost: decimalStringSchema.optional(),
 })
 export type PurchaseOrderWriteInput = z.infer<typeof purchaseOrderWriteSchema>
 export const purchaseOrderStatusSchema = z.enum(['DRAFT', 'APPROVED', 'RECEIVED', 'CANCELLED'])
@@ -78,6 +84,8 @@ export const purchaseOrderSchema = z.object({
   productName: z.string(),
   sku: z.string(),
   quantity: z.int().min(1),
+  unitCost: decimalStringSchema.nullable().optional(),
+  currency: z.string().nullable().optional(),
 })
 export type PurchaseOrder = z.infer<typeof purchaseOrderSchema>
 export const purchaseOrderListQuerySchema = z.object({
@@ -114,6 +122,11 @@ export const productWriteSchema = z.object({
   price: decimalStringSchema.optional(),
   /** Starting quantity — applied as a single initial `StockMovement` inside the create transaction. */
   stock: z.int().min(0).optional(),
+  /**
+   * Acquisition cost per unit for the starting quantity. Required when starting stock is created
+   * after inventory valuation has been configured; never derived from the selling price.
+   */
+  unitCost: decimalStringSchema.optional(),
   warehouse: boundedText(200).optional().nullable(),
   aisle: boundedText(64).optional().nullable(),
   bin: boundedText(64).optional().nullable(),
@@ -238,6 +251,16 @@ export const stockMovementWriteSchema = z.object({
   /** Positive = goods in, negative = goods out. */
   delta: z.int().refine(value => value !== 0, 'delta cannot be zero'),
   note: longTextSchema.optional().nullable(),
+  /**
+   * Required for an outbound movement once valuation is configured: it determines whether the
+   * cost leaves inventory through cost of goods sold, shrinkage expense, or a supplier return.
+   */
+  reason: inventoryCostReasonSchema.optional(),
+  /**
+   * Required for an inbound movement once valuation is configured. Exact acquisition cost per
+   * unit in the product/workspace currency; the product selling price is never used as a cost.
+   */
+  unitCost: decimalStringSchema.optional(),
 })
 
 export type StockMovementWriteInput = z.infer<typeof stockMovementWriteSchema>

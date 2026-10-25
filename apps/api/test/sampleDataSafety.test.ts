@@ -30,6 +30,8 @@ describe('sample-data clearing safety', () => {
   it('resolves import currency only after claiming the tenant in the same transaction', async () => {
     const events: string[] = []
     const create = vi.fn(async (_args: { data: Record<string, unknown> }) => { events.push('employee') })
+    const createImportJob = vi.fn(async () => { events.push('migration-job'); return {} })
+    const updateMigrationProject = vi.fn(async () => { events.push('project-status'); return {} })
     const outsideRead = vi.fn().mockResolvedValue({ currency: 'USD' })
     const tx = {
       tenant: {
@@ -38,10 +40,17 @@ describe('sample-data clearing safety', () => {
         update: async () => ({}),
       },
       employee: { create },
+      dataMigrationProject: {
+        findFirst: async () => { events.push('migration-project'); return { id: 'c00000000000000000000001' } },
+        update: updateMigrationProject,
+      },
+      dataMigrationImportJob: { create: createImportJob },
     }
     const prisma = { tenant: { findUnique: outsideRead }, $transaction: async (work: (tx: unknown) => Promise<unknown>) => work(tx) } as unknown as PrismaClient
-    await expect(importEmployees(prisma, 'tenant_1', { employees: [{ name: 'Ada', title: 'Engineer', salary: '10.123', bankRoutingNumber: '021000021' }] })).resolves.toEqual({ imported: 1 })
-    expect(events).toEqual(['claim', 'currency', 'employee'])
+    await expect(importEmployees(prisma, 'tenant_1', { migrationProjectId: 'c00000000000000000000001', employees: [{ name: 'Ada', title: 'Engineer', salary: '10.123', bankRoutingNumber: '021000021' }] })).resolves.toEqual({ imported: 1 })
+    expect(events).toEqual(['claim', 'migration-project', 'currency', 'employee', 'migration-job', 'project-status'])
+    expect(createImportJob).toHaveBeenCalledWith({ data: expect.objectContaining({ tenantId: 'tenant_1', projectId: 'c00000000000000000000001', entity: 'HR_EMPLOYEES', totalRows: 1, importedRows: 1 }) })
+    expect(updateMigrationProject).toHaveBeenCalledWith({ where: { id: 'c00000000000000000000001' }, data: { status: 'IN_PROGRESS' } })
     expect(outsideRead).not.toHaveBeenCalled()
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ salary: '10.123' }) }))
     const employeeData = create.mock.calls[0]?.[0]

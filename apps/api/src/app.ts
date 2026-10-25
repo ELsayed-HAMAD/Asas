@@ -31,6 +31,7 @@ import { onboardingRoutes } from './modules/onboarding/onboarding.routes.js'
 import { inventoryRoutes } from './modules/inventory/inventory.routes.js'
 import { projectsRoutes } from './modules/projects/projects.routes.js'
 import { settingsRoutes } from './modules/settings/settings.routes.js'
+import { dataMigrationRoutes } from './modules/settings/dataMigration.routes.js'
 import { supportRoutes } from './modules/support/support.routes.js'
 import { betterAuthPlugin } from './plugins/betterAuth.js'
 import { correlationPlugin } from './plugins/correlation.js'
@@ -310,6 +311,14 @@ export async function buildApp(
     (_request, body, done) => done(null, body),
   )
 
+  // Workspace logos are uploaded as raw image bytes, not base64 inside a JSON settings patch.
+  // Keep this allowlist and the in-flight buffer cap aligned with the settings route checks.
+  app.addContentTypeParser(
+    /^image\/(?:png|jpeg|webp|svg\+xml)$/,
+    { parseAs: 'buffer', bodyLimit: 2 * 1024 * 1024 },
+    (_request, body, done) => done(null, body),
+  )
+
   if (options.prisma) {
     await prismaPlugin(app, options.prisma)
     const auth = options.auth ?? createAuth(options.prisma, environment)
@@ -361,6 +370,7 @@ export async function buildApp(
     await app.register(projectsRoutes, { prefix: '/api/v1/projects' })
     await app.register(inventoryRoutes, { prefix: '/api/v1/inventory' })
     await app.register(settingsRoutes, { prefix: '/api/v1/settings' })
+    await app.register(dataMigrationRoutes, { prefix: '/api/v1/settings/data-migrations' })
     await app.register(stripeBillingRoutes, { prefix: '/api/v1/billing' })
     await app.register(supportRoutes, { prefix: '/api/v1/support' })
     await app.register(onboardingRoutes, { prefix: '/api/v1/onboarding' })

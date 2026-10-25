@@ -38,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../../components/ui/select'
+import { RECEIPT_REASONS, ISSUE_REASONS } from '../../../lib/inventoryReasons'
 
 export default function StockMovements() {
   const queryClient = useQueryClient()
@@ -66,6 +67,8 @@ export default function StockMovements() {
     kind: 'receive', // 'receive' | 'issue'
     quantity: '1',
     note: '',
+    reason: 'PURCHASE_RECEIPT',
+    unitCost: '',
   })
   const [movementError, setMovementError] = useState('')
 
@@ -102,6 +105,13 @@ export default function StockMovements() {
     enabled: movementDialogOpen,
   })
 
+  // Query: Valuation policy (determines whether cost and reason are required)
+  const { data: valuationSetup } = useQuery({
+    queryKey: queryKeys.inventory.valuationSetup(),
+    queryFn: () => inventoryApi.getValuationSetup(),
+  })
+  const valuationConfigured = valuationSetup?.configured === true
+
   const rawItems = data?.items ?? []
   const summary = data?.summary
   const pagination = data?.pagination ?? { page: 1, limit: 25, total: 0, pages: 1 }
@@ -126,10 +136,23 @@ export default function StockMovements() {
         throw new Error('Quantity must be a positive integer.')
       }
       const delta = movementForm.kind === 'receive' ? parsedQty : -parsedQty
+      const reason = movementForm.reason
+      if (valuationConfigured) {
+        if (movementForm.kind === 'receive' && !movementForm.unitCost.trim()) {
+          throw new Error('Unit cost is required because this workspace values inventory. The selling price is never used as cost.')
+        }
+        if (movementForm.kind !== 'receive' && !reason) {
+          throw new Error('Select a reason so the cost posts to the right ledger account.')
+        }
+      }
       return inventoryApi.recordStockMovement({
         productId: movementForm.productId,
         delta,
         note: movementForm.note.trim() || null,
+        ...(valuationConfigured && {
+          reason,
+          ...(movementForm.kind === 'receive' && { unitCost: movementForm.unitCost.trim() }),
+        }),
       })
     },
     onSuccess: () => {
@@ -142,7 +165,7 @@ export default function StockMovements() {
   })
 
   function openMovementDialog() {
-    setMovementForm({ productId: '', kind: 'receive', quantity: '1', note: '' })
+    setMovementForm({ productId: '', kind: 'receive', quantity: '1', note: '', reason: 'PURCHASE_RECEIPT', unitCost: '' })
     setSelectedProduct(null)
     setProductSearchInput('')
     setProductPage(1)
@@ -160,6 +183,7 @@ export default function StockMovements() {
   return (
     <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-0">
       <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-5">
+        <h1 className="sr-only">Stock Movements</h1>
         {/* KPI Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Total In */}
@@ -535,7 +559,7 @@ export default function StockMovements() {
                   name="modal-movement-kind"
                   value="receive"
                   checked={movementForm.kind === 'receive'}
-                  onChange={() => setMovementForm((f) => ({ ...f, kind: 'receive' }))}
+                  onChange={() => setMovementForm((f) => ({ ...f, kind: 'receive', reason: 'PURCHASE_RECEIPT' }))}
                   className="accent-primary"
                 />
                 Receive (Inbound)
@@ -552,13 +576,56 @@ export default function StockMovements() {
                   name="modal-movement-kind"
                   value="issue"
                   checked={movementForm.kind === 'issue'}
-                  onChange={() => setMovementForm((f) => ({ ...f, kind: 'issue' }))}
+                  onChange={() => setMovementForm((f) => ({ ...f, kind: 'issue', reason: 'SALE' }))}
                   className="accent-primary"
                 />
                 Issue (Outbound)
               </label>
             </div>
           </div>
+
+          {valuationConfigured && (
+            <>
+              <div>
+                <label className="block text-xs font-bold text-heading mb-1.5">
+                  {movementForm.kind === 'receive' ? 'Unit Cost' : 'Reason'}
+                </label>
+                {movementForm.kind === 'receive' && (
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={movementForm.unitCost}
+                    onChange={(e) => setMovementForm((f) => ({ ...f, unitCost: e.target.value }))}
+                    placeholder="e.g. 12.50"
+                    aria-label="Unit cost"
+                    className="mb-2 w-full text-sm bg-surface-raised"
+                  />
+                )}
+                <Select
+                  value={movementForm.reason}
+                  onValueChange={(value) => setMovementForm((f) => ({ ...f, reason: value }))}
+                >
+                  <SelectTrigger aria-label="Movement reason" className="w-full text-sm bg-surface-raised">
+                    <SelectValue placeholder="Select a reason..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(movementForm.kind === 'receive' ? RECEIPT_REASONS : ISSUE_REASONS).map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1.5 text-[11px] text-muted">
+                  {movementForm.kind === 'receive'
+                    ? 'The exact acquisition cost per unit. The selling price is never used as cost.'
+                    : 'The reason decides whether cost leaves through cost of goods sold, shrinkage, or a supplier return.'}
+                </p>
+              </div>
+
+              <div className="rounded-input border border-info-border bg-info-light px-3 py-2 text-[11px] text-info">
+                Inventory valuation is configured. This movement will post to the mapped inventory and offset accounts in the ledger.
+              </div>
+            </>
+          )}
 
           <div>
             <label className="block text-xs font-bold text-heading mb-1.5">Quantity</label>

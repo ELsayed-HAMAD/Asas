@@ -32,6 +32,68 @@ export const candidateStageSchema = z.enum(CandidateStageValues)
 
 export type CandidateStage = z.infer<typeof candidateStageSchema>
 
+export const DataMigrationEntityValues = [
+  'HR_EMPLOYEES',
+  'CRM_COMPANIES',
+  'CRM_DEALS',
+  'INVENTORY_PRODUCTS',
+  'INVENTORY_OPENING_STOCK',
+  'INVENTORY_SUPPLIERS',
+  'INVENTORY_PRODUCT_SUPPLIERS',
+  'FINANCE_VENDORS',
+  'FINANCE_CUSTOMERS',
+  'FINANCE_AP_OPEN_ITEMS',
+  'FINANCE_AR_OPEN_ITEMS',
+  'FINANCE_OPENING_BALANCE',
+  'PROJECTS_PROJECTS',
+] as const satisfies readonly string[]
+
+export const dataMigrationEntitySchema = z.enum(DataMigrationEntityValues)
+
+export type DataMigrationEntity = z.infer<typeof dataMigrationEntitySchema>
+
+export const DataMigrationImportStatusValues = [
+  'COMPLETED',
+] as const satisfies readonly string[]
+
+export const dataMigrationImportStatusSchema = z.enum(DataMigrationImportStatusValues)
+
+export type DataMigrationImportStatus = z.infer<typeof dataMigrationImportStatusSchema>
+
+export const DataMigrationModuleValues = [
+  'HR',
+  'CRM',
+  'FINANCE',
+  'INVENTORY',
+  'PROJECTS',
+] as const satisfies readonly string[]
+
+export const dataMigrationModuleSchema = z.enum(DataMigrationModuleValues)
+
+export type DataMigrationModule = z.infer<typeof dataMigrationModuleSchema>
+
+export const DataMigrationProjectStatusValues = [
+  'PLANNING',
+  'IN_PROGRESS',
+  'RECONCILING',
+  'READY_FOR_CUTOVER',
+  'COMPLETED',
+  'PAUSED',
+] as const satisfies readonly string[]
+
+export const dataMigrationProjectStatusSchema = z.enum(DataMigrationProjectStatusValues)
+
+export type DataMigrationProjectStatus = z.infer<typeof dataMigrationProjectStatusSchema>
+
+export const DataMigrationStageStatusValues = [
+  'STAGED',
+  'COMPLETED',
+] as const satisfies readonly string[]
+
+export const dataMigrationStageStatusSchema = z.enum(DataMigrationStageStatusValues)
+
+export type DataMigrationStageStatus = z.infer<typeof dataMigrationStageStatusSchema>
+
 export const DealActivityTypeValues = [
   'CALL',
   'EMAIL',
@@ -123,6 +185,30 @@ export const InterviewStatusValues = [
 export const interviewStatusSchema = z.enum(InterviewStatusValues)
 
 export type InterviewStatus = z.infer<typeof interviewStatusSchema>
+
+export const InventoryCostingMethodValues = [
+  'FIFO',
+  'WEIGHTED_AVERAGE',
+] as const satisfies readonly string[]
+
+export const inventoryCostingMethodSchema = z.enum(InventoryCostingMethodValues)
+
+export type InventoryCostingMethod = z.infer<typeof inventoryCostingMethodSchema>
+
+export const InventoryCostReasonValues = [
+  'PURCHASE_RECEIPT',
+  'OPENING_BALANCE',
+  'SALE',
+  'CONSUMPTION',
+  'DAMAGE',
+  'COUNT_ADJUSTMENT',
+  'CUSTOMER_RETURN',
+  'SUPPLIER_RETURN',
+] as const satisfies readonly string[]
+
+export const inventoryCostReasonSchema = z.enum(InventoryCostReasonValues)
+
+export type InventoryCostReason = z.infer<typeof inventoryCostReasonSchema>
 
 export const IssuePriorityValues = [
   'LOW',
@@ -340,6 +426,11 @@ export type UserRole = z.infer<typeof userRoleSchema>
 export const prismaEnums = {
   AttendanceExceptionType: AttendanceExceptionTypeValues,
   CandidateStage: CandidateStageValues,
+  DataMigrationEntity: DataMigrationEntityValues,
+  DataMigrationImportStatus: DataMigrationImportStatusValues,
+  DataMigrationModule: DataMigrationModuleValues,
+  DataMigrationProjectStatus: DataMigrationProjectStatusValues,
+  DataMigrationStageStatus: DataMigrationStageStatusValues,
   DealActivityType: DealActivityTypeValues,
   DealStage: DealStageValues,
   EmployeeStatus: EmployeeStatusValues,
@@ -348,6 +439,8 @@ export const prismaEnums = {
   ExportJobStatus: ExportJobStatusValues,
   IntegrationStatus: IntegrationStatusValues,
   InterviewStatus: InterviewStatusValues,
+  InventoryCostingMethod: InventoryCostingMethodValues,
+  InventoryCostReason: InventoryCostReasonValues,
   IssuePriority: IssuePriorityValues,
   IssueStatus: IssueStatusValues,
   LeaveRequestStatus: LeaveRequestStatusValues,

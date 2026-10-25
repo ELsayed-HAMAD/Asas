@@ -1,13 +1,17 @@
 import {
   envelope,
   errorResponses,
+  dataMigrationProjectCreateSchema,
+  dataMigrationProjectSchema,
   importEmployeesRequestSchema,
   importEmployeesResponseSchema,
+  importEmployeesValidationResponseSchema,
   onboardingStatusResponseSchema,
   sampleApplyResponseSchema,
   sampleDataClearResponseSchema,
 } from '@asas/contracts'
 import type { ImportEmployeesRequest, OnboardingStatus } from '@asas/contracts'
+import type { DataMigrationModule } from '@prisma/client'
 import type { PrismaClient } from '@prisma/client'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
@@ -32,6 +36,58 @@ import { applyEnterpriseSamplePack, clearSamplePack, importEmployees } from './s
  */
 export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
   const server = app.withTypeProvider<ZodTypeProvider>()
+
+  server.post(
+    '/migration-project',
+    {
+      preHandler: requirePermission('onboarding.write'),
+      schema: {
+        body: dataMigrationProjectCreateSchema,
+        response: { 200: envelope(dataMigrationProjectSchema), ...errorResponses },
+      },
+    },
+    async request => {
+      const { tenantId, userId } = requireAuthContext(request)
+      const input = request.body
+      const project = await request.server.prisma.$transaction(async tx => {
+        const current = await tx.dataMigrationProject.findFirst({
+          where: { tenantId, createdDuringOnboarding: true, status: { in: ['PLANNING', 'IN_PROGRESS'] } },
+          orderBy: { updatedAt: 'desc' },
+        })
+        const data = {
+          name: input.name,
+          sourceSystem: input.sourceSystem ?? null,
+          modules: input.modules as DataMigrationModule[],
+          targetCutoverAt: input.targetCutoverAt ? new Date(input.targetCutoverAt) : null,
+        }
+        const saved = current
+          ? await tx.dataMigrationProject.update({ where: { id: current.id }, data })
+          : await tx.dataMigrationProject.create({ data: { ...data, tenantId, createdBy: userId, createdDuringOnboarding: true } })
+        await recordAuditLog(tx, {
+          tenantId,
+          actorId: userId,
+          action: current ? 'dataMigration.project.update' : 'dataMigration.project.create',
+          targetType: 'DataMigrationProject',
+          targetId: saved.id,
+          metadata: { source: 'onboarding', modules: saved.modules, sourceSystem: saved.sourceSystem },
+        })
+        return saved
+      })
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('settings')])
+      return {
+        data: {
+          id: project.id,
+          name: project.name,
+          sourceSystem: project.sourceSystem,
+          modules: project.modules,
+          status: project.status,
+          targetCutoverAt: project.targetCutoverAt?.toISOString() ?? null,
+          createdAt: project.createdAt.toISOString(),
+          updatedAt: project.updatedAt.toISOString(),
+        },
+      }
+    },
+  )
 
   server.get(
     '/status',
@@ -96,8 +152,24 @@ export async function onboardingRoutes(app: FastifyInstance): Promise<void> {
   )
 
   server.post(
+    '/import/validate',
+    {
+      bodyLimit: 5 * 1024 * 1024,
+      preHandler: requirePermission('onboarding.write'),
+      schema: {
+        body: importEmployeesRequestSchema,
+        response: { 200: envelope(importEmployeesValidationResponseSchema), ...errorResponses },
+      },
+    },
+    async request => ({ data: { validRows: request.body.employees.length } }),
+  )
+
+  server.post(
     '/import',
     {
+      // A 2 MiB CSV can expand when quoted rows are posted as JSON; cap the parsed request
+      // while allowing the documented 500 employee rows to reach contract validation.
+      bodyLimit: 5 * 1024 * 1024,
       preHandler: requirePermission('onboarding.write'),
       schema: {
         body: importEmployeesRequestSchema,

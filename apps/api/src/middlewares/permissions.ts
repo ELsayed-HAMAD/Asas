@@ -94,6 +94,7 @@ export const PERMISSIONS = {
   // notification preferences, and integrations (including storing/clearing a credential) —
   // requires ADMIN, mirroring the other module-write gates.
   'settings.general.update': 'ADMIN',
+  'settings.dataMigration.write': 'ADMIN',
   'settings.notifications.update': 'ADMIN',
   'settings.integration.write': 'ADMIN',
   'settings.billing.write': 'ADMIN',

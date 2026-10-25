@@ -41,6 +41,12 @@ export const inventoryApi = {
 
   listWarehouses: () => http.get('/inventory/warehouses'),
 
+  getValuationSetup: () => http.get('/inventory/valuation/setup'),
+  saveValuationSetup: (body) => http.put('/inventory/valuation/setup', { body }),
+  openInventoryValuation: (body) => http.post('/inventory/valuation/openings', { body }),
+  getValuationReport: () => http.get('/inventory/valuation/report'),
+  listUnvaluedProducts: () => http.get('/inventory/valuation/unvalued-products'),
+
   createProduct: (body) => http.post('/inventory/products', { body }),
   updateProduct: (id, patch) => http.patch(`/inventory/products/${id}`, { body: patch }),
   setProductArchived: (id, archived) => http.patch(`/inventory/products/${id}/archive`, { body: { archived } }),

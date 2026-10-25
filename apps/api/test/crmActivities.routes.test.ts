@@ -21,7 +21,7 @@ async function setup(options: { role?: string; foreignDeal?: boolean; failAudit?
     const staged = { activities: [...state.activities], audits: [...state.audits] }
     const tx = {
       deal: { findFirst: vi.fn(async ({ where }: { where: { id: string; tenantId: string } }) => {
-        expect(where).toEqual({ id: dealId, tenantId: 'tenant_1' })
+        expect(where).toEqual({ id: dealId, tenantId: 'tenant_1', archivedAt: null })
         return options.foreignDeal ? null : { id: dealId }
       }) },
       user: { findUnique: vi.fn().mockResolvedValue({ name: 'Ada Lovelace' }) },

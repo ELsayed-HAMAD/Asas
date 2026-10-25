@@ -9,6 +9,12 @@
  */
 import type { PrismaClient } from '@prisma/client'
 import type {
+  InventoryOpeningValuationResult,
+  InventoryOpeningValuationWriteInput,
+  InventoryUnvaluedProduct,
+  InventoryValuationReport,
+  InventoryValuationSetup,
+  InventoryValuationSetupWriteInput,
   Product,
   ProductListQuery,
   ProductArchiveInput,
@@ -26,6 +32,7 @@ import type {
   Warehouse,
 } from '@asas/contracts'
 import * as service from './inventory.service.js'
+import * as valuation from './inventoryValuation.service.js'
 
 export type { ProductListResult, StockMovementListResult } from './inventory.service.js'
 
@@ -133,4 +140,36 @@ export function recordStockMovement(
   actorId: string,
 ): Promise<StockMovementRecorded> {
   return service.recordStockMovement(prisma, tenantId, input, actorId)
+}
+
+// ── Valuation ───────────────────────────────────────────────────────────────────
+
+export function getValuationSetup(prisma: PrismaClient, tenantId: string): Promise<InventoryValuationSetup> {
+  return valuation.getValuationSetup(prisma, tenantId)
+}
+
+export function saveValuationSetup(
+  prisma: PrismaClient,
+  tenantId: string,
+  input: InventoryValuationSetupWriteInput,
+  actorId: string,
+): Promise<InventoryValuationSetup> {
+  return valuation.saveValuationSetup(prisma, tenantId, input, actorId)
+}
+
+export function openInventoryValuation(
+  prisma: PrismaClient,
+  tenantId: string,
+  input: InventoryOpeningValuationWriteInput,
+  actorId: string,
+): Promise<InventoryOpeningValuationResult> {
+  return valuation.postInventoryOpeningValuation(prisma, tenantId, input, actorId)
+}
+
+export function getValuationReport(prisma: PrismaClient, tenantId: string): Promise<InventoryValuationReport> {
+  return valuation.getInventoryValuationReport(prisma, tenantId)
+}
+
+export function listUnvaluedProducts(prisma: PrismaClient, tenantId: string): Promise<InventoryUnvaluedProduct[]> {
+  return valuation.listUnvaluedProducts(prisma, tenantId)
 }

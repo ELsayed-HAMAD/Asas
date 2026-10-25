@@ -117,25 +117,33 @@ function StageSwitcherCard({ stage, group, isActive, onSelect }) {
       aria-label={cardDescription}
       title={cardDescription}
       onClick={() => onSelect(stage)}
-      className={`rounded-xl sm:rounded-2xl p-4 sm:p-5 min-w-[170px] min-[1100px]:min-w-0 text-start cursor-pointer transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+      className={`group rounded-2xl p-3.5 sm:p-4 min-w-[160px] min-[1100px]:min-w-0 text-start cursor-pointer transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 flex flex-col justify-between ${
         isActive
-          ? 'bg-surface-raised border border-primary shadow-[0_0_0_1px_var(--color-primary)]'
-          : 'bg-surface-raised border border-border-default hover:border-border-strong'
+          ? 'bg-surface-raised border border-border-strong ring-2 ring-primary/20 shadow-[0_4px_16px_-4px_rgba(15,23,42,0.08),inset_0_1px_0_0_rgba(255,255,255,0.8)] -translate-y-0.5'
+          : 'bg-surface-raised/90 backdrop-blur-md border border-border-default hover:bg-surface-raised hover:border-border-strong hover:shadow-[0_2px_8px_-2px_rgba(15,23,42,0.06)]'
       } ${isOver ? 'ring-2 ring-accent bg-accent-light/30' : ''}`}
     >
-      <div className="flex items-center justify-between gap-2.5 min-w-0">
+      <div className="flex items-center justify-between gap-2 min-w-0">
         <div className="flex items-center gap-2 min-w-0">
-          <span className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shrink-0 ${getStageDotColor(stage)}`} aria-hidden="true" />
-          <span className="text-xs sm:text-sm font-semibold text-muted whitespace-nowrap">
+          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${getStageDotColor(stage)}`} aria-hidden="true" />
+          <span className="text-xs sm:text-[13px] font-semibold text-heading truncate">
             {STAGE_LABELS[stage]}
           </span>
         </div>
-        <span className="text-xs sm:text-[13px] text-muted font-medium shrink-0 whitespace-nowrap ms-auto ps-1.5">
+        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-muted text-muted border border-border-default/60 shrink-0 whitespace-nowrap">
           {countLabel}
         </span>
       </div>
-      <div className="mt-2.5 text-2xl sm:text-[25px] font-bold tracking-tight text-heading tabular-nums leading-tight whitespace-nowrap">
-        {formatCompactMoney(totalValue || 0)}
+      <div className="mt-2.5 flex items-baseline justify-between gap-1.5 min-w-0">
+        <span
+          title={exactMoney}
+          className="text-xl sm:text-[22px] font-bold tracking-tight text-heading tabular-nums leading-tight truncate cursor-help"
+        >
+          {formatCompactMoney(totalValue || 0)}
+        </span>
+      </div>
+      <div className="mt-2.5 h-1 w-full rounded-full bg-surface-muted overflow-hidden">
+        <div className={`h-full rounded-full ${getStageDotColor(stage)} opacity-80`} style={{ width: '100%' }} />
       </div>
     </button>
   );
@@ -157,39 +165,39 @@ function ListDealRow({ deal, selected, onSelect, disabled }) {
       }}
       style={{
         transform: CSS.Translate.toString(transform),
-        gridTemplateColumns: 'minmax(240px, 1fr) 120px 130px',
-        paddingInline: '20px',
+        gridTemplateColumns: 'minmax(220px, 1fr) 115px 125px',
+        paddingInline: '16px',
       }}
       {...listeners}
       {...attributes}
       onClick={() => onSelect(deal.id)}
-      className={`relative grid items-center gap-x-3 h-14 min-h-[56px] cursor-pointer transition-colors border-b border-border-subtle focus:outline-none focus:ring-2 focus:ring-inset focus:ring-accent ${
-        selected ? 'bg-surface-muted' : 'bg-surface-raised hover:bg-surface-muted/60'
+      className={`relative grid items-center gap-x-3 h-11 min-h-[44px] cursor-pointer transition-colors border-b border-border-subtle focus:outline-none focus:ring-2 focus:ring-inset focus:ring-accent ${
+        selected ? 'bg-surface-muted/90' : 'bg-surface-raised hover:bg-surface-muted/50'
       } ${isDragging || disabled ? 'opacity-60' : ''}`}
     >
       {selected && (
-        <div className="absolute inset-y-0 inset-inline-start-0 w-[3px] bg-accent pointer-events-none" />
+        <div className="absolute inset-y-0 inset-inline-start-0 w-[3px] bg-accent pointer-events-none rounded-r-full" />
       )}
-      <div className="flex items-center gap-3 min-w-0 overflow-hidden">
-        <div className="w-8 h-8 rounded shrink-0 flex items-center justify-center text-xs font-bold bg-surface-strong text-body">
+      <div className="flex items-center gap-2.5 min-w-0 overflow-hidden">
+        <div className="w-7 h-7 rounded-lg shrink-0 flex items-center justify-center text-[11px] font-bold bg-surface-strong text-body border border-border-default/50 shadow-xs">
           {initials(deal)}
         </div>
         <div className="min-w-0 flex-1 overflow-hidden">
-          <p className="text-sm font-bold text-heading truncate leading-tight whitespace-nowrap" title={deal.name}>
+          <p className="text-xs sm:text-[13px] font-bold text-heading truncate leading-snug whitespace-nowrap" title={deal.name}>
             {deal.name}
           </p>
-          <p className="text-xs text-muted truncate mt-0.5 leading-tight whitespace-nowrap" title={deal.company || (deal.owner?.name || 'No company')}>
+          <p className="text-[11px] text-muted truncate leading-tight whitespace-nowrap" title={deal.company || (deal.owner?.name || 'No company')}>
             {deal.company || (deal.owner?.name || 'No company')}
           </p>
         </div>
       </div>
       <div className="flex items-center min-w-0">
-        <Badge variant="outline" className={`h-[22px] min-h-[22px] px-2.5 text-xs font-bold rounded-full whitespace-nowrap ${getStageBadgeColors(deal.stage)}`}>
+        <Badge variant="outline" className={`h-5 min-h-[20px] px-2 text-[10px] font-bold rounded-full whitespace-nowrap ${getStageBadgeColors(deal.stage)}`}>
           {STAGE_LABELS[deal.stage] || deal.stage}
         </Badge>
       </div>
       <div className="text-end">
-        <span className="text-sm font-extrabold text-heading tabular-nums whitespace-nowrap">
+        <span className="text-xs sm:text-[13px] font-bold text-heading tabular-nums whitespace-nowrap">
           {formatMoney(deal.value)}
         </span>
       </div>
@@ -782,44 +790,53 @@ export default function DealsPipeline() {
             ))}
           </div>
 
-          {/* 2) TWO-COLUMN AREA (grid: 1fr 380px, align-items: start, gap 16) */}
-          <div className="grid grid-cols-1 min-[1100px]:grid-cols-[1fr_380px] items-start gap-4 min-w-0">
-            {/* Left Column: Controls + Table Card */}
-            <div className="flex flex-col gap-3 min-w-0">
-              {/* Table Controls (Expanded Search & New Deal Button) */}
-              <div className="flex items-center gap-3 shrink-0">
-                <SearchInput
-                  value={search}
-                  onChange={event => { setSearch(event.target.value); setPageByStage(Object.fromEntries(STAGE_ORDER.map(stage => [stage, 1]))); }}
-                  placeholder="Search..."
-                  wrapperClassName="flex-1 min-w-0"
-                />
+          {/* 3) TOOLBAR CARD */}
+          <div className="bg-surface-raised/90 backdrop-blur-md border border-border-default rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-xs flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="flex items-center gap-3 flex-1 min-w-[240px]">
+              <SearchInput
+                value={search}
+                onChange={event => { setSearch(event.target.value); setPageByStage(Object.fromEntries(STAGE_ORDER.map(stage => [stage, 1]))); }}
+                placeholder="Search..."
+                wrapperClassName="flex-1 min-w-0 max-w-md"
+              />
+            </div>
 
-                <Button type="button" variant={showArchived ? 'default' : 'outline'} onClick={() => { setShowArchived(value => !value); setSelectedId(null); setPageByStage(Object.fromEntries(STAGE_ORDER.map(stage => [stage, 1]))); }} className="h-9 shrink-0">
-                  {showArchived ? 'Archived deals' : 'View archived'}
-                </Button>
+            <div className="flex items-center gap-2.5 shrink-0">
+              <Button
+                type="button"
+                variant={showArchived ? 'default' : 'outline'}
+                onClick={() => { setShowArchived(value => !value); setSelectedId(null); setPageByStage(Object.fromEntries(STAGE_ORDER.map(stage => [stage, 1]))); }}
+                className="h-9 px-3.5 text-xs sm:text-sm font-medium rounded-xl shrink-0"
+              >
+                {showArchived ? 'Archived deals' : 'View archived'}
+              </Button>
 
-                {!showArchived && <Button
+              {!showArchived && (
+                <Button
                   type="button"
                   disabled={!canWrite}
                   onClick={openNewDealDialog}
                   title={!canWrite ? 'Requires the ADMIN role' : undefined}
-                  className="h-9 px-5 text-sm font-semibold rounded-xl shrink-0"
+                  className="h-9 px-4 sm:px-5 text-xs sm:text-sm font-semibold rounded-xl shrink-0 shadow-xs"
                 >
                   New Deal
-                </Button>}
-              </div>
+                </Button>
+              )}
+            </div>
+          </div>
 
-              {/* 5) LIST PANE CARD */}
-              <div
-                data-testid="deals-list-card"
-                className="rounded-[12px] border border-border-default bg-surface-raised flex flex-col min-w-0 overflow-hidden"
-              >
+          {/* 4) TWO-COLUMN AREA (grid: 1fr 380px, align-items: start, gap 16) */}
+          <div className="grid grid-cols-1 min-[1100px]:grid-cols-[1fr_380px] items-start gap-4 min-w-0">
+            {/* Left Column: LIST PANE CARD */}
+            <div
+              data-testid="deals-list-card"
+              className="rounded-2xl border border-border-default bg-surface-raised/90 backdrop-blur-md flex flex-col min-w-0 overflow-hidden shadow-xs"
+            >
               {/* Column Header (outside scroll area, fixed height) */}
               <div
-                className="grid items-center border-b border-border-default bg-surface-muted/90 backdrop-blur-xs text-[11px] font-semibold uppercase text-muted tracking-[0.06em] shrink-0 h-10 min-h-[40px] px-5 gap-x-3"
+                className="grid items-center border-b border-border-default bg-surface-muted/90 backdrop-blur-xs text-[10px] font-semibold uppercase text-muted tracking-[0.06em] shrink-0 h-9 min-h-[36px] px-4 gap-x-3"
                 style={{
-                  gridTemplateColumns: 'minmax(240px, 1fr) 120px 130px',
+                  gridTemplateColumns: 'minmax(220px, 1fr) 115px 125px',
                 }}
               >
                 <div className="text-start">DEAL NAME</div>
@@ -829,9 +846,9 @@ export default function DealsPipeline() {
 
               {/* Group header bar */}
               <div
-                className="grid items-center bg-surface-muted/90 backdrop-blur-xs border-b border-border-default h-9 min-h-[36px] px-5 gap-x-3 text-[11px] font-semibold text-muted uppercase tracking-[0.06em] shrink-0"
+                className="grid items-center bg-surface-muted/60 backdrop-blur-xs border-b border-border-default h-9 min-h-[36px] px-4 gap-x-3 text-[11px] font-semibold text-muted uppercase tracking-[0.06em] shrink-0"
                 style={{
-                  gridTemplateColumns: 'minmax(240px, 1fr) 120px 130px',
+                  gridTemplateColumns: 'minmax(220px, 1fr) 115px 125px',
                 }}
               >
                 <div className="col-span-2 flex items-center gap-2 min-w-0">
@@ -841,7 +858,7 @@ export default function DealsPipeline() {
                   </span>
                 </div>
                 <div className="text-end">
-                  <span className="text-[13px] font-semibold text-body tabular-nums whitespace-nowrap">
+                  <span className="text-xs sm:text-[13px] font-semibold text-heading tabular-nums whitespace-nowrap">
                     {formatMoney(activeTotalValue || 0)}
                   </span>
                 </div>
@@ -869,7 +886,7 @@ export default function DealsPipeline() {
               </div>
 
               {/* Pagination footer: pinned at bottom of card */}
-              <div className="flex items-center justify-between border-t border-border-subtle bg-surface-raised min-h-[36px] h-9 px-5 text-xs text-muted shrink-0">
+              <div className="flex items-center justify-between border-t border-border-subtle bg-surface-raised min-h-[36px] h-9 px-4 text-xs text-muted shrink-0">
                 <span>Showing {activeFirst}–{activeLast} of {activeTotal}</span>
                 <div className="flex items-center gap-2">
                   <Button
@@ -896,13 +913,12 @@ export default function DealsPipeline() {
                 </div>
               </div>
             </div>
-          </div>
 
-            {/* 6) DETAIL PANEL: natural content height, sticky on >= 1100px */}
+            {/* Right Column: 5) DETAIL PANEL: natural content height, sticky on >= 1100px */}
             <aside
               role="complementary"
               aria-label="Deal details"
-              className="w-full min-[1100px]:w-[380px] min-[1100px]:shrink-0 min-[1100px]:sticky min-[1100px]:top-4 self-start bg-white/80 backdrop-blur-xl border border-slate-200/70 rounded-2xl p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05)] flex flex-col space-y-3.5"
+              className="w-full min-[1100px]:w-[380px] min-[1100px]:shrink-0 min-[1100px]:sticky min-[1100px]:top-4 self-start bg-surface-raised/90 backdrop-blur-md border border-border-default rounded-2xl p-5 shadow-xs flex flex-col space-y-3.5"
             >
               <DetailPanel
                 deal={selectedDeal}

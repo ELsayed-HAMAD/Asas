@@ -49,6 +49,7 @@ const SalesPerformance = lazy(() => import('./pages/dashboard/crm/SalesPerforman
 const RevenueForecast = lazy(() => import('./pages/dashboard/crm/RevenueForecast'))
 const ProductCatalog = lazy(() => import('./pages/dashboard/inventory/ProductCatalog'))
 const StockMovements = lazy(() => import('./pages/dashboard/inventory/StockMovements'))
+const InventoryValuation = lazy(() => import('./pages/dashboard/inventory/InventoryValuation'))
 const PortfolioOverview = lazy(() => import('./pages/dashboard/projects/PortfolioOverview'))
 const ActiveSprints = lazy(() => import('./pages/dashboard/projects/ActiveSprints'))
 const Roadmap = lazy(() => import('./pages/dashboard/projects/Roadmap'))
@@ -58,6 +59,7 @@ const BillingPlans = lazy(() => import('./pages/dashboard/settings/BillingPlans'
 const Integrations = lazy(() => import('./pages/dashboard/settings/Integrations'))
 const Notifications = lazy(() => import('./pages/dashboard/settings/Notifications'))
 const DataExport = lazy(() => import('./pages/dashboard/settings/DataExport'))
+const DataMigration = lazy(() => import('./pages/dashboard/settings/DataMigration'))
 const HelpCenter = lazy(() => import('./pages/dashboard/support/HelpCenter'))
 
 // ── 404 ────────────────────────────────────────────────────
@@ -78,9 +80,9 @@ const DASHBOARD_PATHS = [
   '/dashboard/hr/employees', '/dashboard/hr/payroll', '/dashboard/hr/time-attendance', '/dashboard/hr/time-off', '/dashboard/hr/recruitment',
   '/dashboard/finance', '/dashboard/finance/accounts-payable', '/dashboard/finance/accounts-receivable', '/dashboard/finance/expenses', '/dashboard/finance/trial-balance', '/dashboard/finance/reconciliation',
   '/dashboard/crm', '/dashboard/crm/deals', '/dashboard/crm/sales-performance', '/dashboard/crm/revenue-forecast',
-  '/dashboard/inventory', '/dashboard/inventory/movements',
+  '/dashboard/inventory', '/dashboard/inventory/movements', '/dashboard/inventory/valuation',
   '/dashboard/projects', '/dashboard/projects/sprints', '/dashboard/projects/roadmap',
-  '/dashboard/settings', '/dashboard/settings/members', '/dashboard/settings/billing', '/dashboard/settings/integrations', '/dashboard/settings/notifications', '/dashboard/settings/data-export', '/dashboard/exports',
+  '/dashboard/settings', '/dashboard/settings/members', '/dashboard/settings/billing', '/dashboard/settings/integrations', '/dashboard/settings/notifications', '/dashboard/settings/data-export', '/dashboard/settings/data-migration', '/dashboard/exports',
   '/dashboard/support',
 ]
 
@@ -104,6 +106,7 @@ const REAL_PAGES = {
   '/dashboard/crm/revenue-forecast': RevenueForecast,
   '/dashboard/inventory': ProductCatalog,
   '/dashboard/inventory/movements': StockMovements,
+  '/dashboard/inventory/valuation': InventoryValuation,
   '/dashboard/projects': PortfolioOverview,
   '/dashboard/projects/sprints': ActiveSprints,
   '/dashboard/projects/roadmap': Roadmap,
@@ -113,6 +116,7 @@ const REAL_PAGES = {
   '/dashboard/settings/integrations': Integrations,
   '/dashboard/settings/notifications': Notifications,
   '/dashboard/settings/data-export': DataExport,
+  '/dashboard/settings/data-migration': DataMigration,
   '/dashboard/exports': DataExport,
   '/dashboard/support': HelpCenter,
 }

@@ -16,6 +16,7 @@ const accounts = {
   REIMBURSEMENT_CLEARING: { name: 'Unclassified reimbursements', kind: 'LIABILITY' },
   FX_GAIN: { name: 'Realized foreign exchange gain', kind: 'INCOME' },
   FX_LOSS: { name: 'Realized foreign exchange loss', kind: 'EXPENSE' },
+  MIGRATION_OPENING_EQUITY: { name: 'Migration opening equity clearing', kind: 'EQUITY' },
 } as const
 
 interface LedgerCacheEntry<T> {
@@ -109,8 +110,8 @@ export async function recordCashSettlement(tx: Prisma.TransactionClient, input: 
     const payable = input.sourceType === 'AP_PAYMENT'
     const recognition = await tx.journalEntry.findFirst({
       where: payable
-        ? { tenantId: input.tenantId, recognizesPayableInvoiceId: input.sourceId, sourceType: 'AP_RECOGNITION', reversedBy: { is: null } }
-        : { tenantId: input.tenantId, recognizesReceivableInvoiceId: input.sourceId, sourceType: 'AR_RECOGNITION', reversedBy: { is: null } },
+        ? { tenantId: input.tenantId, recognizesPayableInvoiceId: input.sourceId, sourceType: { in: ['AP_RECOGNITION', 'MIGRATION_AP_OPENING'] }, reversedBy: { is: null } }
+        : { tenantId: input.tenantId, recognizesReceivableInvoiceId: input.sourceId, sourceType: { in: ['AR_RECOGNITION', 'MIGRATION_AR_OPENING'] }, reversedBy: { is: null } },
       select: { amount: true, currency: true, baseAmount: true },
     })
     if (!recognition?.baseAmount || !recognition.amount.eq(decimal) || recognition.currency !== currency) {
@@ -149,6 +150,192 @@ export async function recordCashSettlement(tx: Prisma.TransactionClient, input: 
   return entry.id
 }
 
+/**
+ * Post a balanced inventory valuation journal. Both sides carry the same exact document amount;
+ * the caller resolves the accounts and their roles, so this helper cannot invent an account or
+ * derive cost from a product's selling price. Base-currency values use the tenant's effective
+ * FX quote for the posting date and the same conversion path as every other ledger entry.
+ */
+export async function recordInventoryJournal(tx: Prisma.TransactionClient, input: {
+  tenantId: string
+  currency: string
+  workspaceCurrency: string
+  amount: string
+  postedAt: Date
+  actorId: string | null
+  description: string
+  sourceType: 'INVENTORY_RECEIPT' | 'INVENTORY_ISSUE'
+  lines: Array<{ accountId: string; side: 'DEBIT' | 'CREDIT' }>
+}): Promise<string> {
+  let amount: Money
+  try { amount = Money.fromDecimal(input.amount, input.currency) } catch {
+    throw new AppError(409, 'The inventory cost is not exact in its currency; reconcile its precision before posting')
+  }
+  if (!amount.isPositive()) throw new AppError(400, 'An inventory valuation journal must have a positive amount')
+  if (input.lines.length !== 2) throw new AppError(400, 'An inventory valuation journal requires exactly two accounts')
+  if (input.lines[0]!.side === input.lines[1]!.side) throw new AppError(400, 'Inventory journal sides must balance')
+  if (new Set(input.lines.map(line => line.accountId)).size !== 2) {
+    throw new AppError(400, 'Inventory journal accounts must be distinct; verify the valuation account mapping')
+  }
+
+  const fx = await resolveFxRate(tx, input.tenantId, input.currency, input.workspaceCurrency, input.postedAt)
+  const basis = baseJournalFields(amount.toDecimalString(), input.currency, input.workspaceCurrency, fx.rate, fx.exchangeRateId)
+  const decimal = amount.toDecimalString()
+  const entry = await tx.journalEntry.create({ data: {
+    tenantId: input.tenantId, currency: input.currency, amount: decimal, sourceType: input.sourceType,
+    ...basis, currencyProvenance: 'DOCUMENT', description: input.description,
+    actorId: input.actorId, postedAt: input.postedAt,
+  } })
+  await tx.journalLine.createMany({ data: input.lines.map(line => ({
+    tenantId: input.tenantId, entryId: entry.id, accountId: line.accountId,
+    side: line.side, amount: decimal, baseAmount: basis.baseAmount,
+  })) })
+  invalidateLedgerCache(input.tenantId)
+  return entry.id
+}
+
+/**
+ * Reverse an inventory issue by flipping its exact journal lines. Account mappings and FX rates
+ * may have changed since the issue; re-resolving either would produce a reversal that does not
+ * cancel the original. The reversal keeps its own reason and links back to the original entry.
+ */
+export async function reverseInventoryIssueJournal(tx: Prisma.TransactionClient, input: {
+  tenantId: string
+  journalEntryId: string
+  postedAt: Date
+  actorId: string | null
+  reason: string
+}): Promise<string> {
+  const original = await tx.journalEntry.findFirst({
+    where: {
+      id: input.journalEntryId,
+      tenantId: input.tenantId,
+      sourceType: 'INVENTORY_ISSUE',
+      reversedBy: { is: null },
+    },
+    include: { lines: true },
+  })
+  if (!original) {
+    throw new AppError(409, 'The original inventory issue journal is missing or has already been reversed')
+  }
+  if (original.lines.length < 2) {
+    throw new AppError(409, 'The original inventory issue journal is incomplete and cannot be reversed')
+  }
+
+  let debits = new Prisma.Decimal(0)
+  let credits = new Prisma.Decimal(0)
+  for (const line of original.lines) {
+    if (line.side !== 'DEBIT' && line.side !== 'CREDIT') {
+      throw new AppError(409, 'The original inventory issue journal has an invalid side and cannot be reversed')
+    }
+    if (line.side === 'DEBIT') debits = debits.plus(line.amount)
+    else credits = credits.plus(line.amount)
+  }
+  if (!debits.eq(credits)) {
+    throw new AppError(409, 'The original inventory issue journal is unbalanced and cannot be reversed')
+  }
+
+  const reason = input.reason.trim()
+  if (!reason) throw new AppError(400, 'A reversal reason is required')
+
+  const reversal = await tx.journalEntry.create({ data: {
+    tenantId: input.tenantId,
+    currency: original.currency,
+    amount: original.amount,
+    baseCurrency: original.baseCurrency,
+    baseAmount: original.baseAmount,
+    baseMinorUnitDigits: original.baseMinorUnitDigits,
+    fxRate: original.fxRate,
+    exchangeRateId: original.exchangeRateId,
+    sourceType: 'INVENTORY_REVERSAL',
+    reversesJournalEntryId: original.id,
+    reversalReason: reason,
+    currencyProvenance: original.currencyProvenance,
+    description: `Reversal of ${original.description}`,
+    actorId: input.actorId,
+    postedAt: input.postedAt,
+  } })
+  await tx.journalLine.createMany({ data: original.lines.map(line => ({
+    tenantId: input.tenantId,
+    entryId: reversal.id,
+    accountId: line.accountId,
+    side: line.side === 'DEBIT' ? 'CREDIT' : 'DEBIT',
+    amount: line.amount,
+    baseAmount: line.baseAmount,
+  })) })
+  invalidateLedgerCache(input.tenantId)
+  return reversal.id
+}
+
+/** Convert an open-item balance using the tenant's FX quote effective on its cutover date. */
+export async function migrationInvoiceBaseAmount(tx: Prisma.TransactionClient, input: {
+  tenantId: string; amount: string; currency: string; workspaceCurrency: string; asOf: Date;
+}): Promise<string> {
+  let amount: Money
+  try { amount = Money.fromDecimal(input.amount, input.currency) } catch {
+    throw new AppError(409, 'The open invoice amount is not exact in its currency; reconcile its precision before cutover')
+  }
+  if (!amount.isPositive()) throw new AppError(400, 'An open invoice balance must be positive')
+  const fx = await resolveFxRate(tx, input.tenantId, input.currency, input.workspaceCurrency, input.asOf)
+  return convertToBase(amount.toDecimalString(), input.currency, input.workspaceCurrency, fx.rate).toDecimalString()
+}
+
+/**
+ * Recognize an imported AR/AP open balance against migration equity at cutover. Source revenue
+ * and expense are historical and must not be fabricated in the new ledger. The invoice FK lets
+ * ordinary settlement, reversal, and reconciliation paths continue to operate on the document.
+ */
+export async function recordMigrationInvoiceOpeningRecognition(tx: Prisma.TransactionClient, input: {
+  tenantId: string; sourceId: string; kind: 'AP' | 'AR'; amount: string; currency: string;
+  workspaceCurrency: string; postedAt: Date; actorId: string; description: string;
+}): Promise<{ journalId: string; baseAmount: string }> {
+  let amount: Money
+  try { amount = Money.fromDecimal(input.amount, input.currency) } catch {
+    throw new AppError(409, 'The open invoice amount is not exact in its currency; reconcile its precision before cutover')
+  }
+  if (!amount.isPositive()) throw new AppError(400, 'An open invoice balance must be positive')
+  const payable = input.kind === 'AP'
+  const sourceType = payable ? 'MIGRATION_AP_OPENING' : 'MIGRATION_AR_OPENING'
+  const recognitionTypes = payable ? ['AP_RECOGNITION', 'MIGRATION_AP_OPENING'] : ['AR_RECOGNITION', 'MIGRATION_AR_OPENING']
+  const existing = await tx.journalEntry.findFirst({
+    where: {
+      tenantId: input.tenantId,
+      ...(payable ? { recognizesPayableInvoiceId: input.sourceId } : { recognizesReceivableInvoiceId: input.sourceId }),
+      sourceType: { in: recognitionTypes }, reversedBy: { is: null },
+    },
+    select: { id: true, amount: true, currency: true, baseAmount: true, sourceType: true },
+  })
+  if (existing) {
+    if (existing.sourceType === sourceType && existing.amount.eq(amount.toDecimalString()) && existing.currency === input.currency && existing.baseAmount != null) {
+      return { journalId: existing.id, baseAmount: existing.baseAmount.toString() }
+    }
+    throw new AppError(409, 'This invoice already has a different active ledger recognition; reconcile it before migration cutover')
+  }
+
+  const fx = await resolveFxRate(tx, input.tenantId, input.currency, input.workspaceCurrency, input.postedAt)
+  const basis = baseJournalFields(amount.toDecimalString(), input.currency, input.workspaceCurrency, fx.rate, fx.exchangeRateId)
+  const [control, equity] = await Promise.all([
+    upsertAccount(tx, input.tenantId, input.currency, payable ? 'ACCOUNTS_PAYABLE' : 'ACCOUNTS_RECEIVABLE'),
+    upsertAccount(tx, input.tenantId, input.currency, 'MIGRATION_OPENING_EQUITY'),
+  ])
+  const decimal = amount.toDecimalString()
+  const entry = await tx.journalEntry.create({ data: {
+    tenantId: input.tenantId, currency: input.currency, amount: decimal, sourceType, ...basis,
+    recognizesPayableInvoiceId: payable ? input.sourceId : null,
+    recognizesReceivableInvoiceId: payable ? null : input.sourceId,
+    currencyProvenance: 'DOCUMENT', description: input.description, actorId: input.actorId, postedAt: input.postedAt,
+  } })
+  await tx.journalLine.createMany({ data: payable ? [
+    { tenantId: input.tenantId, entryId: entry.id, accountId: equity.id, side: 'DEBIT', amount: decimal, baseAmount: basis.baseAmount },
+    { tenantId: input.tenantId, entryId: entry.id, accountId: control.id, side: 'CREDIT', amount: decimal, baseAmount: basis.baseAmount },
+  ] : [
+    { tenantId: input.tenantId, entryId: entry.id, accountId: control.id, side: 'DEBIT', amount: decimal, baseAmount: basis.baseAmount },
+    { tenantId: input.tenantId, entryId: entry.id, accountId: equity.id, side: 'CREDIT', amount: decimal, baseAmount: basis.baseAmount },
+  ] })
+  invalidateLedgerCache(input.tenantId)
+  return { journalId: entry.id, baseAmount: basis.baseAmount }
+}
+
 /** AP invoices are recognized at approval; issued AR invoices are recognized at creation. */
 export async function recordInvoiceRecognition(tx: Prisma.TransactionClient, input: {
   tenantId: string; sourceId: string; sourceType: 'AP_RECOGNITION' | 'AR_RECOGNITION';
@@ -161,11 +348,12 @@ export async function recordInvoiceRecognition(tx: Prisma.TransactionClient, inp
   if (!amount.isPositive()) throw new AppError(400, 'An invoice recognition amount must be positive')
   const recognizedPayable = input.sourceType === 'AP_RECOGNITION'
   const where = {
-    tenantId: input.tenantId, sourceType: input.sourceType,
+    tenantId: input.tenantId,
+    sourceType: { in: recognizedPayable ? ['AP_RECOGNITION', 'MIGRATION_AP_OPENING'] : ['AR_RECOGNITION', 'MIGRATION_AR_OPENING'] },
     ...(recognizedPayable ? { recognizesPayableInvoiceId: input.sourceId } : { recognizesReceivableInvoiceId: input.sourceId }),
     reversedBy: { is: null },
   }
-  const existing = await tx.journalEntry.findFirst({ where, select: { id: true, amount: true, currency: true, baseAmount: true } })
+  const existing = await tx.journalEntry.findFirst({ where, select: { id: true, amount: true, currency: true, baseAmount: true, sourceType: true } })
   if (existing) {
     if (existing.amount.eq(amount.toDecimalString()) && existing.currency === input.currency && existing.baseAmount != null) return existing.id
     await reverseCashSettlement(tx, {
@@ -284,7 +472,7 @@ export async function recordExpenseRecognition(tx: Prisma.TransactionClient, inp
 }
 
 export async function reverseCashSettlement(tx: Prisma.TransactionClient, input: {
-  tenantId: string; sourceId: string; sourceType: 'AP_PAYMENT' | 'AR_COLLECTION' | 'PAYROLL_PAYMENT' | 'EXPENSE_REIMBURSEMENT' | 'AP_RECOGNITION' | 'AR_RECOGNITION' | 'PAYROLL_RECOGNITION' | 'EXPENSE_RECOGNITION';
+  tenantId: string; sourceId: string; sourceType: 'AP_PAYMENT' | 'AR_COLLECTION' | 'PAYROLL_PAYMENT' | 'EXPENSE_REIMBURSEMENT' | 'AP_RECOGNITION' | 'AR_RECOGNITION' | 'MIGRATION_AP_OPENING' | 'MIGRATION_AR_OPENING' | 'PAYROLL_RECOGNITION' | 'EXPENSE_RECOGNITION';
   reason: string; actorId: string | null; postedAt: Date;
 }): Promise<string> {
   const original = await tx.journalEntry.findFirst({
@@ -296,10 +484,10 @@ export async function reverseCashSettlement(tx: Prisma.TransactionClient, input:
           ? { tenantId: input.tenantId, payrollRunId: input.sourceId, sourceType: input.sourceType }
           : input.sourceType === 'EXPENSE_REIMBURSEMENT'
             ? { tenantId: input.tenantId, expenseId: input.sourceId, sourceType: input.sourceType }
-            : input.sourceType === 'AP_RECOGNITION'
-              ? { tenantId: input.tenantId, recognizesPayableInvoiceId: input.sourceId, sourceType: input.sourceType, reversedBy: { is: null } }
-              : input.sourceType === 'AR_RECOGNITION'
-                ? { tenantId: input.tenantId, recognizesReceivableInvoiceId: input.sourceId, sourceType: input.sourceType, reversedBy: { is: null } }
+            : input.sourceType === 'AP_RECOGNITION' || input.sourceType === 'MIGRATION_AP_OPENING'
+              ? { tenantId: input.tenantId, recognizesPayableInvoiceId: input.sourceId, sourceType: { in: ['AP_RECOGNITION', 'MIGRATION_AP_OPENING'] }, reversedBy: { is: null } }
+              : input.sourceType === 'AR_RECOGNITION' || input.sourceType === 'MIGRATION_AR_OPENING'
+                ? { tenantId: input.tenantId, recognizesReceivableInvoiceId: input.sourceId, sourceType: { in: ['AR_RECOGNITION', 'MIGRATION_AR_OPENING'] }, reversedBy: { is: null } }
                 : input.sourceType === 'PAYROLL_RECOGNITION'
                   ? { tenantId: input.tenantId, recognizesPayrollRunId: input.sourceId, sourceType: input.sourceType, reversedBy: { is: null } }
                   : { tenantId: input.tenantId, recognizesExpenseId: input.sourceId, sourceType: input.sourceType, reversedBy: { is: null } },
@@ -331,8 +519,8 @@ export async function reverseInvoiceRecognitionIfPresent(tx: Prisma.TransactionC
 }): Promise<string | null> {
   const original = await tx.journalEntry.findFirst({
     where: input.sourceType === 'AP_RECOGNITION'
-      ? { tenantId: input.tenantId, recognizesPayableInvoiceId: input.sourceId, sourceType: input.sourceType, reversedBy: { is: null } }
-      : { tenantId: input.tenantId, recognizesReceivableInvoiceId: input.sourceId, sourceType: input.sourceType, reversedBy: { is: null } },
+      ? { tenantId: input.tenantId, recognizesPayableInvoiceId: input.sourceId, sourceType: { in: ['AP_RECOGNITION', 'MIGRATION_AP_OPENING'] }, reversedBy: { is: null } }
+      : { tenantId: input.tenantId, recognizesReceivableInvoiceId: input.sourceId, sourceType: { in: ['AR_RECOGNITION', 'MIGRATION_AR_OPENING'] }, reversedBy: { is: null } },
     select: { id: true },
   })
   if (!original) return null
@@ -503,7 +691,7 @@ export async function trialBalance(prisma: LedgerClient, tenantId: string, asOf:
     asOf, baseCurrency,
     rows: rows.map(row => ({
       accountId: row.accountId, accountCode: row.accountCode, accountName: row.accountName,
-      accountKind: row.accountKind as 'ASSET' | 'LIABILITY' | 'EXPENSE' | 'INCOME', currency: row.currency,
+      accountKind: row.accountKind as TrialBalance['rows'][number]['accountKind'], currency: row.currency,
       debit: wire(row.debit, row.currency), credit: wire(row.credit, row.currency),
       debitBase: wire(row.debitBase, baseCurrency), creditBase: wire(row.creditBase, baseCurrency),
       netDebitBase: wire(netDebitBase(row), baseCurrency), netCreditBase: wire(netCreditBase(row), baseCurrency),

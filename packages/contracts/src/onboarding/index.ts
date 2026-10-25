@@ -10,7 +10,7 @@
  */
 import { z } from 'zod'
 import { employeeStatusSchema, onboardingStatusSchema } from '../enums.generated.js'
-import { boundedText, isoDateSchema, shortTextSchema } from '../primitives/ids.js'
+import { boundedText, idSchema, isoDateSchema, shortTextSchema } from '../primitives/ids.js'
 import { decimalStringSchema } from '../primitives/money.js'
 
 // ── Status ─────────────────────────────────────────────────────────────────────
@@ -80,6 +80,7 @@ export type ImportEmployeeRow = z.infer<typeof importEmployeeRowSchema>
 
 export const importEmployeesRequestSchema = z.object({
   employees: z.array(importEmployeeRowSchema).min(1).max(500),
+  migrationProjectId: idSchema.optional(),
 })
 
 export type ImportEmployeesRequest = z.infer<typeof importEmployeesRequestSchema>
@@ -91,3 +92,10 @@ export const importEmployeesResponseSchema = z.object({
 })
 
 export type ImportEmployeesResponse = z.infer<typeof importEmployeesResponseSchema>
+
+/** `POST /onboarding/import/validate` performs the shared contract validation without writes. */
+export const importEmployeesValidationResponseSchema = z.object({
+  validRows: z.number().int().min(1).max(500),
+})
+
+export type ImportEmployeesValidationResponse = z.infer<typeof importEmployeesValidationResponseSchema>

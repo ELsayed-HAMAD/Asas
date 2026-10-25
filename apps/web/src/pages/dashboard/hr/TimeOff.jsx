@@ -9,6 +9,8 @@ import {
   Clock,
   Shield,
   Layers,
+  Search,
+  CheckCircle2,
 } from 'lucide-react';
 import FormDialog from '../../../components/common/FormDialog';
 import { hrApi } from '../../../lib/api/hr';
@@ -50,6 +52,7 @@ export default function TimeOff() {
   const [departmentId, setDepartmentId] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
   const [rightPanelTab, setRightPanelTab] = useState('balances'); // 'balances' | 'policies'
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [leaveForm, setLeaveForm] = useState({ type: 'VACATION', startDate: '', endDate: '' });
@@ -126,13 +129,24 @@ export default function TimeOff() {
   }, [data?.leaveRequests]);
 
   const filteredLeaveRequests = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
     return rawLeaveRequests.filter((item) => {
       if (departmentId !== 'ALL' && item.departmentId !== departmentId) return false;
       if (statusFilter !== 'ALL' && item.status !== statusFilter) return false;
       if (typeFilter !== 'ALL' && item.type !== typeFilter) return false;
+      if (q && !(item.name || '').toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [rawLeaveRequests, departmentId, statusFilter, typeFilter]);
+  }, [rawLeaveRequests, departmentId, statusFilter, typeFilter, searchQuery]);
+
+  const filteredBalances = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return (leaveBalanceData?.items ?? []).filter((item) => {
+      if (departmentId !== 'ALL' && item.departmentId !== departmentId) return false;
+      if (q && !(item.employeeName || '').toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [leaveBalanceData?.items, departmentId, searchQuery]);
 
   const pendingRequestsCount = useMemo(
     () => rawLeaveRequests.filter((item) => item.status === 'PENDING').length,
@@ -177,12 +191,23 @@ export default function TimeOff() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-y-auto min-w-0 px-6 py-5">
-      {/* ── Toolbar: Filters & Primary Actions ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 w-full mb-5">
-        {/* Left Filters */}
-        <div className="flex items-center gap-2 flex-wrap">
+      {/* ── Toolbar: Filters & Primary Actions (Apple-Glass Unified Bar) ── */}
+      <div className="bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-2.5 shadow-xs flex flex-wrap items-center justify-between gap-2.5 mb-5 shrink-0">
+        {/* Left Filter Cluster: Employee Search + Dept + Type */}
+        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+          <div className="relative w-full sm:w-60 min-w-0">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+            <Input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search employee..."
+              className="w-full h-9 pl-9 pr-3 rounded-xl bg-surface-muted border border-border-default text-xs sm:text-sm focus-visible:ring-1 focus-visible:ring-primary shadow-xs"
+            />
+          </div>
+
           <Select value={departmentId} onValueChange={setDepartmentId}>
-            <SelectTrigger aria-label="Department" className="h-8 text-xs font-medium w-auto min-w-[140px] bg-surface-raised shadow-card">
+            <SelectTrigger aria-label="Department" className="h-9 text-xs sm:text-sm font-medium w-auto min-w-[150px] bg-surface-muted rounded-xl border border-border-default shadow-xs shrink-0">
               <span className="text-muted text-[11px] font-semibold uppercase mr-1">Dept</span>
               <SelectValue placeholder="All Departments" />
             </SelectTrigger>
@@ -197,7 +222,7 @@ export default function TimeOff() {
           </Select>
 
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger aria-label="Leave type filter" className="h-8 text-xs font-medium w-auto min-w-[125px] bg-surface-raised shadow-card">
+            <SelectTrigger aria-label="Leave type filter" className="h-9 text-xs sm:text-sm font-medium w-auto min-w-[130px] bg-surface-muted rounded-xl border border-border-default shadow-xs shrink-0">
               <span className="text-muted text-[11px] font-semibold uppercase mr-1">Type</span>
               <SelectValue />
             </SelectTrigger>
@@ -210,15 +235,15 @@ export default function TimeOff() {
           </Select>
         </div>
 
-        {/* Right Actions */}
-        <div className="flex items-center gap-2 shrink-0 ml-auto">
+        {/* Right Action Cluster: Export + Request Time Off */}
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="outline"
             size="sm"
             type="button"
             onClick={exportLeaveCSV}
             disabled={isLoading || isError || filteredLeaveRequests.length === 0}
-            className="gap-1.5 shadow-sm"
+            className="h-9 px-3.5 rounded-xl border border-border-default text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-xs"
           >
             <Download size={13} /> Export
           </Button>
@@ -229,39 +254,59 @@ export default function TimeOff() {
             onClick={() => setLeaveDialogOpen(true)}
             disabled={!data?.selfClock}
             title={!data?.selfClock ? 'Link an active employee record to request time off' : undefined}
-            className="gap-1.5 shadow-sm font-semibold"
+            className="h-9 px-4 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm"
           >
             <Plus size={14} /> Request Time Off
           </Button>
         </div>
       </div>
 
-      {/* ── 4 KPI Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-5 mb-5 flex-shrink-0">
-        <div className="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-auto flex flex-col justify-start">
-          <p className="text-[11px] font-bold text-muted uppercase tracking-wider leading-none">Pending Requests</p>
-          <p className="text-2xl font-bold text-warning mt-1 leading-tight">{pendingRequestsCount}</p>
-          <p className="text-xs text-muted mt-1 leading-normal">Awaiting admin review</p>
+      {/* ── 4 KPI Cards: Tactile Apple-Glass Surface with Squircle Badges ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-5 flex-shrink-0">
+        <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[124px]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">Pending Requests</span>
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 flex items-center justify-center shrink-0">
+              <Clock size={16} />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-warning tracking-tight my-1 leading-none">{pendingRequestsCount}</div>
+          <div className="pt-1.5 border-t border-border-subtle/80 text-[11px] text-muted leading-tight">Awaiting admin review</div>
         </div>
 
-        <div className="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-auto flex flex-col justify-start">
-          <p className="text-[11px] font-bold text-muted uppercase tracking-wider leading-none">Currently On Leave</p>
-          <p className="text-2xl font-bold text-heading mt-1 leading-tight">{onLeaveCount}</p>
-          <p className="text-xs text-muted mt-1 leading-normal">Active employees away</p>
+        <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[124px]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">Currently On Leave</span>
+            <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-600 flex items-center justify-center shrink-0">
+              <CalendarDays size={16} />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-heading tracking-tight my-1 leading-none">{onLeaveCount}</div>
+          <div className="pt-1.5 border-t border-border-subtle/80 text-[11px] text-muted leading-tight">Active employees away</div>
         </div>
 
-        <div className="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-auto flex flex-col justify-start">
-          <p className="text-[11px] font-bold text-muted uppercase tracking-wider leading-none">Approved Requests</p>
-          <p className="text-2xl font-bold text-heading mt-1 leading-tight">{approvedRequestsCount}</p>
-          <p className="text-xs text-muted mt-1 leading-normal">Recorded in current period</p>
+        <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[124px]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">Approved Requests</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 flex items-center justify-center shrink-0">
+              <CheckCircle2 size={16} />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-heading tracking-tight my-1 leading-none">{approvedRequestsCount}</div>
+          <div className="pt-1.5 border-t border-border-subtle/80 text-[11px] text-muted leading-tight">Recorded in current period</div>
         </div>
 
-        <div className="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-auto flex flex-col justify-start">
-          <p className="text-[11px] font-bold text-muted uppercase tracking-wider leading-none">Leave Balances Active</p>
-          <p className="text-2xl font-bold text-heading mt-1 leading-tight">{totalEmployeesWithBalances}</p>
-          <p className="text-xs text-muted mt-1 leading-normal">
-            Year {leaveBalanceData?.year ?? 'current'} · {leavePolicyData?.items?.length ?? 0} policies
-          </p>
+        <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[124px]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">Leave Balances Active</span>
+            <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 flex items-center justify-center shrink-0">
+              <Layers size={16} />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-heading tracking-tight my-1 leading-none">{totalEmployeesWithBalances}</div>
+          <div className="pt-1.5 border-t border-border-subtle/80 text-[11px] text-muted leading-tight">
+            Year {leaveBalanceData?.year ?? '2026'} · {leavePolicyData?.items?.length ?? 0} policies
+          </div>
         </div>
       </div>
 
@@ -272,31 +317,37 @@ export default function TimeOff() {
       )}
 
       {isError && (
-        <div className="p-6 text-danger text-center bg-danger-light/20 rounded-card border border-danger/30">
+        <div className="p-6 text-danger text-center bg-danger-light/20 rounded-2xl border border-danger/30">
           {error?.message || 'Error loading time off data'}
         </div>
       )}
 
-      {/* ── Main Workspace: Left Column (Requests Table) & Right Column (Unified Balances & Policies) ── */}
+      {/* ── Main Workspace: Master-Detail Grid (col-span-12 lg:col-span-7/8 vs lg:col-span-5/4) ── */}
       {!isLoading && !isError && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start flex-1 min-h-0">
-          {/* ── Left Column: Time Off Requests (col-span-12 lg:col-span-8) ── */}
-          <div className="col-span-12 lg:col-span-8 space-y-5 min-w-0">
-            <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card flex flex-col overflow-hidden">
+          {/* ── Left Column: Time Off Requests (col-span-12 lg:col-span-7 xl:col-span-8) ── */}
+          <div className="col-span-12 lg:col-span-7 xl:col-span-8 min-w-0">
+            <div className="bg-surface-raised/95 backdrop-blur-xl border border-border-default rounded-2xl shadow-xs flex flex-col overflow-hidden">
               {/* Header with Title + Segmented Status Switcher */}
-              <div className="px-5 py-3.5 border-b border-border-subtle flex items-center justify-between bg-surface-raised flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <CalendarDays size={16} className="text-primary" />
-                  <h2 className="text-sm font-bold text-heading">Time Off Requests</h2>
-                  <span className="text-xs text-muted font-medium">({filteredLeaveRequests.length})</span>
+              <div className="px-5 py-3.5 border-b border-border-default/60 flex items-center justify-between bg-surface-raised flex-wrap gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-surface-muted border border-border-default/70 flex items-center justify-center text-primary shrink-0">
+                    <CalendarDays size={16} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm sm:text-base font-bold text-heading">Time Off Requests</h2>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-surface-muted text-muted border border-border-default/60">
+                      {filteredLeaveRequests.length}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Status Segmented Filter Pills */}
-                <div className="flex items-center p-0.5 rounded-lg bg-surface-muted border border-border-subtle shrink-0">
+                <div className="flex items-center p-1 rounded-xl bg-surface-muted border border-border-default/60 shrink-0 gap-1">
                   <button
                     type="button"
                     onClick={() => setStatusFilter('ALL')}
-                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                       statusFilter === 'ALL'
                         ? 'bg-surface-raised text-heading shadow-xs'
                         : 'text-muted hover:text-heading'
@@ -308,7 +359,7 @@ export default function TimeOff() {
                   <button
                     type="button"
                     onClick={() => setStatusFilter('PENDING')}
-                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                       statusFilter === 'PENDING'
                         ? 'bg-surface-raised text-heading shadow-xs'
                         : 'text-muted hover:text-heading'
@@ -320,7 +371,7 @@ export default function TimeOff() {
                   <button
                     type="button"
                     onClick={() => setStatusFilter('APPROVED')}
-                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                       statusFilter === 'APPROVED'
                         ? 'bg-surface-raised text-heading shadow-xs'
                         : 'text-muted hover:text-heading'
@@ -332,7 +383,7 @@ export default function TimeOff() {
                   <button
                     type="button"
                     onClick={() => setStatusFilter('REJECTED')}
-                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                       statusFilter === 'REJECTED'
                         ? 'bg-surface-raised text-heading shadow-xs'
                         : 'text-muted hover:text-heading'
@@ -343,22 +394,16 @@ export default function TimeOff() {
                 </div>
               </div>
 
-              <div className="max-h-[580px] overflow-y-auto overflow-x-hidden">
-                <Table wrapperClassName="overflow-x-hidden" className="w-full table-fixed text-left border-collapse">
-                  <colgroup>
-                    <col className="w-[26%]" />
-                    <col className="w-[16%]" />
-                    <col className="w-[26%]" />
-                    <col className="w-[16%]" />
-                    {isAdmin && <col className="w-[16%]" />}
-                  </colgroup>
-                  <TableHeader className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
+              {/* Table with Unconstrained Employee Names */}
+              <div className="max-h-[580px] overflow-y-auto overflow-x-auto">
+                <Table className="w-full text-left border-collapse">
+                  <TableHeader className="bg-surface-muted/90 backdrop-blur-xs sticky top-0 z-10 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-xs">
                     <TableRow className="hover:bg-transparent border-0">
-                      <TableHead className="px-3.5 py-2.5 text-left rtl:text-right bg-surface-muted truncate">Employee</TableHead>
-                      <TableHead className="px-3.5 py-2.5 text-left rtl:text-right bg-surface-muted truncate">Type</TableHead>
-                      <TableHead className="px-3.5 py-2.5 text-left rtl:text-right bg-surface-muted truncate">Dates</TableHead>
-                      <TableHead className="px-2 py-2.5 text-center bg-surface-muted truncate">Status</TableHead>
-                      {isAdmin && <TableHead className="px-2 py-2.5 text-right rtl:text-left bg-surface-muted truncate">Actions</TableHead>}
+                      <TableHead className="px-4 py-2.5 text-left rtl:text-right">Employee</TableHead>
+                      <TableHead className="px-3.5 py-2.5 text-left rtl:text-right">Type</TableHead>
+                      <TableHead className="px-3.5 py-2.5 text-left rtl:text-right">Dates</TableHead>
+                      <TableHead className="px-3 py-2.5 text-center">Status</TableHead>
+                      {isAdmin && <TableHead className="px-4 py-2.5 text-right rtl:text-left">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-border-subtle">
@@ -369,35 +414,39 @@ export default function TimeOff() {
 
                       return (
                         <TableRow key={item.id} className="hover:bg-surface-muted/60 transition-colors border-0">
-                          <TableCell className="px-3.5 py-3">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-subtle flex items-center justify-center text-xs font-bold text-heading shrink-0 overflow-hidden">
+                          <TableCell className="px-4 py-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-subtle flex items-center justify-center text-xs font-bold text-heading shrink-0 overflow-hidden shadow-xs">
                                 {item.avatar ? (
                                   <img src={item.avatar} alt={item.name} className="w-full h-full object-cover" />
                                 ) : (
                                   (item.name?.[0] || '?')
                                 )}
                               </div>
-                              <div className="min-w-0 truncate">
-                                <p className="text-sm font-semibold text-heading truncate">{item.name}</p>
-                                <p className="text-[11px] text-muted truncate">{item.departmentName || 'General'}</p>
+                              <div className="min-w-0">
+                                <p className="text-xs sm:text-sm font-semibold text-heading whitespace-nowrap" title={item.name}>
+                                  {item.name}
+                                </p>
+                                <p className="text-[11px] text-muted whitespace-nowrap" title={item.departmentName || 'General'}>
+                                  {item.departmentName || 'General'}
+                                </p>
                               </div>
                             </div>
                           </TableCell>
 
                           <TableCell className="px-3.5 py-3">
-                            <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-surface-strong text-body border border-border-subtle inline-block truncate max-w-full">
+                            <span className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-surface-strong text-body border border-border-subtle inline-block whitespace-nowrap">
                               {item.humanType}
                             </span>
                           </TableCell>
 
-                          <TableCell className="px-3.5 py-3 text-xs text-body truncate">
+                          <TableCell className="px-3.5 py-3 text-xs text-body whitespace-nowrap">
                             {displayDate}
                           </TableCell>
 
-                          <TableCell className="px-2 py-3 text-center">
+                          <TableCell className="px-3 py-3 text-center">
                             <span
-                              className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full inline-block truncate max-w-full ${
+                              className={`text-[10px] font-semibold uppercase px-2.5 py-0.5 rounded-full inline-block whitespace-nowrap ${
                                 item.status === 'APPROVED'
                                   ? 'bg-success-light text-success-text'
                                   : item.status === 'REJECTED'
@@ -410,15 +459,15 @@ export default function TimeOff() {
                           </TableCell>
 
                           {isAdmin && (
-                            <TableCell className="px-2 py-3 text-right rtl:text-left">
+                            <TableCell className="px-4 py-3 text-right rtl:text-left">
                               {item.status === 'PENDING' ? (
-                                <div className="flex items-center justify-end gap-1">
+                                <div className="flex items-center justify-end gap-1.5">
                                   <Button
                                     size="sm"
                                     type="button"
                                     disabled={leaveDecisionMutation.isPending}
                                     onClick={() => leaveDecisionMutation.mutate({ id: item.id, decision: 'APPROVED' })}
-                                    className="h-6 px-2 text-[11px] font-semibold"
+                                    className="h-6 px-2.5 text-[11px] font-semibold rounded-md shadow-xs"
                                     title="Approve leave"
                                   >
                                     Approve
@@ -429,14 +478,16 @@ export default function TimeOff() {
                                     type="button"
                                     disabled={leaveDecisionMutation.isPending}
                                     onClick={() => leaveDecisionMutation.mutate({ id: item.id, decision: 'REJECTED' })}
-                                    className="h-6 px-1.5 text-[11px] font-medium"
+                                    className="h-6 px-2 text-[11px] font-medium rounded-md"
                                     title="Reject leave"
                                   >
                                     Reject
                                   </Button>
                                 </div>
                               ) : (
-                                <span className="text-[11px] text-muted font-medium">Done</span>
+                                <span className="px-2.5 py-1 rounded-lg bg-surface-muted text-muted text-xs font-medium inline-block border border-border-default/50">
+                                  Done
+                                </span>
                               )}
                             </TableCell>
                           )}
@@ -457,43 +508,46 @@ export default function TimeOff() {
             </div>
           </div>
 
-          {/* ── Right Column: Single Unified Balances & Policies Panel (col-span-12 lg:col-span-4) ── */}
-          <div className="col-span-12 lg:col-span-4 space-y-5 min-w-0">
-            <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card flex flex-col overflow-hidden">
-              {/* Header with Sub-Tabs */}
-              <div className="p-4 border-b border-border-subtle flex items-center justify-between gap-2.5 bg-surface-raised">
-                <div className="flex items-center gap-2">
-                  <Clock size={15} className="text-accent" />
-                  <h2 className="text-sm font-bold text-heading">
+          {/* ── Right Column: Fixed Header Wrapping & Organized Balances / Policies (col-span-12 lg:col-span-5 xl:col-span-4 lg:sticky lg:top-4) ── */}
+          <div className="col-span-12 lg:col-span-5 xl:col-span-4 lg:sticky lg:top-4 min-w-0">
+            <div className="bg-surface-raised/95 backdrop-blur-xl border border-border-default rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
+              {/* Header: 2-Row Clean Hierarchy (No 3-Line Title Wrapping) */}
+              <div className="flex flex-col gap-3 pb-3 border-b border-border-default/60">
+                {/* Row 1: Squircle Clock Badge + Full Title */}
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 flex items-center justify-center shrink-0">
+                    <Clock size={16} />
+                  </div>
+                  <h2 className="text-sm sm:text-base font-bold text-heading whitespace-nowrap truncate">
                     {rightPanelTab === 'balances' ? 'Annual Leave Balances' : 'Manage Leave Policies'}
                   </h2>
                 </div>
 
-                {/* Sub-Tabs: Balances vs Policy Rules */}
-                <div className="flex items-center p-0.5 rounded-lg bg-surface-muted border border-border-subtle shrink-0">
+                {/* Row 2: Full-Width 2-Column Apple Segmented Control */}
+                <div className="grid grid-cols-2 p-1 rounded-xl bg-surface-muted border border-border-default/60 text-xs font-semibold gap-1">
                   <button
                     type="button"
                     onClick={() => setRightPanelTab('balances')}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                    className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                       rightPanelTab === 'balances'
                         ? 'bg-surface-raised text-heading shadow-xs'
                         : 'text-muted hover:text-heading'
                     }`}
                   >
-                    <Layers size={12} />
+                    <Layers size={13} />
                     <span>Balances</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setRightPanelTab('policies')}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                    className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                       rightPanelTab === 'policies'
                         ? 'bg-surface-raised text-heading shadow-xs'
                         : 'text-muted hover:text-heading'
                     }`}
                   >
-                    <Shield size={12} />
+                    <Shield size={13} />
                     <span>Policies</span>
                   </button>
                 </div>
@@ -501,51 +555,63 @@ export default function TimeOff() {
 
               {/* View 1: Annual Leave Balances */}
               {rightPanelTab === 'balances' && (
-                <div>
-                  <div className="px-4 py-2.5 bg-surface-muted/30 border-b border-border-subtle flex items-center justify-between text-xs text-muted">
-                    <span>Year {leaveBalanceData?.year ?? 'Current'} Employee Coverage</span>
-                    <span>{leaveBalanceData?.items?.length ?? 0} active records</span>
+                <div className="space-y-3">
+                  {/* Recessed Metadata Bar */}
+                  <div className="bg-surface-muted/80 border border-border-default/60 rounded-xl px-3 py-2 flex items-center justify-between text-xs font-medium text-muted">
+                    <span>Year {leaveBalanceData?.year ?? '2026'} Employee Coverage</span>
+                    <span>{filteredBalances.length} active records</span>
                   </div>
 
-                  <div className="max-h-[480px] overflow-y-auto overflow-x-hidden px-4 py-2 divide-y divide-border-subtle">
-                    {(leaveBalanceData?.items ?? [])
-                      .filter((item) => departmentId === 'ALL' || item.departmentId === departmentId)
-                      .map((item) => (
+                  {/* Sticky Column Header + High-Density Balance Rows */}
+                  <div className="border border-border-default/60 rounded-xl overflow-hidden bg-surface-raised">
+                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted px-3 py-2 bg-surface-muted/95 border-b border-border-default/60 sticky top-0 z-10">
+                      <span className="flex-1 min-w-0">Employee / Type</span>
+                      <div className="flex items-center gap-1 text-center shrink-0">
+                        <span className="w-10">Allow</span>
+                        <span className="w-10">Pend</span>
+                        <span className="w-11">Rem</span>
+                      </div>
+                    </div>
+
+                    <div className="max-h-[440px] overflow-y-auto space-y-1 p-2">
+                      {filteredBalances.map((item) => (
                         <div
                           key={`${item.employeeId}-${item.type}`}
-                          className="py-2.5 flex items-center justify-between gap-2 text-xs"
+                          className="px-3 py-2 rounded-xl bg-surface-muted/40 hover:bg-surface-muted/80 border border-border-default/40 flex items-center justify-between gap-2 transition-colors text-xs"
                         >
-                          <div className="min-w-0 flex-1 truncate">
-                            <p className="font-semibold text-heading truncate">{item.employeeName}</p>
-                            <p className="text-[11px] text-muted truncate">{LEAVE_TYPE_LABELS[item.type] || item.type}</p>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-heading truncate" title={item.employeeName}>
+                              {item.employeeName}
+                            </p>
+                            <p className="text-[11px] text-muted truncate">
+                              {LEAVE_TYPE_LABELS[item.type] || item.type}
+                            </p>
                           </div>
-                          <div className="flex items-center gap-2 text-right shrink-0">
-                            <div className="text-center w-12">
-                              <p className="text-[9px] text-muted uppercase">Allowed</p>
-                              <p className="font-medium text-body text-xs">{item.annualAllowanceDays ?? '—'}</p>
+                          <div className="flex items-center gap-1 text-right shrink-0 tabular-nums">
+                            <div className="w-10 text-center font-mono font-medium text-body text-xs" title={`Allowed: ${item.annualAllowanceDays ?? '—'}`}>
+                              {item.annualAllowanceDays ?? '—'}
                             </div>
-                            <div className="text-center w-12">
-                              <p className="text-[9px] text-muted uppercase">Pending</p>
-                              <p className="font-medium text-warning text-xs">{item.pendingDays}</p>
+                            <div className="w-10 text-center font-mono font-medium text-warning text-xs" title={`Pending: ${item.pendingDays}`}>
+                              {item.pendingDays}
                             </div>
-                            <div className="text-center w-14">
-                              <p className="text-[9px] text-muted uppercase">Remaining</p>
-                              <p className="font-bold text-heading text-xs">{item.remainingDays ?? '—'}d</p>
+                            <div className="w-11 text-center font-mono font-bold text-heading text-xs" title={`Remaining: ${item.remainingDays ?? '—'} days`}>
+                              {item.remainingDays ?? '—'}d
                             </div>
                           </div>
                         </div>
                       ))}
 
-                    {(!leaveBalanceData?.items || leaveBalanceData.items.length === 0) && (
-                      <p className="py-12 text-center text-xs text-muted">No annual leave balances recorded.</p>
-                    )}
+                      {filteredBalances.length === 0 && (
+                        <p className="py-12 text-center text-xs text-muted">No annual leave balances recorded.</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
 
               {/* View 2: Manage Leave Policies */}
               {rightPanelTab === 'policies' && (
-                <div className="p-4 sm:p-5 space-y-4">
+                <div className="space-y-4">
                   <p className="text-xs text-muted leading-relaxed">
                     Set the standard annual allowance and counting rules for each category of employee leave.
                   </p>
@@ -556,7 +622,7 @@ export default function TimeOff() {
                         Leave Type
                       </label>
                       <Select value={policyType} onValueChange={setPolicyType}>
-                        <SelectTrigger id="policy-leave-type-off" aria-label="Policy leave type" className="h-8 text-xs w-full bg-surface-raised">
+                        <SelectTrigger id="policy-leave-type-off" aria-label="Policy leave type" className="h-9 text-xs w-full bg-surface-muted rounded-xl border border-border-default">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -569,7 +635,7 @@ export default function TimeOff() {
                       </Select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 items-end">
+                    <div className="bg-surface-muted/60 border border-border-default/60 rounded-xl p-3 space-y-3">
                       <div>
                         <label htmlFor="policy-allowance-days" className="text-xs font-semibold text-body block mb-1">
                           Allowance (days)
@@ -585,20 +651,20 @@ export default function TimeOff() {
                           onChange={(e) =>
                             setPolicyDraft((current) => ({ ...current, annualAllowanceDays: e.target.value }))
                           }
-                          className="h-8 text-xs"
+                          className="h-8.5 text-xs bg-surface-raised rounded-lg border border-border-default"
                         />
                       </div>
 
-                      <label className="flex items-center gap-2 pb-1.5 text-xs font-medium text-body cursor-pointer">
+                      <label className="flex items-center gap-2 pt-1 text-xs font-medium text-body cursor-pointer select-none">
                         <input
                           type="checkbox"
                           checked={policyDraft.weekdaysOnly}
                           onChange={(e) =>
                             setPolicyDraft((current) => ({ ...current, weekdaysOnly: e.target.checked }))
                           }
-                          className="rounded border-border-default"
+                          className="rounded border-border-default text-primary focus:ring-primary/20"
                         />
-                        Weekdays only
+                        <span>Weekdays only</span>
                       </label>
                     </div>
 
@@ -616,7 +682,7 @@ export default function TimeOff() {
                             },
                           })
                         }
-                        className="w-full h-8 text-xs font-semibold mt-2"
+                        className="w-full h-9 text-xs font-semibold rounded-xl shadow-xs"
                       >
                         {policyMutation.isPending ? 'Saving…' : 'Save Policy Changes'}
                       </Button>

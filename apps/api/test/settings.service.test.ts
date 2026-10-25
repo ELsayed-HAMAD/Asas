@@ -424,7 +424,7 @@ describe('testIntegration', () => {
     })
   })
 
-  it('encrypts credential when creating an integration and returns masked read credential', async () => {
+  it('encrypts the stored integration value and returns only a masked read value', async () => {
     const rawKey = 'test_secret_integration_token_123456789'
     let savedCredential = ''
     const prisma = {

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   ArrowRight,
   Boxes,
@@ -146,9 +146,27 @@ const SOLUTIONS = [
 ]
 
 export default function Solutions() {
-  const [activeSolutionId, setActiveSolutionId] = useState(SOLUTIONS[0].id)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedArea = searchParams.get('area')
+  const initialArea = SOLUTIONS.some(solution => solution.id === requestedArea) ? requestedArea : SOLUTIONS[0].id
+  const [activeSolutionId, setActiveSolutionId] = useState(initialArea)
   const currentSolution = SOLUTIONS.find((s) => s.id === activeSolutionId) || SOLUTIONS[0]
   const Icon = currentSolution.icon
+
+  useEffect(() => {
+    if (SOLUTIONS.some(solution => solution.id === requestedArea)) setActiveSolutionId(requestedArea)
+  }, [requestedArea])
+
+  const selectSolution = id => {
+    setActiveSolutionId(id)
+    setSearchParams({ area: id }, { replace: true })
+    window.requestAnimationFrame(() => {
+      document.getElementById('solution-detail')?.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        block: 'start',
+      })
+    })
+  }
 
   return (
     <MarketingPageFrame
@@ -180,7 +198,7 @@ export default function Solutions() {
       </div>
 
       {/* Featured Architecture Canvas */}
-      <div className="glass-strong rounded-card border border-border-default/80 p-6 sm:p-10 shadow-glass mb-16 hover-lift transition-premium">
+      <div id="solution-detail" className="glass-strong scroll-mt-28 rounded-card border border-border-default/80 p-6 sm:p-10 shadow-glass mb-16 hover-lift transition-premium">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
           <div className="lg:col-span-2 space-y-5">
             <div className="flex items-center gap-2">
@@ -264,10 +282,8 @@ export default function Solutions() {
             <button
               key={item.id}
               type="button"
-              onClick={() => {
-                setActiveSolutionId(item.id)
-                window.scrollTo({ top: 200, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
-              }}
+              onClick={() => selectSolution(item.id)}
+              aria-pressed={activeSolutionId === item.id}
               className="w-full text-left bg-surface-raised rounded-card border border-border-default/80 p-6 flex flex-col justify-between hover:border-accent/40 shadow-card hover:shadow-card-hover hover-lift transition-premium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
             >
               <div>

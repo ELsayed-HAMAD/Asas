@@ -1,22 +1,33 @@
 import React, { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Send, ChevronDown,
-  FileText, Paperclip, Phone,
+  FileText, Paperclip, Phone, Package,
   CircleDot, Circle, Loader2,
   Users, Plus, Pencil, Trash2, X, Check
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../../../lib/api/finance';
+import { inventoryApi } from '../../../lib/api/inventory';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatDate, formatMoney, formatCompactTableMoney } from '../../../lib/format';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import FormDialog from '../../../components/common/FormDialog';
 import SearchInput from '../../../components/common/SearchInput';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
 import { Checkbox } from '../../../components/ui/checkbox';
+import { Textarea } from '../../../components/ui/textarea';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../../../components/ui/dropdown-menu';
+import { useActiveMemberRole } from '../../../lib/authClient';
+import { getMemberRoleName } from '../../../lib/memberRole';
 import {
   Select,
   SelectContent,
@@ -41,8 +52,135 @@ const metricFontSize = (v) => {
   return `clamp(0.75rem, ${Math.min(14, 130 / Math.max(1, label.length))}cqw, 1.5rem)`
 };
 
+function InvoiceInventoryLineEditor({ line, index, onChange, onRemove }) {
+  const [search, setSearch] = useState('');
+  const { data, isFetching, isError } = useQuery({
+    queryKey: [...queryKeys.inventory.products.all(), 'invoice-picker', search],
+    queryFn: () => inventoryApi.listProducts({ search: search.trim() || undefined, limit: 20, archived: false }),
+    enabled: !line.product,
+    staleTime: 30_000,
+  });
+  const products = (data?.items ?? []).filter(product => product.stock > 0);
+
+  if (line.product) {
+    return (
+      <div className="rounded-input border border-border-default bg-surface p-2.5 space-y-2">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-semibold text-heading truncate">{line.product.name}</p>
+            <p className="text-[11px] text-muted mt-0.5">
+              {line.product.sku} • {line.product.stock} on hand
+            </p>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={`Change product for stock line ${index + 1}`}
+              onClick={() => onChange({ product: null, productId: '', quantity: '1' })}
+              className="h-7 w-7 text-muted hover:bg-surface-muted"
+            >
+              <Pencil size={13} />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={`Remove stock line ${index + 1}`}
+              onClick={onRemove}
+              className="h-7 w-7 text-muted hover:bg-danger-light hover:text-danger"
+            >
+              <Trash2 size={13} />
+            </Button>
+          </div>
+        </div>
+        <label className="block">
+          <span className="block text-[11px] font-medium text-body mb-1">Quantity</span>
+          <Input
+            type="number"
+            min="1"
+            step="1"
+            inputMode="numeric"
+            aria-label={`Quantity for ${line.product.name}`}
+            value={line.quantity}
+            onChange={(event) => onChange({ quantity: event.target.value })}
+            className="h-8 text-xs"
+            required
+          />
+        </label>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-input border border-border-default bg-surface p-2.5 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor={`invoice-stock-search-${line.key}`} className="text-[11px] font-semibold text-body">
+          Stock line {index + 1}
+        </label>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={`Remove stock line ${index + 1}`}
+          onClick={onRemove}
+          className="h-7 w-7 text-muted hover:bg-danger-light hover:text-danger"
+        >
+          <Trash2 size={13} />
+        </Button>
+      </div>
+      <Input
+        id={`invoice-stock-search-${line.key}`}
+        type="search"
+        placeholder="Search products by name or SKU"
+        aria-label={`Search products for stock line ${index + 1}`}
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        className="h-8 text-xs"
+      />
+      {isFetching ? (
+        <div className="flex items-center gap-1.5 px-1 py-2 text-[11px] text-muted">
+          <Loader2 size={12} className="animate-spin" /> Loading products…
+        </div>
+      ) : isError ? (
+        <p className="px-1 py-1 text-[11px] text-danger">Products could not be loaded. Try again.</p>
+      ) : products.length === 0 ? (
+        <p className="px-1 py-1 text-[11px] text-muted">
+          {search.trim() ? 'No products with stock match that search.' : 'No products with stock on hand.'}
+        </p>
+      ) : (
+        <div role="listbox" aria-label={`Product choices for stock line ${index + 1}`} className="max-h-40 overflow-y-auto rounded-input border border-border-subtle bg-surface-raised divide-y divide-border-subtle">
+          {products.map(product => (
+            <button
+              key={product.id}
+              type="button"
+              role="option"
+              aria-selected={false}
+              onClick={() => onChange({
+                product: { id: product.id, name: product.name, sku: product.sku, stock: product.stock },
+                productId: product.id,
+                quantity: line.quantity || '1',
+              })}
+              className="w-full px-2.5 py-2 text-left hover:bg-surface-muted focus:bg-surface-muted focus:outline-none"
+            >
+              <span className="block text-xs font-semibold text-heading truncate">{product.name}</span>
+              <span className="block text-[10px] text-muted mt-0.5">{product.sku} • {product.stock} on hand</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <p className="text-[10px] text-muted">
+        Cost comes from the configured inventory costing policy. Stock on hand may include quantity that has no established cost yet.
+      </p>
+    </div>
+  );
+}
+
 export default function AccountsReceivable() {
   const queryClient = useQueryClient();
+  const { data: roleData } = useActiveMemberRole();
+  const canManageInvoices = ['OWNER', 'ADMIN'].includes(getMemberRoleName(roleData));
   const [selectedId, setSelectedId] = useState(null);
   const [activityBody, setActivityBody] = useState('')
   const [activityType, setActivityType] = useState('Note')
@@ -61,6 +199,12 @@ export default function AccountsReceivable() {
   const [newInvoiceAmount, setNewInvoiceAmount] = useState('');
   const [newInvoiceDueDate, setNewInvoiceDueDate] = useState('');
   const [newInvoiceError, setNewInvoiceError] = useState('');
+  const [invoiceInventoryLines, setInvoiceInventoryLines] = useState([]);
+  const [voidTarget, setVoidTarget] = useState(null);
+  const [voidReason, setVoidReason] = useState('');
+  const [voidError, setVoidError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteError, setDeleteError] = useState('');
 
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState('');
@@ -93,9 +237,55 @@ export default function AccountsReceivable() {
     queryFn: financeApi.listCustomers,
   });
 
+  const {
+    data: valuationSetup,
+    isLoading: isValuationSetupLoading,
+    isError: isValuationSetupError,
+  } = useQuery({
+    queryKey: queryKeys.inventory.valuationSetup(),
+    queryFn: inventoryApi.getValuationSetup,
+    enabled: invoiceModalOpen,
+    staleTime: 30_000,
+  });
+  const inventoryConfigured = valuationSetup?.configured === true;
+
+  const addInvoiceInventoryLine = () => {
+    setInvoiceInventoryLines(lines => [
+      ...lines,
+      {
+        key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        productId: '',
+        product: null,
+        quantity: '1',
+      },
+    ]);
+  };
+
+  const updateInvoiceInventoryLine = (key, patch) => {
+    setInvoiceInventoryLines(lines => lines.map(line => line.key === key ? { ...line, ...patch } : line));
+  };
+
+  const closeInvoiceModal = () => {
+    setInvoiceModalOpen(false);
+    setInvoiceInventoryLines([]);
+    setNewInvoiceError('');
+  };
+
+  const invalidateReceivableCaches = (hasInventoryLines = false) => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.finance.receivables.all() });
+    queryClient.invalidateQueries({ queryKey: [...queryKeys.finance.all(), 'customers'] });
+    if (hasInventoryLines) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.products.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.movements.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.valuationReport() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.valuationSetup() });
+    }
+  };
+
   React.useEffect(() => {
     if (searchParams.get('new') === '1') {
       setInvoiceModalOpen(true);
+      setInvoiceInventoryLines([]);
       if (!newInvoiceNumber) {
         setNewInvoiceNumber(`INV-${Date.now().toString().slice(-6)}`);
       }
@@ -109,14 +299,21 @@ export default function AccountsReceivable() {
 
   const createInvoiceMutation = useMutation({
     mutationFn: (body) => financeApi.createReceivable(body),
-    onSuccess: () => {
+    onSuccess: (invoice) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.finance.receivables.all() });
       queryClient.invalidateQueries({ queryKey: [...queryKeys.finance.all(), 'customers'] });
+      if (invoice?.inventoryLines?.length) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.inventory.products.all() });
+        queryClient.invalidateQueries({ queryKey: queryKeys.inventory.movements.all() });
+        queryClient.invalidateQueries({ queryKey: queryKeys.inventory.valuationReport() });
+        queryClient.invalidateQueries({ queryKey: queryKeys.inventory.valuationSetup() });
+      }
       setInvoiceModalOpen(false);
       setNewInvoiceAmount('');
       setNewInvoiceNumber('');
       setNewInvoiceDueDate('');
       setNewInvoiceError('');
+      setInvoiceInventoryLines([]);
       if (searchParams.get('new') === '1') {
         const next = new URLSearchParams(searchParams);
         next.delete('new');
@@ -134,6 +331,25 @@ export default function AccountsReceivable() {
       queryClient.invalidateQueries({ queryKey: [...queryKeys.finance.all(), 'customers'] })
       setPaymentTargetId(null)
     },
+  });
+  const voidInvoiceMutation = useMutation({
+    mutationFn: ({ id, reason }) => financeApi.voidReceivable(id, reason),
+    onSuccess: (invoice) => {
+      invalidateReceivableCaches(Boolean(invoice?.inventoryLines?.length));
+      setVoidTarget(null);
+      setVoidReason('');
+      setVoidError('');
+    },
+    onError: (err) => setVoidError(err?.message || 'Could not void this invoice.'),
+  });
+  const deleteInvoiceMutation = useMutation({
+    mutationFn: ({ id }) => financeApi.deleteReceivable(id),
+    onSuccess: (_result, target) => {
+      invalidateReceivableCaches(Boolean(target?.inventoryLineCount));
+      setDeleteTarget(null);
+      setDeleteError('');
+    },
+    onError: (err) => setDeleteError(err?.message || 'Could not delete this invoice.'),
   });
   const { data: activitiesData } = useQuery({
     queryKey: [...queryKeys.finance.all(), 'customer-activities', selectedId],
@@ -351,6 +567,7 @@ export default function AccountsReceivable() {
             size="sm"
             onClick={() => {
               setNewInvoiceError('');
+              setInvoiceInventoryLines([]);
               if (!newInvoiceNumber) setNewInvoiceNumber(`INV-${Date.now().toString().slice(-6)}`);
               if (!newInvoiceDueDate) {
                 const d = new Date();
@@ -658,21 +875,61 @@ export default function AccountsReceivable() {
                           <span className="text-success font-semibold">Current</span>
                         )}
                         {inv.dueDate && ` • Due ${formatDate(inv.dueDate)}`}
+                        {inv.inventoryLines?.length > 0 && (
+                          <span
+                            className="inline-flex items-center gap-1 ml-1 text-body-light"
+                            title={inv.inventoryLines.map(line => `${line.productName} × ${line.quantity} — ${formatMoney(line.costValue)}`).join('\n')}
+                          >
+                            <Package size={10} /> {inv.inventoryLines.length} stock line{inv.inventoryLines.length === 1 ? '' : 's'}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0 ml-2">
                     <span className="text-xs font-bold text-heading tabular-nums" title={money(inv.amount)}>{compactMoney(inv.amount)}</span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={paymentMutation.isPending || inv.status === 'PAID'}
-                      onClick={() => setPaymentTargetId(inv.id)}
-                      className="gap-1 h-7 px-2 text-xs font-semibold"
-                    >
-                      Action <ChevronDown size={12} className="text-caption" />
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={paymentMutation.isPending || voidInvoiceMutation.isPending || deleteInvoiceMutation.isPending}
+                          aria-label={`Invoice actions for ${inv.number || inv.id}`}
+                          className="gap-1 h-7 px-2 text-xs font-semibold"
+                        >
+                          Action <ChevronDown size={12} className="text-caption" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuItem
+                          disabled={!canManageInvoices || paymentMutation.isPending || inv.status === 'PAID'}
+                          onSelect={() => setPaymentTargetId(inv.id)}
+                        >
+                          <Check size={13} /> Mark as paid
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={!canManageInvoices || voidInvoiceMutation.isPending || inv.status === 'VOID'}
+                          onSelect={() => {
+                            setVoidError('');
+                            setVoidReason('');
+                            setVoidTarget({ id: inv.id, number: inv.number || inv.id, inventoryLineCount: inv.inventoryLines?.length ?? 0 });
+                          }}
+                        >
+                          <X size={13} /> Void invoice
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={!canManageInvoices || deleteInvoiceMutation.isPending || ['PAID', 'VOID'].includes(inv.status)}
+                          onSelect={() => {
+                            setDeleteError('');
+                            setDeleteTarget({ id: inv.id, number: inv.number || inv.id, inventoryLineCount: inv.inventoryLines?.length ?? 0 });
+                          }}
+                          className="text-danger focus:text-danger"
+                        >
+                          <Trash2 size={13} /> Delete invoice
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               ))}
@@ -804,6 +1061,62 @@ export default function AccountsReceivable() {
         description={paymentTarget ? `Mark invoice ${paymentTarget.number || paymentTarget.id} as paid? This updates the receivable status and customer balance.` : 'Mark this invoice as paid?'}
         confirmLabel="Mark as paid"
         busy={paymentMutation.isPending}
+      />
+      <FormDialog
+        open={Boolean(voidTarget)}
+        onClose={() => {
+          if (voidInvoiceMutation.isPending) return;
+          setVoidTarget(null);
+          setVoidReason('');
+          setVoidError('');
+        }}
+        title="Void receivable invoice?"
+        subtitle={voidTarget
+          ? `Invoice ${voidTarget.number} will be marked void. Any stock issued by this invoice, its ledger recognition, and any recorded cash settlement will be reversed; the original invoice, stock, and audit history remain.`
+          : 'Mark this invoice as void and reverse its stock and ledger effects.'}
+        confirmLabel="Void invoice"
+        confirmVariant="danger"
+        busy={voidInvoiceMutation.isPending}
+        error={voidError}
+        isConfirmDisabled={!voidReason.trim()}
+        onConfirm={() => {
+          if (!voidTarget || !voidReason.trim()) return;
+          voidInvoiceMutation.mutate({ id: voidTarget.id, reason: voidReason.trim() });
+        }}
+      >
+        <label htmlFor="void-receivable-reason" className="block text-sm font-medium text-body">
+          Reason
+          <Textarea
+            id="void-receivable-reason"
+            required
+            maxLength={2000}
+            rows={4}
+            value={voidReason}
+            onChange={(event) => setVoidReason(event.target.value)}
+            className="mt-1 resize-y"
+            placeholder="Explain why this invoice is being voided"
+          />
+        </label>
+        <p className="mt-3 text-xs text-muted">
+          This cannot be undone. Voiding keeps the original invoice and reverses the exact stock and ledger entries.
+        </p>
+      </FormDialog>
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => {
+          if (deleteInvoiceMutation.isPending) return;
+          setDeleteTarget(null);
+          setDeleteError('');
+        }}
+        onConfirm={() => deleteTarget && deleteInvoiceMutation.mutate(deleteTarget)}
+        title="Delete receivable invoice?"
+        description={deleteTarget
+          ? `Delete invoice ${deleteTarget.number}? It will be removed from active receivables and any stock and ledger recognition will be restored. The record remains in history as void.`
+          : 'Delete this invoice?'}
+        confirmLabel="Delete invoice"
+        busy={deleteInvoiceMutation.isPending}
+        error={deleteError}
+        danger
       />
       {customerModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -969,14 +1282,15 @@ export default function AccountsReceivable() {
       {/* ── New Invoice Modal ── */}
       {invoiceModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in-50">
-          <div className="w-full max-w-md rounded-card border border-border-default bg-surface-raised p-6 shadow-elevated">
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-card border border-border-default bg-surface-raised p-6 shadow-elevated">
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-border-subtle">
               <h2 className="text-base font-bold text-heading">New Receivable Invoice</h2>
               <Button
                 type="button"
                 size="icon"
                 variant="ghost"
-                onClick={() => setInvoiceModalOpen(false)}
+                aria-label="Close new invoice"
+                onClick={closeInvoiceModal}
                 className="h-7 w-7 text-muted hover:bg-surface-muted"
               >
                 <X size={16} />
@@ -1001,19 +1315,43 @@ export default function AccountsReceivable() {
                   setNewInvoiceError('Please enter a valid invoice amount greater than zero.');
                   return;
                 }
+                let inventoryPayload;
+                try {
+                  inventoryPayload = invoiceInventoryLines.map((line, index) => {
+                    if (!line.product || !line.productId) {
+                      throw new Error(`Select a product for stock line ${index + 1}.`);
+                    }
+                    const quantity = Number(line.quantity);
+                    if (!Number.isSafeInteger(quantity) || quantity <= 0) {
+                      throw new Error(`Enter a whole quantity greater than zero for ${line.product.name}.`);
+                    }
+                    return { productId: line.productId, quantity };
+                  });
+                  if (new Set(inventoryPayload.map(line => line.productId)).size !== inventoryPayload.length) {
+                    throw new Error('Each product may appear only once on an invoice.');
+                  }
+                  if (inventoryPayload.length > 0 && !inventoryConfigured) {
+                    throw new Error('Inventory valuation is not configured. Remove the stock lines or configure valuation first.');
+                  }
+                } catch (validationError) {
+                  setNewInvoiceError(validationError.message);
+                  return;
+                }
                 createInvoiceMutation.mutate({
                   customerId: newInvoiceCustomerId,
                   number: newInvoiceNumber.trim() || undefined,
-                  amount: numAmount.toFixed(2),
-                  dueDate: newInvoiceDueDate ? new Date(newInvoiceDueDate).toISOString() : undefined,
+                  amount: newInvoiceAmount.trim(),
+                  dueDate: newInvoiceDueDate || undefined,
+                  ...(inventoryPayload.length > 0 && { inventoryLines: inventoryPayload }),
                 });
               }}
               className="space-y-4 text-xs"
             >
               <div>
-                <label className="block font-medium text-body mb-1">Customer</label>
+                <label htmlFor="new-invoice-customer" className="block font-medium text-body mb-1">Customer</label>
                 {(customersData?.items ?? []).length > 0 ? (
                   <select
+                    id="new-invoice-customer"
                     value={newInvoiceCustomerId}
                     onChange={(e) => setNewInvoiceCustomerId(e.target.value)}
                     className="w-full h-9 rounded-input border border-border-default bg-surface-raised px-3 text-xs text-body focus:outline-none focus:border-primary"
@@ -1032,7 +1370,7 @@ export default function AccountsReceivable() {
                     <button
                       type="button"
                       onClick={() => {
-                        setInvoiceModalOpen(false);
+                        closeInvoiceModal();
                         setCustomerModalOpen(true);
                       }}
                       className="underline font-semibold"
@@ -1044,8 +1382,9 @@ export default function AccountsReceivable() {
               </div>
 
               <div>
-                <label className="block font-medium text-body mb-1">Invoice Number</label>
+                <label htmlFor="new-invoice-number" className="block font-medium text-body mb-1">Invoice Number</label>
                 <Input
+                  id="new-invoice-number"
                   type="text"
                   placeholder="e.g. INV-2026-001"
                   value={newInvoiceNumber}
@@ -1055,8 +1394,9 @@ export default function AccountsReceivable() {
               </div>
 
               <div>
-                <label className="block font-medium text-body mb-1">Invoice Amount</label>
+                <label htmlFor="new-invoice-amount" className="block font-medium text-body mb-1">Invoice Amount</label>
                 <Input
+                  id="new-invoice-amount"
                   type="number"
                   step="0.01"
                   min="0.01"
@@ -1069,8 +1409,9 @@ export default function AccountsReceivable() {
               </div>
 
               <div>
-                <label className="block font-medium text-body mb-1">Due Date</label>
+                <label htmlFor="new-invoice-due-date" className="block font-medium text-body mb-1">Due Date</label>
                 <Input
+                  id="new-invoice-due-date"
                   type="date"
                   value={newInvoiceDueDate}
                   onChange={(e) => setNewInvoiceDueDate(e.target.value)}
@@ -1078,12 +1419,84 @@ export default function AccountsReceivable() {
                 />
               </div>
 
+              <div className="rounded-button border border-border-default bg-surface p-3 space-y-2.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-heading flex items-center gap-1.5">
+                      <Package size={13} className="text-muted" />
+                      Stock fulfillment
+                      <span className="font-normal text-muted">(optional)</span>
+                    </p>
+                    <p className="text-[11px] text-muted mt-0.5">
+                      Issue inventory and post cost of goods sold using this workspace&apos;s costing policy.
+                    </p>
+                  </div>
+                  {inventoryConfigured && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addInvoiceInventoryLine}
+                      className="h-7 px-2 gap-1 text-[11px] shrink-0"
+                    >
+                      <Plus size={12} /> Add
+                    </Button>
+                  )}
+                </div>
+
+                {isValuationSetupLoading ? (
+                  <div className="flex items-center gap-1.5 py-1 text-[11px] text-muted">
+                    <Loader2 size={12} className="animate-spin" /> Checking inventory valuation…
+                  </div>
+                ) : isValuationSetupError ? (
+                  <p className="text-[11px] text-warning-text bg-warning-light border border-warning/20 rounded-input p-2">
+                    Inventory valuation could not be checked. You can still create a total-only invoice.
+                  </p>
+                ) : !inventoryConfigured ? (
+                  <p className="text-[11px] text-warning-text bg-warning-light border border-warning/20 rounded-input p-2 leading-4">
+                    Inventory valuation is not configured, so this invoice will be total-only. To issue stock and post COGS,{' '}
+                    <Link
+                      to="/dashboard/inventory/valuation"
+                      onClick={closeInvoiceModal}
+                      className="font-semibold underline underline-offset-2"
+                    >
+                      configure inventory valuation
+                    </Link>
+                    .
+                  </p>
+                ) : (
+                  <>
+                    {invoiceInventoryLines.length === 0 ? (
+                      <p className="text-[11px] text-muted">
+                        No stock is issued for this invoice. Add a line to fulfill it from valued inventory.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {invoiceInventoryLines.map((line, index) => (
+                          <InvoiceInventoryLineEditor
+                            key={line.key}
+                            line={line}
+                            index={index}
+                            onChange={(patch) => updateInvoiceInventoryLine(line.key, patch)}
+                            onRemove={() => setInvoiceInventoryLines(lines => lines.filter(candidate => candidate.key !== line.key))}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-[10px] text-muted leading-4">
+                      Cost is allocated by the workspace costing policy; the product selling price is never used as cost.
+                      A total-only invoice remains valid.
+                    </p>
+                  </>
+                )}
+              </div>
+
               <div className="pt-2 flex items-center justify-end gap-2 border-t border-border-subtle">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setInvoiceModalOpen(false)}
+                  onClick={closeInvoiceModal}
                   disabled={createInvoiceMutation.isPending}
                 >
                   Cancel

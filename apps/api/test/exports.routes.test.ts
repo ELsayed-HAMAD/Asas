@@ -20,6 +20,14 @@ async function setup(options: { failAudit?: boolean; failDispatch?: boolean } = 
   } as unknown as Auth)
 
   const events: string[] = []
+  const dispatch = vi.fn(async (_id: string, _kind: string, _data: unknown) => {
+    events.push('dispatch')
+    if (options.failDispatch) {
+      if (job) job = { ...job, status: 'FAILED' }
+      throw new Error('queue unavailable')
+    }
+    if (job) job = { ...job, status: 'DONE', progressPct: 100 }
+  })
   const jobTemplate = {
     id: exportId,
     tenantId: 'tenant_1',
@@ -42,7 +50,9 @@ async function setup(options: { failAudit?: boolean; failDispatch?: boolean } = 
     member: { findUnique: vi.fn().mockResolvedValue({ role: 'ADMIN', employeeId: null }) },
     exportJob: {
       findFirstOrThrow: vi.fn(async () => job),
+      findFirst: vi.fn(async () => job),
     },
+    auditLog: { create: vi.fn().mockResolvedValue({}) },
     $transaction: vi.fn(async callback => {
       const before = job
       const tx = {
@@ -64,20 +74,12 @@ async function setup(options: { failAudit?: boolean; failDispatch?: boolean } = 
     }),
   } as unknown as PrismaClient
   app.decorate('prisma', prisma)
-  app.decorate('exportQueue', {
-    dispatch: vi.fn(async () => {
-      events.push('dispatch')
-      if (options.failDispatch) {
-        if (job) job = { ...job, status: 'FAILED' }
-        throw new Error('queue unavailable')
-      }
-      if (job) job = { ...job, status: 'DONE', progressPct: 100 }
-    }),
-  } as never)
-  app.decorate('objectStorage', {} as never)
+  app.decorate('exportQueue', { dispatch } as never)
+  const storageGet = vi.fn(async () => Buffer.from('Name,Status\r\nAda,ACTIVE\r\n'))
+  app.decorate('objectStorage', { mode: 'local', get: storageGet } as never)
   app.decorate('ssePublish', vi.fn(() => events.push('sse')))
   await app.register(exportRoutes, { prefix: '/api/v1/exports' })
-  return { app, events, prisma, createJob, job: () => job }
+  return { app, events, prisma, createJob, dispatch, storageGet, job: () => job }
 }
 
 afterEach(() => clearAuthContextCache())
@@ -99,6 +101,61 @@ describe('POST /exports/jobs', () => {
       expect(f.createJob).toHaveBeenCalledWith({
         data: expect.objectContaining({ tenantId: 'tenant_1', dataScope: 'workspace', status: 'QUEUED', format: 'json' }),
       })
+    } finally {
+      await f.app.close()
+    }
+  })
+
+  it('persists and dispatches CSV format and inclusive date filters', async () => {
+    const f = await setup()
+    try {
+      const response = await f.app.inject({
+        method: 'POST',
+        url: '/api/v1/exports/jobs',
+        headers: { cookie: 'better-auth.session_token=export-test-token' },
+        payload: { kind: 'employees', format: 'csv', dateRange: { from: '2026-01-01', to: '2026-03-31' } },
+      })
+
+      expect(response.statusCode, response.body).toBe(202)
+      expect(response.json().data).toMatchObject({
+        kind: 'employees', format: 'csv',
+        dateRange: { from: '2026-01-01', to: '2026-03-31' }, filename: 'employees.csv',
+      })
+      expect(f.createJob).toHaveBeenCalledWith({ data: expect.objectContaining({
+        dataScope: 'employees', filename: 'employees.csv', format: 'csv',
+        dateRange: '{"from":"2026-01-01","to":"2026-03-31"}',
+      }) })
+      expect(f.dispatch).toHaveBeenCalledWith(exportId, 'employees', expect.objectContaining({
+        format: 'csv', dateRange: { from: '2026-01-01', to: '2026-03-31' },
+      }))
+    } finally {
+      await f.app.close()
+    }
+  })
+
+  it('downloads a CSV job from its matching tenant-scoped key and content type', async () => {
+    const f = await setup()
+    try {
+      const created = await f.app.inject({
+        method: 'POST',
+        url: '/api/v1/exports/jobs',
+        headers: { cookie: 'better-auth.session_token=export-test-token' },
+        payload: { kind: 'employees', format: 'csv' },
+      })
+      expect(created.statusCode).toBe(202)
+
+      const response = await f.app.inject({
+        method: 'GET',
+        url: `/api/v1/exports/jobs/${exportId}/download`,
+        headers: { cookie: 'better-auth.session_token=export-test-token' },
+      })
+
+      expect(response.statusCode).toBe(200)
+      expect(response.headers['content-type']).toBe('text/csv; charset=utf-8')
+      expect(response.headers['content-disposition']).toBe('attachment; filename="employees.csv"')
+      expect(response.body).toBe('Name,Status\r\nAda,ACTIVE\r\n')
+      expect(f.storageGet).toHaveBeenCalledWith(`exports/tenant_1/${exportId}.csv`)
+      expect(f.prisma.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: 'export.download' }) }))
     } finally {
       await f.app.close()
     }

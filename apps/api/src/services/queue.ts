@@ -89,18 +89,28 @@ export function exportFilePath(jobId: string, extension: string): string {
 }
 
 /** The file extension a kind renders to — the download endpoint needs it to address the file. */
-export function exportFileExtension(kind: string): string {
-  return (KIND_FILENAME[kind] ?? { extension: 'xlsx' }).extension
+export function exportFileExtension(kind: string, format?: string | null): string {
+  const defaults = KIND_FILENAME[kind]
+  if (!defaults) throw new Error(`Unsupported export kind '${kind}'`)
+  if (kind === 'workspace') {
+    if (format && format !== 'json') throw new Error('Workspace archives are JSON exports')
+    return 'json'
+  }
+  if (format === 'csv') return 'csv'
+  if (format && format !== 'xlsx') throw new Error(`Unsupported ${kind} export format '${format}'`)
+  return 'xlsx'
 }
 
-export function exportFileName(kind: string): string {
-  return (KIND_FILENAME[kind] ?? { filename: `${kind}.xlsx` }).filename
+export function exportFileName(kind: string, format?: string | null): string {
+  const extension = exportFileExtension(kind, format)
+  return `${KIND_FILENAME[kind]!.filename.replace(/\.[^.]+$/, '')}.${extension}`
 }
 
-export function exportContentType(kind: string): string {
-  return exportFileExtension(kind) === 'json'
-    ? 'application/json; charset=utf-8'
-    : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+export function exportContentType(kind: string, format?: string | null): string {
+  const extension = exportFileExtension(kind, format)
+  if (extension === 'json') return 'application/json; charset=utf-8'
+  if (extension === 'csv') return 'text/csv; charset=utf-8'
+  return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 }
 
 const BOSS_QUEUE = 'exports'
@@ -153,12 +163,13 @@ export async function createExportQueue(options: CreateExportQueueOptions): Prom
     }
     await updateRow(job.jobId, { status: 'RUNNING', progressPct: 10 })
     try {
-      const extension = (KIND_FILENAME[job.kind] ?? { extension: 'xlsx' }).extension
+      const options = job.data && typeof job.data === 'object' ? job.data as { format?: string } : {}
+      const extension = exportFileExtension(job.kind, options.format)
       const buffer = await handler(job.data, { jobId: job.jobId })
       const tenantId = await store.getTenantId(job.jobId)
       if (!tenantId) throw new Error(`Export job ${job.jobId} not found`)
       await store.withStorageCapacity(tenantId, buffer.byteLength, () =>
-        storage.put(exportObjectKey(tenantId, job.jobId, extension), buffer, exportContentType(job.kind)),
+        storage.put(exportObjectKey(tenantId, job.jobId, extension), buffer, exportContentType(job.kind, options.format)),
       )
       await updateRow(job.jobId, { status: 'DONE', progressPct: 100 })
     } catch (error) {

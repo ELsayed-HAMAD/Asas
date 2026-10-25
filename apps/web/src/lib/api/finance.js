@@ -45,6 +45,7 @@ export const financeApi = {
   listCollectionActivities: (customerId) => http.get(`/finance/customers/${customerId}/activities`),
   createCollectionActivity: (customerId, body) => http.post(`/finance/customers/${customerId}/activities`, { body }),
   createReceivable: (body) => http.post('/finance/receivables', { body }),
+  deleteReceivable: (id) => http.delete(`/finance/receivables/${id}`),
   createPayable: (body) => http.post('/finance/payables', { body }),
   createExpense: (body) => http.post('/finance/expenses', { body }),
   createExpenseSelf: (body) => http.post('/finance/expenses/self', { body }),

@@ -1,6 +1,22 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { csvCell, csvRows, downloadCsv } from '../src/lib/csv.js'
+import { csvCell, csvRows, downloadCsv, inferCsvColumnMapping, parseCsvImport } from '../src/lib/csv.js'
+
+test('parses bounded CSV rows, escaped quotes, and employee migration limits', () => {
+  const parsed = parseCsvImport('\uFEFFSource ID,Company Name,Tier\r\n"legacy-1","North, Inc.",Gold\r\nlegacy-2,"A ""quoted"" name",Silver', { recordLabel: 'companies' })
+  assert.deepEqual(parsed.headers, ['Source ID', 'Company Name', 'Tier'])
+  assert.deepEqual(parsed.rows, [['legacy-1', 'North, Inc.', 'Gold'], ['legacy-2', 'A "quoted" name', 'Silver']])
+  assert.throws(() => parseCsvImport('Name\nA\nB', { maxRows: 1, recordLabel: 'employees', limitPrefix: 'This onboarding import' }), /This onboarding import supports up to 1 employees/)
+  assert.throws(() => parseCsvImport('Name\n"unfinished'), /unfinished quoted value/)
+})
+
+test('infers mappings from normalized source headers without reusing positional assumptions', () => {
+  const fields = [
+    { key: 'sourceId', aliases: ['source id', 'legacy id'] },
+    { key: 'name', aliases: ['company name', 'account name'] },
+  ]
+  assert.deepEqual(inferCsvColumnMapping(['Legacy_ID', 'Account Name', 'Unused'], fields), { sourceId: '0', name: '1' })
+})
 
 test('quotes commas and quotes while preserving ordinary numeric values', () => {
   assert.equal(csvCell('Sales, East'), '"Sales, East"')

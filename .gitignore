@@ -29,6 +29,12 @@ yarn.lock
 *.env.*
 *.env.local
 *.env.*.local
+.envrc
+*.envrc
+.env.vault
+.env.me
+*.env.bak
+*.env.backup
 !.env.example
 !.env.*.example
 
@@ -46,10 +52,14 @@ yarn.lock
 *.priv
 *.private
 *.kdbx
+*.keepass*
 *.age
 *.gpg
 *.asc
 secring.*
+master.key
+credentials.yml.enc
+*.ovpn
 
 # Secret & Credential Stores
 *.secret
@@ -58,6 +68,37 @@ secring.*
 *.tokens
 *.credential
 *.credentials
+*secret*.json
+*secrets*.json
+*credential*.json
+*credentials*.json
+*token*.json
+*tokens*.json
+*secret*.yaml
+*secrets*.yaml
+*secret*.yml
+*secrets*.yml
+*credential*.yaml
+*credentials*.yaml
+*credential*.yml
+*credentials*.yml
+*token*.yaml
+*tokens*.yaml
+*token*.yml
+*tokens*.yml
+*secret*.txt
+*secrets*.txt
+*credential*.txt
+*credentials*.txt
+*token*.txt
+*tokens*.txt
+.htpasswd
+.netrc
+netrc
+.pgpass
+.dockercfg
+.npmrc
+.pypirc
 secrets/
 credentials/
 .secrets/
@@ -69,17 +110,25 @@ certificates/
 id_rsa*
 id_ed25519*
 id_ecdsa*
+id_dsa*
 
-# Cloud Credentials & Service Accounts
+# Cloud Credentials, SDKs & Service Accounts
 *service-account*.json
 *serviceAccount*.json
 *firebase-adminsdk*.json
 *gcp-credentials*.json
 *google-credentials*.json
+*google-services*.json
 *aws-credentials*
+*service-key*.json
 .aws/
 .azure/
 .gcloud/
+.kube/
+kubeconfig*
+.oci/
+.alicloud/
+.docker/config.json
 
 # =========================
 # Frontend Builds & Caches
@@ -152,6 +201,14 @@ tmp/
 temp/
 .tmp/
 .tmp-shims/
+*.pid
+*.seed
+
+# Ephemeral test storage and queue runtime directories
+storage-test-*/
+queue-storage-test-*/
+apps/api/storage-test-*/
+apps/api/queue-storage-test-*/
 
 # =========================
 # Testing & Coverage
@@ -226,25 +283,57 @@ claude.json
 .qodo/
 .cody/
 .trae/
+.factory/
+.supermaven/
+.augment/
+.amazonq/
+.goose/
+.openhands/
+.junie/
+.agent-memory/
+.ai_cache/
+ai_cache/
+.llm/
+llm/
 .system_generated/
 brain/
-*.scratch.*
+.brain/
+*.brain
+chat-history/
+.chat-history/
+transcripts/
+.transcripts/
+agent-transcripts/
 scratch/
 .scratch/
+*.scratch.*
+scratchpad/
+.scratchpad/
+*scratchpad*
+*SCRATCHPAD*
+*.scratchpad.*
+*.scratchpad.md
 .ai/
+ai/
 .prompts/
 .prompt/
+prompt/
+prompts/
+prompt_history/
 ai-output/
 ai_artifacts/
 llm_output/
-prompts/
-prompt_history/
 
 # Local AI instruction, prompt, and context files
 AGENTS.md
 AGENTS.*
 AGENTS-*.md
 AGENT-*.md
+AGENT.md
+agent.md
+agents.md
+*agent*.md
+*AGENT*.md
 CLAUDE.md
 CLAUDE.*
 claude.md
@@ -259,18 +348,31 @@ copilot.md
 copilot-instructions.md
 .github/copilot-instructions.md
 *.agent.md
+*.agent.json
+*.agent.yaml
+*.agent.yml
 *.instructions.md
+*.prompt
+*.prompts
 *.prompt.md
+*.prompt.txt
+*.prompt.json
 *.ai.md
 *.ai.txt
+*.ai.json
+*.ai.yaml
+*.ai.yml
 *.context.md
+*.context.txt
 *.codex.md
 *.copilot.md
 *.gemini.md
 *.chatgpt.md
 *.claude.md
+*.llm
 .cursorrules
 *.cursorrules
+.cursor/rules/
 .windsurfrules
 *.windsurfrules
 .aider*.*
@@ -281,19 +383,36 @@ copilot-instructions.md
 .codeiumignore
 
 # =========================
-# Audit, Review, Plan, Analysis & Remediation Files
-# Keep private analysis, remediation tracking, and planning notes out of git.
+# Audit, Review, Plan, Analysis, Status & Remediation Files
+# Keep private analysis, remediation tracking, status logs, and planning notes out of git.
 # =========================
-# Common local work directories used for plans, reviews, and AI output.
+# Common local work directories used for plans, reviews, status, and AI output.
 .reviews/
 .plans/
 .audits/
+.status/
+.tracking/
+.reports/
+.remediation/
+.notes/
+.todos/
+.specs/
+.scratchpads/
 .ai-review/
 plans/
 reviews/
 audits/
+status/
+tracking/
+reports/
+remediation/
+notes/
+todos/
+specs/
+scratchpads/
 analysis/
 
+# Explicit named files
 internal notes
 UI_UX_security review
 AUDIT.md
@@ -301,6 +420,7 @@ security review
 migration notes
 migration notes
 migration log
+internal notes
 REMEDIATION-PLAN-*.md
 REVIEW-*.md
 
@@ -315,6 +435,30 @@ REVIEW-*.md
 *handoff*.md
 *PROGRESS*.md
 *progress*.md
+*STATUS*.md
+*status*.md
+*MIGRATION*.md
+*migration*.md
+*TRACKING*.md
+*tracking*.md
+*REPORT*.md
+*report*.md
+*REPORTS*.md
+*reports*.md
+*FINDINGS*.md
+*findings*.md
+*CHANGES*.md
+*changes*.md
+*BACKLOG*.md
+*backlog*.md
+*ROADMAP*.md
+*roadmap*.md
+*BRIEF*.md
+*brief*.md
+*DIAGNOSIS*.md
+*diagnosis*.md
+*RECONCILIATION*.md
+*reconciliation*.md
 *COMPLETION-REPORT*.md
 *remediation*.md
 *REMEDIATION*.md
@@ -326,17 +470,36 @@ REVIEW-*.md
 *.todo.md
 *CHECKLIST*.md
 *checklist*.md
+*.checklist.md
 *ANALYSIS*.md
 *analysis*.md
+*.analysis.md
 *SUMMARY*.md
 *summary*.md
+*.summary.md
 *TASK*.md
 *tasks*.md
 *TASKS*.md
+*.tasks.md
 *SCRATCH*.md
 *scratch*.md
+*.scratch.md
 *INVESTIGATION*.md
 *investigation*.md
+*.investigation.md
+*SESSION*.md
+*session*.md
+*.session.md
+*LOG*.md
+*log*.md
+*.status.md
+*.status.txt
+*.tracking.md
+*.report.md
+*.findings.md
+*.brief.md
+*.roadmap.md
+*.backlog.md
 *.plan
 *.plan.json
 *.plan.txt
@@ -353,6 +516,22 @@ REVIEW-*.md
 *[Hh][Aa][Nn][Dd][Oo][Ff][Ff]*.markdown
 *[Pp][Rr][Oo][Gg][Rr][Ee][Ss][Ss]*.md
 *[Pp][Rr][Oo][Gg][Rr][Ee][Ss][Ss]*.markdown
+*[Ss][Tt][Aa][Tt][Uu][Ss]*.md
+*[Ss][Tt][Aa][Tt][Uu][Ss]*.markdown
+*[Tt][Rr][Aa][Cc][Kk][Ii][Nn][Gg]*.md
+*[Tt][Rr][Aa][Cc][Kk][Ii][Nn][Gg]*.markdown
+*[Rr][Ee][Pp][Oo][Rr][Tt]*.md
+*[Rr][Ee][Pp][Oo][Rr][Tt]*.markdown
+*[Ff][Ii][Nn][Dd][Ii][Nn][Gg][Ss]*.md
+*[Ff][Ii][Nn][Dd][Ii][Nn][Gg][Ss]*.markdown
+*[Bb][Aa][Cc][Kk][Ll][Oo][Gg]*.md
+*[Bb][Aa][Cc][Kk][Ll][Oo][Gg]*.markdown
+*[Rr][Oo][Aa][Dd][Mm][Aa][Pp]*.md
+*[Rr][Oo][Aa][Dd][Mm][Aa][Pp]*.markdown
+*[Bb][Rr][Ii][Ee][Ff]*.md
+*[Bb][Rr][Ii][Ee][Ff]*.markdown
+*[Dd][Ii][Aa][Gg][Nn][Oo][Ss][Ii][Ss]*.md
+*[Dd][Ii][Aa][Gg][Nn][Oo][Ss][Ii][Ss]*.markdown
 *[Rr][Ee][Mm][Ee][Dd][Ii][Aa][Tt][Ii][Oo][Nn]*.md
 *[Rr][Ee][Mm][Ee][Dd][Ii][Aa][Tt][Ii][Oo][Nn]*.markdown
 *[Ii][Nn][Vv][Ee][Ss][Tt][Ii][Gg][Aa][Tt][Ii][Oo][Nn]*.md
@@ -367,8 +546,10 @@ REVIEW-*.md
 *[Tt][Aa][Ss][Kk][Ss]*.markdown
 *[Cc][Hh][Ee][Cc][Kk][Ll][Ii][Ss][Tt]*.md
 *[Cc][Hh][Ee][Cc][Kk][Ll][Ii][Ss][Tt]*.markdown
+*[Ss][Cc][Rr][Aa][Tt][Cc][Hh][Pp][Aa][Dd]*.md
+*[Ss][Cc][Rr][Aa][Tt][Cc][Hh][Pp][Aa][Dd]*.markdown
 
-# Non-Markdown exports of local review/planning notes (.txt, .json, .yaml, .rst, etc.)
+# Non-Markdown exports of local review/planning/status notes (.txt, .json, .yaml, .rst, etc.)
 *[Rr][Ee][Vv][Ii][Ee][Ww]*.txt
 *[Rr][Ee][Vv][Ii][Ee][Ww]*.json
 *[Rr][Ee][Vv][Ii][Ee][Ww]*.yaml
@@ -391,6 +572,19 @@ REVIEW-*.md
 *[Hh][Aa][Nn][Dd][Oo][Ff][Ff]*.json
 *[Pp][Rr][Oo][Gg][Rr][Ee][Ss][Ss]*.txt
 *[Pp][Rr][Oo][Gg][Rr][Ee][Ss][Ss]*.json
+*[Ss][Tt][Aa][Tt][Uu][Ss]*.txt
+*[Ss][Tt][Aa][Tt][Uu][Ss]*.json
+*[Ss][Tt][Aa][Tt][Uu][Ss]*.yaml
+*[Ss][Tt][Aa][Tt][Uu][Ss]*.yml
+*[Tt][Rr][Aa][Cc][Kk][Ii][Nn][Gg]*.txt
+*[Tt][Rr][Aa][Cc][Kk][Ii][Nn][Gg]*.json
+*[Tt][Rr][Aa][Cc][Kk][Ii][Nn][Gg]*.yaml
+*[Tt][Rr][Aa][Cc][Kk][Ii][Nn][Gg]*.yml
+*[Rr][Ee][Pp][Oo][Rr][Tt]*.txt
+*[Rr][Ee][Pp][Oo][Rr][Tt]*.json
+*[Rr][Ee][Pp][Oo][Rr][Tt]*.yaml
+*[Rr][Ee][Pp][Oo][Rr][Tt]*.yml
+*[Ff][Ii][Nn][Dd][Ii][Nn][Gg][Ss]*.txt
 *[Rr][Ee][Mm][Ee][Dd][Ii][Aa][Tt][Ii][Oo][Nn]*.txt
 *[Rr][Ee][Mm][Ee][Dd][Ii][Aa][Tt][Ii][Oo][Nn]*.json
 *[Ii][Nn][Vv][Ee][Ss][Tt][Ii][Gg][Aa][Tt][Ii][Oo][Nn]*.txt
@@ -399,6 +593,7 @@ REVIEW-*.md
 *[Tt][Oo][Dd][Oo]*.txt
 *[Tt][Aa][Ss][Kk][Ss]*.txt
 *[Cc][Hh][Ee][Cc][Kk][Ll][Ii][Ss][Tt]*.txt
+*[Ss][Cc][Rr][Aa][Tt][Cc][Hh][Pp][Aa][Dd]*.txt
 *.review.md
 *.audit.md
 *.plan.md
@@ -434,10 +629,28 @@ REVIEW-*.md
 !*.jsx
 !*.ts
 !*.tsx
+!*.mjs
+!*.cjs
 !*.css
 !*.html
 !*.prisma
 !*.sql
+
+# Explicitly protect legitimate repository configuration files
+!package.json
+!**/package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!turbo.json
+!tsconfig*.json
+!**/tsconfig*.json
+!docker-compose*.yml
+!docker-compose*.yaml
+!Dockerfile*
+!**/Dockerfile*
+!.oxlintrc.json
+!.github/workflows/*.yml
+!.github/workflows/*.yaml
 
 # =========================
 # Scratch, Maintenance & Local Scripts

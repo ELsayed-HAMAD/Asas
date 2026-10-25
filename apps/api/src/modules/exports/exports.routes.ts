@@ -10,7 +10,11 @@ import {
   envelope,
   errorResponses,
   idParamSchema,
+  exportDateRangeSchema,
+  exportFormatSchema,
   type ExportJobKind,
+  type ExportDateRange,
+  type ExportFormat,
 } from '@asas/contracts'
 import { requireAuthContext, requireRole } from '../../middlewares/rbac.js'
 import { requirePermission } from '../../middlewares/permissions.js'
@@ -18,7 +22,14 @@ import { moduleKeyPrefix } from '../../plugins/sse.js'
 import { recordAuditLog } from '../../services/auditLog.js'
 import { exportContentType, exportFileExtension, exportFileName, type ExportHandler } from '../../services/queue.js'
 import { exportObjectKey } from '../../services/objectStorage.js'
-import { renderEmployeeDirectoryXlsx, renderLedgerXlsx, renderProjectsXlsx } from '../../services/export.js'
+import {
+  renderEmployeeDirectoryCsv,
+  renderEmployeeDirectoryXlsx,
+  renderLedgerCsv,
+  renderLedgerXlsx,
+  renderProjectsCsv,
+  renderProjectsXlsx,
+} from '../../services/export.js'
 import type { EmployeeDirectoryRow, LedgerRow, ProjectExportRow } from '../../services/export.js'
 import { AppError } from '../../utils/errors.js'
 
@@ -32,11 +43,11 @@ import { AppError } from '../../utils/errors.js'
  * default inline mode the row is DONE before the POST returns, so the round trip still takes
  * one poll; the client is written against the same two-step in both modes.
  *
- * Two handlers are registered with the queue here (not in `app.ts`) because they are the only
+ * Four handlers are registered with the queue here (not in `app.ts`) because they are the only
  * place the queue's abstract "render a kind into bytes" meets the concrete data: the employee
  * directory reuses the HR salary-visibility rule (an ADMIN export carries salary, a MEMBER's
- * does not — the same gate as the list endpoint), and the ledger is the tenant's full
- * `LedgerTransaction` set in date order, credits negative exactly as stored.
+ * does not — the same gate as the list endpoint), and the ledger export includes posted journal
+ * lines with account/debit-credit detail plus separately identified legacy sample transactions.
  *
  * The download is a binary stream addressed by job id (`storage/exports/<id>.<ext>`), so it
  * declares no JSON response schema — the same rule the CV preview route follows. Tenant
@@ -44,9 +55,9 @@ import { AppError } from '../../utils/errors.js'
  * Downloading carries the same `employee.write` gate as creating, since an export may carry
  * salaries; both are recorded in the audit log.
  *
- * The queue payload is plain data only (`{ canReadSalary }`) — it is JSON-serialised into
- * pg-boss in boss mode. Handlers use the app's Prisma client (captured at registration) and
- * read the owning `tenantId` from the `ExportJob` row, never from the payload.
+ * The queue payload is plain data only (salary permission, format, date range) — it is
+ * JSON-serialised into pg-boss in boss mode. Handlers read the owning `tenantId` from the
+ * `ExportJob` row, never from the payload.
  */
 
 /** Wire projection of an `ExportJob` row: the model's `dataScope` carries the kind. */
@@ -54,6 +65,8 @@ function mapExportJob(row: {
   id: string
   filename: string
   dataScope: string | null
+  format: string | null
+  dateRange: string | null
   status: 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED'
   progressPct: number
   createdAt: Date
@@ -64,6 +77,14 @@ function mapExportJob(row: {
     kind: row.dataScope as ExportJobKind,
     status: row.status,
     progressPct: row.progressPct,
+    format: exportFormatSchema.safeParse(row.format).success
+      ? exportFormatSchema.parse(row.format)
+      : row.dataScope === 'workspace' ? 'json' : 'xlsx',
+    dateRange: row.dateRange
+      ? exportDateRangeSchema.safeParse(parseDateRangeJson(row.dateRange)).success
+        ? exportDateRangeSchema.parse(parseDateRangeJson(row.dateRange))
+        : null
+      : null,
     downloadUrl: `/api/v1/exports/jobs/${row.id}/download`,
     filename: row.filename,
     createdAt: row.createdAt.toISOString(),
@@ -71,16 +92,39 @@ function mapExportJob(row: {
   }
 }
 
+function parseDateRangeJson(value: string): unknown {
+  try { return JSON.parse(value) as unknown } catch { return null }
+}
+
+function exportWindow(dateRange: ExportDateRange | undefined): { gte: Date; lt: Date } | undefined {
+  if (!dateRange) return undefined
+  const afterEndDate = new Date(`${dateRange.to}T00:00:00.000Z`)
+  afterEndDate.setUTCDate(afterEndDate.getUTCDate() + 1)
+  return { gte: new Date(`${dateRange.from}T00:00:00.000Z`), lt: afterEndDate }
+}
+
+function optionsFromQueueData(data: unknown, kind: ExportJobKind): { format: ExportFormat; dateRange?: ExportDateRange } {
+  const input = data && typeof data === 'object' ? data as Record<string, unknown> : {}
+  const parsed = exportJobCreateSchema.parse({
+    kind,
+    ...(input.format !== undefined ? { format: input.format } : {}),
+    ...(input.dateRange !== undefined && input.dateRange !== null ? { dateRange: input.dateRange } : {}),
+  })
+  return { format: parsed.format ?? (kind === 'workspace' ? 'json' : 'xlsx'), ...(parsed.dateRange ? { dateRange: parsed.dateRange } : {}) }
+}
+
 /** The tenant's full employee directory, salary present only when the caller may read it. */
 async function buildEmployeeDirectory(
   prisma: PrismaClient,
   tenantId: string,
   canReadSalary: boolean,
+  options: { format: ExportFormat; dateRange?: ExportDateRange },
 ): Promise<Buffer> {
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } })
   const currency = tenant?.currency ?? 'USD'
+  const hiredAt = exportWindow(options.dateRange)
   const employees = await prisma.employee.findMany({
-    where: { tenantId, status: { not: 'ARCHIVED' } },
+    where: { tenantId, status: { not: 'ARCHIVED' }, ...(hiredAt ? { hiredAt } : {}) },
     orderBy: { name: 'asc' },
     include: { department: { select: { name: true } } },
   })
@@ -95,57 +139,72 @@ async function buildEmployeeDirectory(
     salary: canReadSalary ? (employee.salary?.toString() ?? null) : null,
     currency,
   }))
-  return renderEmployeeDirectoryXlsx(rows)
+  return options.format === 'csv' ? renderEmployeeDirectoryCsv(rows) : renderEmployeeDirectoryXlsx(rows)
 }
 
-/** The tenant's full general ledger in date order; queries real JournalEntry accounting rows when present. */
-async function buildLedger(prisma: PrismaClient, tenantId: string): Promise<Buffer> {
+/** Tenant general-ledger detail, preserving both posted journals and separately marked legacy records. */
+async function buildLedger(prisma: PrismaClient, tenantId: string, options: { format: ExportFormat; dateRange?: ExportDateRange }): Promise<Buffer> {
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } })
   const currency = tenant?.currency ?? 'USD'
+  const postedAt = exportWindow(options.dateRange)
 
   // Query real JournalEntry and JournalLine records
   const journalEntries = typeof prisma.journalEntry?.findMany === 'function'
     ? await prisma.journalEntry.findMany({
-        where: { tenantId },
+        where: { tenantId, ...(postedAt ? { postedAt } : {}) },
         include: { lines: { include: { account: true } } },
         orderBy: { postedAt: 'asc' },
       })
     : []
 
-  if (journalEntries.length > 0) {
-    const rows: LedgerRow[] = journalEntries.map(entry => ({
-      date: entry.postedAt.toISOString().slice(0, 10),
-      description: entry.description,
-      status: entry.sourceType,
-      amount: (entry.baseAmount ?? entry.amount).toString(),
-      currency: entry.baseCurrency ?? entry.currency ?? currency,
-    }))
-    return renderLedgerXlsx(rows)
-  }
+  const journalRows: LedgerRow[] = journalEntries.flatMap(entry => entry.lines.map(line => ({
+    date: entry.postedAt.toISOString().slice(0, 10),
+    recordType: 'JOURNAL_LINE' as const,
+    journalId: entry.id,
+    description: entry.description,
+    sourceType: entry.sourceType,
+    accountCode: line.account.code,
+    accountName: line.account.name,
+    side: line.side as 'DEBIT' | 'CREDIT',
+    amount: line.amount.toString(),
+    currency: entry.currency,
+    baseAmount: line.baseAmount?.toString() ?? null,
+    baseCurrency: entry.baseCurrency,
+  })))
 
-  // Fallback to legacy LedgerTransaction for workspaces with only sample data
+  // Legacy sample transactions have no chart-of-accounts or journal-line detail. Preserve them
+  // in the same export but label them explicitly instead of pretending they are posted GL lines.
   const transactions = typeof prisma.ledgerTransaction?.findMany === 'function'
     ? await prisma.ledgerTransaction.findMany({
-        where: { tenantId },
+        where: { tenantId, ...(postedAt ? { date: postedAt } : {}) },
         orderBy: { date: 'asc' },
       })
     : []
-  const rows: LedgerRow[] = transactions.map(tx => ({
+  const legacyRows: LedgerRow[] = transactions.map(tx => ({
     date: tx.date.toISOString().slice(0, 10),
+    recordType: 'LEGACY_TRANSACTION',
+    journalId: null,
     description: tx.description,
-    status: tx.status,
+    sourceType: tx.status,
+    accountCode: null,
+    accountName: null,
+    side: tx.isCredit ? 'CREDIT' : 'DEBIT',
     amount: tx.amount.toString(),
-    currency,
+    currency: tx.currency ?? currency,
+    baseAmount: null,
+    baseCurrency: null,
   }))
-  return renderLedgerXlsx(rows)
+  const rows = [...journalRows, ...legacyRows].sort((left, right) => left.date.localeCompare(right.date) || (left.journalId ?? '').localeCompare(right.journalId ?? ''))
+  return options.format === 'csv' ? renderLedgerCsv(rows) : renderLedgerXlsx(rows)
 }
 
 /** The tenant's full project portfolio, calculating true aggregated spend from source financial records (Finding 18). */
-async function buildProjects(prisma: PrismaClient, tenantId: string): Promise<Buffer> {
+async function buildProjects(prisma: PrismaClient, tenantId: string, options: { format: ExportFormat; dateRange?: ExportDateRange }): Promise<Buffer> {
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } })
   const currency = tenant?.currency ?? 'USD'
+  const createdAt = options.dateRange ? exportWindow(options.dateRange) : undefined
   const projects = await prisma.project.findMany({
-    where: { tenantId },
+    where: { tenantId, ...(createdAt ? { createdAt } : {}) },
     orderBy: { name: 'asc' },
     include: {
       department: { select: { name: true } },
@@ -187,7 +246,7 @@ async function buildProjects(prisma: PrismaClient, tenantId: string): Promise<Bu
     currency,
     sprintsCount: proj._count.sprints,
   }))
-  return renderProjectsXlsx(rows)
+  return options.format === 'csv' ? renderProjectsCsv(rows) : renderProjectsXlsx(rows)
 }
 
 const EXCLUDED_EXPORT_MODELS = new Set(['Account', 'Session', 'TwoFactor', 'Verification'])
@@ -309,11 +368,11 @@ export function registerExportHandlers(
     return job.tenantId
   }
   queue.register('employees', async (data, { jobId }) => {
-    const { canReadSalary } = data as { canReadSalary?: unknown }
-    return buildEmployeeDirectory(prisma, await jobTenantId(jobId), canReadSalary === true)
+    const input = data && typeof data === 'object' ? data as { canReadSalary?: unknown } : {}
+    return buildEmployeeDirectory(prisma, await jobTenantId(jobId), input.canReadSalary === true, optionsFromQueueData(data, 'employees'))
   })
-  queue.register('ledger', async (_data, { jobId }) => buildLedger(prisma, await jobTenantId(jobId)))
-  queue.register('projects', async (_data, { jobId }) => buildProjects(prisma, await jobTenantId(jobId)))
+  queue.register('ledger', async (data, { jobId }) => buildLedger(prisma, await jobTenantId(jobId), optionsFromQueueData(data, 'ledger')))
+  queue.register('projects', async (data, { jobId }) => buildProjects(prisma, await jobTenantId(jobId), optionsFromQueueData(data, 'projects')))
   queue.register('workspace', async (_data, { jobId }) => buildWorkspaceArchive(prisma, await jobTenantId(jobId)))
 }
 
@@ -388,6 +447,9 @@ export async function exportRoutes(app: FastifyInstance): Promise<void> {
       const { tenantId, role, userId } = requireAuthContext(request)
       const prisma = request.server.prisma
       const canReadSalary = role === 'ADMIN' || role === 'OWNER'
+      const format: ExportFormat = request.body.format ?? (request.body.kind === 'workspace' ? 'json' : 'xlsx')
+      const dateRange = request.body.dateRange
+      const extension = exportFileExtension(request.body.kind, format)
 
       // Persist the requested job and its audit event together before any worker can read data.
       // This prevents a completed export from existing without an attributable audit record.
@@ -395,10 +457,10 @@ export async function exportRoutes(app: FastifyInstance): Promise<void> {
         const created = await tx.exportJob.create({
           data: {
             tenantId,
-            filename: exportFileName(request.body.kind),
+            filename: exportFileName(request.body.kind, format),
             dataScope: request.body.kind,
-            format: exportFileExtension(request.body.kind),
-            dateRange: null,
+            format: extension,
+            dateRange: dateRange ? JSON.stringify(dateRange) : null,
             status: 'QUEUED',
           },
         })
@@ -408,13 +470,13 @@ export async function exportRoutes(app: FastifyInstance): Promise<void> {
           action: 'export.create',
           targetType: 'ExportJob',
           targetId: created.id,
-          metadata: { kind: request.body.kind },
+          metadata: { kind: request.body.kind, format, dateRange: dateRange ?? null },
         })
         return created
       })
 
       try {
-        await request.server.exportQueue.dispatch(job.id, request.body.kind, { canReadSalary })
+        await request.server.exportQueue.dispatch(job.id, request.body.kind, { canReadSalary, format, dateRange: dateRange ?? null })
       } catch (error) {
         request.server.ssePublish(tenantId, [moduleKeyPrefix('exports')])
         if (error instanceof AppError) throw error
@@ -454,7 +516,7 @@ export async function exportRoutes(app: FastifyInstance): Promise<void> {
         return { error: { message: `Export is still ${job.status.toLowerCase()}; not ready to download` } }
       }
 
-      const extension = exportFileExtension(job.dataScope ?? '')
+      const extension = exportFileExtension(job.dataScope ?? '', job.format)
       const storage = request.server.objectStorage
       const key = exportObjectKey(tenantId, job.id, extension)
       let bytes = await storage.get(key)
@@ -475,7 +537,7 @@ export async function exportRoutes(app: FastifyInstance): Promise<void> {
 
       reply
         .code(200)
-        .header('content-type', exportContentType(job.dataScope ?? ''))
+        .header('content-type', exportContentType(job.dataScope ?? '', job.format))
         .header('content-disposition', `attachment; filename="${job.filename}"`)
         .header('content-length', bytes.length)
       return reply.send(bytes)

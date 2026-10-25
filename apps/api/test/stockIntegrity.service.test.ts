@@ -17,6 +17,7 @@ function movementSetup(count = 1) {
   }
   const prisma = {
     product: { findFirst: vi.fn().mockResolvedValue({ id: 'product_1', stock: 10 }) },
+    inventoryValuationConfig: { findUnique: vi.fn().mockResolvedValue(null) },
     $transaction: vi.fn(async (work: (client: unknown) => unknown) => work(tx)),
   } as unknown as PrismaClient
   return { prisma, tx }
@@ -39,6 +40,16 @@ describe('stock integrity', () => {
   it('does not create a movement when an atomic decrement loses the stock race', async () => {
     const { prisma, tx } = movementSetup(0)
     await expect(recordStockMovement(prisma, 'tenant_1', { productId: 'product_1', delta: -3 }, 'user_1')).rejects.toMatchObject({ statusCode: 409 })
+    expect(tx.stockMovement.create).not.toHaveBeenCalled()
+  })
+  it('blocks a positive movement that would overflow the stored Int quantity', async () => {
+    const { prisma, tx } = movementSetup(0)
+    await expect(recordStockMovement(prisma, 'tenant_1', { productId: 'product_1', delta: 1 }, 'user_1'))
+      .rejects.toMatchObject({ statusCode: 409, message: 'Stock quantity exceeds the supported maximum or product is no longer available' })
+    expect(tx.product.updateMany).toHaveBeenCalledWith({
+      where: { id: 'product_1', tenantId: 'tenant_1', archivedAt: null, stock: { lte: 2_147_483_646 } },
+      data: { stock: { increment: 1 } },
+    })
     expect(tx.stockMovement.create).not.toHaveBeenCalled()
   })
   it('fails the stock transaction when audit persistence fails', async () => {

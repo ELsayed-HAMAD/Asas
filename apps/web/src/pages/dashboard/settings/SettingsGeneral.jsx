@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../../components/ui/select'
-import { http } from '../../../lib/api/http'
+import { API_ORIGIN_URL, http } from '../../../lib/api/http'
 import { onboardingApi } from '../../../lib/api/onboarding'
 import { settingsApi } from '../../../lib/api/settings'
 import { queryKeys } from '../../../lib/queryKeys'
@@ -79,17 +79,7 @@ export default function SettingsGeneral() {
 
   const handleLogoFileChange = (e) => {
     const file = e.target.files?.[0]
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert('Image must be under 2MB.')
-        return
-      }
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        setForm((curr) => ({ ...curr, logoUrl: event.target?.result || '' }))
-      }
-      reader.readAsDataURL(file)
-    }
+    if (file) logoUploadMutation.mutate(file)
   }
 
   useEffect(() => {
@@ -126,6 +116,17 @@ export default function SettingsGeneral() {
       queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'asas' })
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
+    },
+  })
+
+  const logoUploadMutation = useMutation({
+    mutationFn: (file) => http.putRaw('/settings/general/logo', {
+      body: file,
+      headers: { 'content-type': file.type },
+    }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(queryKeys.settings.general(), updated)
+      setForm((current) => ({ ...current, logoUrl: updated.logoUrl ?? '' }))
     },
   })
 
@@ -234,7 +235,7 @@ export default function SettingsGeneral() {
                   type="file"
                   accept="image/png,image/jpeg,image/webp,image/svg+xml"
                   onChange={handleLogoFileChange}
-                  disabled={!canManageSettings}
+                  disabled={!canManageSettings || logoUploadMutation.isPending}
                   className="hidden"
                 />
                 <div
@@ -244,11 +245,11 @@ export default function SettingsGeneral() {
                   onClick={() => canManageSettings && fileInputRef.current?.click()}
                   onKeyDown={event => { if (canManageSettings && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); fileInputRef.current?.click() } }}
                   className={`w-32 h-32 rounded-button border-2 border-dashed border-border-strong bg-surface-muted flex flex-col items-center justify-center text-caption transition-colors shrink-0 overflow-hidden relative group ${canManageSettings ? 'hover:bg-surface-active hover:border-caption cursor-pointer' : 'cursor-not-allowed opacity-70'}`}
-                  title="Click to select logo image"
+                  title={logoUploadMutation.isPending ? 'Uploading logo…' : 'Click to select logo image'}
                 >
                   {form.logoUrl ? (
                     <>
-                      <img src={form.logoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
+                      <img src={form.logoUrl.startsWith('/') ? `${API_ORIGIN_URL}${form.logoUrl}` : form.logoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-semibold transition-opacity">
                         Change File
                       </div>
@@ -258,11 +259,13 @@ export default function SettingsGeneral() {
                       <div className="w-10 h-10 bg-surface-strong rounded-full flex items-center justify-center mb-2">
                         <Upload size={18} className="text-muted" />
                       </div>
-                      <span className="text-xs font-semibold text-body-light">Upload File</span>
-                      <span className="text-[10px] text-caption mt-0.5">PNG, JPG, SVG</span>
+                      <span className="text-xs font-semibold text-body-light">{logoUploadMutation.isPending ? 'Uploading…' : 'Upload File'}</span>
+                      <span className="text-[10px] text-caption mt-0.5">PNG, JPG, WebP, SVG · up to 2 MB</span>
                     </>
                   )}
                 </div>
+
+                {logoUploadMutation.isError && <p role="alert" className="max-w-32 text-center text-xs text-danger">{logoUploadMutation.error?.message || 'Logo upload failed.'}</p>}
 
                 {form.logoUrl && (
                   <button

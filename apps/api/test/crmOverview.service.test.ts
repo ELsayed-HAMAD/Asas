@@ -64,6 +64,13 @@ describe('CRM overview stage conversion cohorts', () => {
     await db.waitReady
     try {
       await db.exec(`CREATE TYPE "DealStage" AS ENUM ('LEADS', 'PROPOSAL', 'NEGOTIATION', 'CLOSED_WON', 'CLOSED_LOST');
+        CREATE TABLE "Deal" (
+          "id" TEXT, "tenantId" TEXT NOT NULL, "archivedAt" TIMESTAMPTZ,
+          "stage" "DealStage", "closedAt" TIMESTAMPTZ
+        );
+        INSERT INTO "Deal" ("id", "tenantId", "archivedAt") VALUES
+          ('a', 'tenant_1', NULL), ('b', 'tenant_1', NULL), ('c', 'tenant_1', NULL),
+          ('d', 'tenant_1', NULL), ('e', 'tenant_1', NULL), ('foreign', 'tenant_2', NULL);
         CREATE TABLE "DealStageHistory" (
           "id" TEXT, "tenantId" TEXT NOT NULL, "dealId" TEXT NOT NULL,
           "toStage" "DealStage" NOT NULL, "occurredAt" TIMESTAMPTZ NOT NULL, "value" NUMERIC NOT NULL,
@@ -83,8 +90,7 @@ describe('CRM overview stage conversion cohorts', () => {
         { fromStage: 'NEGOTIATION', toStage: 'CLOSED_WON', enteredCount: 2, convertedCount: 1 },
       ])
 
-      await db.exec(`CREATE TABLE "Deal" ("tenantId" TEXT NOT NULL, "stage" "DealStage" NOT NULL, "closedAt" TIMESTAMPTZ NOT NULL);
-        INSERT INTO "Deal" VALUES
+      await db.exec(`INSERT INTO "Deal" ("tenantId", "stage", "closedAt") VALUES
           ('tenant_1', 'CLOSED_WON', '${result.winRateComparison.current.startDate}T16:00:00Z'),
           ('tenant_1', 'CLOSED_WON', '${result.winRateComparison.current.startDate}T17:00:00Z'),
           ('tenant_1', 'CLOSED_LOST', '${result.winRateComparison.current.startDate}T18:00:00Z'),

@@ -260,13 +260,13 @@ test('crm deals pipeline UX reorganization, board columns, on-demand panel, and 
     const leadsFirstRow = page.locator('[data-deal-id="deal-leads-1"]');
     await expect(leadsFirstRow).toBeVisible();
     const rowBox = await leadsFirstRow.evaluate(el => Math.round(el.getBoundingClientRect().height));
-    expect(rowBox).toBe(56);
+    expect(rowBox).toBe(44);
 
-    // Stage badge in deal row: 22px high, 12px bold, text "Leads"
+    // Compact stage badge in deal row
     const stageBadge = leadsFirstRow.locator('.rounded-full:has-text("Leads")');
     await expect(stageBadge).toBeVisible();
     const badgeHeight = await stageBadge.evaluate(el => Math.round(el.getBoundingClientRect().height));
-    expect(badgeHeight).toBe(22);
+    expect(badgeHeight).toBe(20);
 
     // First deal is selected by default and has 3px accent bar
     const selectedStripe = leadsFirstRow.locator('.w-\\[3px\\].bg-accent');

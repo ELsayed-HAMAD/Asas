@@ -90,6 +90,7 @@ const inventoryStockLevelsBase = () => [...inventoryBase.all(), 'stock-levels']
 const inventoryStockAlertsBase = () => [...inventoryBase.all(), 'stock-alerts']
 const inventoryWarehousesBase = () => [...inventoryBase.all(), 'warehouses']
 const inventoryPurchaseOrdersBase = () => [...inventoryBase.all(), 'purchase-orders']
+const inventoryValuationBase = () => [...inventoryBase.all(), 'valuation']
 
 const exportsBase = moduleKeys('exports')
 const settingsBase = moduleKeys('settings')
@@ -168,6 +169,9 @@ export const queryKeys = {
     stockAlerts: () => [...inventoryStockAlertsBase()],
     warehouses: () => [...inventoryWarehousesBase()],
     purchaseOrders: resourceKeys(inventoryPurchaseOrdersBase),
+    valuationSetup: () => [...inventoryValuationBase(), 'setup'],
+    valuationReport: () => [...inventoryValuationBase(), 'report'],
+    unvaluedProducts: () => [...inventoryValuationBase(), 'unvalued-products'],
   },
 
   exports: {
@@ -183,6 +187,9 @@ export const queryKeys = {
     billing: () => [...settingsBase.all(), 'billing'],
     backups: () => [...settingsBase.all(), 'backups'],
     notifications: () => [...settingsBase.all(), 'notifications'],
+    dataMigrationProjects: () => [...settingsBase.all(), 'data-migrations'],
+    dataMigrationFinanceReconciliation: (projectId) => [...settingsBase.all(), 'data-migrations', projectId, 'finance-reconciliation'],
+    dataMigrationFinanceStageRecords: (projectId, entity, page = 1) => [...settingsBase.all(), 'data-migrations', projectId, 'finance-stage-records', entity, page],
     integrations: resourceKeys(() => [...settingsBase.all(), 'integrations']),
   },
 

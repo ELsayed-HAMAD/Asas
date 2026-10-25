@@ -8,6 +8,7 @@ import { computePayrollLine, Money, type TaxRate } from '@asas/domain'
 import { recordAuditLog } from '../../services/auditLog.js'
 import { decryptBankDetail, encryptBankDetail } from '../../services/crypto.js'
 import { AppError } from '../../utils/errors.js'
+import { writeStockMovement } from '../inventory/stockMovementWriter.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -450,20 +451,14 @@ export async function applyEnterpriseSamplePack(
           name: product.name,
           sku: product.sku,
           price: new Prisma.Decimal(Money.fromDecimal(String(product.price), currency, 'HALF_UP').toDecimalString()),
-          stock: quantity,
+          stock: 0,
           status: asEnum(PRODUCT_STATUSES, product.stockStatus, 'IN_STOCK', 'products'),
         },
       })
-      // Every seeded on-hand quantity is a recorded movement, so stock levels trace to a
-      // StockMovement row exactly as a real delivery would (Phase 6's invariant).
+      // Seeded stock uses the same transactional quantity writer as live inventory workflows.
       if (quantity !== 0) {
-        await tx.stockMovement.create({
-          data: {
-            tenantId,
-            productId: created.id,
-            delta: quantity,
-            note: 'Sample pack initial stock',
-          },
+        await writeStockMovement(tx, {
+          tenantId, productId: created.id, delta: quantity, note: 'Sample pack initial stock',
         })
       }
     }
@@ -953,7 +948,14 @@ export async function importEmployees(
       data: { onboardingStatus: 'IMPORTED' },
     })
     if (claimed.count !== 1) throw new AppError(409, 'Employees can only be imported during workspace setup')
+    if (!input.migrationProjectId) throw new AppError(400, 'Create a company migration project before importing employee records')
+    const migrationProject = await tx.dataMigrationProject.findFirst({
+      where: { id: input.migrationProjectId, tenantId, status: 'PLANNING', modules: { has: 'HR' } },
+      select: { id: true },
+    })
+    if (!migrationProject) throw new AppError(409, 'The selected migration project is unavailable or does not include People & HR')
     const currency = await getTenantCurrency(tx, tenantId)
+    const requestHash = createHash('sha256').update(JSON.stringify(input.employees)).digest('hex')
     let count = 0
     for (const row of input.employees) {
       let departmentId: string | null = null
@@ -1006,6 +1008,19 @@ export async function importEmployees(
       count++
     }
     await tx.tenant.update({ where: { id: tenantId }, data: { onboardingStatus: 'IMPORTED' } })
+    await tx.dataMigrationImportJob.create({
+      data: {
+        tenantId,
+        projectId: migrationProject.id,
+        entity: 'HR_EMPLOYEES',
+        idempotencyKey: `onboarding:${requestHash}`,
+        requestHash,
+        totalRows: count,
+        importedRows: count,
+        createdBy: actorId ?? 'system',
+      },
+    })
+    await tx.dataMigrationProject.update({ where: { id: migrationProject.id }, data: { status: 'IN_PROGRESS' } })
     if (actorId) {
       await recordAuditLog(tx, {
         tenantId,

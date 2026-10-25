@@ -13,13 +13,16 @@ import {
   X,
   Check,
   Maximize2,
-  ExternalLink
+  ExternalLink,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../../../lib/api/finance';
 import { projectsApi } from '../../../lib/api/projects';
 import { queryKeys } from '../../../lib/queryKeys';
-import { formatMoney, formatCompactTableMoney } from '../../../lib/format';
+import { formatMoney, formatCompactCurrency } from '../../../lib/format';
 import { http } from '../../../lib/api/http';
 import { useDebouncedValue } from '../../../lib/useDebouncedValue';
 import FormDialog from '../../../components/common/FormDialog';
@@ -46,10 +49,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../../components/ui/select';
+import { cn } from '../../../lib/utils';
 
-const metricFontSize = (money) => {
-  const label = formatMoney(money)
-  return `clamp(0.75rem, ${Math.min(14, 130 / Math.max(1, label.length))}cqw, 1.5rem)`
+function getStatusBadgeStyle(status) {
+  switch (status) {
+    case 'PENDING':
+      return 'bg-amber-500/10 text-amber-700 border-amber-500/20';
+    case 'APPROVED':
+      return 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20';
+    case 'SCHEDULED':
+      return 'bg-blue-500/10 text-blue-700 border-blue-500/20';
+    case 'PAID':
+      return 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20';
+    case 'REJECTED':
+      return 'bg-rose-500/10 text-rose-700 border-rose-500/20';
+    default:
+      return 'bg-surface-muted text-muted border-border-default';
+  }
 }
 
 export default function AccountsPayable() {
@@ -82,6 +98,7 @@ export default function AccountsPayable() {
   const [batchConfirmOpen, setBatchConfirmOpen] = useState(false)
   const [dateFilter, setDateFilter] = useState('ALL')
   const [statusGroup, setStatusGroup] = useState('OPEN')
+  const [queueTab, setQueueTab] = useState('ALL')
   const [projectSearchInput, setProjectSearchInput] = useState('')
   const projectSearch = useDebouncedValue(projectSearchInput)
   const [projectPage, setProjectPage] = useState(1)
@@ -227,24 +244,37 @@ export default function AccountsPayable() {
   const summary = data.summary || {};
 
   const selectedRecord = items.find(i => i.id === selectedId);
-  const selectedDetail = detailData?.id === selectedId ? detailData : null
+  const selectedDetail = detailData?.id === selectedId ? detailData : null;
   const needsApproval = items.filter(i => i.status === 'PENDING');
   const scheduled = items.filter(i => i.status === 'SCHEDULED' || i.status === 'APPROVED');
-  const historyItems = statusGroup === 'HISTORY' ? items : []
+  const historyItems = statusGroup === 'HISTORY' ? items : [];
 
-  const pastDueTotal = summary.pastDueTotal
-  const dueIn7DaysTotal = summary.dueIn7DaysTotal
-  const paidThisMonthTotal = summary.paidThisMonthTotal
-  const previousPaidTotal = summary.paidThisMonthComparison?.previousTotal
+  const displayedItems = statusGroup === 'HISTORY'
+    ? historyItems
+    : queueTab === 'PENDING'
+    ? needsApproval
+    : queueTab === 'SCHEDULED'
+    ? scheduled
+    : items;
+
+  const pastDueTotal = summary.pastDueTotal;
+  const dueIn7DaysTotal = summary.dueIn7DaysTotal;
+  const paidThisMonthTotal = summary.paidThisMonthTotal;
+  const previousPaidTotal = summary.paidThisMonthComparison?.previousTotal;
   const paidThisMonthDelta = paidThisMonthTotal == null || previousPaidTotal == null
     ? null
-    : paidThisMonthTotal.amount - previousPaidTotal.amount
+    : paidThisMonthTotal.amount - previousPaidTotal.amount;
   const paidThisMonthCaption = paidThisMonthTotal == null
-    ? 'Unavailable until journal history covers this month'
+    ? 'Unavailable until journal history complete'
     : paidThisMonthDelta == null
     ? 'Prior-period comparison unavailable'
-    : `${paidThisMonthDelta > 0 ? '+' : ''}${formatMoney({ amount: paidThisMonthDelta, currency: paidThisMonthTotal.currency })} vs same period last month`
+    : `${paidThisMonthDelta > 0 ? '+' : ''}${formatMoney({ amount: paidThisMonthDelta, currency: paidThisMonthTotal.currency })} vs same period last month`;
 
+  const attachmentFileName = selectedRecord?.invoiceNumber
+    ? `invoice-${selectedRecord.invoiceNumber}.pdf`
+    : selectedRecord
+    ? `invoice-${selectedRecord.id}.pdf`
+    : 'invoice-document.pdf';
 
   // Download the real invoice PDF (GET /finance/payables/:id/pdf, streamed binary).
   const handleDownloadPdf = async () => {
@@ -277,25 +307,29 @@ export default function AccountsPayable() {
   };
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-y-auto min-w-0 px-6 py-5">
+    <div className="flex-1 min-h-0 flex flex-col bg-surface overflow-y-auto min-w-0 p-4 sm:p-6 space-y-4">
 
-      {/* ── Top Toolbar (Single Row across 12-column width) ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 w-full mb-5 flex-shrink-0">
-        {/* Left group */}
-        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+      {/* ── 1. Unified Single-Row Apple-Glass Command Toolbar ── */}
+      <div className="relative z-30 bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-2.5 shadow-xs flex flex-wrap xl:flex-nowrap items-center justify-between gap-2.5 flex-shrink-0">
+        {/* Left Cluster */}
+        <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap sm:flex-nowrap">
           <SearchInput
             placeholder="Search invoices..."
             value={searchInput}
             onChange={event => setSearchInput(event.target.value)}
-            wrapperClassName="w-72 max-w-full"
+            wrapperClassName="w-full sm:w-64 xl:w-72 shrink-0"
+            className="h-9 pl-9 pr-3 text-xs sm:text-sm"
           />
           <Select value={statusGroup} onValueChange={setStatusGroup}>
-            <SelectTrigger aria-label="Payables view" className="text-xs bg-surface-raised hover:bg-surface-muted shadow-card h-9 w-[130px]">
+            <SelectTrigger
+              aria-label="Payables view"
+              className="inline-flex items-center justify-between gap-2 w-auto h-9 px-3.5 rounded-xl text-xs font-medium shrink-0 bg-surface-muted hover:bg-surface-muted/80 border border-border-default shadow-xs text-body hover:text-heading cursor-pointer"
+            >
               <SelectValue placeholder="Payables view" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="OPEN">Open bills</SelectItem>
-              <SelectItem value="HISTORY">History</SelectItem>
+              <SelectItem value="OPEN" className="text-xs">Open bills</SelectItem>
+              <SelectItem value="HISTORY" className="text-xs">History</SelectItem>
             </SelectContent>
           </Select>
           <Button
@@ -303,22 +337,22 @@ export default function AccountsPayable() {
             variant="outline"
             size="sm"
             onClick={() => setDateFilter(current => current === 'ALL' ? 'MONTH' : 'ALL')}
-            className="gap-1.5 bg-surface-raised shadow-card font-medium h-9"
+            className="h-9 px-3.5 rounded-xl text-xs font-medium inline-flex items-center gap-2 shrink-0 border border-border-default bg-surface-raised hover:bg-surface-muted shadow-xs cursor-pointer text-body hover:text-heading"
           >
             <Calendar size={13} className="text-muted" />
-            {dateFilter === 'ALL' ? 'All Dates' : 'This Month'}
+            <span>{dateFilter === 'ALL' ? 'All Dates' : 'This Month'}</span>
           </Button>
         </div>
 
-        {/* Right group */}
-        <div className="flex items-center gap-2 shrink-0 ml-auto">
+        {/* Right Cluster */}
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             type="button"
             variant="outline"
             size="sm"
             disabled={!scheduled.length || batchPayment.isPending}
             onClick={() => setBatchConfirmOpen(true)}
-            className="bg-surface-raised shadow-card font-medium h-9"
+            className="h-9 px-3.5 rounded-xl text-xs font-semibold shrink-0 border border-border-default bg-surface-raised hover:bg-surface-muted shadow-xs cursor-pointer text-body hover:text-heading"
           >
             Batch Payment {scheduled.length > 0 ? `(${scheduled.length})` : ''}
           </Button>
@@ -327,7 +361,7 @@ export default function AccountsPayable() {
             variant="outline"
             size="sm"
             onClick={() => { setVendorError(''); setVendorModalOpen(true); }}
-            className="gap-1.5 bg-surface-raised shadow-card font-medium h-9"
+            className="h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shrink-0 border border-border-default bg-surface-raised hover:bg-surface-muted shadow-xs cursor-pointer text-body hover:text-heading"
             title="Manage vendors"
           >
             <Users size={13} className="text-muted" />
@@ -336,8 +370,8 @@ export default function AccountsPayable() {
           <Button
             type="button"
             size="sm"
-            onClick={() => { setProjectSearchInput(''); setProjectPage(1); setSelectedProject(null); setBillOpen(true) }}
-            className="gap-1.5 shadow-card font-semibold h-9"
+            onClick={() => { setProjectSearchInput(''); setProjectPage(1); setSelectedProject(null); setBillOpen(true); }}
+            className="h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm shrink-0 cursor-pointer"
           >
             <Plus size={14} /> New Bill
           </Button>
@@ -357,297 +391,322 @@ export default function AccountsPayable() {
                   typeof item.amount === 'object' ? item.amount.currency : 'USD',
                   item.status,
                 ]),
-              ]
-              downloadCsv(rows, 'accounts-payable.csv')
+              ];
+              downloadCsv(rows, 'accounts-payable.csv');
             }}
             title="Export Accounts Payable CSV"
-            className="bg-surface-raised shadow-card h-9 w-9 text-muted hover:text-body"
+            className="w-9 h-9 rounded-xl inline-flex items-center justify-center shrink-0 border border-border-default bg-surface-raised hover:bg-surface-muted shadow-xs cursor-pointer text-muted hover:text-heading"
           >
             <MoreVertical size={14} />
           </Button>
         </div>
       </div>
 
-      {/* ── Top 4 KPI Cards (grid-cols-12 gap-5 mb-5) ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-5 mb-5 flex-shrink-0">
-        <div className="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-auto flex flex-col justify-start" style={{ containerType: 'inline-size' }}>
-          <p className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none">Total Outstanding</p>
-          <p className="min-w-0 text-2xl font-bold text-heading mt-1.5 leading-tight tracking-tight truncate" style={{ fontSize: metricFontSize(summary.openOutstanding) }}>
-            {formatMoney(summary.openOutstanding)}
-          </p>
-          <p className="text-xs text-muted mt-1.5 leading-normal truncate" title={`${items.length} open bills`}>
-            {summary.openCount != null ? `${summary.openCount} open bills` : `${items.length} open bills`}
-          </p>
-        </div>
-        <div className="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-auto flex flex-col justify-start" style={{ containerType: 'inline-size' }}>
-          <div className="flex items-center justify-between leading-none">
-            <p className="text-[11px] font-semibold text-muted uppercase tracking-wider">Past Due</p>
-            {pastDueTotal.amount > 0 && <span className="w-2 h-2 rounded-full bg-danger inline-block" />}
+      {/* ── 2. Row 1: 3-Tier Apple-Glass KPI Cards + Compact Currency + Fix Truncation ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-shrink-0">
+        {/* Card 1: Total Outstanding */}
+        <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[122px]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none">
+              Total Outstanding
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 flex items-center justify-center shrink-0">
+              <FileText size={16} />
+            </div>
           </div>
-          <p className="min-w-0 text-2xl font-bold text-heading mt-1.5 leading-tight tracking-tight truncate" style={{ fontSize: metricFontSize(pastDueTotal) }}>
-            {formatMoney(pastDueTotal)}
-          </p>
-          <p className="text-xs text-muted mt-1.5 leading-normal truncate" title={pastDueTotal.amount > 0 ? 'Requires immediate attention' : 'No overdue bills'}>
-            {pastDueTotal.amount > 0 ? 'Requires immediate attention' : 'No overdue bills'}
-          </p>
+          <div className="flex items-baseline justify-between gap-2 my-1">
+            <span
+              className="text-2xl font-bold text-heading tracking-tight tabular-nums leading-none"
+              title={formatMoney(summary.openOutstanding)}
+            >
+              {formatCompactCurrency(summary.openOutstanding)}
+            </span>
+            <span className="bg-surface-muted text-muted text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0">
+              {summary.openCount != null ? `${summary.openCount} Bills` : `${items.length} Bills`}
+            </span>
+          </div>
+          <div className="pt-1.5 border-t border-border-subtle text-[11px] leading-snug text-muted">
+            {summary.openCount != null ? `${summary.openCount} open bills` : `${items.length} open bills`}
+          </div>
         </div>
-        <div className="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-auto flex flex-col justify-start" style={{ containerType: 'inline-size' }}>
-          <p className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none">Due in 7 Days</p>
-          <p className="min-w-0 text-2xl font-bold text-heading mt-1.5 leading-tight tracking-tight truncate" style={{ fontSize: metricFontSize(dueIn7DaysTotal) }}>
-            {formatMoney(dueIn7DaysTotal)}
-          </p>
-          <p className="text-xs text-muted mt-1.5 leading-normal truncate" title="Upcoming payments scheduled">
+
+        {/* Card 2: Past Due */}
+        <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[122px]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none">
+              Past Due
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 flex items-center justify-center shrink-0">
+              <AlertTriangle size={16} />
+            </div>
+          </div>
+          <div className="flex items-baseline justify-between gap-2 my-1">
+            <span
+              className="text-2xl font-bold text-heading tracking-tight tabular-nums leading-none"
+              title={formatMoney(pastDueTotal)}
+            >
+              {formatCompactCurrency(pastDueTotal)}
+            </span>
+            {pastDueTotal?.amount > 0 ? (
+              <span className="bg-rose-500/10 text-rose-600 border border-rose-500/20 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0">
+                Action Needed
+              </span>
+            ) : (
+              <span className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0">
+                On Track
+              </span>
+            )}
+          </div>
+          <div className="pt-1.5 border-t border-border-subtle text-[11px] leading-snug text-muted">
+            {pastDueTotal?.amount > 0 ? 'Requires immediate attention' : 'No overdue bills'}
+          </div>
+        </div>
+
+        {/* Card 3: Due in 7 Days */}
+        <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[122px]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none">
+              Due in 7 Days
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-600 flex items-center justify-center shrink-0">
+              <Clock size={16} />
+            </div>
+          </div>
+          <div className="flex items-baseline justify-between gap-2 my-1">
+            <span
+              className="text-2xl font-bold text-heading tracking-tight tabular-nums leading-none"
+              title={formatMoney(dueIn7DaysTotal)}
+            >
+              {formatCompactCurrency(dueIn7DaysTotal)}
+            </span>
+            <span className="bg-blue-500/10 text-blue-600 border border-blue-500/20 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0">
+              Next 7 Days
+            </span>
+          </div>
+          <div className="pt-1.5 border-t border-border-subtle text-[11px] leading-snug text-muted">
             Upcoming payments scheduled
-          </p>
+          </div>
         </div>
-        <div className="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-auto flex flex-col justify-start" style={{ containerType: 'inline-size' }} title="Based on valued AP payment journals in base currency, net of linked reversals.">
-          <p className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none">Paid This Month</p>
-          <p className="min-w-0 text-2xl font-bold text-heading mt-1.5 leading-tight tracking-tight truncate" style={{ fontSize: metricFontSize(paidThisMonthTotal) }}>
-            {formatMoney(paidThisMonthTotal)}
-          </p>
-          <p className="text-xs text-muted mt-1.5 leading-normal truncate" title={paidThisMonthCaption}>
+
+        {/* Card 4: Paid This Month */}
+        <div
+          className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[122px]"
+          title="Based on valued AP payment journals in base currency, net of linked reversals."
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none">
+              Paid This Month
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 flex items-center justify-center shrink-0">
+              <CheckCircle2 size={16} />
+            </div>
+          </div>
+          <div className="flex items-baseline justify-between gap-2 my-1">
+            <span
+              className="text-2xl font-bold text-heading tracking-tight tabular-nums leading-none"
+              title={formatMoney(paidThisMonthTotal)}
+            >
+              {paidThisMonthTotal == null ? '—' : formatCompactCurrency(paidThisMonthTotal)}
+            </span>
+            <span className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0">
+              MTD
+            </span>
+          </div>
+          <div className="pt-1.5 border-t border-border-subtle text-[11px] leading-snug text-muted" title={paidThisMonthCaption}>
             {paidThisMonthCaption}
-          </p>
+          </div>
         </div>
       </div>
 
-      {/* ── Main Workspace: Table (col-span-8) & Right Inspector (col-span-4) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* Left Column (col-span-8): Bills Table Card */}
-        <div className="lg:col-span-8 min-w-0 bg-surface-raised rounded-card border border-border-subtle shadow-card flex flex-col overflow-hidden">
-          {statusGroup === 'OPEN' ? (
-            items.length === 0 ? (
-              <div className="px-6 py-12 text-center text-muted text-sm">
-                No invoices found.
-              </div>
-            ) : (
-              <>
-                {/* Needs Approval Section */}
-                {needsApproval.length > 0 && (
-                  <div className="flex flex-col min-w-0">
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-surface-muted/60 border-b border-border-default shrink-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-heading uppercase tracking-wider">Needs Approval</span>
-                        <span className="bg-surface-strong text-body-light text-[10px] font-bold px-1.5 py-0.5 rounded">{needsApproval.length}</span>
-                      </div>
-                    </div>
-                    <div className={`${scheduled.length > 0 ? 'max-h-[250px]' : 'max-h-[500px]'} overflow-y-auto overflow-x-auto`}>
-                      <Table className="w-full min-w-[500px] text-left border-collapse">
-                        <TableHeader className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
-                          <TableRow className="border-b border-border-default hover:bg-transparent">
-                            <TableHead className="px-4 py-2.5 text-left bg-surface-muted">Vendor</TableHead>
-                            <TableHead className="px-4 py-2.5 text-left bg-surface-muted whitespace-nowrap">Due Date</TableHead>
-                            <TableHead className="px-5 py-2.5 text-right bg-surface-muted whitespace-nowrap">Amount</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody className="divide-y divide-border-subtle">
-                          {needsApproval.map(item => {
-                            const isSelected = selectedId === item.id;
-                            return (
-                              <TableRow
-                                key={item.id}
-                                onClick={() => setSelectedId(item.id)}
-                                className={`cursor-pointer transition-colors h-12 ${
-                                  isSelected ? 'bg-accent-light/50' : 'bg-surface-raised hover:bg-surface-muted/60'
-                                }`}
-                              >
-                                <TableCell className="px-4 py-2.5">
-                                  <div className="flex items-center gap-3">
-                                    {item.vendorId && getVendorAvatar(item.vendorId) ? (
-                                      <img src={getVendorAvatar(item.vendorId)} alt="Avatar" className="w-7 h-7 rounded border border-border-default bg-surface-strong object-cover shrink-0" />
-                                    ) : (
-                                      <div className="w-7 h-7 rounded border border-border-default bg-surface-strong flex items-center justify-center text-[10px] font-bold text-body shrink-0">
-                                        {item.vendor?.substring(0, 2).toUpperCase() || 'NA'}
-                                      </div>
-                                    )}
-                                    <div className="min-w-0">
-                                      <span className="text-sm font-semibold text-heading truncate block">{item.vendor}</span>
-                                      {item.invoiceNumber && <span className="text-[11px] text-muted truncate block">#{item.invoiceNumber}</span>}
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="px-4 py-2.5 text-sm text-body font-medium whitespace-nowrap">
-                                  {new Date(item.dueDate || item.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' })}
-                                </TableCell>
-                                <TableCell className="px-5 py-2.5 text-right text-sm font-bold text-heading tabular-nums whitespace-nowrap" title={formatMoney(item.amount)}>
-                                  {formatCompactTableMoney(item.amount)}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                )}
+      {/* ── 3. Row 2: Master-Detail Workspace Grid ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start flex-1 min-h-0">
 
-                {/* Scheduled Section */}
-                {scheduled.length > 0 && (
-                  <div className="flex flex-col min-w-0">
-                    <div className={`flex items-center justify-between px-4 py-2.5 bg-surface-muted/60 ${needsApproval.length > 0 ? 'border-t' : ''} border-b border-border-default shrink-0`}>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-heading uppercase tracking-wider">Scheduled</span>
-                        <span className="bg-surface-strong text-body-light text-[10px] font-bold px-1.5 py-0.5 rounded">{scheduled.length}</span>
-                      </div>
-                    </div>
-                    <div className={`${needsApproval.length > 0 ? 'max-h-[250px]' : 'max-h-[500px]'} overflow-y-auto overflow-x-auto`}>
-                      <Table className="w-full min-w-[500px] text-left border-collapse">
-                        <TableHeader className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
-                          <TableRow className="border-b border-border-default hover:bg-transparent">
-                            <TableHead className="px-4 py-2.5 text-left bg-surface-muted">Vendor</TableHead>
-                            <TableHead className="px-4 py-2.5 text-left bg-surface-muted whitespace-nowrap">Due Date</TableHead>
-                            <TableHead className="px-5 py-2.5 text-right bg-surface-muted whitespace-nowrap">Amount</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody className="divide-y divide-border-subtle">
-                          {scheduled.map(item => {
-                            const isSelected = selectedId === item.id;
-                            return (
-                              <TableRow
-                                key={item.id}
-                                onClick={() => setSelectedId(item.id)}
-                                className={`cursor-pointer transition-colors h-12 ${
-                                  isSelected ? 'bg-accent-light/50' : 'bg-surface-raised hover:bg-surface-muted/60'
-                                }`}
-                              >
-                                <TableCell className="px-4 py-2.5">
-                                  <div className="flex items-center gap-3">
-                                    {item.vendorId && getVendorAvatar(item.vendorId) ? (
-                                      <img src={getVendorAvatar(item.vendorId)} alt="Avatar" className="w-7 h-7 rounded border border-border-default bg-surface-raised object-cover shrink-0" />
-                                    ) : (
-                                      <div className="w-7 h-7 rounded border border-border-default bg-surface-raised flex items-center justify-center text-[10px] font-bold text-body shrink-0">
-                                        {item.vendor?.substring(0, 2).toUpperCase() || 'NA'}
-                                      </div>
-                                    )}
-                                    <div className="min-w-0">
-                                      <span className="text-sm font-semibold text-heading truncate block">{item.vendor}</span>
-                                      {item.invoiceNumber && <span className="text-[11px] text-muted truncate block">#{item.invoiceNumber}</span>}
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="px-4 py-2.5 text-sm text-body font-medium whitespace-nowrap">
-                                  {new Date(item.dueDate || item.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' })}
-                                </TableCell>
-                                <TableCell className="px-5 py-2.5 text-right text-sm font-bold text-heading tabular-nums whitespace-nowrap" title={formatMoney(item.amount)}>
-                                  {formatCompactTableMoney(item.amount)}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                )}
-              </>
-            )
-          ) : (
-            /* History Section */
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center justify-between px-4 py-2.5 bg-surface-muted/60 border-b border-border-default shrink-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-heading uppercase tracking-wider">History</span>
-                  <span className="bg-surface-strong text-body-light text-[10px] font-bold px-1.5 py-0.5 rounded">{historyItems.length}</span>
-                </div>
+        {/* Left Column: Unified Bills Table Card */}
+        <div className="col-span-12 lg:col-span-7 xl:col-span-8 min-w-0 flex flex-col gap-3">
+          <div className="bg-gradient-to-b from-surface-raised to-surface-raised/80 backdrop-blur-xl border border-border-default rounded-2xl shadow-card overflow-hidden flex flex-col min-h-[560px] h-[560px]">
+
+            {/* Integrated Card Header with Segmented Tab Switcher */}
+            <div className="px-4 py-3 border-b border-border-default/60 flex flex-wrap items-center justify-between gap-3 bg-surface-raised">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-heading">
+                  {statusGroup === 'HISTORY' ? 'Historical Bills' : 'Payable Bills'}
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-surface-muted text-muted border border-border-default/60">
+                  {displayedItems.length}
+                </span>
               </div>
-              <div className="max-h-[500px] overflow-y-auto overflow-x-auto">
-                <Table className="w-full min-w-[500px] text-left border-collapse">
-                  <TableHeader className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
-                    <TableRow className="border-b border-border-default hover:bg-transparent">
-                      <TableHead className="px-4 py-2.5 text-left bg-surface-muted">Status</TableHead>
-                      <TableHead className="px-4 py-2.5 text-left bg-surface-muted">Vendor</TableHead>
-                      <TableHead className="px-4 py-2.5 text-left bg-surface-muted whitespace-nowrap">Due Date</TableHead>
-                      <TableHead className="px-5 py-2.5 text-right bg-surface-muted whitespace-nowrap">Amount</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="divide-y divide-border-subtle">
-                    {historyItems.length > 0 ? (
-                      historyItems.map(item => (
-                        <TableRow
-                          key={item.id}
-                          onClick={() => setSelectedId(item.id)}
-                          className={`cursor-pointer transition-colors h-12 ${
-                            selectedId === item.id ? 'bg-accent-light/50' : 'bg-surface-raised hover:bg-surface-muted/60'
-                          }`}
-                        >
-                          <TableCell className="px-4 py-2.5 text-left">
-                            <span className="text-xs font-semibold text-muted">{item.status}</span>
-                          </TableCell>
-                          <TableCell className="px-4 py-2.5">
+
+              {/* Auto-width segmented tab switcher */}
+              {statusGroup === 'OPEN' && (
+                <div
+                  role="tablist"
+                  aria-label="Filter payable bills"
+                  className="flex items-center p-1 rounded-xl bg-surface-muted border border-border-default/60 shrink-0 gap-1 overflow-x-auto no-scrollbar"
+                >
+                  {[
+                    { key: 'ALL', label: `All (${items.length})` },
+                    { key: 'PENDING', label: `Needs Approval (${needsApproval.length})` },
+                    { key: 'SCHEDULED', label: `Scheduled (${scheduled.length})` },
+                  ].map(tab => {
+                    const isActive = queueTab === tab.key;
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        role="tab"
+                        aria-selected={isActive}
+                        onClick={() => {
+                          setQueueTab(tab.key);
+                          const targetItems = tab.key === 'PENDING' ? needsApproval : tab.key === 'SCHEDULED' ? scheduled : items;
+                          if (targetItems.length > 0 && !targetItems.some(i => i.id === selectedId)) {
+                            setSelectedId(targetItems[0].id);
+                          }
+                        }}
+                        className={cn(
+                          'w-auto px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer',
+                          isActive
+                            ? 'bg-surface-raised text-heading shadow-xs'
+                            : 'text-muted hover:text-heading'
+                        )}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Scrollable Table Viewport */}
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto bg-surface-raised">
+              <Table className="w-full text-left border-collapse">
+                <colgroup>
+                  <col className="min-w-[180px]" />
+                  <col className="w-[120px]" />
+                  <col className="w-[110px]" />
+                  <col className="w-[120px]" />
+                </colgroup>
+                <TableHeader className="bg-surface-muted/60 border-b border-border-default sticky top-0 z-10 h-10">
+                  <TableRow className="h-10 hover:bg-transparent border-0">
+                    <TableHead className="pl-4 pr-3 py-0 text-left rtl:text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10">Vendor</TableHead>
+                    <TableHead className="w-[120px] px-2.5 py-0 text-left rtl:text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10 whitespace-nowrap">Due Date</TableHead>
+                    <TableHead className="w-[110px] px-2.5 py-0 text-center text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10">Status</TableHead>
+                    <TableHead className="w-[120px] px-2.5 pr-4 py-0 text-right rtl:text-left text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10 whitespace-nowrap">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+
+                <TableBody className="divide-y divide-border-subtle">
+                  {displayedItems.map(item => {
+                    const isSelected = selectedId === item.id;
+                    return (
+                      <TableRow
+                        key={item.id}
+                        onClick={() => setSelectedId(item.id)}
+                        className={cn(
+                          'h-[48px] cursor-pointer transition-colors border-0',
+                          isSelected
+                            ? 'bg-surface-row-selected hover:bg-surface-row-selected-hover'
+                            : 'bg-surface-raised hover:bg-surface-muted/60'
+                        )}
+                      >
+                        <TableCell className={cn(
+                          'pl-4 pr-3 py-0 align-middle border-b border-border-subtle min-w-0 transition-colors',
+                          isSelected ? 'border-l-[3px] border-l-accent' : 'border-l-[3px] border-l-transparent'
+                        )}>
+                          <div className="flex items-center gap-3">
+                            {item.vendorId && getVendorAvatar(item.vendorId) ? (
+                              <img src={getVendorAvatar(item.vendorId)} alt="Avatar" className="w-8 h-8 rounded-xl border border-border-default bg-surface-strong object-cover shrink-0" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-xl border border-border-default bg-surface-muted flex items-center justify-center text-[11px] font-bold text-heading shrink-0 shadow-xs">
+                                {item.vendor?.substring(0, 2).toUpperCase() || 'NA'}
+                              </div>
+                            )}
                             <div className="min-w-0">
-                              <span className="text-sm font-semibold text-heading truncate block">{item.vendor}</span>
-                              <span className="text-[11px] text-muted truncate block">#{item.invoiceNumber || 'N/A'}</span>
+                              <span className="text-xs sm:text-sm font-semibold text-heading truncate block leading-tight">{item.vendor}</span>
+                              {item.invoiceNumber && <span className="text-[11px] text-muted truncate block leading-tight mt-0.5">#{item.invoiceNumber}</span>}
                             </div>
-                          </TableCell>
-                          <TableCell className="px-4 py-2.5 text-sm text-body font-medium whitespace-nowrap">
-                            {new Date(item.dueDate || item.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' })}
-                          </TableCell>
-                          <TableCell className="px-5 py-2.5 text-right text-sm font-bold text-heading tabular-nums whitespace-nowrap" title={formatMoney(item.amount)}>
-                            {formatCompactTableMoney(item.amount)}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={4} className="px-6 py-12 text-center text-muted text-sm">
-                          No historical invoices found.
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-2.5 py-0 align-middle border-b border-border-subtle text-xs font-medium text-body whitespace-nowrap">
+                          {new Date(item.dueDate || item.date).toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' })}
+                        </TableCell>
+                        <TableCell className="px-2.5 py-0 align-middle border-b border-border-subtle text-center whitespace-nowrap">
+                          <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border', getStatusBadgeStyle(item.status))}>
+                            {item.status}
+                          </span>
+                        </TableCell>
+                        <TableCell className="px-2.5 pr-4 py-0 align-middle border-b border-border-subtle text-right text-xs sm:text-sm font-bold text-heading tabular-nums whitespace-nowrap" title={formatMoney(item.amount)}>
+                          {formatMoney(item.amount)}
                         </TableCell>
                       </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+                    );
+                  })}
+                  {displayedItems.length === 0 && (
+                    <TableRow className="hover:bg-transparent border-0">
+                      <TableCell colSpan={4} className="px-6 py-12 text-center text-muted text-xs">
+                        {statusGroup === 'HISTORY'
+                          ? 'No historical invoices found.'
+                          : queueTab === 'PENDING'
+                          ? 'No invoices needing approval.'
+                          : queueTab === 'SCHEDULED'
+                          ? 'No scheduled invoices.'
+                          : 'No invoices found.'}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
             </div>
-          )}
+
+            {/* Table Card Footer */}
+            <div className="h-9 flex-shrink-0 border-t border-border-subtle px-4 flex items-center justify-between text-xs text-muted bg-surface-muted/30">
+              <span>Showing {displayedItems.length} of {items.length} bills</span>
+              {statusGroup === 'OPEN' && queueTab !== 'ALL' && (
+                <span className="text-[11px] font-medium text-accent">
+                  Filtered by: {queueTab === 'PENDING' ? 'Needs Approval' : 'Scheduled'}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Right Column (col-span-4): Selected Bill Inspector Card */}
-        <div className="lg:col-span-4 min-w-0">
+        {/* Right Column: Sticky, Calm Apple-Glass Invoice Inspector */}
+        <div className="col-span-12 lg:col-span-5 xl:col-span-4 min-w-0 lg:sticky lg:top-6">
           {selectedRecord ? (
-            <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card p-5 space-y-4">
-              {/* Header: Vendor Info & Status Badge */}
-              <div className="flex items-start justify-between gap-3">
+            <div className="bg-gradient-to-b from-surface-raised to-surface-raised/80 backdrop-blur-xl border border-border-default rounded-2xl shadow-card p-5 space-y-4 flex flex-col overflow-hidden">
+              {/* 1. Vendor & Invoice Header */}
+              <div className="flex items-center justify-between gap-3 pb-3 border-b border-border-subtle">
                 <div className="flex items-center gap-3 min-w-0">
                   {selectedRecord.vendorId && getVendorAvatar(selectedRecord.vendorId) ? (
-                    <img src={getVendorAvatar(selectedRecord.vendorId)} alt="Avatar" className="w-10 h-10 bg-surface-strong rounded-button object-cover shrink-0" />
+                    <img src={getVendorAvatar(selectedRecord.vendorId)} alt="Avatar" className="w-10 h-10 rounded-xl border border-border-default bg-surface-strong object-cover shrink-0" />
                   ) : (
-                    <div className="w-10 h-10 bg-surface-strong rounded-button flex items-center justify-center text-sm font-bold text-body shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-surface-muted border border-border-default flex items-center justify-center text-xs font-bold text-heading shrink-0 shadow-xs">
                       {selectedRecord.vendor?.substring(0, 2).toUpperCase() || 'NA'}
                     </div>
                   )}
                   <div className="min-w-0">
-                    <h2 className="text-base font-bold text-heading leading-tight truncate">{selectedRecord.vendor}</h2>
-                    <p className="text-xs text-muted mt-0.5 truncate">Invoice #{selectedRecord.invoiceNumber || 'N/A'}</p>
+                    <h2 className="text-base font-bold text-heading leading-tight truncate" title={selectedRecord.vendor}>{selectedRecord.vendor}</h2>
+                    <p className="text-xs text-muted mt-0.5 truncate leading-tight">Invoice #{selectedRecord.invoiceNumber || 'N/A'}</p>
                   </div>
                 </div>
-                <Badge
-                  variant="outline"
-                  className={`text-xs font-semibold whitespace-nowrap shrink-0 border-0 ${
-                    selectedRecord.status === 'PAID'
-                      ? 'bg-success-light text-success-text'
-                      : selectedRecord.status === 'REJECTED'
-                      ? 'bg-danger-light text-danger'
-                      : 'bg-warning-light text-warning'
-                  }`}
-                >
+                <span className={cn('px-2.5 py-0.5 rounded-full text-[11px] font-medium shrink-0 border', getStatusBadgeStyle(selectedRecord.status))}>
                   {selectedRecord.status}
-                </Badge>
+                </span>
               </div>
 
-              {/* Total Amount Due */}
+              {/* 2. Recessed TOTAL AMOUNT DUE & Calm Action Row */}
               <div className="pt-2 border-t border-border-subtle">
                 <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1">Total Amount Due</p>
-                <p className="text-3xl font-extrabold text-heading tracking-tight">{formatMoney(selectedRecord.amount)}</p>
+                <p className="text-2xl font-bold text-heading tracking-tight tabular-nums">{formatMoney(selectedRecord.amount)}</p>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex items-center gap-2 pt-1">
                 <Button
                   type="button"
                   size="sm"
                   disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'PENDING'}
                   onClick={() => statusMutation.mutate('APPROVED')}
-                  className="flex-1 whitespace-nowrap text-xs font-semibold"
+                  className="h-8.5 px-4 rounded-xl text-xs font-semibold cursor-pointer shadow-xs whitespace-nowrap"
                 >
                   Approve
                 </Button>
@@ -655,9 +714,9 @@ export default function AccountsPayable() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => { setChangeRequestReason(''); requestChanges.reset(); setChangeRequestSaved(false); setChangeRequestOpen(true) }}
+                  onClick={() => { setChangeRequestReason(''); requestChanges.reset(); setChangeRequestSaved(false); setChangeRequestOpen(true); }}
                   disabled={!selectedRecord || requestChanges.isPending || !['APPROVED', 'SCHEDULED'].includes(selectedRecord.status)}
-                  className="shrink-0 whitespace-nowrap text-xs font-medium"
+                  className="h-8.5 px-3 rounded-xl border border-border-default text-xs font-medium flex-1 cursor-pointer hover:bg-surface-muted whitespace-nowrap"
                 >
                   Request Changes
                 </Button>
@@ -667,7 +726,7 @@ export default function AccountsPayable() {
                   size="sm"
                   disabled={!selectedRecord || statusMutation.isPending || !['PENDING', 'APPROVED'].includes(selectedRecord.status)}
                   onClick={() => statusMutation.mutate('REJECTED')}
-                  className="flex-1 whitespace-nowrap text-xs font-medium text-danger border-border-default hover:bg-danger-light"
+                  className="h-8.5 px-3 rounded-xl border border-border-default text-xs font-medium text-danger hover:bg-danger-light hover:text-danger-hover hover:border-danger/30 cursor-pointer whitespace-nowrap"
                 >
                   Reject
                 </Button>
@@ -675,39 +734,45 @@ export default function AccountsPayable() {
               {statusMutation.isError && <p role="alert" className="text-xs text-danger">{statusMutation.error?.message || 'Could not update the invoice status.'}</p>}
               {changeRequestSaved && <p role="status" className="text-xs text-success-text">Change request recorded in the invoice audit history.</p>}
 
-              {/* Line Items Section */}
+              {/* 3. Recessed LINE ITEMS Empty Well */}
               <div className="pt-2 border-t border-border-subtle">
                 <h3 className="text-[10px] font-bold text-muted uppercase tracking-wider mb-2">Line Items</h3>
-                <div className="divide-y divide-border-subtle">
-                  {selectedDetail?.lineItems?.length ? selectedDetail.lineItems.map(line => (
-                    <div key={line.id} className="flex items-center justify-between py-2 text-xs">
-                      <div className="min-w-0 pr-2">
-                        <p className="font-semibold text-heading truncate">{line.description}</p>
-                        {line.periodOrUsage && <p className="text-[11px] text-muted mt-0.5 truncate">{line.periodOrUsage}</p>}
+                {selectedDetail?.lineItems?.length ? (
+                  <div className="divide-y divide-border-subtle rounded-xl border border-border-subtle bg-surface-muted/20 px-3 py-1">
+                    {selectedDetail.lineItems.map(line => (
+                      <div key={line.id} className="flex items-center justify-between py-2 text-xs">
+                        <div className="min-w-0 pr-2">
+                          <p className="font-semibold text-heading truncate">{line.description}</p>
+                          {line.periodOrUsage && <p className="text-[11px] text-muted mt-0.5 truncate">{line.periodOrUsage}</p>}
+                        </div>
+                        <span className="font-semibold text-heading tabular-nums shrink-0">{formatMoney(line.amount)}</span>
                       </div>
-                      <span className="font-semibold text-heading tabular-nums shrink-0">{formatMoney(line.amount)}</span>
-                    </div>
-                  )) : (
-                    <p className="py-2.5 text-xs text-muted">{selectedDetail ? 'No line items recorded for this invoice.' : 'Loading invoice details...'}</p>
-                  )}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-border-default bg-surface-muted/30 p-4 text-center text-xs text-muted">
+                    {selectedDetail ? 'No line items recorded for this invoice.' : 'Loading invoice details...'}
+                  </div>
+                )}
               </div>
 
-              {/* PDF Preview Section */}
-              <div className="pt-2 border-t border-border-subtle">
-                <div className="flex items-center justify-between px-3 py-2 bg-surface-muted/60 border border-border-default rounded-t-input">
-                  <div className="flex items-center gap-2 text-body min-w-0">
-                    <FileText size={14} className="text-muted shrink-0" />
-                    <span className="text-xs font-semibold truncate">invoice_{selectedRecord.invoiceNumber || 'document'}.pdf</span>
+              {/* 4. Unclipped Invoice Attachment Bar + PDF Viewer */}
+              <div className="pt-2 border-t border-border-subtle space-y-2">
+                <div className="rounded-xl p-2.5 sm:p-3 border border-border-default bg-surface-muted/40 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-heading min-w-0 flex-1">
+                    <FileText size={15} className="text-muted shrink-0" />
+                    <span className="text-xs font-semibold text-heading truncate" title={attachmentFileName}>
+                      {attachmentFileName}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-muted shrink-0">
+                  <div className="flex items-center gap-1 shrink-0">
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       onClick={() => setInvoicePreviewOpen(true)}
                       title="Full preview"
-                      className="gap-1 h-7 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/15"
+                      className="h-7.5 px-2.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 shrink-0 text-primary bg-primary/10 hover:bg-primary/15 cursor-pointer"
                     >
                       <Maximize2 size={13} />
                       <span>Full preview</span>
@@ -718,7 +783,7 @@ export default function AccountsPayable() {
                       size="icon"
                       onClick={handleOpenInNewTab}
                       title="Open in new window"
-                      className="h-7 w-7 text-muted hover:text-heading"
+                      className="w-7.5 h-7.5 rounded-lg inline-flex items-center justify-center shrink-0 text-muted hover:text-heading cursor-pointer"
                     >
                       <ExternalLink size={14} />
                     </Button>
@@ -728,7 +793,7 @@ export default function AccountsPayable() {
                       size="icon"
                       onClick={handleDownloadPdf}
                       title="Download PDF"
-                      className="h-7 w-7 text-muted hover:text-heading"
+                      className="w-7.5 h-7.5 rounded-lg inline-flex items-center justify-center shrink-0 text-muted hover:text-heading cursor-pointer"
                     >
                       <Download size={14} />
                     </Button>
@@ -736,13 +801,13 @@ export default function AccountsPayable() {
                 </div>
 
                 {/* PDF Viewer Container */}
-                <div className="bg-[#374151] p-2 flex justify-center items-center rounded-b-input border-x border-b border-border-default h-[350px] overflow-hidden">
+                <div className="bg-[#1e293b] p-2 flex justify-center items-center rounded-xl border border-border-default h-[320px] overflow-hidden">
                   {pdfUrl ? (
                     <iframe
                       key={`${selectedRecord.id}`}
                       title={`Invoice ${selectedRecord.invoiceNumber || selectedRecord.id}`}
                       src={`${pdfUrl}#toolbar=0&navpanes=0`}
-                      className="w-full h-full bg-surface-raised shadow-card border-0 rounded"
+                      className="w-full h-full bg-white shadow-sm border-0 rounded-lg"
                     />
                   ) : (
                     <div className="flex flex-col items-center justify-center h-full text-center p-4">
@@ -753,7 +818,7 @@ export default function AccountsPayable() {
                         </div>
                       ) : pdfError ? (
                         <div className="space-y-2">
-                          <p className="text-xs text-danger-light">Invoice preview could not be loaded.</p>
+                          <p className="text-xs text-rose-300">Invoice preview could not be loaded.</p>
                           <Button
                             type="button"
                             variant="outline"
@@ -774,7 +839,7 @@ export default function AccountsPayable() {
 
             </div>
           ) : (
-            <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card p-6 text-center text-sm text-muted">
+            <div className="bg-gradient-to-b from-surface-raised to-surface-raised/80 backdrop-blur-xl border border-border-default rounded-2xl shadow-card p-6 text-center text-sm text-muted">
               Select an invoice to view details.
             </div>
           )}

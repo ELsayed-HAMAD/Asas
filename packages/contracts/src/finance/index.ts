@@ -123,6 +123,10 @@ export const payableInvoiceSchema = z.object({
   date: isoDateTimeSchema,
   dueDate: isoDateTimeSchema.nullable(),
   amount: moneySchema,
+  /** Legacy face amount, when provided by a source-system migration. */
+  sourceOriginalAmount: moneySchema.nullable().default(null),
+  /** Aggregate paid before cutover; no historical settlement journals are implied. */
+  sourcePaidAmount: moneySchema.nullable().default(null),
   status: payableStatusSchema,
   lineItemCount: z.int().min(0),
   createdAt: isoDateTimeSchema,
@@ -298,17 +302,49 @@ export type CollectionActivityWriteInput = z.infer<typeof collectionActivityWrit
 
 // ── Receivable invoices (accounts receivable) ──────────────────────────────────────────
 
+/**
+ * Costed stock fulfillment attached to a receivable. The invoice itself remains total-only;
+ * this line records which units were issued and at what exact cost, plus the reversal evidence
+ * once the invoice is voided or deleted.
+ */
+export const receivableInventoryLineSchema = z.object({
+  id: idSchema,
+  productId: idSchema,
+  productName: shortTextSchema,
+  sku: shortTextSchema,
+  quantity: z.int().min(1).max(2_147_483_647),
+  costValue: moneySchema,
+  stockMovementId: idSchema,
+  valuationEventId: idSchema,
+  journalEntryId: idSchema.nullable(),
+  reversedAt: isoDateTimeSchema.nullable(),
+  reversalStockMovementId: idSchema.nullable(),
+  reversalValuationEventId: idSchema.nullable(),
+  reversalJournalEntryId: idSchema.nullable(),
+  createdAt: isoDateTimeSchema,
+})
+
+export type ReceivableInventoryLine = z.infer<typeof receivableInventoryLineSchema>
+
 export const receivableInvoiceSchema = z.object({
   id: idSchema,
   customerId: idSchema,
   /** Denormalised customer name so a list row never needs a second fetch. */
   customer: z.string(),
   number: z.string().nullable(),
+  /** Source document date; distinct from the date the record was imported. */
+  date: isoDateTimeSchema,
   amount: moneySchema,
+  /** Legacy face amount, when provided by a source-system migration. */
+  sourceOriginalAmount: moneySchema.nullable().default(null),
+  /** Aggregate paid before cutover; no historical collection journals are implied. */
+  sourcePaidAmount: moneySchema.nullable().default(null),
   dueDate: isoDateTimeSchema.nullable(),
   /** Workspace-local calendar days past the due date; zero on the due date and after payment/void. */
   daysPastDue: z.int().min(0),
   status: receivableStatusSchema,
+  /** Costed stock issues that funded this invoice; empty for a total-only invoice. */
+  inventoryLines: z.array(receivableInventoryLineSchema).default([]),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 })
@@ -357,9 +393,25 @@ export const receivableListResponseSchema = paginated(receivableInvoiceSchema, r
 
 export type ReceivableListResponse = z.infer<typeof receivableListResponseSchema>
 
+const MAX_RECEIVABLE_INVENTORY_LINES = 100
+
+/**
+ * Optional fulfillment line. Cost is never supplied here: it comes from the workspace's explicit
+ * inventory valuation policy, and the service rejects the line when valuation is not configured.
+ */
+export const receivableInventoryLineWriteSchema = z.object({
+  productId: idSchema,
+  quantity: z.int().min(1).max(2_147_483_647),
+})
+
+export type ReceivableInventoryLineWriteInput = z.infer<typeof receivableInventoryLineWriteSchema>
+
 /**
  * Create a receivable. There is no `status`: a new invoice always starts `CURRENT`; status
  * changes go through the status endpoint. (An extra `status` key is stripped, not rejected.)
+ *
+ * `inventoryLines` is additive: omitting it creates the same total-only invoice the API has
+ * always supported. Supplying it issues each product from valued stock in the same transaction.
  */
 export const receivableWriteSchema = z.object({
   customerId: idSchema,
@@ -367,6 +419,15 @@ export const receivableWriteSchema = z.object({
   /** Major-unit decimal string in the tenant's currency, e.g. '4800.00'. Must be > 0. */
   amount: positiveDecimalStringSchema,
   dueDate: calendarDateSchema.optional().nullable(),
+  inventoryLines: z.array(receivableInventoryLineWriteSchema).max(MAX_RECEIVABLE_INVENTORY_LINES).optional(),
+}).superRefine((input, ctx) => {
+  const seen = new Set<string>()
+  input.inventoryLines?.forEach((line, index) => {
+    if (seen.has(line.productId)) {
+      ctx.addIssue({ code: 'custom', message: 'Each product may appear only once per invoice', path: ['inventoryLines', index, 'productId'] })
+    }
+    seen.add(line.productId)
+  })
 })
 
 export type ReceivableWriteInput = z.infer<typeof receivableWriteSchema>
@@ -595,6 +656,11 @@ export const journalSourceTypeSchema = z.enum([
   'PAYROLL_RECOGNITION',
   'EXPENSE_RECOGNITION',
   'OPENING_BALANCE',
+  'MIGRATION_AP_OPENING',
+  'MIGRATION_AR_OPENING',
+  'INVENTORY_RECEIPT',
+  'INVENTORY_ISSUE',
+  'INVENTORY_REVERSAL',
 ])
 export const journalSideSchema = z.enum(['DEBIT', 'CREDIT'])
 export const journalCurrencyProvenanceSchema = z.enum(['DOCUMENT', 'WORKSPACE_FALLBACK', 'MANUAL_BASE'])

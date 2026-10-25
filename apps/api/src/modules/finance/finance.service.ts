@@ -20,6 +20,7 @@ import type {
   ExpenseStatus,
   PayableStatus,
   PrismaClient,
+  ReceivableInventoryLine as PrismaReceivableInventoryLine,
   ReceivableStatus,
   Vendor as PrismaVendor,
 } from '@prisma/client'
@@ -41,6 +42,7 @@ import type {
   PayableSummary,
   PayableUpdateInput,
   PayableWriteInput,
+  ReceivableInventoryLine,
   ReceivableInvoice,
   ReceivableListQuery,
   ReceivableSummary,
@@ -58,6 +60,8 @@ import { monthToDateComparisonPeriods, tenantToday } from '../../utils/dates.js'
 export { monthToDateComparisonPeriods } from '../../utils/dates.js'
 import { computeAgingBuckets } from './aging.service.js'
 import { expenseSettlementComparison, getJournal as getLedgerJournal, listJournals as listLedgerJournals, payableSettlementComparison, receivableSettlementComparison, postOpeningBalance as postLedgerOpeningBalance, recentSettlements, recordCashSettlement, recordExpenseRecognition, recordInvoiceRecognition, reverseCashSettlement, reverseExpenseRecognitionIfPresent, reverseInvoiceRecognitionIfPresent, settlementCashFlow, settlementCashFlowComparison, trialBalance as getLedgerTrialBalance } from './ledger.service.js'
+import { postValuedIssue, reverseValuedSaleIssue } from '../inventory/inventoryValuation.service.js'
+import { writeStockMovement } from '../inventory/stockMovementWriter.js'
 import type { InvoiceDoc } from '../../services/pdf.js'
 
 export type FinanceClient = PrismaClient | Prisma.TransactionClient
@@ -409,9 +413,11 @@ function mapPayable(
     vendorId: invoice.vendorId,
     vendor: invoice.vendor?.name ?? null,
     invoiceNumber: invoice.invoiceNumber,
-    date: invoice.date.toISOString(),
+    date: (invoice.date ?? invoice.createdAt).toISOString(),
     dueDate: invoice.dueDate?.toISOString() ?? null,
     amount: moneyWire(invoice.amount, invoice.currency ?? currency),
+    sourceOriginalAmount: toMoneyWire(invoice.sourceOriginalAmount, invoice.currency ?? currency),
+    sourcePaidAmount: toMoneyWire(invoice.sourcePaidAmount, invoice.currency ?? currency),
     status: invoice.status,
     lineItemCount: invoice._count.lineItems,
     createdAt: invoice.createdAt.toISOString(),
@@ -916,6 +922,38 @@ export interface ReceivableListResult {
   summary: ReceivableSummary
 }
 
+const receivableInclude = {
+  customer: true,
+  inventoryLines: {
+    include: { product: { select: { name: true, sku: true } } },
+    orderBy: { createdAt: 'asc' },
+  },
+} satisfies Prisma.ReceivableInvoiceInclude
+
+type PrismaReceivableWithIncludes = Prisma.ReceivableInvoiceGetPayload<{ include: typeof receivableInclude }>
+type PrismaReceivableInventoryLineWithIncludes = Prisma.ReceivableInventoryLineGetPayload<{
+  include: { product: { select: { name: true; sku: true } } }
+}>
+
+function mapReceivableInventoryLine(line: PrismaReceivableInventoryLineWithIncludes): ReceivableInventoryLine {
+  return {
+    id: line.id,
+    productId: line.productId,
+    productName: line.product.name,
+    sku: line.product.sku,
+    quantity: line.quantity,
+    costValue: moneyWire(line.costValue, line.currency),
+    stockMovementId: line.stockMovementId,
+    valuationEventId: line.valuationEventId,
+    journalEntryId: line.journalEntryId,
+    reversedAt: line.reversedAt?.toISOString() ?? null,
+    reversalStockMovementId: line.reversalStockMovementId,
+    reversalValuationEventId: line.reversalValuationEventId,
+    reversalJournalEntryId: line.reversalJournalEntryId,
+    createdAt: line.createdAt.toISOString(),
+  }
+}
+
 export async function listReceivables(
   prisma: FinanceClient,
   tenantId: string,
@@ -961,7 +999,7 @@ export async function listReceivables(
       skip,
       take,
       orderBy: { dueDate: 'asc' },
-      include: { customer: true },
+      include: receivableInclude,
     }),
     prisma.receivableInvoice.count({ where }),
     receivableAggregates(prisma, tenantId),
@@ -985,8 +1023,6 @@ export async function listReceivables(
   }
 }
 
-type PrismaReceivableWithIncludes = Prisma.ReceivableInvoiceGetPayload<{ include: { customer: true } }>
-
 function mapReceivable(invoice: PrismaReceivableWithIncludes, currency: string, today: Date): ReceivableInvoice {
   const dueDate = invoice.dueDate ? new Date(Date.UTC(invoice.dueDate.getUTCFullYear(), invoice.dueDate.getUTCMonth(), invoice.dueDate.getUTCDate())) : null
   const status = invoice.status === 'CURRENT' && dueDate && dueDate < today ? 'OVERDUE' : invoice.status
@@ -998,10 +1034,14 @@ function mapReceivable(invoice: PrismaReceivableWithIncludes, currency: string, 
     customerId: invoice.customerId,
     customer: invoice.customer?.name ?? null,
     number: invoice.number,
+    date: (invoice.date ?? invoice.createdAt).toISOString(),
     amount: moneyWire(invoice.amount, invoice.currency ?? currency),
+    sourceOriginalAmount: toMoneyWire(invoice.sourceOriginalAmount, invoice.currency ?? currency),
+    sourcePaidAmount: toMoneyWire(invoice.sourcePaidAmount, invoice.currency ?? currency),
     dueDate: invoice.dueDate?.toISOString() ?? null,
     daysPastDue,
     status,
+    inventoryLines: (invoice.inventoryLines ?? []).map(mapReceivableInventoryLine),
     createdAt: invoice.createdAt.toISOString(),
     updatedAt: invoice.updatedAt.toISOString(),
   }
@@ -1015,7 +1055,7 @@ export async function getReceivable(
   const [currency, timezone] = await Promise.all([getTenantCurrency(prisma, tenantId), getTenantTimezone(prisma, tenantId)])
   const invoice = await prisma.receivableInvoice.findFirst({
     where: { id, tenantId },
-    include: { customer: true },
+    include: receivableInclude,
   })
   if (!invoice) throw new AppError(404, 'Invoice not found')
   return mapReceivable(invoice, currency, tenantToday(timezone))
@@ -1030,6 +1070,134 @@ async function assertCustomerInTenant(
   if (!customerId) return
   const customer = await prisma.customer.findFirst({ where: { id: customerId, tenantId } })
   if (!customer) throw new AppError(400, 'Customer does not belong to this workspace')
+}
+
+/**
+ * Issue each requested product from valued stock in the same transaction as the invoice. The
+ * invoice amount remains the source document total; COGS comes only from the configured costing
+ * method. There is deliberately no fallback to product price or a zero cost.
+ */
+async function issueReceivableInventory(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  invoice: { id: string; number: string | null; createdAt: Date },
+  lines: ReceivableWriteInput['inventoryLines'],
+  actorId: string | null,
+): Promise<void> {
+  if (!lines?.length) return
+
+  const valuation = await tx.inventoryValuationConfig.findUnique({ where: { tenantId }, select: { tenantId: true } })
+  if (!valuation) {
+    throw new AppError(
+      409,
+      'Inventory valuation is not configured. Configure the costing method and ledger accounts before adding stock fulfillment, or remove the inventory lines to create a total-only invoice.',
+    )
+  }
+
+  const productIds = lines.map(line => line.productId)
+  if (new Set(productIds).size !== productIds.length) {
+    throw new AppError(400, 'Each product may appear only once per receivable invoice')
+  }
+  const products = await tx.product.findMany({
+    where: { tenantId, id: { in: productIds }, archivedAt: null },
+    select: { id: true, name: true, sku: true },
+  })
+  if (products.length !== productIds.length) {
+    throw new AppError(404, 'One or more inventory fulfillment products were not found or are archived')
+  }
+  const byId = new Map(products.map(product => [product.id, product]))
+
+  for (const line of lines) {
+    if (!Number.isSafeInteger(line.quantity) || line.quantity <= 0) {
+      throw new AppError(400, 'An inventory fulfillment quantity must be a positive whole number')
+    }
+    if (!byId.has(line.productId)) {
+      throw new AppError(404, 'An inventory fulfillment product was not found or is archived')
+    }
+    const { movement } = await writeStockMovement(tx, {
+      tenantId,
+      productId: line.productId,
+      delta: -line.quantity,
+      note: `Sale — receivable ${invoice.number ?? invoice.id}`,
+      createdAt: invoice.createdAt,
+    })
+    if (!movement) throw new AppError(409, 'The inventory fulfillment movement was not created')
+
+    const issue = await postValuedIssue(tx, {
+      tenantId,
+      productId: line.productId,
+      stockMovementId: movement.id,
+      quantity: line.quantity,
+      reason: 'SALE',
+      postedAt: invoice.createdAt,
+      actorId,
+    })
+    await tx.receivableInventoryLine.create({
+      data: {
+        tenantId,
+        invoiceId: invoice.id,
+        productId: line.productId,
+        quantity: line.quantity,
+        currency: issue.currency,
+        costValue: issue.value,
+        stockMovementId: movement.id,
+        valuationEventId: issue.eventId,
+        journalEntryId: issue.journalEntryId,
+      },
+    })
+  }
+}
+
+/**
+ * Undo every still-open inventory fulfillment line at its exact original cost. Stock quantity and
+ * valuation are restored before the invoice status is updated, and all reversal links stay on the
+ * line. Already-reversed lines are skipped so a retry cannot post the return twice.
+ */
+async function reverseReceivableInventory(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  invoice: { id: string; number: string | null; inventoryLines: PrismaReceivableInventoryLine[] },
+  actorId: string | null,
+  reason: string,
+): Promise<number> {
+  const pending = (invoice.inventoryLines ?? []).filter(line => line.reversedAt === null)
+  if (pending.length === 0) return 0
+  const postedAt = new Date()
+  for (const line of pending) {
+    if (line.reversalStockMovementId || line.reversalValuationEventId || line.reversalJournalEntryId) {
+      throw new AppError(409, 'This receivable inventory line has partial reversal evidence and cannot be reversed again')
+    }
+    const { movement } = await writeStockMovement(tx, {
+      tenantId,
+      productId: line.productId,
+      delta: line.quantity,
+      note: `Sale reversal — receivable ${invoice.number ?? invoice.id}`,
+      createdAt: postedAt,
+    })
+    if (!movement) throw new AppError(409, 'The inventory reversal movement was not created')
+
+    const reversal = await reverseValuedSaleIssue(tx, {
+      tenantId,
+      productId: line.productId,
+      originalStockMovementId: line.stockMovementId,
+      originalValuationEventId: line.valuationEventId,
+      reversalStockMovementId: movement.id,
+      quantity: line.quantity,
+      postedAt,
+      actorId,
+      reason,
+    })
+    await tx.receivableInventoryLine.update({
+      where: { id_tenantId: { id: line.id, tenantId } },
+      data: {
+        reversedAt: postedAt,
+        reversalStockMovementId: movement.id,
+        reversalValuationEventId: reversal.eventId,
+        reversalJournalEntryId: reversal.journalEntryId,
+      },
+    })
+  }
+  return pending.length
 }
 
 export async function createReceivable(
@@ -1058,7 +1226,12 @@ export async function createReceivable(
       currency: invoice.currency ?? currency, workspaceCurrency: currency, postedAt: invoice.createdAt, actorId,
       description: `Receivable recognized: ${invoice.customer.name}${invoice.number ? ` · ${invoice.number}` : ''}`,
     })
-    return mapReceivable(invoice, currency, tenantToday(timezone))
+    await issueReceivableInventory(tx, tenantId, invoice, input.inventoryLines, actorId)
+    const complete = await tx.receivableInvoice.findFirstOrThrow({
+      where: { id: invoice.id, tenantId },
+      include: receivableInclude,
+    })
+    return mapReceivable(complete, currency, tenantToday(timezone))
   }
   return '$transaction' in prisma ? prisma.$transaction(create, { isolationLevel: 'Serializable' }) : create(prisma)
 }
@@ -1083,7 +1256,7 @@ export async function updateReceivable(
         ...(input.amount !== undefined && { amount: toStoredDecimal(input.amount, currency) }),
         ...(input.dueDate !== undefined && { dueDate: input.dueDate ? dayToDate(input.dueDate) : null }),
       },
-      include: { customer: true },
+      include: receivableInclude,
     })
     if (input.amount !== undefined) await recordInvoiceRecognition(tx, {
       tenantId, sourceId: invoice.id, sourceType: 'AR_RECOGNITION', amount: invoice.amount.toString(),
@@ -1114,7 +1287,7 @@ export async function updateReceivableStatus(
     const invoice = await tx.receivableInvoice.update({
       where: { id_tenantId: { id, tenantId } },
       data: { status, ...(status === 'PAID' && { paidAt: new Date() }) },
-      include: { customer: true },
+      include: receivableInclude,
     })
     if (status === 'PAID' && invoice.paidAt) {
       await recordCashSettlement(tx, {
@@ -1127,26 +1300,34 @@ export async function updateReceivableStatus(
   })
 }
 
-export async function deleteReceivable(prisma: FinanceClient, tenantId: string, id: string, actorId: string | null = null): Promise<void> {
-  await withDocumentLock(prisma, 'ReceivableInvoice', tenantId, id, async tx => {
-    const existing = await tx.receivableInvoice.findFirstOrThrow({ where: { id, tenantId } })
+export async function deleteReceivable(
+  prisma: FinanceClient,
+  tenantId: string,
+  id: string,
+  actorId: string | null = null,
+): Promise<{ inventoryLinesReturned: number }> {
+  return withDocumentLock(prisma, 'ReceivableInvoice', tenantId, id, async tx => {
+    const existing = await tx.receivableInvoice.findFirstOrThrow({ where: { id, tenantId }, include: receivableInclude })
     if (['PAID', 'VOID'].includes(existing.status)) throw new AppError(409, 'Paid or void invoices cannot be deleted')
+    const inventoryLinesReturned = await reverseReceivableInventory(tx, tenantId, existing, actorId, 'Receivable removed')
     await reverseInvoiceRecognitionIfPresent(tx, { tenantId, sourceId: id, sourceType: 'AR_RECOGNITION', actorId, reason: 'Receivable removed' })
     await tx.receivableInvoice.update({ where: { id_tenantId: { id, tenantId } }, data: { status: 'VOID' } })
+    return { inventoryLinesReturned }
   })
 }
 
 export async function voidReceivable(prisma: FinanceClient, tenantId: string, id: string, reason = 'Voided', actorId: string | null = null): Promise<ReceivableInvoice> {
   const [currency, timezone] = await Promise.all([getTenantCurrency(prisma, tenantId), getTenantTimezone(prisma, tenantId)])
   return withDocumentLock(prisma, 'ReceivableInvoice', tenantId, id, async tx => {
-    const existing = await tx.receivableInvoice.findFirstOrThrow({ where: { id, tenantId } })
+    const existing = await tx.receivableInvoice.findFirstOrThrow({ where: { id, tenantId }, include: receivableInclude })
     if (existing.status === 'VOID') throw new AppError(409, 'This invoice is already void')
     if (existing.status === 'PAID') await reverseCashSettlement(tx, { tenantId, sourceId: id, sourceType: 'AR_COLLECTION', reason, actorId, postedAt: new Date() })
+    await reverseReceivableInventory(tx, tenantId, existing, actorId, reason)
     await reverseInvoiceRecognitionIfPresent(tx, { tenantId, sourceId: id, sourceType: 'AR_RECOGNITION', actorId, reason })
     const invoice = await tx.receivableInvoice.update({
       where: { id_tenantId: { id, tenantId } },
       data: { status: 'VOID' },
-      include: { customer: true },
+      include: receivableInclude,
     })
     return mapReceivable(invoice, currency, tenantToday(timezone))
   })

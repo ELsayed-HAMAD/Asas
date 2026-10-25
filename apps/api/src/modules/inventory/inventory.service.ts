@@ -19,6 +19,7 @@ import type {
   StockMovement as PrismaStockMovement,
 } from '@prisma/client'
 import type {
+  InventoryCostReason,
   Product,
   ProductListQuery,
   ProductArchiveInput,
@@ -39,9 +40,12 @@ import type {
   Warehouse,
 } from '@asas/contracts'
 import { buildPaginationMeta, stockLevelToStatus, toPrismaPage } from '@asas/contracts'
+import { Money } from '@asas/domain'
 import { AppError } from '../../utils/errors.js'
 import { monthToDateComparisonPeriods, tenantToday } from '../../utils/dates.js'
 import { recordAuditLog } from '../../services/auditLog.js'
+import { writeStockMovement } from './stockMovementWriter.js'
+import { ensureInventoryOpeningEquity, postValuedIssue, postValuedReceipt } from './inventoryValuation.service.js'
 
 // ── Stock derivation (SQL, single round trip) ──────────────────────────────────
 
@@ -166,17 +170,37 @@ export async function removeProductSupplier(
 
 export async function createPurchaseOrder(prisma: PrismaClient, tenantId: string, input: PurchaseOrderWriteInput, actorId: string): Promise<PurchaseOrder> {
   return prisma.$transaction(async tx => {
-    const product = await tx.product.findFirst({ where: { id: input.productId, tenantId, archivedAt: null }, select: { id: true } })
+    const [product, tenant] = await Promise.all([
+      tx.product.findFirst({ where: { id: input.productId, tenantId, archivedAt: null }, select: { id: true, currency: true } }),
+      tx.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } }),
+    ])
     if (!product) throw new AppError(404, 'Product not found')
+    if (!tenant) throw new AppError(404, 'Workspace not found')
+    const currency = product.currency ?? tenant.currency
+    let unitCost: string | null = null
+    if (input.unitCost != null) {
+      let cost: Money
+      try {
+        cost = Money.fromDecimal(input.unitCost, currency)
+      } catch {
+        throw new AppError(400, `The unit cost is not exact in ${currency}`)
+      }
+      if (cost.isNegative()) throw new AppError(400, 'A unit cost cannot be negative')
+      unitCost = cost.toDecimalString()
+    }
     const order = await tx.purchaseOrder.create({
-      data: { tenantId, status: 'DRAFT', lines: { create: { productId: product.id, quantity: input.quantity } } },
+      data: {
+        tenantId,
+        status: 'DRAFT',
+        lines: { create: { productId: product.id, quantity: input.quantity, unitCost, currency: unitCost == null ? null : currency } },
+      },
       include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
     })
     const line = order.lines[0]
     if (!line) throw new AppError(500, 'Purchase order line was not created')
     await recordAuditLog(tx, {
       tenantId, actorId, action: 'inventory.purchase-order.create', targetType: 'PurchaseOrder', targetId: order.id,
-      metadata: { productId: line.product.id, quantity: line.quantity },
+      metadata: { productId: line.product.id, quantity: line.quantity, unitCost: line.unitCost?.toString() ?? null, currency: line.currency },
     })
     return {
       id: order.id,
@@ -186,6 +210,8 @@ export async function createPurchaseOrder(prisma: PrismaClient, tenantId: string
       productName: line.product.name,
       sku: line.product.sku,
       quantity: line.quantity,
+      unitCost: line.unitCost?.toString() ?? null,
+      currency: line.currency,
     }
   })
 }
@@ -219,6 +245,8 @@ export async function listPurchaseOrders(
       productName: line?.product.name ?? 'Unknown product',
       sku: line?.product.sku ?? '',
       quantity: line?.quantity ?? 0,
+      unitCost: line?.unitCost?.toString() ?? null,
+      currency: line?.currency ?? null,
     }
   })
 }
@@ -265,6 +293,8 @@ export async function approvePurchaseOrder(
       productName: line?.product.name ?? 'Unknown product',
       sku: line?.product.sku ?? '',
       quantity: line?.quantity ?? 0,
+      unitCost: line?.unitCost?.toString() ?? null,
+      currency: line?.currency ?? null,
     }
   })
 }
@@ -294,6 +324,17 @@ export async function receivePurchaseOrder(
   }
 
   return prisma.$transaction(async tx => {
+    const valuationConfig = await tx.inventoryValuationConfig.findUnique({ where: { tenantId } })
+    if (valuationConfig) {
+      const missingCost = order.lines.find(line => line.unitCost == null)
+      if (missingCost) {
+        throw new AppError(
+          409,
+          `Purchase order line for ${missingCost.product.sku} has no acquisition cost. Inventory valuation is configured, so every received unit must carry an explicit cost. Approved orders cannot be edited; cancel this order and create a replacement with a unit cost.`,
+        )
+      }
+    }
+
     const updatedCount = await tx.purchaseOrder.updateMany({
       where: { id, tenantId, status: 'APPROVED' },
       data: { status: 'RECEIVED', receivedAt: new Date() },
@@ -308,18 +349,26 @@ export async function receivePurchaseOrder(
     })
 
     for (const line of updatedOrder.lines) {
-      await tx.product.update({
-        where: { id: line.productId },
-        data: { stock: { increment: line.quantity } },
+      const { movement } = await writeStockMovement(tx, {
+        tenantId,
+        productId: line.productId,
+        delta: line.quantity,
+        note: `PO #${updatedOrder.id} received`,
+        allowArchived: true,
       })
-      await tx.stockMovement.create({
-        data: {
+      if (valuationConfig && movement && line.unitCost != null) {
+        await postValuedReceipt(tx, {
           tenantId,
           productId: line.productId,
-          delta: line.quantity,
-          note: `PO #${updatedOrder.id} received`,
-        },
-      })
+          stockMovementId: movement.id,
+          quantity: line.quantity,
+          unitCost: line.unitCost.toString(),
+          ...(line.currency ? { unitCostCurrency: line.currency } : {}),
+          reason: 'PURCHASE_RECEIPT',
+          postedAt: movement.createdAt,
+          actorId,
+        })
+      }
     }
 
     const line = updatedOrder.lines[0]
@@ -341,6 +390,8 @@ export async function receivePurchaseOrder(
       productName: line?.product.name ?? 'Unknown product',
       sku: line?.product.sku ?? '',
       quantity: line?.quantity ?? 0,
+      unitCost: line?.unitCost?.toString() ?? null,
+      currency: line?.currency ?? null,
     }
   })
 }
@@ -390,6 +441,8 @@ export async function cancelPurchaseOrder(
       productName: line?.product.name ?? 'Unknown product',
       sku: line?.product.sku ?? '',
       quantity: line?.quantity ?? 0,
+      unitCost: line?.unitCost?.toString() ?? null,
+      currency: line?.currency ?? null,
     }
   })
 }
@@ -553,16 +606,37 @@ export async function createProduct(
   if (skuExists) throw new AppError(409, 'A product with this SKU already exists')
 
   const initialStock = input.stock ?? 0
+  if (input.unitCost !== undefined && initialStock === 0) {
+    throw new AppError(400, 'A unit cost only applies when starting stock is greater than zero')
+  }
+
   let product: PrismaProduct
   try {
     product = await prisma.$transaction(async tx => {
+    // Read the policy inside the transaction so a concurrent setup change cannot create initial
+    // stock unvalued while valuation is already configured (or value it before configuration).
+    const valuationConfig = initialStock > 0
+      ? await tx.inventoryValuationConfig.findUnique({ where: { tenantId } })
+      : null
+    if (initialStock > 0 && valuationConfig && input.unitCost === undefined) {
+      throw new AppError(
+        400,
+        'A unit cost is required for starting stock because inventory valuation is configured. The selling price is never used as cost.',
+      )
+    }
+    if (input.unitCost !== undefined && !valuationConfig) {
+      throw new AppError(
+        409,
+        'Inventory valuation is not configured, so a starting cost cannot be recorded. Configure the costing policy first, or create the product with zero stock and value the opening position later.',
+      )
+    }
     const created = await tx.product.create({
       data: {
         tenantId,
         name: input.name,
         sku: input.sku,
         price: input.price ?? '0',
-        stock: initialStock,
+        stock: 0,
         warehouse: input.warehouse ?? null,
         aisle: input.aisle ?? null,
         bin: input.bin ?? null,
@@ -571,14 +645,23 @@ export async function createProduct(
         minThreshold: input.minThreshold ?? 10,
       },
     })
-    if (initialStock !== 0) {
-      await tx.stockMovement.create({
-        data: {
-          tenantId,
-          productId: created.id,
-          delta: initialStock,
-          note: 'Initial stock',
-        },
+    const movement = initialStock === 0 ? null : (await writeStockMovement(tx, {
+      tenantId, productId: created.id, delta: initialStock, note: 'Initial stock',
+    })).movement
+    if (movement && valuationConfig && input.unitCost !== undefined) {
+      // Starting stock is an opening position, not a trading gain: post the value against the
+      // dedicated opening-equity account rather than an adjustment-income account.
+      const tenant = await tx.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { currency: true } })
+      await postValuedReceipt(tx, {
+        tenantId,
+        productId: created.id,
+        stockMovementId: movement.id,
+        quantity: initialStock,
+        unitCost: input.unitCost,
+        reason: 'OPENING_BALANCE',
+        offsetAccountId: await ensureInventoryOpeningEquity(tx, tenantId, tenant.currency),
+        postedAt: movement.createdAt,
+        actorId,
       })
     }
     await recordAuditLog(tx, {
@@ -587,8 +670,9 @@ export async function createProduct(
       action: 'inventory.product.create',
       targetType: 'Product',
       targetId: created.id,
+      ...(input.unitCost !== undefined && { metadata: { unitCost: input.unitCost, initialStock } }),
     })
-    return created
+    return { ...created, stock: movement ? initialStock : 0 }
     })
   } catch (error) {
     throwSkuConflict(error)
@@ -852,34 +936,84 @@ export async function recordStockMovement(
   const product = await prisma.product.findFirst({ where: { id: input.productId, tenantId, archivedAt: null } })
   if (!product) throw new AppError(404, 'Product not found')
 
+  const valuationConfig = await prisma.inventoryValuationConfig.findUnique({ where: { tenantId } })
+  const RECEIPT_REASONS: InventoryCostReason[] = ['PURCHASE_RECEIPT', 'CUSTOMER_RETURN', 'COUNT_ADJUSTMENT']
+  const ISSUE_REASONS: InventoryCostReason[] = ['SALE', 'CONSUMPTION', 'DAMAGE', 'COUNT_ADJUSTMENT', 'SUPPLIER_RETURN']
+  let reason: InventoryCostReason | undefined
+  if (valuationConfig) {
+    if (input.delta > 0) {
+      if (input.unitCost === undefined) {
+        throw new AppError(
+          400,
+          'An inbound stock movement needs an explicit unit cost while inventory valuation is configured. The selling price is never used as cost.',
+        )
+      }
+      reason = input.reason ?? 'COUNT_ADJUSTMENT'
+      if (reason === 'OPENING_BALANCE') {
+        throw new AppError(400, 'Use the opening-valuation action to value stock that already exists; it does not create a quantity movement.')
+      }
+      if (!RECEIPT_REASONS.includes(reason)) {
+        throw new AppError(400, `Reason ${reason} is not valid for an inbound movement`)
+      }
+    } else {
+      if (!input.reason) {
+        throw new AppError(
+          400,
+          'An outbound stock movement needs a reason while inventory valuation is configured so cost is posted to the right account.',
+        )
+      }
+      reason = input.reason
+      if (!ISSUE_REASONS.includes(reason)) {
+        throw new AppError(400, `Reason ${reason} is not valid for an outbound movement`)
+      }
+    }
+  } else if (input.unitCost !== undefined) {
+    throw new AppError(
+      409,
+      'Inventory valuation is not configured, so this movement cannot carry a cost. Configure the costing policy and ledger accounts first.',
+    )
+  }
+
   const result = await prisma.$transaction(async tx => {
-    const changed = await tx.product.updateMany({
-      where: {
-        id: product.id, tenantId, archivedAt: null,
-        ...(input.delta < 0 && { stock: { gte: -input.delta } }),
-      },
-      data: { stock: { increment: input.delta } },
+    const { movement, newStock } = await writeStockMovement(tx, {
+      tenantId, productId: product.id, delta: input.delta, note: input.note ?? null,
     })
-    if (changed.count !== 1) throw new AppError(409, 'Insufficient stock or product no longer available')
-    const updated = await tx.product.findUniqueOrThrow({ where: { id: product.id } })
-    const movement = await tx.stockMovement.create({
-      data: {
-        tenantId,
-        productId: product.id,
-        delta: input.delta,
-        note: input.note ?? null,
-      },
-      include: { product: { select: { name: true, warehouse: true } } },
-    })
+    if (!movement) throw new AppError(400, 'Stock movement cannot be zero')
+    const valuation = valuationConfig && reason
+      ? input.delta > 0
+        ? await postValuedReceipt(tx, {
+            tenantId,
+            productId: product.id,
+            stockMovementId: movement.id,
+            quantity: input.delta,
+            unitCost: input.unitCost!,
+            reason,
+            postedAt: movement.createdAt,
+            actorId,
+          })
+        : await postValuedIssue(tx, {
+            tenantId,
+            productId: product.id,
+            stockMovementId: movement.id,
+            quantity: -input.delta,
+            reason,
+            postedAt: movement.createdAt,
+            actorId,
+          })
+      : null
     await recordAuditLog(tx, {
       tenantId,
       actorId,
       action: 'inventory.stock.record',
       targetType: 'StockMovement',
       targetId: movement.id,
-      metadata: { productId: movement.productId, delta: movement.delta },
+      metadata: {
+        productId: movement.productId,
+        delta: movement.delta,
+        ...(valuation && { valuationEventId: valuation.eventId, costValue: valuation.value, journalEntryId: valuation.journalEntryId }),
+      },
     })
-    return { movement, newStock: updated.stock }
+    return { movement, newStock }
   })
 
   return {

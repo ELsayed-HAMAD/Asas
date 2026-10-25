@@ -8,6 +8,7 @@ const storage = new LocalObjectStorage(root)
 afterEach(async () => {
   await storage.delete(exportObjectKey('tenant1', 'job1', 'xlsx'))
   await storage.delete(exportObjectKey('tenant1', 'job2', 'json'))
+  await storage.delete(exportObjectKey('tenant1', 'job3', 'csv'))
 })
 
 describe('export object storage', () => {
@@ -85,6 +86,30 @@ describe('export object storage', () => {
       exportObjectKey('tenant1', 'job2', 'json'),
       Buffer.from('{"ok":true}'),
       'application/json; charset=utf-8',
+    )
+    put.mockRestore()
+  })
+
+  it('stores selected CSV reports with a CSV extension and content type', async () => {
+    const put = vi.spyOn(storage, 'put')
+    const queue = await createExportQueue({
+      storage,
+      store: {
+        create: async () => ({ id: 'job3' }),
+        updateMany: async () => undefined,
+        getTenantId: async () => 'tenant1',
+        withStorageCapacity: async (_tenantId, _additionalBytes, write) => write(),
+      },
+    })
+    queue.register('employees', async () => Buffer.from('Name,Status\r\nAda,ACTIVE\r\n'))
+
+    await queue.submit('employees', { format: 'csv' }, 'tenant1')
+
+    expect(await storage.get(exportObjectKey('tenant1', 'job3', 'csv'))).toEqual(Buffer.from('Name,Status\r\nAda,ACTIVE\r\n'))
+    expect(put).toHaveBeenCalledWith(
+      exportObjectKey('tenant1', 'job3', 'csv'),
+      Buffer.from('Name,Status\r\nAda,ACTIVE\r\n'),
+      'text/csv; charset=utf-8',
     )
     put.mockRestore()
   })

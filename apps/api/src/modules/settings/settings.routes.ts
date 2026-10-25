@@ -33,7 +33,29 @@ import { ensureAutomaticBackupsUnavailable } from './settings.service.js'
 import { executeDataRetentionCleanup } from '../../services/dataRetention.js'
 import { moduleKeyPrefix } from '../../plugins/sse.js'
 import { AppError } from '../../utils/errors.js'
+import { randomUUID } from 'node:crypto'
+import { tenantLogoKey } from '../../services/objectStorage.js'
+import { withStorageCapacity } from '../../services/entitlements.js'
+import { z } from 'zod'
 import * as settingsController from './settings.controller.js'
+
+const MAX_LOGO_BYTES = 2 * 1024 * 1024
+function isSafeLogoSvg(bytes: Buffer): boolean {
+  const source = bytes.toString('utf8').replace(/^\uFEFF/, '').trim()
+  const document = source.replace(/^(?:<\?xml\s+[^?]*\?>\s*)?(?:<!--[\s\S]*?-->\s*)*/i, '')
+  return /^<svg(?:\s|>)/i.test(document)
+    && !/<\s*(?:script|foreignObject|iframe|object|embed)\b/i.test(source)
+    && !/<!DOCTYPE|<!ENTITY|<\?(?!xml\b)/i.test(source)
+    && !/\bon[a-z]+\s*=|\b(?:href|src)\s*=\s*["']\s*(?:https?:|\/\/|javascript:|data:)/i.test(source)
+    && !/\burl\s*\(\s*(?:https?:|\/\/|javascript:|data:)/i.test(source)
+}
+
+const LOGO_TYPES = {
+  'image/png': { extension: 'png', signature: (bytes: Buffer) => bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
+  'image/jpeg': { extension: 'jpg', signature: (bytes: Buffer) => bytes.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff])) },
+  'image/webp': { extension: 'webp', signature: (bytes: Buffer) => bytes.subarray(0, 4).toString('ascii') === 'RIFF' && bytes.subarray(8, 12).toString('ascii') === 'WEBP' },
+  'image/svg+xml': { extension: 'svg', signature: isSafeLogoSvg },
+} as const
 
 /**
  * Settings — the tenant's general profile, notification preferences, and integrations.
@@ -46,6 +68,67 @@ import * as settingsController from './settings.controller.js'
  */
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   const server = app.withTypeProvider<ZodTypeProvider>()
+
+  server.put('/general/logo', {
+    preHandler: requirePermission('settings.general.update'),
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    schema: { response: { 200: envelope(generalSettingsSchema), ...errorResponses } },
+  }, async (request, reply) => {
+    const { tenantId, userId } = requireAuthContext(request)
+    const contentType = request.headers['content-type']?.split(';', 1)[0]?.trim().toLowerCase() as keyof typeof LOGO_TYPES | undefined
+    const type = contentType ? LOGO_TYPES[contentType] : undefined
+    const bytes = request.body
+    if (!contentType || !type || !Buffer.isBuffer(bytes) || bytes.length === 0) throw new AppError(400, 'Choose a PNG, JPEG, WebP, or SVG logo image')
+    if (bytes.length > MAX_LOGO_BYTES) throw new AppError(413, 'Logo image exceeds the 2 MB limit')
+    if (!type.signature(bytes)) throw new AppError(400, 'The file contents do not match the selected image type')
+
+    const logoId = randomUUID()
+    const key = tenantLogoKey(tenantId, logoId, type.extension)
+    const storage = request.server.objectStorage
+    const logoUrl = new URL(`/api/v1/settings/general/logo/${logoId}.${type.extension}`, process.env.BETTER_AUTH_URL || 'http://127.0.0.1:4000').toString()
+    try {
+      const settings = await withStorageCapacity(
+        request.server.prisma,
+        storage,
+        tenantId,
+        bytes.length,
+        async tx => {
+          await storage.put(key, bytes, contentType)
+          const updated = await settingsController.updateGeneral(tx, tenantId, { logoUrl })
+          await recordAuditLog(tx, {
+            tenantId,
+            actorId: userId,
+            action: 'settings.general.logo.upload',
+            targetType: 'Tenant',
+            targetId: tenantId,
+            metadata: { contentType, sizeBytes: bytes.length },
+          })
+          return updated
+        },
+      )
+      request.server.ssePublish(tenantId, [moduleKeyPrefix('settings')])
+      return { data: settings }
+    } catch (error) {
+      await storage.delete(key).catch(deleteError => request.log.warn({ tenantId, err: deleteError }, 'Could not clean up an uncommitted workspace logo upload'))
+      throw error
+    }
+  })
+
+  server.get('/general/logo/:file', {
+    preHandler: requireRole('MEMBER'),
+    schema: { params: z.object({ file: z.string().regex(/^[0-9a-f-]{36}\.(?:png|jpg|webp|svg)$/i) }) },
+  }, async (request, reply) => {
+    const { tenantId } = requireAuthContext(request)
+    const match = /^([0-9a-f-]{36})\.(png|jpg|webp|svg)$/i.exec(request.params.file)
+    if (!match) throw new AppError(404, 'Workspace logo not found')
+    const extension = match[2] as 'png' | 'jpg' | 'webp' | 'svg'
+    const contentType = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp', svg: 'image/svg+xml' }[extension]
+    const bytes = await request.server.objectStorage.get(tenantLogoKey(tenantId, match[1]!, extension))
+    if (!bytes) throw new AppError(404, 'Workspace logo not found')
+    reply.type(contentType).header('cache-control', 'private, max-age=300').header('x-content-type-options', 'nosniff')
+    if (extension === 'svg') reply.header('content-security-policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox")
+    return reply.send(bytes)
+  })
 
   server.get('/exchange-rates', {
     preHandler: requireRole('MEMBER'),

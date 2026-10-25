@@ -22,6 +22,64 @@ enum OnboardingStatus {
   IMPORTED
 }
 
+enum DataMigrationModule {
+  HR
+  CRM
+  FINANCE
+  INVENTORY
+  PROJECTS
+}
+
+enum DataMigrationProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  RECONCILING
+  READY_FOR_CUTOVER
+  COMPLETED
+  PAUSED
+}
+
+enum DataMigrationEntity {
+  HR_EMPLOYEES
+  CRM_COMPANIES
+  CRM_DEALS
+  INVENTORY_PRODUCTS
+  INVENTORY_OPENING_STOCK
+  INVENTORY_SUPPLIERS
+  INVENTORY_PRODUCT_SUPPLIERS
+  FINANCE_VENDORS
+  FINANCE_CUSTOMERS
+  FINANCE_AP_OPEN_ITEMS
+  FINANCE_AR_OPEN_ITEMS
+  FINANCE_OPENING_BALANCE
+  PROJECTS_PROJECTS
+}
+
+enum DataMigrationImportStatus {
+  COMPLETED
+}
+
+enum DataMigrationStageStatus {
+  STAGED
+  COMPLETED
+}
+
+enum InventoryCostingMethod {
+  FIFO
+  WEIGHTED_AVERAGE
+}
+
+enum InventoryCostReason {
+  PURCHASE_RECEIPT
+  OPENING_BALANCE
+  SALE
+  CONSUMPTION
+  DAMAGE
+  COUNT_ADJUSTMENT
+  CUSTOMER_RETURN
+  SUPPLIER_RETURN
+}
+
 enum RecordStatus {
   ACTIVE
   ARCHIVED
@@ -205,75 +263,208 @@ enum SubscriptionStatus {
 // ─── Core ────────────────────────────────────────────────────────────────────
 
 model Tenant {
-  id                 String           @id @default(cuid())
-  name               String
-  slug               String           @unique
-  supportEmail       String?
-  stripeCustomerId   String?          @unique
-  logoUrl            String?
-  metadata           String?
-  timezone           String           @default("UTC")
-  currency           String           @default("USD")
-  currencyLockedAt   DateTime?
-  dateFormat         String           @default("MMM d, yyyy")
-  overtimeThresholdHours Float        @default(8)
-  onboardingStatus   OnboardingStatus @default(PENDING)
-  status             String           @default("ACTIVE")
-  archivedAt         DateTime?
-  sampleDataManifest Json?
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  id                     String           @id @default(cuid())
+  name                   String
+  slug                   String           @unique
+  supportEmail           String?
+  stripeCustomerId       String?          @unique
+  logoUrl                String?
+  metadata               String?
+  timezone               String           @default("UTC")
+  currency               String           @default("USD")
+  currencyLockedAt       DateTime?
+  dateFormat             String           @default("MMM d, yyyy")
+  overtimeThresholdHours Float            @default(8)
+  onboardingStatus       OnboardingStatus @default(PENDING)
+  status                 String           @default("ACTIVE")
+  archivedAt             DateTime?
+  sampleDataManifest     Json?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
 
-  members              Member[]
-  invitations          Invitation[]
-  seatReservations     SeatReservation[]
-  auditLogs            AuditLog[]
-  departments          Department[]
-  activityEvents       ActivityEvent[]
-  employees            Employee[]
-  payrollRuns          PayrollRun[]
-  timesheets           Timesheet[]
-  attendanceExceptions AttendanceException[]
-  leaveRequests        LeaveRequest[]
-  leavePolicies        LeavePolicy[]
-  candidates           Candidate[]
-  vendors              Vendor[]
-  payableInvoices      PayableInvoice[]
-  customers            Customer[]
-  receivableInvoices   ReceivableInvoice[]
-  expenses             Expense[]
-  ledgerTransactions   LedgerTransaction[]
-  ledgerAccounts       LedgerAccount[]
-  exchangeRates        ExchangeRate[]
-  journalEntries       JournalEntry[]
-  cashFlowSnapshots    CashFlowSnapshot[]
-  bankStatementImports BankStatementImport[]
-  bankStatementLines   BankStatementLine[]
-  companies            Company[]
-  deals                Deal[]
-  dealStageHistory     DealStageHistory[]
-  crmHistoryCoverage   CrmHistoryCoverage?
-  settlementHistoryCoverage SettlementHistoryCoverage?
-  dealActivities       DealActivity[]
-  agendaItems          AgendaItem[]
-  salesQuotas          SalesQuota[]
-  forecastSnapshots    ForecastSnapshot[]
-  products             Product[]
-  suppliers            Supplier[]
-  purchaseOrders       PurchaseOrder[]
-  projects             Project[]
-  sprints              Sprint[]
-  roadmapPhases        RoadmapPhase[]
-  subscriptions        Subscription[]
-  paymentMethods       PaymentMethod[]
-  billingInvoices      BillingInvoice[]
-  integrations         Integration[]
-  notificationPrefs    NotificationPreference[]
-  quietHours           QuietHours?
-  exportJobs           ExportJob[]
-  backupSchedules      BackupSchedule[]
-  supportTickets       SupportTicket[]
-  notifications        Notification[]
+  members                           Member[]
+  invitations                       Invitation[]
+  seatReservations                  SeatReservation[]
+  auditLogs                         AuditLog[]
+  departments                       Department[]
+  activityEvents                    ActivityEvent[]
+  employees                         Employee[]
+  payrollRuns                       PayrollRun[]
+  timesheets                        Timesheet[]
+  attendanceExceptions              AttendanceException[]
+  leaveRequests                     LeaveRequest[]
+  leavePolicies                     LeavePolicy[]
+  candidates                        Candidate[]
+  vendors                           Vendor[]
+  payableInvoices                   PayableInvoice[]
+  customers                         Customer[]
+  receivableInvoices                ReceivableInvoice[]
+  expenses                          Expense[]
+  ledgerTransactions                LedgerTransaction[]
+  ledgerAccounts                    LedgerAccount[]
+  exchangeRates                     ExchangeRate[]
+  journalEntries                    JournalEntry[]
+  cashFlowSnapshots                 CashFlowSnapshot[]
+  bankStatementImports              BankStatementImport[]
+  bankStatementLines                BankStatementLine[]
+  companies                         Company[]
+  deals                             Deal[]
+  dealStageHistory                  DealStageHistory[]
+  crmHistoryCoverage                CrmHistoryCoverage?
+  settlementHistoryCoverage         SettlementHistoryCoverage?
+  dealActivities                    DealActivity[]
+  agendaItems                       AgendaItem[]
+  salesQuotas                       SalesQuota[]
+  forecastSnapshots                 ForecastSnapshot[]
+  products                          Product[]
+  suppliers                         Supplier[]
+  purchaseOrders                    PurchaseOrder[]
+  projects                          Project[]
+  sprints                           Sprint[]
+  roadmapPhases                     RoadmapPhase[]
+  subscriptions                     Subscription[]
+  paymentMethods                    PaymentMethod[]
+  billingInvoices                   BillingInvoice[]
+  integrations                      Integration[]
+  notificationPrefs                 NotificationPreference[]
+  quietHours                        QuietHours?
+  exportJobs                        ExportJob[]
+  backupSchedules                   BackupSchedule[]
+  supportTickets                    SupportTicket[]
+  notifications                     Notification[]
+  inventoryValuationConfig          InventoryValuationConfig?
+  inventoryValuationAccountMappings InventoryValuationAccountMapping[]
+  inventoryValuationBalances        InventoryValuationBalance[]
+  inventoryCostLayers               InventoryCostLayer[]
+  inventoryValuationEvents          InventoryValuationEvent[]
+  inventoryCostAllocations          InventoryCostAllocation[]
+  receivableInventoryLines          ReceivableInventoryLine[]
+  dataMigrationProjects             DataMigrationProject[]
+  dataMigrationImportJobs           DataMigrationImportJob[]
+  dataMigrationRecordLinks          DataMigrationRecordLink[]
+  dataMigrationStageBatches         DataMigrationStageBatch[]
+  dataMigrationStagedRecords        DataMigrationStagedRecord[]
+}
+
+/// Durable company-wide migration plan. Individual imports remain typed and are added as
+/// supported entity adapters are implemented; this record is their shared project scope.
+model DataMigrationProject {
+  id                      String                     @id @default(cuid())
+  tenantId                String
+  name                    String
+  sourceSystem            String?
+  modules                 DataMigrationModule[]
+  status                  DataMigrationProjectStatus @default(PLANNING)
+  createdDuringOnboarding Boolean                    @default(false)
+  targetCutoverAt         DateTime?
+  createdBy               String
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+
+  tenant        Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  jobs          DataMigrationImportJob[]
+  recordLinks   DataMigrationRecordLink[]
+  stageBatches  DataMigrationStageBatch[]
+  stagedRecords DataMigrationStagedRecord[]
+
+  @@index([tenantId, updatedAt])
+  @@index([tenantId, status])
+  @@index([tenantId, createdDuringOnboarding, status, updatedAt])
+}
+
+/// Completed entity imports linked to their company project. Additional entity/status values
+/// are added together with their staged import adapters so history never claims fake jobs.
+model DataMigrationImportJob {
+  id             String                    @id @default(cuid())
+  tenantId       String
+  projectId      String
+  entity         DataMigrationEntity
+  status         DataMigrationImportStatus @default(COMPLETED)
+  idempotencyKey String
+  requestHash    String
+  totalRows      Int
+  importedRows   Int
+  createdBy      String
+  createdAt      DateTime                  @default(now())
+  completedAt    DateTime                  @default(now())
+
+  tenant      Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project     DataMigrationProject      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  recordLinks DataMigrationRecordLink[]
+
+  @@unique([tenantId, projectId, entity, idempotencyKey])
+  @@index([tenantId, projectId, createdAt])
+  @@index([tenantId, entity, status])
+}
+
+/// Maps stable source IDs to Asas IDs so later entity batches can preserve cross-module links.
+model DataMigrationRecordLink {
+  id           String              @id @default(cuid())
+  tenantId     String
+  projectId    String
+  importJobId  String
+  sourceEntity DataMigrationEntity
+  sourceId     String
+  targetEntity DataMigrationEntity
+  targetId     String
+  createdAt    DateTime            @default(now())
+
+  tenant    Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project   DataMigrationProject   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  importJob DataMigrationImportJob @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, projectId, sourceEntity, sourceId])
+  @@index([tenantId, targetEntity, targetId])
+  @@index([tenantId, importJobId])
+}
+
+/// A durable, validated source batch held separately from operational records until cutover.
+model DataMigrationStageBatch {
+  id             String                   @id @default(cuid())
+  tenantId       String
+  projectId      String
+  entity         DataMigrationEntity
+  sequence       Int                      @default(1)
+  status         DataMigrationStageStatus @default(STAGED)
+  idempotencyKey String
+  requestHash    String
+  totalRows      Int
+  stagedRows     Int
+  metadata       Json?
+  createdBy      String
+  createdAt      DateTime                 @default(now())
+  completedAt    DateTime?
+
+  tenant  Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project DataMigrationProject        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  records DataMigrationStagedRecord[]
+
+  @@unique([tenantId, projectId, entity, idempotencyKey])
+  @@unique([tenantId, projectId, entity, sequence])
+  @@index([tenantId, projectId, createdAt])
+  @@index([tenantId, projectId, entity, status])
+}
+
+/// Raw validated migration row, retained for review/reconciliation and never exposed as an invoice.
+model DataMigrationStagedRecord {
+  id        String              @id @default(cuid())
+  tenantId  String
+  projectId String
+  batchId   String
+  entity    DataMigrationEntity
+  sourceId  String
+  revision  Int                 @default(1)
+  isCurrent Boolean             @default(true)
+  payload   Json
+  createdAt DateTime            @default(now())
+
+  tenant  Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project DataMigrationProject    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  batch   DataMigrationStageBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, projectId, entity, sourceId, revision])
+  @@index([tenantId, projectId, entity, batchId])
+  @@index([tenantId, projectId, entity, sourceId, isCurrent])
 }
 
 // ─── Auth (Better Auth core + organization plugin, mapped onto Tenant) ───────
@@ -283,22 +474,22 @@ model Tenant {
 // because a single person can belong to more than one tenant. See ADR note in the rebuild
 // plan, Phase 1 §4 ("Better Auth — the one delicate migration").
 model User {
-  id            String   @id @default(cuid())
-  name          String
-  email         String   @unique
-  emailVerified Boolean  @default(false)
-  twoFactorEnabled Boolean @default(false)
-  image         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id               String   @id @default(cuid())
+  name             String
+  email            String   @unique
+  emailVerified    Boolean  @default(false)
+  twoFactorEnabled Boolean  @default(false)
+  image            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   sessions             Session[]
   accounts             Account[]
   members              Member[]
-  sentInvitations      Invitation[]   @relation("InvitationInviter")
+  sentInvitations      Invitation[]    @relation("InvitationInviter")
   auditLogs            AuditLog[]
   exchangeRatesCreated ExchangeRate[]
-  twoFactors            TwoFactor[]
+  twoFactors           TwoFactor[]
   supportTickets       SupportTicket[]
   notifications        Notification[]
 }
@@ -379,13 +570,13 @@ model Verification {
 // reuses the `UserRole` enum rather than better-auth's default lowercase strings — see the
 // note in auth.ts about the resulting gap in built-in permission checks.
 model Member {
-  id         String   @id @default(cuid())
-  tenantId   String
-  userId     String
-  employeeId String?  @unique
-  role       UserRole @default(MEMBER)
+  id                String   @id @default(cuid())
+  tenantId          String
+  userId            String
+  employeeId        String?  @unique
+  role              UserRole @default(MEMBER)
   seatReservationId String?
-  createdAt  DateTime @default(now())
+  createdAt         DateTime @default(now())
 
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -397,15 +588,15 @@ model Member {
 }
 
 model Invitation {
-  id        String   @id @default(cuid())
-  tenantId  String
-  email     String
-  role      UserRole @default(MEMBER)
-  status    String   @default("pending")
-  inviterId String
+  id                String   @id @default(cuid())
+  tenantId          String
+  email             String
+  role              UserRole @default(MEMBER)
+  status            String   @default("pending")
+  inviterId         String
   seatReservationId String?
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
 
   tenant  Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   inviter User   @relation("InvitationInviter", fields: [inviterId], references: [id], onDelete: Cascade)
@@ -497,36 +688,36 @@ enum PayFrequency {
 }
 
 model Employee {
-  id             String         @id @default(cuid())
-  tenantId       String
-  currency       String?
-  departmentId   String?
-  managerId      String?
-  name           String
-  title          String
-  status         EmployeeStatus @default(ACTIVE)
-  avatarUrl      String?
-  hiredAt        DateTime?
-  employmentEndDate DateTime?   @db.Date
-  salary         Decimal?       @db.Decimal(19, 4)
-  salaryBasis    SalaryBasis?
-  equityOptions  Int?
-  band           String?
-  location       String?
-  employeeNumber String?
-  email          String?
-  bankRoutingNumber  String?
-  bankAccountNumber  String?
-  bankAccountType    String?
-  bankIban           String?
-  bankBic            String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id                String         @id @default(cuid())
+  tenantId          String
+  currency          String?
+  departmentId      String?
+  managerId         String?
+  name              String
+  title             String
+  status            EmployeeStatus @default(ACTIVE)
+  avatarUrl         String?
+  hiredAt           DateTime?
+  employmentEndDate DateTime?      @db.Date
+  salary            Decimal?       @db.Decimal(19, 4)
+  salaryBasis       SalaryBasis?
+  equityOptions     Int?
+  band              String?
+  location          String?
+  employeeNumber    String?
+  email             String?
+  bankRoutingNumber String?
+  bankAccountNumber String?
+  bankAccountType   String?
+  bankIban          String?
+  bankBic           String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
-  tenant           Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  department       Department?           @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  manager          Employee?             @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
-  reports          Employee[]            @relation("EmployeeManager")
+  tenant           Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department       Department?             @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  manager          Employee?               @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
+  reports          Employee[]              @relation("EmployeeManager")
   member           Member?
   salaryHistory    EmployeeSalaryHistory[]
   payrollLines     PayrollLine[]
@@ -546,15 +737,15 @@ model Employee {
 }
 
 model EmployeeSalaryHistory {
-  id            String      @id @default(cuid())
+  id            String       @id @default(cuid())
   tenantId      String
   employeeId    String
-  salary        Decimal     @db.Decimal(19, 4)
+  salary        Decimal      @db.Decimal(19, 4)
   salaryBasis   SalaryBasis?
   currency      String
-  effectiveFrom DateTime    @db.Date
+  effectiveFrom DateTime     @db.Date
   createdById   String?
-  createdAt     DateTime    @default(now())
+  createdAt     DateTime     @default(now())
 
   employee Employee @relation(fields: [employeeId, tenantId], references: [id, tenantId], onDelete: Cascade)
 
@@ -591,9 +782,9 @@ model PayrollRun {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  tenant             Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  lines              PayrollLine[]
-  settlementJournals JournalEntry[]
+  tenant              Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lines               PayrollLine[]
+  settlementJournals  JournalEntry[]
   recognitionJournals JournalEntry[] @relation("PayrollRecognition")
 
   @@unique([tenantId, requestKey])
@@ -603,25 +794,25 @@ model PayrollRun {
 }
 
 model PayrollLine {
-  id               String       @id @default(cuid())
-  tenantId         String
-  payrollRunId     String
-  employeeId       String
-  gross            Decimal      @default(0) @db.Decimal(19, 4)
-  deductions       Decimal      @default(0) @db.Decimal(19, 4)
-  net              Decimal      @default(0) @db.Decimal(19, 4)
-  baseSalary       Decimal?     @db.Decimal(19, 4)
-  sourceSalary     Decimal?     @db.Decimal(19, 4)
-  salaryBasis      SalaryBasis?
+  id                 String       @id @default(cuid())
+  tenantId           String
+  payrollRunId       String
+  employeeId         String
+  gross              Decimal      @default(0) @db.Decimal(19, 4)
+  deductions         Decimal      @default(0) @db.Decimal(19, 4)
+  net                Decimal      @default(0) @db.Decimal(19, 4)
+  baseSalary         Decimal?     @db.Decimal(19, 4)
+  sourceSalary       Decimal?     @db.Decimal(19, 4)
+  salaryBasis        SalaryBasis?
   salaryRateSegments Json?
-  eligibleDays     Int?
-  periodDays       Int?
-  missedDaysCount  Int?
-  missedDaysAmount Decimal?     @db.Decimal(19, 4)
-  bonusLabel       String?
-  bonusAmount      Decimal?     @db.Decimal(19, 4)
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  eligibleDays       Int?
+  periodDays         Int?
+  missedDaysCount    Int?
+  missedDaysAmount   Decimal?     @db.Decimal(19, 4)
+  bonusLabel         String?
+  bonusAmount        Decimal?     @db.Decimal(19, 4)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   payrollRun PayrollRun       @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
   employee   Employee         @relation(fields: [employeeId], references: [id], onDelete: Restrict)
@@ -642,17 +833,17 @@ model PayrollTaxLine {
 }
 
 model Timesheet {
-  id            String    @id @default(cuid())
-  tenantId      String
-  employeeId    String
-  weekStart     DateTime
-  regularHours  Float     @default(0)
-  overtimeHours Float     @default(0)
-  totalHours    Float     @default(0)
-  overtimeThresholdHours Float @default(8)
-  approvedAt    DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                     String    @id @default(cuid())
+  tenantId               String
+  employeeId             String
+  weekStart              DateTime
+  regularHours           Float     @default(0)
+  overtimeHours          Float     @default(0)
+  totalHours             Float     @default(0)
+  overtimeThresholdHours Float     @default(8)
+  approvedAt             DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   employee Employee       @relation(fields: [employeeId], references: [id], onDelete: Restrict)
@@ -712,13 +903,13 @@ model LeaveRequest {
 }
 
 model LeavePolicy {
-  id                   String   @id @default(cuid())
-  tenantId             String
-  type                 LeaveType
-  annualAllowanceDays  Int
-  weekdaysOnly         Boolean  @default(false)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                  String    @id @default(cuid())
+  tenantId            String
+  type                LeaveType
+  annualAllowanceDays Int
+  weekdaysOnly        Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -747,8 +938,8 @@ model Candidate {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  employee   Employee?           @relation(fields: [employeeId, tenantId], references: [id, tenantId], onDelete: NoAction)
+  tenant     Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee   Employee?            @relation(fields: [employeeId, tenantId], references: [id, tenantId], onDelete: NoAction)
   activities CandidateActivity[]
   interviews CandidateInterview[]
 
@@ -806,23 +997,25 @@ model Vendor {
 }
 
 model PayableInvoice {
-  id            String        @id @default(cuid())
-  tenantId      String
-  projectId     String?
-  currency      String?
-  vendorId      String
-  invoiceNumber String?
-  date          DateTime
-  dueDate       DateTime?
-  amount        Decimal       @db.Decimal(19, 4)
-  status        PayableStatus @default(PENDING)
-  pdfFilename   String?
-  createdById   String?
-  approvedById  String?
-  approvedAt    DateTime?
-  paidAt        DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id                   String        @id @default(cuid())
+  tenantId             String
+  projectId            String?
+  currency             String?
+  vendorId             String
+  invoiceNumber        String?
+  date                 DateTime
+  dueDate              DateTime?
+  amount               Decimal       @db.Decimal(19, 4)
+  sourceOriginalAmount Decimal?      @db.Decimal(19, 4)
+  sourcePaidAmount     Decimal?      @db.Decimal(19, 4)
+  status               PayableStatus @default(PENDING)
+  pdfFilename          String?
+  createdById          String?
+  approvedById         String?
+  approvedAt           DateTime?
+  paidAt               DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 
   tenant              Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   project             Project?          @relation(fields: [projectId, tenantId], references: [id, tenantId], onDelete: NoAction)
@@ -866,25 +1059,78 @@ model Customer {
 }
 
 model ReceivableInvoice {
-  id         String           @id @default(cuid())
-  tenantId   String
-  currency   String?
-  customerId String
-  number     String?
-  amount     Decimal          @db.Decimal(19, 4)
-  dueDate    DateTime?
-  status     ReceivableStatus @default(CURRENT)
-  paidAt     DateTime?
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
+  id                   String           @id @default(cuid())
+  tenantId             String
+  currency             String?
+  customerId           String
+  number               String?
+  date                 DateTime         @default(now())
+  amount               Decimal          @db.Decimal(19, 4)
+  sourceOriginalAmount Decimal?         @db.Decimal(19, 4)
+  sourcePaidAmount     Decimal?         @db.Decimal(19, 4)
+  dueDate              DateTime?
+  status               ReceivableStatus @default(CURRENT)
+  paidAt               DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
-  tenant              Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer            Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tenant              Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer            Customer                  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   settlementJournals  JournalEntry[]
-  recognitionJournals JournalEntry[] @relation("ReceivableRecognition")
+  recognitionJournals JournalEntry[]            @relation("ReceivableRecognition")
+  inventoryLines      ReceivableInventoryLine[]
 
   @@unique([id, tenantId])
   @@index([tenantId])
+}
+
+/// Optional stock fulfillment for one receivable invoice. The invoice remains a total-only
+/// document; these lines record the costed inventory issue that funded it. Every original and
+/// reversal movement, valuation event, and journal is retained so voiding an invoice restores
+/// stock and cost without deleting history or inventing a new unit cost.
+model ReceivableInventoryLine {
+  id        String   @id @default(cuid())
+  tenantId  String
+  invoiceId String
+  productId String
+  quantity  Int
+  currency  String
+  costValue Decimal  @db.Decimal(19, 4)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// The original sale issue and its cost/accounting evidence.
+  stockMovementId  String
+  valuationEventId String
+  journalEntryId   String?
+
+  /// Set only when the invoice is voided or deleted. The reversal uses the exact original issue
+  /// value; it is not recomputed from today's costing position.
+  reversedAt               DateTime?
+  reversalStockMovementId  String?
+  reversalValuationEventId String?
+  reversalJournalEntryId   String?
+
+  tenant                 Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoice                ReceivableInvoice        @relation(fields: [invoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  product                Product                  @relation(fields: [productId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  stockMovement          StockMovement            @relation("ReceivableInventoryIssueMovement", fields: [stockMovementId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  valuationEvent         InventoryValuationEvent  @relation("ReceivableInventoryIssueValuation", fields: [valuationEventId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  journalEntry           JournalEntry?            @relation("ReceivableInventoryIssueJournal", fields: [journalEntryId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  reversalStockMovement  StockMovement?           @relation("ReceivableInventoryReversalMovement", fields: [reversalStockMovementId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  reversalValuationEvent InventoryValuationEvent? @relation("ReceivableInventoryReversalValuation", fields: [reversalValuationEventId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  reversalJournalEntry   JournalEntry?            @relation("ReceivableInventoryReversalJournal", fields: [reversalJournalEntryId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@unique([invoiceId, productId, tenantId])
+  @@unique([stockMovementId, tenantId])
+  @@unique([valuationEventId, tenantId])
+  @@unique([journalEntryId, tenantId])
+  @@unique([reversalStockMovementId, tenantId])
+  @@unique([reversalValuationEventId, tenantId])
+  @@unique([reversalJournalEntryId, tenantId])
+  @@index([tenantId, invoiceId])
+  @@index([tenantId, productId])
 }
 
 model CollectionActivity {
@@ -928,10 +1174,10 @@ model Expense {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
-  tenant             Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  project            Project?       @relation(fields: [projectId, tenantId], references: [id, tenantId], onDelete: NoAction)
-  employee           Employee?      @relation(fields: [employeeId], references: [id], onDelete: SetNull)
-  settlementJournals JournalEntry[]
+  tenant              Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project             Project?       @relation(fields: [projectId, tenantId], references: [id, tenantId], onDelete: NoAction)
+  employee            Employee?      @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  settlementJournals  JournalEntry[]
   recognitionJournals JournalEntry[] @relation("ExpenseRecognition")
 
   @@unique([id, tenantId])
@@ -1004,19 +1250,22 @@ model JournalEntry {
   postedAt                      DateTime
   createdAt                     DateTime @default(now())
 
-  tenant               Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  exchangeRate         ExchangeRate?      @relation(fields: [exchangeRateId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  payable              PayableInvoice?    @relation(fields: [payableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  receivable           ReceivableInvoice? @relation(fields: [receivableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  payrollRun           PayrollRun?        @relation(fields: [payrollRunId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  expense              Expense?           @relation(fields: [expenseId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  recognizedPayable    PayableInvoice?    @relation("PayableRecognition", fields: [recognizesPayableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  recognizedReceivable ReceivableInvoice? @relation("ReceivableRecognition", fields: [recognizesReceivableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  recognizedPayrollRun PayrollRun?        @relation("PayrollRecognition", fields: [recognizesPayrollRunId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  recognizedExpense    Expense?           @relation("ExpenseRecognition", fields: [recognizesExpenseId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  reverses             JournalEntry?      @relation("JournalReversal", fields: [reversesJournalEntryId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  reversedBy           JournalEntry?      @relation("JournalReversal")
-  lines                JournalLine[]
+  tenant                           Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  exchangeRate                     ExchangeRate?             @relation(fields: [exchangeRateId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  payable                          PayableInvoice?           @relation(fields: [payableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  receivable                       ReceivableInvoice?        @relation(fields: [receivableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  payrollRun                       PayrollRun?               @relation(fields: [payrollRunId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  expense                          Expense?                  @relation(fields: [expenseId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  recognizedPayable                PayableInvoice?           @relation("PayableRecognition", fields: [recognizesPayableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  recognizedReceivable             ReceivableInvoice?        @relation("ReceivableRecognition", fields: [recognizesReceivableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  recognizedPayrollRun             PayrollRun?               @relation("PayrollRecognition", fields: [recognizesPayrollRunId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  recognizedExpense                Expense?                  @relation("ExpenseRecognition", fields: [recognizesExpenseId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  reverses                         JournalEntry?             @relation("JournalReversal", fields: [reversesJournalEntryId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  reversedBy                       JournalEntry?             @relation("JournalReversal")
+  lines                            JournalLine[]
+  inventoryValuationEvent          InventoryValuationEvent?
+  receivableInventoryIssueLines    ReceivableInventoryLine[] @relation("ReceivableInventoryIssueJournal")
+  receivableInventoryReversalLines ReceivableInventoryLine[] @relation("ReceivableInventoryReversalJournal")
 
   @@unique([id, tenantId])
   @@unique([tenantId, payableInvoiceId])
@@ -1038,23 +1287,23 @@ model JournalLine {
   amount     Decimal  @db.Decimal(19, 4)
   baseAmount Decimal? @db.Decimal(19, 4)
 
-  entry   JournalEntry  @relation(fields: [entryId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  account LedgerAccount @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  entry              JournalEntry       @relation(fields: [entryId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  account            LedgerAccount      @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
   bankStatementMatch BankStatementLine?
 
+  @@unique([id, tenantId])
   @@index([tenantId, accountId])
   @@index([entryId])
-  @@unique([id, tenantId])
 }
 
 model BankStatementImport {
-  id         String   @id @default(cuid())
-  tenantId   String
-  fileName   String
+  id          String   @id @default(cuid())
+  tenantId    String
+  fileName    String
   contentHash String
-  createdAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
 
-  tenant Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   lines  BankStatementLine[]
 
   @@unique([tenantId, contentHash])
@@ -1063,22 +1312,22 @@ model BankStatementImport {
 }
 
 model BankStatementLine {
-  id                    String   @id @default(cuid())
-  tenantId              String
-  importId              String
-  fingerprint           String
-  postedAt               DateTime @db.Date
-  description            String
-  reference              String?
-  currency               String
-  amount                 Decimal  @db.Decimal(19, 4)
-  matchedJournalLineId   String?
-  matchedAt              DateTime?
-  createdAt              DateTime @default(now())
+  id                   String    @id @default(cuid())
+  tenantId             String
+  importId             String
+  fingerprint          String
+  postedAt             DateTime  @db.Date
+  description          String
+  reference            String?
+  currency             String
+  amount               Decimal   @db.Decimal(19, 4)
+  matchedJournalLineId String?
+  matchedAt            DateTime?
+  createdAt            DateTime  @default(now())
 
-  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   statementImport    BankStatementImport @relation(fields: [importId, tenantId], references: [id, tenantId], onDelete: Cascade)
-  matchedJournalLine JournalLine?       @relation(fields: [matchedJournalLineId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  matchedJournalLine JournalLine?        @relation(fields: [matchedJournalLineId, tenantId], references: [id, tenantId], onDelete: Restrict)
 
   @@unique([id, tenantId])
   @@unique([importId, fingerprint])
@@ -1186,14 +1435,18 @@ model DealStageHistory {
   @@index([tenantId, dealId, occurredAt(sort: Desc), id(sort: Desc)])
 }
 
-/** Earliest instant from which CRM stage history is complete for historical comparisons. */
+/**
+ * Earliest instant from which CRM stage history is complete for historical comparisons.
+ */
 model CrmHistoryCoverage {
   tenantId String   @id
   startsAt DateTime
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
-/** Earliest instant from which tenant settlement journals are complete for period comparisons. */
+/**
+ * Earliest instant from which tenant settlement journals are complete for period comparisons.
+ */
 model SettlementHistoryCoverage {
   tenantId String   @id
   startsAt DateTime
@@ -1284,10 +1537,14 @@ model Product {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
-  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  movements StockMovement[]
-  suppliers ProductSupplier[]
-  poLines   PurchaseOrderLine[]
+  tenant                   Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  movements                StockMovement[]
+  suppliers                ProductSupplier[]
+  poLines                  PurchaseOrderLine[]
+  valuationBalance         InventoryValuationBalance?
+  costLayers               InventoryCostLayer[]
+  valuationEvents          InventoryValuationEvent[]
+  receivableInventoryLines ReceivableInventoryLine[]
 
   @@unique([tenantId, sku])
   @@unique([id, tenantId])
@@ -1303,9 +1560,141 @@ model StockMovement {
   note      String?
   createdAt DateTime @default(now())
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product                 Product                   @relation(fields: [productId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  valuationEvent          InventoryValuationEvent?
+  costLayer               InventoryCostLayer?
+  receivableIssueLines    ReceivableInventoryLine[] @relation("ReceivableInventoryIssueMovement")
+  receivableReversalLines ReceivableInventoryLine[] @relation("ReceivableInventoryReversalMovement")
 
+  @@unique([id, tenantId])
   @@index([tenantId])
+}
+
+/// Company policy and default chart-of-account mappings for perpetual inventory valuation.
+/// It is absent on existing workspaces until an administrator completes costing setup.
+model InventoryValuationConfig {
+  tenantId      String                 @id
+  costingMethod InventoryCostingMethod
+  configuredAt  DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+/// Explicit posting accounts for one currency. There are intentionally no defaults: a business
+/// must map real ledger accounts before valued inventory can post financial journals.
+model InventoryValuationAccountMapping {
+  id                                  String   @id @default(cuid())
+  tenantId                            String
+  currency                            String
+  inventoryAssetAccountCode           String
+  costOfGoodsSoldAccountCode          String
+  goodsReceivedNotInvoicedAccountCode String
+  adjustmentExpenseAccountCode        String
+  adjustmentGainAccountCode           String
+  createdAt                           DateTime @default(now())
+  updatedAt                           DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, currency])
+  @@unique([id, tenantId])
+  @@index([tenantId])
+}
+
+/// Cached product carrying value. Immutable movement events and FIFO allocations remain the
+/// audit trail; this row is the transactionally maintained current position.
+model InventoryValuationBalance {
+  id             String   @id @default(cuid())
+  tenantId       String
+  productId      String
+  currency       String
+  onHandQuantity Int      @default(0)
+  inventoryValue Decimal  @default(0) @db.Decimal(19, 4)
+  updatedAt      DateTime @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([productId, tenantId])
+  @@unique([id, tenantId])
+  @@index([tenantId, currency])
+}
+
+/// Original and remaining value for a FIFO receipt layer. A layer is never removed; issues
+/// append allocations and update its remaining position in the same database transaction.
+model InventoryCostLayer {
+  id                String   @id @default(cuid())
+  tenantId          String
+  productId         String
+  /// Absent when the layer represents an opening valuation of quantity that already existed;
+  /// such a layer has no new stock movement and must not fabricate one.
+  sourceMovementId  String?
+  currency          String
+  originalQuantity  Int
+  remainingQuantity Int
+  originalValue     Decimal  @db.Decimal(19, 4)
+  remainingValue    Decimal  @db.Decimal(19, 4)
+  receivedAt        DateTime
+  createdAt         DateTime @default(now())
+
+  tenant         Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product        Product                   @relation(fields: [productId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  sourceMovement StockMovement?            @relation(fields: [sourceMovementId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  allocations    InventoryCostAllocation[]
+
+  @@unique([sourceMovementId, tenantId])
+  @@unique([id, tenantId])
+  @@index([tenantId, productId, receivedAt, id])
+}
+
+/// Valuation result for a stock movement, linked to the journal that changed inventory and its
+/// corresponding offset account. Legacy quantity movements without a cost event remain unvalued.
+model InventoryValuationEvent {
+  id              String                 @id @default(cuid())
+  tenantId        String
+  productId       String
+  /// Absent for an opening valuation of existing quantity (no new movement occurred).
+  stockMovementId String?
+  journalEntryId  String?
+  costingMethod   InventoryCostingMethod
+  reason          InventoryCostReason
+  quantityDelta   Int
+  costValue       Decimal                @db.Decimal(19, 4)
+  currency        String
+  postedAt        DateTime
+  createdAt       DateTime               @default(now())
+
+  tenant                  Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product                 Product                   @relation(fields: [productId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  stockMovement           StockMovement?            @relation(fields: [stockMovementId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  journalEntry            JournalEntry?             @relation(fields: [journalEntryId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  allocations             InventoryCostAllocation[]
+  receivableIssueLines    ReceivableInventoryLine[] @relation("ReceivableInventoryIssueValuation")
+  receivableReversalLines ReceivableInventoryLine[] @relation("ReceivableInventoryReversalValuation")
+
+  @@unique([stockMovementId, tenantId])
+  @@unique([journalEntryId, tenantId])
+  @@unique([id, tenantId])
+  @@index([tenantId, productId, postedAt, id])
+}
+
+/// Append-only cost allocation from an outgoing issue to the receipt layer(s) it consumed.
+model InventoryCostAllocation {
+  id        String   @id @default(cuid())
+  tenantId  String
+  eventId   String
+  layerId   String
+  quantity  Int
+  value     Decimal  @db.Decimal(19, 4)
+  createdAt DateTime @default(now())
+
+  tenant Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  event  InventoryValuationEvent @relation(fields: [eventId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  layer  InventoryCostLayer      @relation(fields: [layerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([tenantId, eventId, layerId])
+  @@index([tenantId, layerId])
 }
 
 model Supplier {
@@ -1347,10 +1736,16 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderLine {
-  id              String @id @default(cuid())
+  id              String   @id @default(cuid())
   purchaseOrderId String
   productId       String
   quantity        Int
+  /// Expected acquisition cost per unit. Required before receipt when the workspace has
+  /// configured perpetual inventory valuation; nullable so historical quantity-only purchase
+  /// orders remain valid rather than being backfilled with a guessed cost.
+  unitCost        Decimal? @db.Decimal(19, 4)
+  /// Currency of `unitCost`; must match the product/workspace valuation currency at receipt.
+  currency        String?
 
   purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   product       Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -1540,21 +1935,21 @@ model RoadmapDependency {
 // ─── Settings / Support ──────────────────────────────────────────────────────
 
 model Subscription {
-  id             String             @id @default(cuid())
-  tenantId       String
-  planName       String
-  priceMonthly   Decimal            @default(0) @db.Decimal(19, 4)
-  status         SubscriptionStatus @default(ACTIVE)
-  renewsOn       DateTime?
-  stripeSubscriptionId String?          @unique
-  stripePriceId       String?
-  stripeCurrency      String?
-  seatsUsed      Int                @default(1)
-  seatLimit      Int                @default(10)
-  storageUsedGb  Float              @default(0)
-  storageLimitGb Float              @default(100)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  id                   String             @id @default(cuid())
+  tenantId             String
+  planName             String
+  priceMonthly         Decimal            @default(0) @db.Decimal(19, 4)
+  status               SubscriptionStatus @default(ACTIVE)
+  renewsOn             DateTime?
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String?
+  stripeCurrency       String?
+  seatsUsed            Int                @default(1)
+  seatLimit            Int                @default(10)
+  storageUsedGb        Float              @default(0)
+  storageLimitGb       Float              @default(100)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -1576,15 +1971,15 @@ model PaymentMethod {
 }
 
 model BillingInvoice {
-  id          String   @id @default(cuid())
-  tenantId    String
-  date        DateTime
-  description String
-  amount      Decimal  @db.Decimal(19, 4)
-  status      String   @default("Paid")
-  stripeInvoiceId String? @unique
+  id              String   @id @default(cuid())
+  tenantId        String
+  date            DateTime
+  description     String
+  amount          Decimal  @db.Decimal(19, 4)
+  status          String   @default("Paid")
+  stripeInvoiceId String?  @unique
   stripeCurrency  String?
-  createdAt   DateTime @default(now())
+  createdAt       DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -1606,8 +2001,9 @@ model Integration {
   syncPullRequests Boolean           @default(false)
   syncCiCdStatus   Boolean           @default(false)
   /**
-   * The stored integration credential (API key, token, …). Written by the settings module and
-   * NEVER returned by any read endpoint — `settings.service.ts` masks it on the way out.
+   * Encrypted custom HTTPS endpoint URL used by endpoint health checks. Legacy token-like values
+   * remain stored for compatibility but are never treated as endpoints or reported connected.
+   * Never returned in full; settings.service.ts returns only a masked preview.
    */
   credential       String?
   createdAt        DateTime          @default(now())
@@ -1653,16 +2049,16 @@ model QuietHours {
 }
 
 model Notification {
-  id        String   @id @default(cuid())
-  tenantId  String
-  userId    String
-  title     String
-  message   String
-  type      String   @default("INFO")
-  link      String?
-  read      Boolean  @default(false)
+  id          String   @id @default(cuid())
+  tenantId    String
+  userId      String
+  title       String
+  message     String
+  type        String   @default("INFO")
+  link        String?
+  read        Boolean  @default(false)
   availableAt DateTime @default(now())
-  createdAt DateTime @default(now())
+  createdAt   DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)

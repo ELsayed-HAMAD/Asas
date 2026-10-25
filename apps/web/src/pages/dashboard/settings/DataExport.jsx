@@ -36,6 +36,9 @@ export default function SettingsDataExport() {
   const roleName = getMemberRoleName(memberRole);
   const canManageExports = roleName === 'OWNER' || roleName === 'ADMIN';
   const [scope, setScope] = useState('Full Workspace');
+  const [format, setFormat] = useState('json');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [jobSearch, setJobSearch] = useState('')
   const [showHistory, setShowHistory] = useState(false)
   const [historyPage, setHistoryPage] = useState(1)
@@ -56,6 +59,21 @@ export default function SettingsDataExport() {
     mutationFn: (input) => exportsApi.createJob(input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.exports.all() }),
   });
+
+  const isWorkspaceArchive = scope === 'Full Workspace';
+  const dateRangeIncomplete = Boolean(dateFrom) !== Boolean(dateTo);
+  const dateRangeInvalid = Boolean(dateFrom && dateTo && dateFrom > dateTo);
+  const dateFilterLabel = scope === 'Financial Ledgers'
+    ? 'Posting date'
+    : scope === 'Employee Directory'
+      ? 'Hire date'
+      : 'Project creation date';
+  const changeScope = (value) => {
+    setScope(value);
+    setFormat(value === 'Full Workspace' ? 'json' : 'xlsx');
+    setDateFrom('');
+    setDateTo('');
+  };
 
   if (isLoading) {
     return (
@@ -139,7 +157,7 @@ export default function SettingsDataExport() {
               <div>
                 <div>
                   <label htmlFor="data-scope" className="block text-xs font-bold text-muted mb-1.5">Data Scope</label>
-                  <Select value={scope} onValueChange={setScope}>
+                  <Select value={scope} onValueChange={changeScope}>
                     <SelectTrigger id="data-scope" className="w-full text-sm bg-surface-raised">
                       <SelectValue />
                     </SelectTrigger>
@@ -153,15 +171,58 @@ export default function SettingsDataExport() {
                 </div>
               </div>
 
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="export-format" className="block text-xs font-bold text-muted mb-1.5">File format</label>
+                  <Select value={format} onValueChange={setFormat}>
+                    <SelectTrigger id="export-format" className="w-full text-sm bg-surface-raised" disabled={isWorkspaceArchive}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {isWorkspaceArchive
+                        ? <SelectItem value="json">JSON workspace archive</SelectItem>
+                        : <>
+                            <SelectItem value="xlsx">Excel workbook (.xlsx)</SelectItem>
+                            <SelectItem value="csv">Comma-separated values (.csv)</SelectItem>
+                          </>}
+                    </SelectContent>
+                  </Select>
+                  {isWorkspaceArchive && <p className="mt-1.5 text-[11px] text-muted">A complete relational workspace archive is provided as JSON.</p>}
+                </div>
+
+                <div>
+                  <span className="block text-xs font-bold text-muted mb-1.5">Date range</span>
+                  {isWorkspaceArchive ? (
+                    <div className="flex min-h-10 items-center rounded-md border border-border-default bg-surface-muted px-3 text-xs text-muted">
+                      Full workspace history
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label htmlFor="export-date-from" className="sr-only">{dateFilterLabel} from</label>
+                        <input id="export-date-from" type="date" value={dateFrom} max={dateTo || undefined} onChange={event => setDateFrom(event.target.value)} className="h-10 w-full rounded-md border border-border-default bg-surface-raised px-2 text-xs text-body" />
+                      </div>
+                      <div>
+                        <label htmlFor="export-date-to" className="sr-only">{dateFilterLabel} to</label>
+                        <input id="export-date-to" type="date" value={dateTo} min={dateFrom || undefined} onChange={event => setDateTo(event.target.value)} className="h-10 w-full rounded-md border border-border-default bg-surface-raised px-2 text-xs text-body" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <p className="text-xs text-muted">
                 {scope === 'Full Workspace'
                   ? 'Exports tenant records across business modules as JSON. Passwords, sessions, credentials, and employee bank details are excluded; this is not a restorable database backup.'
                   : scope === 'Project Summary'
-                    ? 'Creates an XLSX summary of projects, budgets, recorded spend, departments, status, and sprint counts.'
+                    ? 'Exports projects, budgets, recorded spend, departments, status, and sprint counts. The selected date range filters by project creation date.'
                     : scope === 'Financial Ledgers'
-                      ? 'Creates an XLSX export of the workspace general ledger.'
-                      : 'Creates an XLSX export of the employee directory. Salary details are limited by your access role.'}
+                      ? 'Exports posted journal lines with account and debit/credit detail, plus legacy sample transactions clearly marked. The selected date range filters by journal posting date.'
+                      : 'Creates an export of the employee directory. The selected date range filters by hire date; salary details are limited by your access role.'}
               </p>
+              {!isWorkspaceArchive && <p className="-mt-3 text-[11px] text-muted">Optional inclusive {dateFilterLabel.toLowerCase()} range. Leave both dates blank to include all records.</p>}
+              {dateRangeIncomplete && <p role="alert" className="text-xs text-danger">Choose both a start and end date, or clear both dates.</p>}
+              {dateRangeInvalid && <p role="alert" className="text-xs text-danger">The end date must be on or after the start date.</p>}
 
               {/* Submit Button */}
               <div className="pt-2">
@@ -169,8 +230,10 @@ export default function SettingsDataExport() {
                   type="button"
                   onClick={() => createMutation.mutate({
                     kind: SCOPE_TO_KIND[scope] || 'employees',
+                    format,
+                    ...(!isWorkspaceArchive && dateFrom && dateTo ? { dateRange: { from: dateFrom, to: dateTo } } : {}),
                   })}
-                  disabled={!canManageExports || createMutation.isPending}
+                  disabled={!canManageExports || createMutation.isPending || dateRangeIncomplete || dateRangeInvalid}
                   title={!canManageExports ? 'Only workspace admins and owners can create exports' : undefined}
                   className="w-full"
                 >
@@ -179,7 +242,7 @@ export default function SettingsDataExport() {
                       <Loader2 size={14} className="animate-spin" /> Generating...
                     </span>
                   ) : (
-                    scope === 'Full Workspace' ? 'Generate JSON Workspace Export' : 'Generate XLSX Export'
+                    scope === 'Full Workspace' ? 'Generate JSON Workspace Export' : `Generate ${format.toUpperCase()} Export`
                   )}
                 </Button>
                 {createMutation.isError && <p role="alert" className="mt-3 text-xs text-danger">{createMutation.error?.message || 'The export could not be started.'}</p>}
@@ -217,7 +280,8 @@ export default function SettingsDataExport() {
                       <p className="text-sm font-semibold text-heading truncate">{job.filename || `${job.kind} export`}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <Badge variant={job.status === 'DONE' ? 'default' : 'secondary'} className="text-[10px] py-0 px-1.5">{job.status}</Badge>
-                        <span className="text-[11px] text-muted">{job.kind} · {new Date(job.createdAt).toLocaleDateString()}</span>
+                        <span className="text-[11px] text-muted">{job.kind} · {job.format?.toUpperCase()} · {new Date(job.createdAt).toLocaleDateString()}</span>
+                        {job.dateRange && <span className="block text-[11px] text-muted">{job.dateRange.from} to {job.dateRange.to}</span>}
                       </div>
                     </div>
                     {job.status === 'DONE' && <Button variant="link" size="sm" type="button" disabled={!canManageExports || downloadingJobId === job.id} title={!canManageExports ? 'Only workspace admins and owners can download exports' : undefined} onClick={() => handleDownload(job)} className="h-auto p-0 text-[11px] font-semibold text-accent hover:text-accent-hover">{downloadingJobId === job.id ? 'Downloading…' : 'Download'}</Button>}

@@ -26,11 +26,18 @@ export interface EmployeeDirectoryRow {
 
 export interface LedgerRow {
   date: string
+  recordType: 'JOURNAL_LINE' | 'LEGACY_TRANSACTION'
+  journalId: string | null
   description: string
-  status: string
-  /** Signed major-unit decimal string as stored (credits already negative). */
+  sourceType: string
+  accountCode: string | null
+  accountName: string | null
+  side: 'DEBIT' | 'CREDIT'
+  /** Positive major-unit amount; `side` determines debit versus credit. */
   amount: string
   currency: string
+  baseAmount: string | null
+  baseCurrency: string | null
 }
 
 /** A fixed timestamp so the workbook is deterministic — never `new Date()`, which would stamp it. */
@@ -85,40 +92,54 @@ export function renderEmployeeDirectoryXlsx(rows: EmployeeDirectoryRow[]): Promi
 }
 
 /**
- * The general-ledger export: one row per `LedgerTransaction` in date order (the service sorts
- * before calling), credits negative exactly as stored, plus a totals row computed from the
- * *rows* — which are the full tenant set, not a page, so the total is honest.
+ * General-ledger detail: one row per posted journal line. Legacy sample ledger records are
+ * explicitly marked. Workbook totals are grouped by record type, currency, and amount basis.
  */
 export function renderLedgerXlsx(rows: LedgerRow[]): Promise<Buffer> {
   return buildWorkbook(workbook => {
     const sheet = workbook.addWorksheet('Ledger')
-    applyHeader(sheet, ['Date', 'Description', 'Status', 'Amount'], [12, 60, 12, 18])
+    applyHeader(sheet, ['Date', 'Record Type', 'Journal ID', 'Description', 'Source', 'Account Code', 'Account Name', 'Side', 'Amount', 'Currency', 'Base Amount', 'Base Currency'], [12, 18, 26, 48, 24, 16, 26, 10, 18, 12, 18, 12])
     for (const row of rows) {
       sheet.addRow({
         col0: row.date,
-        col1: row.description,
-        col2: row.status,
-        col3: formatMoneyDisplay(row.amount, row.currency),
+        col1: row.recordType,
+        col2: row.journalId ?? '',
+        col3: row.description,
+        col4: row.sourceType,
+        col5: row.accountCode ?? '',
+        col6: row.accountName ?? '',
+        col7: row.side,
+        col8: row.amount,
+        col9: row.currency,
+        col10: row.baseAmount ?? '',
+        col11: row.baseCurrency ?? '',
       })
     }
 
-    // Totals row, derived from the full row set (never a page). Summed in integer minor units
-    // via `Money.sum` — a float `Number()` sum would lose precision on large books.
-    const currency: CurrencyCode = (rows[0]?.currency ?? 'USD') as CurrencyCode
-    const total =
-      rows.length === 0
-        ? '0'
-        : Money.sum(
-            rows.map(row => Money.fromDecimal(row.amount, currency, 'HALF_UP')),
-            currency,
-          ).toDecimalString()
-    const totalsRow = sheet.addRow({
-      col0: '',
-      col1: 'Total',
-      col2: '',
-      col3: formatMoneyDisplay(total, rows[0]?.currency ?? 'USD'),
-    })
-    totalsRow.font = { bold: true }
+    // Keep totals separated by document/base denomination and journal/legacy record type.
+    // Money.sum works in exact minor units, avoiding floating-point errors on large books.
+    const groups = new Map<string, { recordType: string; basis: string; currency: CurrencyCode; debit: string[]; credit: string[] }>()
+    const addToGroup = (recordType: string, basis: string, currencyCode: string, side: 'DEBIT' | 'CREDIT', amount: string) => {
+      const currency = currencyCode as CurrencyCode
+      const key = `${recordType}\0${basis}\0${currency}`
+      let group = groups.get(key)
+      if (!group) {
+        group = { recordType, basis, currency, debit: [], credit: [] }
+        groups.set(key, group)
+      }
+      group[side === 'DEBIT' ? 'debit' : 'credit'].push(amount)
+    }
+    for (const row of rows) {
+      addToGroup(row.recordType, 'DOCUMENT', row.currency, row.side, row.amount)
+      if (row.baseAmount !== null && row.baseCurrency !== null) addToGroup(row.recordType, 'BASE', row.baseCurrency, row.side, row.baseAmount)
+    }
+    const totals = workbook.addWorksheet('Totals')
+    applyHeader(totals, ['Record Type', 'Basis', 'Currency', 'Debits', 'Credits'], [24, 14, 14, 20, 20])
+    for (const group of groups.values()) {
+      const debit = group.debit.length ? Money.sum(group.debit.map(value => Money.fromDecimal(value, group.currency, 'HALF_UP')), group.currency).toDecimalString() : '0'
+      const credit = group.credit.length ? Money.sum(group.credit.map(value => Money.fromDecimal(value, group.currency, 'HALF_UP')), group.currency).toDecimalString() : '0'
+      totals.addRow({ col0: group.recordType, col1: group.basis, col2: group.currency, col3: formatMoneyDisplay(debit, group.currency), col4: formatMoneyDisplay(credit, group.currency) })
+    }
   })
 }
 
@@ -130,6 +151,40 @@ export interface ProjectExportRow {
   spent: string | null
   currency: string
   sprintsCount: number
+}
+
+/** RFC 4180 encoding with spreadsheet-formula neutralization for tenant-controlled strings. */
+function csvCell(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return ''
+  let text = String(value)
+  if (/^[\s]*[=+\-@]/.test(text)) text = `'${text}`
+  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
+}
+
+function renderCsv(headers: string[], rows: Array<Array<string | number | null | undefined>>): Buffer {
+  const content = [headers, ...rows].map(row => row.map(csvCell).join(',')).join('\r\n') + '\r\n'
+  return Buffer.from(`\uFEFF${content}`, 'utf8')
+}
+
+export function renderEmployeeDirectoryCsv(rows: EmployeeDirectoryRow[]): Buffer {
+  return renderCsv(
+    ['Name', 'Title', 'Status', 'Department', 'Location', 'Email', 'Hired', 'Salary', 'Currency'],
+    rows.map(row => [row.name, row.title, row.status, row.department, row.location, row.email, row.hiredAt, row.salary, row.currency]),
+  )
+}
+
+export function renderLedgerCsv(rows: LedgerRow[]): Buffer {
+  return renderCsv(
+    ['Date', 'Record Type', 'Journal ID', 'Description', 'Source', 'Account Code', 'Account Name', 'Side', 'Amount', 'Currency', 'Base Amount', 'Base Currency'],
+    rows.map(row => [row.date, row.recordType, row.journalId, row.description, row.sourceType, row.accountCode, row.accountName, row.side, row.amount, row.currency, row.baseAmount, row.baseCurrency]),
+  )
+}
+
+export function renderProjectsCsv(rows: ProjectExportRow[]): Buffer {
+  return renderCsv(
+    ['Project Name', 'Status', 'Department', 'Budget', 'Settled Spend', 'Currency', 'Sprints'],
+    rows.map(row => [row.name, row.status, row.department, row.budget, row.spent, row.currency, row.sprintsCount]),
+  )
 }
 
 export function renderProjectsXlsx(rows: ProjectExportRow[]): Promise<Buffer> {

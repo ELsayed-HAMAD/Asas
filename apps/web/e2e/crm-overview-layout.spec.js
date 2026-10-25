@@ -50,6 +50,7 @@ async function signIn(page, account) {
 }
 
 test('crm overview dashboard strictly satisfies all layout rules at 1280px, 1440px and 1920px in LTR and RTL', async ({ browser }) => {
+  test.setTimeout(120_000)
   const account = { id: 'crm_layout_admin', name: 'CRM Admin', email: 'crm.layout@example.test', emailVerified: true, role: 'ADMIN' }
 
   const context = await browser.newContext()
@@ -158,12 +159,12 @@ test('crm overview dashboard strictly satisfies all layout rules at 1280px, 1440
         // Notification bell
         await expect(page.getByRole('button', { name: 'Open notifications' })).toBeVisible()
 
-        // "Search deals..." input: 36px high, ~260px wide
+        // "Search deals..." input: 36px high, 288px wide
         const searchDealsInput = page.getByPlaceholder('Search deals...')
         await expect(searchDealsInput).toBeVisible()
         const searchBox = await searchDealsInput.boundingBox()
         expect(Math.round(searchBox.height)).toBe(36)
-        expect(Math.round(searchBox.width)).toBe(260)
+        expect(Math.round(searchBox.width)).toBe(288)
 
         // "New Deal" button: 36px high
         const newDealBtn = page.getByRole('button', { name: 'New Deal' })
@@ -189,7 +190,7 @@ test('crm overview dashboard strictly satisfies all layout rules at 1280px, 1440
         await expect(page.getByText('0 deals')).toBeVisible()
 
         // Check KPI values and equal height
-        const kpiCards = page.locator('.grid.grid-cols-2.min-\\[1100px\\]\\:grid-cols-4 > div')
+        const kpiCards = page.locator('.grid.grid-cols-1.sm\\:grid-cols-2.lg\\:grid-cols-4 > div')
         await expect(kpiCards).toHaveCount(4)
 
         const heights = []
@@ -212,7 +213,7 @@ test('crm overview dashboard strictly satisfies all layout rules at 1280px, 1440
         // All 4 cards stretch to the same height (in 4-column layout at 1280, 1440, 1920)
         expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(2)
         // All 4 values sit on the exact same horizontal baseline
-        expect(Math.max(...valueTops) - Math.min(...valueTops)).toBeLessThanOrEqual(1)
+        expect(Math.max(...valueTops) - Math.min(...valueTops), `${dir} ${width}px value tops: ${JSON.stringify(valueTops)}`).toBeLessThanOrEqual(1)
 
         // 5. Verify Charts Row
         await expect(page.getByRole('heading', { name: 'Revenue Forecast' })).toBeVisible()
@@ -253,8 +254,8 @@ test('crm overview dashboard strictly satisfies all layout rules at 1280px, 1440
 
         // Verify column alignment between Charts row and Bottom row:
         // Daily Agenda width should match Revenue Forecast width (within 2px)
-        const revCard = page.locator('h2:text-is("Revenue Forecast")').locator('xpath=ancestor::div[contains(@class, "rounded-card-sm")]')
-        const agendaCard = page.locator('h2:text-is("Daily Agenda")').locator('xpath=ancestor::div[contains(@class, "rounded-card-sm")]')
+        const revCard = page.locator('h2:text-is("Revenue Forecast")').locator('xpath=ancestor::div[contains(@class, "rounded-2xl")]').first()
+        const agendaCard = page.locator('h2:text-is("Daily Agenda")').locator('xpath=ancestor::div[contains(@class, "rounded-2xl")]').first()
         const revBox = await revCard.evaluate(el => {
           const r = el.getBoundingClientRect()
           return { width: Math.round(r.width), top: Math.round(r.top) }

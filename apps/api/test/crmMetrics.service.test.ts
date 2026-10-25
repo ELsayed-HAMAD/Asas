@@ -44,7 +44,7 @@ describe('CRM filtered lists', () => {
 
     const result = await listDeals(prisma, tenantId, { page: 5, limit: 25, stage: 'PROPOSAL' })
 
-    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId, stage: 'PROPOSAL' }, skip: 100, take: 25 }))
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId, stage: 'PROPOSAL', archivedAt: null }, skip: 100, take: 25 }))
     expect(result.pagination).toMatchObject({ page: 5, limit: 25, total: 123, pages: 5 })
     expect(result.summary).toMatchObject({ openDealCount: 123, openPipelineValue: { amount: 987654, currency: 'USD' } })
   })
@@ -95,9 +95,9 @@ describe('CRM dated performance', () => {
     const start = new Date(`${year}-01-01T00:00:00Z`)
     const end = new Date(`${Number(year) + 1}-01-01T00:00:00Z`)
     expect(groupBy).toHaveBeenCalledWith(expect.objectContaining({ where: {
-      tenantId, OR: [{ stage: { in: openStages } }, { stage: { in: closedStages }, closedAt: { gte: start, lt: end } }],
+      tenantId, archivedAt: null, OR: [{ stage: { in: openStages } }, { stage: { in: closedStages }, closedAt: { gte: start, lt: end } }],
     } }))
-    expect(count).toHaveBeenCalledWith({ where: { tenantId, stage: { in: closedStages }, closedAt: null } })
+    expect(count).toHaveBeenCalledWith({ where: { tenantId, archivedAt: null, stage: { in: closedStages }, closedAt: null } })
     for (const [index, [sql, ...values]] of raw.mock.calls.entries()) {
       const text = (sql as TemplateStringsArray).join('?')
       expect(text).not.toContain('"updatedAt"')

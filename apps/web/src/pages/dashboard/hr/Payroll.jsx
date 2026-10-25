@@ -14,11 +14,16 @@ import {
   Landmark,
   Scale,
   X,
+  Banknote,
+  Receipt,
+  Wallet,
 } from 'lucide-react'
 import FormDialog from '../../../components/common/FormDialog'
+import SearchInput from '../../../components/common/SearchInput'
 import { hrApi } from '../../../lib/api/hr'
 import { queryKeys } from '../../../lib/queryKeys'
-import { formatMoney, formatCompactTableMoney, formatDate } from '../../../lib/format'
+import { formatMoney, formatCompactCurrency, formatCompactTableMoney, formatDate } from '../../../lib/format'
+import { cn } from '../../../lib/utils'
 import { downloadCsv } from '../../../lib/csv'
 import { payrollPaymentSummaryFilename, payrollPaymentSummaryRows } from '../../../lib/payrollExport'
 import { clearPayrollRunDraft, payrollRunDraftStorageKey, readPayrollRunDraft, savePayrollRunDraft } from '../../../lib/payrollRunDraft'
@@ -46,6 +51,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../../components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '../../../components/ui/dropdown-menu'
 
 // The old page rendered deductions/taxes as a leading-minus negative; the minus only appears
 // for a positive amount (a zero rendered plain), so mirror that instead of an unconditional '-'.
@@ -55,7 +66,12 @@ function formatNegativeDeduction(value, currency, options = {}) {
 }
 
 function formatCompactNegativeDeduction(value, currency, options = {}) {
-  const opt = { ...(currency ? { currency } : {}), ...options }
+  const opt = {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+    ...(currency ? { currency } : {}),
+    ...options,
+  }
   return Number(value) > 0 ? `-${formatCompactTableMoney(value, opt)}` : formatCompactTableMoney(value, opt)
 }
 
@@ -70,7 +86,7 @@ const DIALOG_INPUT =
 // One payslip download for a single payroll line (rendered in a row / the detail panel).
 // Streams the deterministic PDF bytes, opens them in a new tab, and revokes the object URL
 // once the tab has long since loaded it.
-function PayslipButton({ runId, lineId, onSelect, onNotifyError }) {
+function PayslipButton({ runId, lineId, onSelect, onNotifyError, className }) {
   const [pending, setPending] = useState(false)
 
   async function handleDownload(event) {
@@ -98,7 +114,7 @@ function PayslipButton({ runId, lineId, onSelect, onNotifyError }) {
       type="button"
       onClick={handleDownload}
       disabled={pending}
-      className="h-7 px-2 text-xs font-medium gap-1 shadow-sm whitespace-nowrap shrink-0"
+      className={cn('h-7.5 px-3 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 shadow-2xs whitespace-nowrap shrink-0', className)}
     >
       {pending ? <Loader2 size={12} className="animate-spin shrink-0" /> : <FileText size={12} className="shrink-0" />}
       <span>Payslip</span>
@@ -120,31 +136,6 @@ export default function Payroll() {
 
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const [toolsMenuOpen, setToolsMenuOpen] = useState(false)
-  const exportMenuRef = useRef(null)
-  const toolsMenuRef = useRef(null)
-
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target)) {
-        setExportMenuOpen(false)
-      }
-      if (toolsMenuRef.current && !toolsMenuRef.current.contains(event.target)) {
-        setToolsMenuOpen(false)
-      }
-    }
-    function handleKeyDown(event) {
-      if (event.key === 'Escape') {
-        setExportMenuOpen(false)
-        setToolsMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [])
 
   const [selectedId, setSelectedId] = useState(null)
   const [selectedRunId, setSelectedRunId] = useState('')
@@ -210,6 +201,7 @@ export default function Payroll() {
   const isLoading = isLoadingList || (!!activeRunId && isLoadingRun)
 
   const [departmentFilter, setDepartmentFilter] = useState('ALL')
+  const [tableSearch, setTableSearch] = useState('')
   const { data: deptData } = useQuery({
     queryKey: queryKeys.hr.departments.all(),
     queryFn: hrApi.getDepartments,
@@ -217,15 +209,25 @@ export default function Payroll() {
   const departments = deptData?.items || []
 
   const allRecords = run?.lines ?? []
-  const records = departmentFilter === 'ALL'
-    ? allRecords
-    : allRecords.filter(r => r.employee?.departmentName === departmentFilter)
+  const normalizedSearch = tableSearch.trim().toLowerCase()
+  const records = allRecords.filter(r => {
+    if (departmentFilter !== 'ALL' && r.employee?.departmentName !== departmentFilter) {
+      return false
+    }
+    if (normalizedSearch) {
+      const name = (r.employee?.name || '').toLowerCase()
+      const role = (r.employee?.title || '').toLowerCase()
+      const dept = (r.employee?.departmentName || '').toLowerCase()
+      return name.includes(normalizedSearch) || role.includes(normalizedSearch) || dept.includes(normalizedSearch)
+    }
+    return true
+  })
   const money = value => formatMoney(value, run?.currency ? { currency: run.currency } : {})
-  const compactMoney = value => formatCompactTableMoney(value, run?.currency ? { currency: run.currency } : {})
-  const metricFontSize = value => {
-    const label = money(value)
-    return `clamp(0.75rem, ${Math.min(14, 130 / Math.max(1, label.length))}cqw, 1.5rem)`
-  }
+  const compactMoney = value => formatCompactTableMoney(value, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+    ...(run?.currency ? { currency: run.currency } : {}),
+  })
 
   // Exact aggregates over every stored line in this run, returned by the API as decimal strings.
   const totals = run?.totals ?? { gross: '0', deductions: '0', net: '0' }
@@ -583,273 +585,247 @@ export default function Payroll() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-y-auto min-w-0 px-6 py-5 space-y-5">
-      {/* ── Fixed Top Controls (Single Toolbar Row) ── */}
-      <div className="flex-shrink-0">
-        <div className="w-full flex flex-wrap lg:flex-nowrap items-start justify-between gap-2.5 min-w-0">
-          {/* Left: All Depts ⌄ + July 2026 · PAID ⌄ + < 1/1 > + Auto-Calculate + Subtitle */}
-          <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
-              <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                <SelectTrigger aria-label="Department" className="h-8 text-xs shrink-0 w-auto min-w-[100px]">
-                  <SelectValue placeholder="All Depts" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Depts</SelectItem>
-                  {departments.map((d) => (
-                    <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                value={activeRun?.id || undefined}
-                onValueChange={val => { setSelectedRunId(val); setSelectedId(null) }}
-              >
-                <SelectTrigger aria-label="Payroll run" className="h-8 text-xs shrink-0 w-auto min-w-[160px] sm:min-w-[180px]">
-                  <SelectValue placeholder="Select payroll run" />
-                </SelectTrigger>
-                <SelectContent>
-                  {runs.map(item => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.label.replace(/\s*Payroll\s*/i, ' ').trim()} · {item.status}
-                    </SelectItem>
-                  ))}
-                  {listData?.pagination && listData.pagination.pages > 1 && (
-                    <div
-                      className="flex items-center justify-between p-2 border-t border-border-default text-xs text-muted"
-                      onPointerDown={e => e.stopPropagation()}
+      {/* ── Unified Apple-Glass Top Command Toolbar + Run Metadata Strip ── */}
+      <div className="relative z-30 bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-3 shadow-xs space-y-2.5 flex-shrink-0">
+        {/* Row 1 — Interactive Controls (Spacious Single Row) */}
+        <div className="flex flex-wrap xl:flex-nowrap items-center justify-between gap-2 min-w-0">
+          {/* Left Cluster: Search + Dept + Run Select */}
+          <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap sm:flex-nowrap">
+            <SearchInput
+              value={tableSearch}
+              onChange={e => setTableSearch(e.target.value)}
+              placeholder="Search employees..."
+              wrapperClassName="w-full sm:w-52 xl:w-56 shrink-0"
+              className="h-8.5 text-xs pl-8 pr-3"
+            />
+
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+              <SelectTrigger aria-label="Department" className="h-8.5 px-3 rounded-xl text-xs font-medium shrink-0 w-auto min-w-[100px] bg-surface-muted hover:bg-surface-muted/80 border border-border-default shadow-xs">
+                <SelectValue placeholder="All Depts" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Depts</SelectItem>
+                {departments.map((d) => (
+                  <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={activeRun?.id || undefined}
+              onValueChange={val => { setSelectedRunId(val); setSelectedId(null) }}
+            >
+              <SelectTrigger aria-label="Payroll run" className="inline-flex items-center justify-between gap-2 w-auto h-8.5 px-3 rounded-xl text-xs font-semibold shrink-0 bg-surface-muted hover:bg-surface-muted/80 border border-border-default shadow-xs">
+                <SelectValue placeholder="Select payroll run" />
+              </SelectTrigger>
+              <SelectContent>
+                {runs.map(item => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.label.replace(/\s*Payroll\s*/i, ' ').trim()} · {item.status}
+                  </SelectItem>
+                ))}
+                {listData?.pagination && listData.pagination.pages > 1 && (
+                  <div
+                    className="flex items-center justify-between p-2 border-t border-border-default text-xs text-muted"
+                    onPointerDown={e => e.stopPropagation()}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      aria-label="Previous payroll run page"
+                      disabled={payrollRunPage <= 1}
+                      onPointerDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setPayrollRunPage(current => Math.max(1, current - 1))
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        if (e.detail === 0) setPayrollRunPage(current => Math.max(1, current - 1))
+                      }}
+                      className="h-6 w-6 p-0 text-xs"
                     >
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        type="button"
-                        aria-label="Previous payroll run page"
-                        disabled={payrollRunPage <= 1}
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          setPayrollRunPage(current => current - 1)
-                        }}
-                        className="h-6 w-6 p-0 text-xs"
-                      >
-                        ‹
-                      </Button>
-                      <span className="text-[11px] text-muted">{payrollRunPage}/{listData.pagination.pages}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        type="button"
-                        aria-label="Next payroll run page"
-                        disabled={payrollRunPage >= listData.pagination.pages}
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          setPayrollRunPage(current => current + 1)
-                        }}
-                        className="h-6 w-6 p-0 text-xs"
-                      >
-                        ›
-                      </Button>
-                    </div>
-                  )}
-                </SelectContent>
-              </Select>
-              <span
-                title="Payroll line amounts are priced from saved salary and tax inputs when a run is created."
-                className="flex items-center gap-1.5 text-xs font-medium text-muted shrink-0"
-              >
-                <Calculator size={14} className="text-accent" />
-                <span>Auto-priced on creation</span>
-              </span>
-            </div>
-            <p className="mt-1 text-[11px] text-muted flex items-center gap-1.5 truncate">
-              <span className="shrink-0 font-medium text-heading">Pay date {activeRun?.payDate ? formatDate(activeRun.payDate) : '—'}</span>
-              <span>·</span>
-              <span className="truncate">Earning period {run?.periodStart && run?.periodEnd ? `${run.periodStart} – ${run.periodEnd}` : 'not recorded (legacy run)'}</span>
-              {run?.createdById && (
-                <>
-                  <span>·</span>
-                  <span className="truncate text-caption">Prepared by: {run.createdById}</span>
-                </>
-              )}
-              {run?.approvedById && (
-                <>
-                  <span>·</span>
-                  <span className="truncate text-success">Approved by: {run.approvedById} {run.approvedAt ? `(${formatDate(run.approvedAt)})` : ''}</span>
-                </>
-              )}
-            </p>
+                      ‹
+                    </Button>
+                    <span className="text-[11px] text-muted">{payrollRunPage}/{listData.pagination.pages}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      aria-label="Next payroll run page"
+                      disabled={payrollRunPage >= listData.pagination.pages}
+                      onPointerDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setPayrollRunPage(current => Math.min(listData.pagination.pages, current + 1))
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        if (e.detail === 0) setPayrollRunPage(current => Math.min(listData.pagination.pages, current + 1))
+                      }}
+                      className="h-6 w-6 p-0 text-xs"
+                    >
+                      ›
+                    </Button>
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Right: Calculators ⌄ + Export ⌄ + Void run + + New Payroll Run */}
-          <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
+          {/* Right Cluster: Calculators + Export + Void run + + New Payroll Run */}
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap sm:flex-nowrap">
             {/* Calculators dropdown */}
-            <div className="relative shrink-0" ref={toolsMenuRef}>
-              <Button
-                variant="outline"
-                size="sm"
-                type="button"
-                aria-expanded={toolsMenuOpen}
-                aria-haspopup="true"
-                onClick={() => setToolsMenuOpen(prev => !prev)}
-                className="h-8 gap-1.5 text-xs font-medium bg-surface-raised shadow-card shrink-0"
-              >
-                <Calculator size={13} />
-                <span>Calculators</span>
-                {roundingReviewOpen && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" title="Rounding review open" />
-                )}
-                <ChevronDown size={12} className={`text-muted transition-transform duration-150 ${toolsMenuOpen ? 'rotate-180' : ''}`} />
-              </Button>
-
-              {toolsMenuOpen && (
-                <div
-                  role="menu"
-                  className="absolute right-0 mt-1.5 w-60 bg-surface-raised border border-border-default rounded-card shadow-xl z-50 py-1 divide-y divide-border-subtle"
+            <DropdownMenu open={toolsMenuOpen} onOpenChange={setToolsMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  aria-expanded={toolsMenuOpen}
+                  aria-label="Calculators"
+                  className="h-8.5 px-3 rounded-xl gap-1.5 text-xs font-semibold bg-surface-raised hover:bg-surface-muted border border-border-default shadow-xs shrink-0 whitespace-nowrap inline-flex items-center cursor-pointer"
                 >
-                  <div className="py-1">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setToolsMenuOpen(false)
-                        setStatutoryCalculatorOpen(true)
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs hover:bg-surface-muted transition-colors flex items-start gap-2.5 cursor-pointer"
-                    >
-                      <Calculator size={15} className="text-accent shrink-0 mt-0.5" />
-                      <div className="min-w-0">
-                        <p className="font-semibold text-heading leading-tight">Statutory Tax Calculator</p>
-                        <p className="text-[11px] text-muted leading-tight mt-0.5">Withholdings & deduction preview</p>
-                      </div>
-                    </button>
+                  <Calculator size={13} />
+                  <span>Calculators</span>
+                  {roundingReviewOpen && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" title="Rounding review open" />
+                  )}
+                  <ChevronDown size={12} className={cn("text-muted transition-transform duration-150", toolsMenuOpen && "rotate-180")} />
+                </Button>
+              </DropdownMenuTrigger>
 
-                    <button
-                      type="button"
-                      role="menuitem"
-                      aria-expanded={roundingReviewOpen}
-                      onClick={() => {
-                        setToolsMenuOpen(false)
-                        setRoundingReviewOpen(open => !open)
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs hover:bg-surface-muted transition-colors flex items-start gap-2.5 cursor-pointer"
-                    >
-                      <Scale size={15} className="text-primary shrink-0 mt-0.5" />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <p className="font-semibold text-heading leading-tight">Year-end rounding review</p>
-                          {roundingReviewOpen && (
-                            <span className="text-[10px] bg-accent/15 text-accent px-1.5 py-0.2 rounded font-medium">Active</span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-muted leading-tight mt-0.5">
-                          {roundingReviewOpen ? 'Hide rounding review drawer' : 'Audit cent rounding across runs'}
-                        </p>
-                      </div>
-                    </button>
-                  </div>
+              <DropdownMenuContent
+                align="end"
+                className="w-60 p-1 bg-surface-raised border border-border-default rounded-xl shadow-xl z-50 divide-y divide-border-subtle"
+              >
+                <div className="py-0.5">
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setStatutoryCalculatorOpen(true)
+                    }}
+                    className="w-full text-left p-2 text-xs rounded-lg hover:bg-surface-muted transition-colors flex items-start gap-2.5 cursor-pointer focus:bg-surface-muted"
+                  >
+                    <Calculator size={15} className="text-accent shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="font-semibold text-heading leading-tight">Statutory Tax Calculator</p>
+                      <p className="text-[11px] text-muted leading-tight mt-0.5">Withholdings & deduction preview</p>
+                    </div>
+                  </DropdownMenuItem>
 
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setRoundingReviewOpen(open => !open)
+                    }}
+                    className="w-full text-left p-2 text-xs rounded-lg hover:bg-surface-muted transition-colors flex items-start gap-2.5 cursor-pointer focus:bg-surface-muted"
+                  >
+                    <Scale size={15} className="text-primary shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-semibold text-heading leading-tight">Year-end rounding review</p>
+                        {roundingReviewOpen && (
+                          <span className="text-[10px] bg-accent/15 text-accent px-1.5 py-0.2 rounded font-medium">Active</span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted leading-tight mt-0.5">
+                        {roundingReviewOpen ? 'Hide rounding review drawer' : 'Audit cent rounding across runs'}
+                      </p>
+                    </div>
+                  </DropdownMenuItem>
                 </div>
-              )}
-            </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Export dropdown */}
-            <div className="relative shrink-0" ref={exportMenuRef}>
-              <Button
-                variant="outline"
-                size="sm"
-                type="button"
-                disabled={!run || records.length === 0}
-                aria-expanded={exportMenuOpen}
-                aria-haspopup="true"
-                onClick={() => setExportMenuOpen(prev => !prev)}
-                title={run ? 'Export payroll reports' : 'No payroll run loaded'}
-                className="h-8 gap-1.5 text-xs font-medium bg-surface-raised shadow-card disabled:opacity-60 shrink-0"
-              >
-                <Download size={13} />
-                <span>Export</span>
-                <ChevronDown size={12} className={`text-muted transition-transform duration-150 ${exportMenuOpen ? 'rotate-180' : ''}`} />
-              </Button>
-
-              {exportMenuOpen && (
-                <div
-                  role="menu"
-                  className="absolute right-0 mt-1.5 w-64 bg-surface-raised border border-border-default rounded-card shadow-xl z-50 py-1 divide-y divide-border-subtle"
+            <DropdownMenu open={exportMenuOpen} onOpenChange={setExportMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  disabled={!run || records.length === 0}
+                  aria-expanded={exportMenuOpen}
+                  aria-label="Export"
+                  title={run ? 'Export payroll reports' : 'No payroll run loaded'}
+                  className="h-8.5 px-3 rounded-xl gap-1.5 text-xs font-semibold bg-surface-raised hover:bg-surface-muted border border-border-default shadow-xs disabled:opacity-60 shrink-0 whitespace-nowrap inline-flex items-center cursor-pointer"
                 >
-                  <div className="py-1">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setExportMenuOpen(false)
-                        exportPaymentSummary()
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs hover:bg-surface-muted transition-colors flex items-start gap-2.5 cursor-pointer"
-                    >
-                      <FileSpreadsheet size={15} className="text-accent shrink-0 mt-0.5" />
-                      <div className="min-w-0">
-                        <p className="font-semibold text-heading leading-tight">Payroll Summary (CSV)</p>
-                        <p className="text-[11px] text-muted leading-tight mt-0.5">Payment breakdown for current run</p>
-                      </div>
-                    </button>
-                  </div>
+                  <Download size={13} />
+                  <span>Export</span>
+                  <ChevronDown size={12} className={cn("text-muted transition-transform duration-150", exportMenuOpen && "rotate-180")} />
+                </Button>
+              </DropdownMenuTrigger>
 
-                  <div className="py-1">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      disabled={!run || activeRun?.status !== 'PAID'}
-                      onClick={() => {
-                        setExportMenuOpen(false)
-                        exportPayrollRegister()
-                      }}
-                      title={activeRun?.status === 'PAID' ? 'Download payroll register CSV' : 'Available when run is marked paid'}
-                      className="w-full text-left px-3 py-2 text-xs hover:bg-surface-muted transition-colors flex items-start gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                    >
-                      <FileText size={15} className="text-muted shrink-0 mt-0.5" />
-                      <div className="min-w-0">
-                        <p className="font-semibold text-heading leading-tight">Payroll Register (CSV)</p>
-                        <p className="text-[11px] text-muted leading-tight mt-0.5">
-                          {activeRun?.status === 'PAID' ? 'Gross, deductions, net, and tax details' : 'Available when run is marked paid'}
-                        </p>
-                      </div>
-                    </button>
-                  </div>
-
-                  <div className="py-1">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      disabled
-                      title="Available after a secure ODFI profile and server-side export are configured"
-                      className="w-full text-left px-3 py-2 text-xs flex items-start gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Landmark size={15} className="text-muted shrink-0 mt-0.5" />
-                      <div className="min-w-0">
-                        <p className="font-semibold text-heading leading-tight">U.S. ACH Direct Deposit</p>
-                        <p className="text-[11px] text-muted leading-tight mt-0.5">Unavailable until a secure ODFI profile is configured</p>
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      disabled
-                      title="Available after a secure SEPA profile and current bank-accepted format are configured"
-                      className="w-full text-left px-3 py-2 text-xs flex items-start gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Landmark size={15} className="text-muted shrink-0 mt-0.5" />
-                      <div className="min-w-0">
-                        <p className="font-semibold text-heading leading-tight">SEPA Credit Transfer</p>
-                        <p className="text-[11px] text-muted leading-tight mt-0.5">Unavailable until a secure PSP profile is configured</p>
-                      </div>
-                    </button>
-                  </div>
+              <DropdownMenuContent
+                align="end"
+                className="w-64 p-1 bg-surface-raised border border-border-default rounded-xl shadow-xl z-50 divide-y divide-border-subtle"
+              >
+                <div className="py-0.5">
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      exportPaymentSummary()
+                    }}
+                    className="w-full text-left p-2 text-xs rounded-lg hover:bg-surface-muted transition-colors flex items-start gap-2.5 cursor-pointer focus:bg-surface-muted"
+                  >
+                    <FileSpreadsheet size={15} className="text-accent shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="font-semibold text-heading leading-tight">Payroll Summary (CSV)</p>
+                      <p className="text-[11px] text-muted leading-tight mt-0.5">Payment breakdown for current run</p>
+                    </div>
+                  </DropdownMenuItem>
                 </div>
-              )}
-            </div>
+
+                <div className="py-0.5">
+                  <DropdownMenuItem
+                    disabled={!run || activeRun?.status !== 'PAID'}
+                    onSelect={() => {
+                      exportPayrollRegister()
+                    }}
+                    title={activeRun?.status === 'PAID' ? 'Download payroll register CSV' : 'Available when run is marked paid'}
+                    className="w-full text-left p-2 text-xs rounded-lg hover:bg-surface-muted transition-colors flex items-start gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer focus:bg-surface-muted"
+                  >
+                    <FileText size={15} className="text-muted shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="font-semibold text-heading leading-tight">Payroll Register (CSV)</p>
+                      <p className="text-[11px] text-muted leading-tight mt-0.5">
+                        {activeRun?.status === 'PAID' ? 'Gross, deductions, net, and tax details' : 'Available when run is marked paid'}
+                      </p>
+                    </div>
+                  </DropdownMenuItem>
+                </div>
+
+                <div className="py-0.5">
+                  <DropdownMenuItem
+                    disabled
+                    title="Available after a secure ODFI profile and server-side export are configured"
+                    className="w-full text-left p-2 text-xs flex items-start gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Landmark size={15} className="text-muted shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="font-semibold text-heading leading-tight">U.S. ACH Direct Deposit</p>
+                      <p className="text-[11px] text-muted leading-tight mt-0.5">Unavailable until a secure ODFI profile is configured</p>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled
+                    title="Available after a secure SEPA profile and current bank-accepted format are configured"
+                    className="w-full text-left p-2 text-xs flex items-start gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Landmark size={15} className="text-muted shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="font-semibold text-heading leading-tight">SEPA Credit Transfer</p>
+                      <p className="text-[11px] text-muted leading-tight mt-0.5">Unavailable until a secure PSP profile is configured</p>
+                    </div>
+                  </DropdownMenuItem>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Run Lifecycle Action (Void / Pay / Approve) */}
             {activeRun?.status === 'VOID' ? (
-              <Badge variant="secondary">Voided</Badge>
+              <Badge variant="secondary" className="h-8.5 px-3 rounded-xl inline-flex items-center">Voided</Badge>
             ) : activeRun?.status === 'PAID' ? (
               <Button
                 variant="outline"
@@ -860,19 +836,19 @@ export default function Payroll() {
                   const reason = window.prompt('Reason for voiding this payroll run:')?.trim()
                   if (reason) voidMutation.mutate(reason)
                 }}
-                className="border-danger/40 text-danger hover:bg-danger/5"
+                className="h-8.5 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 border-danger/40 text-danger hover:bg-danger/5 shrink-0 whitespace-nowrap cursor-pointer"
               >
                 {voidMutation.isPending ? 'Voiding…' : 'Void run'}
               </Button>
             ) : activeRun?.status === 'APPROVED' ? (
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0">
                 <Button
                   size="sm"
                   type="button"
                   disabled={payMutation.isPending}
                   title="Records payment after it has been completed outside Asas."
                   onClick={() => { setPayrollActionError(null); payMutation.mutate() }}
-                  className="shadow-sm"
+                  className="h-8.5 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
                 >
                   {payMutation.isPending ? 'Recording Payment…' : 'Mark Run Paid'}
                 </Button>
@@ -885,19 +861,19 @@ export default function Payroll() {
                     const reason = window.prompt('Reason for voiding this payroll run:')?.trim()
                     if (reason) voidMutation.mutate(reason)
                   }}
-                  className="border-danger/40 text-danger hover:bg-danger/5"
+                  className="h-8.5 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 border-danger/40 text-danger hover:bg-danger/5 shrink-0 whitespace-nowrap cursor-pointer"
                 >
                   {voidMutation.isPending ? 'Voiding…' : 'Void run'}
                 </Button>
               </div>
             ) : (
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0">
                 <Button
                   size="sm"
                   type="button"
                   disabled={!activeRun || activeRun.status === 'APPROVED' || approveMutation.isPending}
                   onClick={() => { setPayrollActionError(null); approveMutation.mutate() }}
-                  className="shadow-sm"
+                  className="h-8.5 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
                 >
                   {activeRun?.status === 'APPROVED' ? 'Pay Run Approved' : 'Approve Pay Run'}
                 </Button>
@@ -910,7 +886,7 @@ export default function Payroll() {
                     const reason = window.prompt('Reason for voiding this payroll run:')?.trim()
                     if (reason) voidMutation.mutate(reason)
                   }}
-                  className="border-danger/40 text-danger hover:bg-danger/5"
+                  className="h-8.5 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 border-danger/40 text-danger hover:bg-danger/5 shrink-0 whitespace-nowrap cursor-pointer"
                 >
                   {voidMutation.isPending ? 'Voiding…' : 'Void run'}
                 </Button>
@@ -924,10 +900,39 @@ export default function Payroll() {
               onClick={openNewRunDialog}
               disabled={!isAdmin}
               title={isAdmin ? undefined : 'Requires the ADMIN role'}
-              className="gap-1.5 shadow-sm"
+              className="h-8.5 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm shrink-0 whitespace-nowrap cursor-pointer"
             >
               <Plus size={14} /> New Payroll Run
             </Button>
+          </div>
+        </div>
+
+        {/* Row 2 — Unified Telemetry & Status Bar (With Auto-priced on creation on Right) */}
+        <div className="px-3.5 py-1.5 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs bg-surface-muted/60 border border-border-subtle text-muted">
+          <div className="flex items-center gap-1.5 truncate min-w-0">
+            <span className="shrink-0 font-medium text-heading">Pay date {activeRun?.payDate ? formatDate(activeRun.payDate) : '—'}</span>
+            <span>·</span>
+            <span className="truncate">Earning period {run?.periodStart && run?.periodEnd ? `${run.periodStart} – ${run.periodEnd}` : 'not recorded (legacy run)'}</span>
+            {run?.createdById && (
+              <>
+                <span>·</span>
+                <span className="truncate text-caption">Prepared by: {run.createdById}</span>
+              </>
+            )}
+            {run?.approvedById && (
+              <>
+                <span>·</span>
+                <span className="truncate text-success">Approved by: {run.approvedById} {run.approvedAt ? `(${formatDate(run.approvedAt)})` : ''}</span>
+              </>
+            )}
+          </div>
+
+          <div
+            title="Payroll line amounts are priced from saved salary and tax inputs when a run is created."
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-medium shrink-0 bg-surface-raised/70 border border-border-default/60 text-muted shadow-xs"
+          >
+            <Calculator size={13} className="text-accent shrink-0" />
+            <span>Auto-priced on creation</span>
           </div>
         </div>
       </div>
@@ -939,23 +944,108 @@ export default function Payroll() {
         </Alert>
       )}
 
-      {/* ── KPI Grid (12-column grid, col-span-4 each, gap-5) ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-12 gap-5 flex-shrink-0">
-        <div className="lg:col-span-4 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-[92px] flex flex-col justify-start" style={{ containerType: 'inline-size' }}>
-          <p className="text-[11px] font-bold text-muted uppercase tracking-wider leading-none">Total Gross</p>
-          <p className="min-w-0 text-2xl font-bold text-heading mt-3.5 leading-none tracking-tight" style={{ fontSize: metricFontSize(totals.gross) }}>{money(totals.gross)}</p>
-        </div>
+      {/* ── Row 1: 3-Tier Apple-Glass KPI Cards + Compact Currency ── */}
+      {(() => {
+        const grossNum = Number(totals.gross) || 0
+        const dedNum = Number(totals.deductions) || 0
+        const netNum = Number(totals.net) || 0
+        const dedPct = grossNum > 0 ? (dedNum / grossNum) * 100 : 0
+        const netPct = grossNum > 0 ? (netNum / grossNum) * 100 : 0
 
-        <div className="lg:col-span-4 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-[92px] flex flex-col justify-start" style={{ containerType: 'inline-size' }}>
-          <p className="text-[11px] font-bold text-muted uppercase tracking-wider leading-none">Taxes & Deductions</p>
-          <p className="min-w-0 text-2xl font-bold text-heading mt-3.5 leading-none tracking-tight" style={{ fontSize: metricFontSize(totals.deductions) }}>{money(totals.deductions)}</p>
-        </div>
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-shrink-0">
+            {/* TOTAL GROSS */}
+            <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[122px]">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none">
+                  Total Gross
+                </span>
+                <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 flex items-center justify-center shrink-0">
+                  <Banknote size={16} />
+                </div>
+              </div>
+              <div className="flex items-baseline justify-between gap-2 my-1">
+                <span
+                  className="text-2xl font-bold text-heading tracking-tight leading-none tabular-nums"
+                  title={money(totals.gross)}
+                >
+                  {formatCompactCurrency(totals.gross, run?.currency)}
+                </span>
+                <span className="bg-surface-muted text-muted text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0">
+                  100% Gross
+                </span>
+              </div>
+              <div className="space-y-1">
+                <div className="h-1.5 w-full rounded-full overflow-hidden bg-surface-muted">
+                  <div className="h-full bg-indigo-500 rounded-full w-full" />
+                </div>
+              </div>
+            </div>
 
-        <div className="lg:col-span-4 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-[92px] flex flex-col justify-start" style={{ containerType: 'inline-size' }}>
-          <p className="text-[11px] font-bold text-muted uppercase tracking-wider leading-none">Total Net</p>
-          <p className="min-w-0 text-2xl font-bold text-heading mt-3.5 leading-none tracking-tight" style={{ fontSize: metricFontSize(totals.net) }}>{money(totals.net)}</p>
-        </div>
-      </div>
+            {/* TAXES & DEDUCTIONS */}
+            <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[122px]">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none">
+                  Taxes & Deductions
+                </span>
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 flex items-center justify-center shrink-0">
+                  <Receipt size={16} />
+                </div>
+              </div>
+              <div className="flex items-baseline justify-between gap-2 my-1">
+                <span
+                  className="text-2xl font-bold text-heading tracking-tight leading-none tabular-nums"
+                  title={money(totals.deductions)}
+                >
+                  {formatCompactCurrency(totals.deductions, run?.currency)}
+                </span>
+                <span className="bg-amber-500/10 text-amber-600 border border-amber-500/20 text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0">
+                  {dedPct.toFixed(1)}% of Gross
+                </span>
+              </div>
+              <div className="space-y-1">
+                <div className="h-1.5 w-full rounded-full overflow-hidden bg-surface-muted">
+                  <div
+                    className="h-full bg-amber-500 rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(100, Math.max(0, dedPct))}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* TOTAL NET */}
+            <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[122px]">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-none">
+                  Total Net
+                </span>
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 flex items-center justify-center shrink-0">
+                  <Wallet size={16} />
+                </div>
+              </div>
+              <div className="flex items-baseline justify-between gap-2 my-1">
+                <span
+                  className="text-2xl font-bold text-heading tracking-tight leading-none tabular-nums"
+                  title={money(totals.net)}
+                >
+                  {formatCompactCurrency(totals.net, run?.currency)}
+                </span>
+                <span className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0">
+                  {netPct.toFixed(1)}% Net Ratio
+                </span>
+              </div>
+              <div className="space-y-1">
+                <div className="h-1.5 w-full rounded-full overflow-hidden bg-surface-muted">
+                  <div
+                    className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(100, Math.max(0, netPct))}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {roundingReviewOpen && (
         <section aria-label="Year-end rounding review" className="flex-shrink-0 max-h-[35vh] overflow-y-auto rounded-card border border-border-default bg-surface-muted/30 p-4">
@@ -1020,214 +1110,263 @@ export default function Payroll() {
       )}
 
       {/* ── Main Workspace: Table (col-span-8) & Right Inspector Panel (col-span-4) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-0">
-        {/* Table Card (col-span-8) */}
-        <div className="lg:col-span-8 min-w-0 h-[510px] bg-surface-raised rounded-card border border-border-subtle shadow-card flex flex-col overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
-              {isLoading && (
-                <div className="flex items-center justify-center gap-2 py-16 text-muted text-sm">
-                  <Loader2 size={16} className="animate-spin" /> Loading payroll…
-                </div>
-              )}
-              {isError && (
-                <div className="p-6 text-sm text-danger text-center">
-                  {error?.message || 'Unable to load payroll.'}
-                </div>
-              )}
-              {!isLoading && !isError && records.length === 0 && (
-                <div className="p-10 text-center">
-                  <p className="text-base font-semibold text-heading mb-1">No payroll lines</p>
-                  <p className="text-sm text-muted">Load the sample pack or create a payroll run to see data here.</p>
-                </div>
-              )}
-              {!isLoading && records.length > 0 && (
-                <Table className="w-full table-fixed text-left border-collapse">
-                  <colgroup>
-                    <col className="w-[35%]" />
-                    <col className="w-[18%]" />
-                    <col className="w-[18%]" />
-                    <col className="w-[16%]" />
-                    <col className="w-[13%] min-w-[85px]" />
-                  </colgroup>
-                  <TableHeader className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
-                    <TableRow className="hover:bg-transparent border-0">
-                      <TableHead className="px-4 py-2.5 text-left rtl:text-right bg-surface-muted">Employee</TableHead>
-                      <TableHead className="px-4 py-2.5 text-right rtl:text-left bg-surface-muted">Gross</TableHead>
-                      <TableHead className="px-4 py-2.5 text-right rtl:text-left bg-surface-muted">Deductions</TableHead>
-                      <TableHead className="px-4 py-2.5 text-right rtl:text-left bg-surface-muted">Net</TableHead>
-                      <TableHead className="px-4 py-2.5 bg-surface-muted text-right rtl:text-left" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="divide-y divide-border-subtle">
-                    {records.map(record => {
-                      const isSelected = selectedId === record.id
-                      return (
-                        <TableRow
-                          key={record.id}
-                          onClick={() => {
-                            setSelectedId(record.id)
-                            setPayslipError(null)
-                          }}
-                          className={`cursor-pointer transition-colors border-0 ${
-                            isSelected ? 'bg-accent-light/50' : 'bg-surface-raised hover:bg-surface-muted/60'
-                          }`}
-                        >
-                          <TableCell className="px-4 py-3.5">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-subtle flex items-center justify-center text-xs font-bold text-heading shrink-0">
-                                {(record.employee?.name || '?').charAt(0)}
-                              </div>
-                              <div className="min-w-0 truncate">
-                                <p className="text-sm font-semibold text-heading truncate">{record.employee?.name}</p>
-                                <p className="text-[11px] text-muted truncate">{record.employee?.title || '—'}</p>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="px-4 py-3.5 text-xs sm:text-sm text-body text-right rtl:text-left tabular-nums truncate" title={money(record.gross)}>{compactMoney(record.gross)}</TableCell>
-                          <TableCell className="px-4 py-3.5 text-xs sm:text-sm text-body text-right rtl:text-left tabular-nums truncate" title={formatNegativeDeduction(record.deductions, run?.currency)}>{formatCompactNegativeDeduction(record.deductions, run?.currency)}</TableCell>
-                          <TableCell className="px-4 py-3.5 text-xs sm:text-sm font-semibold text-heading text-right rtl:text-left tabular-nums truncate" title={money(record.net)}>{compactMoney(record.net)}</TableCell>
-                          <TableCell className="px-4 py-3.5 text-right rtl:text-left whitespace-nowrap">
-                            <div className="flex items-center justify-end whitespace-nowrap">
-                              <PayslipButton
-                                runId={activeRunId}
-                                lineId={record.id}
-                                onSelect={() => setSelectedId(record.id)}
-                                onNotifyError={setPayslipError}
-                              />
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </div>
-          </div>
-
-          {/* Right Inspector Panel (col-span-4) */}
-          <div className="lg:col-span-4 min-w-0 h-[510px] bg-surface-raised rounded-card border border-border-subtle shadow-card flex flex-col overflow-hidden">
-            {!selectedRecord ? (
-              <div className="flex-1 flex items-center justify-center p-6 text-center text-sm text-muted">
-                Select a payroll line to inspect breakdown.
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-0 items-start">
+        {/* Left Column — Payroll Register Table (lg:col-span-8) */}
+        <div className="col-span-12 lg:col-span-8 min-w-0 bg-surface-raised rounded-2xl border border-border-default shadow-xs flex flex-col overflow-hidden h-[560px] min-h-[560px]">
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-surface-raised">
+            {isLoading && (
+              <div className="flex items-center justify-center gap-2 py-16 text-muted text-sm">
+                <Loader2 size={16} className="animate-spin" /> Loading payroll…
               </div>
-            ) : (
-              <>
-                {/* Fixed Inspector Header */}
-                <div className="flex-shrink-0 p-5 border-b border-border-subtle bg-surface-raised">
-                  <p className="text-[11px] font-bold text-muted uppercase tracking-wider mb-2 leading-none">Selected Line</p>
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-surface-strong border border-border-subtle flex items-center justify-center text-sm font-bold text-heading shrink-0">
-                      {(selectedRecord.employee?.name || '?').charAt(0)}
-                    </div>
-                    <div className="min-w-0">
-                      <h2 className="text-sm sm:text-base font-bold text-heading truncate">{selectedRecord.employee?.name}</h2>
-                      <p className="text-xs text-muted truncate">{selectedRecord.employee?.title || '—'}</p>
-                    </div>
-                  </div>
-
-                  {/* Side-by-side Edit payroll inputs and Payslip button */}
-                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border-subtle">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      type="button"
-                      onClick={openLineEditor}
-                      disabled={!isAdmin || !activeRun || ['APPROVED', 'PAID'].includes(activeRun.status)}
-                      title={!isAdmin ? 'Requires the ADMIN role' : 'Adjust inputs and recalculate this line'}
-                      className="flex-1 text-xs"
-                    >
-                      Edit payroll inputs
-                    </Button>
-                    <div className="shrink-0">
-                      <PayslipButton
-                        runId={activeRunId}
-                        lineId={selectedRecord.id}
-                        onNotifyError={setPayslipError}
-                      />
-                    </div>
-                  </div>
-                  {payslipError && (
-                    <Alert variant="destructive" className="mt-2">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>{payslipError}</AlertDescription>
-                    </Alert>
-                  )}
-                </div>
-
-                {/* Scrollable Inspector Breakdown */}
-                <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-3">
-                  {/* Subtle 1px divider above EARNINGS */}
-                  <div className="border-t border-slate-100 my-3" />
-
-                  <div>
-                    <p className="text-[10px] font-bold text-caption uppercase tracking-wider mb-2">Earnings</p>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-muted">Period base pay</span>
-                        <span className="font-semibold text-heading tabular-nums">{money(selectedRecord.baseSalary ?? selectedRecord.gross)}</span>
-                      </div>
-                      {selectedRecord.salaryRateSegments?.length <= 1 && selectedRecord.sourceSalary != null && (
-                        <p className="text-[11px] text-muted leading-relaxed">
-                          Source salary: {money(selectedRecord.sourceSalary)} {selectedRecord.salaryBasis?.toLowerCase()} · {run?.periodsPerYear} periods/year · {selectedRecord.eligibleDays}/{selectedRecord.periodDays} eligible calendar days. Period base pay may include manual adjustments.
-                        </p>
-                      )}
-                      {selectedRecord.salaryRateSegments?.length > 1 && (
-                        <div className="text-[11px] text-muted">
-                          <p className="font-medium text-body">Effective salary rates used · {selectedRecord.eligibleDays}/{selectedRecord.periodDays} eligible days</p>
-                          <ul className="mt-1 space-y-0.5">
-                            {selectedRecord.salaryRateSegments.map(segment => (
-                              <li key={segment.effectiveFrom}>
-                                {money(segment.salary)} {segment.salaryBasis.toLowerCase()} from {formatDate(segment.effectiveFrom)} · {segment.eligibleDays} eligible days
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      <div className="flex justify-between text-xs">
-                        <span className="text-muted">Missed days ({selectedRecord.missedDaysCount || 0})</span>
-                        <span className="font-semibold text-heading tabular-nums">{formatNegativeDeduction(selectedRecord.missedDaysAmount || '0', run?.currency)}</span>
-                      </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-muted">Bonus {selectedRecord.bonusLabel ? `(${selectedRecord.bonusLabel})` : ''}</span>
-                        <span className="font-semibold text-heading tabular-nums">{money(selectedRecord.bonusAmount || '0')}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Subtle horizontal divider above Taxes & Deductions */}
-                  <div className="border-t border-slate-100 my-3" />
-
-                  <div>
-                    <p className="text-[10px] font-bold text-caption uppercase tracking-wider mb-2">Taxes & Deductions</p>
-                    <div className="space-y-1.5">
-                      {(selectedRecord.taxLines || []).map(tax => (
-                        <div key={tax.id} className="flex justify-between text-xs">
-                          <span className="text-muted flex items-center gap-1.5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-muted shrink-0" />
-                            {tax.label}
-                          </span>
-                          <span className="font-semibold text-heading tabular-nums">{formatNegativeDeduction(tax.amount, run?.currency)}</span>
-                        </div>
-                      ))}
-                      {(!selectedRecord.taxLines || selectedRecord.taxLines.length === 0) && (
-                        <p className="text-[11px] text-muted">No tax lines recorded for this employee.</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Subtle horizontal divider above Net Pay */}
-                  <div className="border-t border-slate-100 my-3" />
-
-                  <div className="flex justify-between items-center text-sm font-bold pt-0.5">
-                    <span className="text-heading">Net Pay</span>
-                    <span className="text-accent text-base tabular-nums">{money(selectedRecord.net)}</span>
-                  </div>
-                </div>
-              </>
+            )}
+            {isError && (
+              <div className="p-6 text-sm text-danger text-center">
+                {error?.message || 'Unable to load payroll.'}
+              </div>
+            )}
+            {!isLoading && !isError && records.length === 0 && (
+              <div className="p-10 text-center">
+                <p className="text-base font-semibold text-heading mb-1">No payroll lines</p>
+                <p className="text-sm text-muted">
+                  {tableSearch ? 'No employees matching search criteria.' : 'Load the sample pack or create a payroll run to see data here.'}
+                </p>
+              </div>
+            )}
+            {!isLoading && records.length > 0 && (
+              <Table wrapperClassName="overflow-visible" className="w-full table-fixed text-left border-collapse">
+                <colgroup>
+                  <col className="w-[38%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[15%]" />
+                </colgroup>
+                <TableHeader className="bg-surface-muted sticky top-0 z-10 text-[11px] font-semibold text-muted uppercase tracking-wider border-b border-border-default shadow-xs">
+                  <TableRow className="hover:bg-transparent border-0">
+                    <TableHead className="w-[38%] pl-4 pr-3 py-2.5 text-left rtl:text-right bg-surface-muted">EMPLOYEE</TableHead>
+                    <TableHead className="w-[15%] px-3 py-2.5 text-right rtl:text-left bg-surface-muted">GROSS</TableHead>
+                    <TableHead className="w-[16%] px-3 py-2.5 text-right rtl:text-left bg-surface-muted">DEDUCTIONS</TableHead>
+                    <TableHead className="w-[16%] pl-3 pr-6 py-2.5 text-right rtl:text-left bg-surface-muted">NET</TableHead>
+                    <TableHead className="w-[15%] pl-2 pr-4 py-2.5 text-right rtl:text-left bg-surface-muted">PAYSLIP</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-border-subtle">
+                  {records.map(record => {
+                    const isSelected = selectedId === record.id
+                    return (
+                      <TableRow
+                        key={record.id}
+                        onClick={() => {
+                          setSelectedId(record.id)
+                          setPayslipError(null)
+                        }}
+                        className={cn(
+                          'cursor-pointer transition-colors border-0',
+                          isSelected
+                            ? 'bg-surface-row-selected hover:bg-surface-row-selected-hover'
+                            : 'bg-surface-raised hover:bg-surface-muted/60'
+                        )}
+                      >
+                        <TableCell className={cn(
+                          'w-[38%] pl-4 pr-3 py-2.5 transition-colors',
+                          isSelected ? 'border-l-2 border-l-accent' : 'border-l-2 border-l-transparent'
+                        )}>
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-xl bg-surface-muted border border-border-default flex items-center justify-center text-xs font-bold text-heading shrink-0 shadow-xs">
+                              {(record.employee?.name || '?').charAt(0)}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs sm:text-sm font-semibold text-heading whitespace-nowrap">{record.employee?.name}</p>
+                              <p className="text-[11px] text-muted truncate">{record.employee?.title || record.employee?.departmentName || '—'}</p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="w-[15%] px-3 py-2.5 text-xs sm:text-sm text-body text-right rtl:text-left tabular-nums whitespace-nowrap truncate" title={money(record.gross)}>
+                          {compactMoney(record.gross)}
+                        </TableCell>
+                        <TableCell className="w-[16%] px-3 py-2.5 text-xs sm:text-sm text-body text-right rtl:text-left tabular-nums whitespace-nowrap truncate" title={formatNegativeDeduction(record.deductions, run?.currency)}>
+                          {formatCompactNegativeDeduction(record.deductions, run?.currency)}
+                        </TableCell>
+                        <TableCell className="w-[16%] pl-3 pr-6 py-2.5 text-xs sm:text-sm font-semibold text-heading text-right rtl:text-left tabular-nums whitespace-nowrap truncate" title={money(record.net)}>
+                          {compactMoney(record.net)}
+                        </TableCell>
+                        <TableCell className="w-[15%] pl-2 pr-4 py-2.5 text-right rtl:text-left whitespace-nowrap">
+                          <div className="flex items-center justify-end whitespace-nowrap">
+                            <PayslipButton
+                              runId={activeRunId}
+                              lineId={record.id}
+                              onSelect={() => setSelectedId(record.id)}
+                              onNotifyError={setPayslipError}
+                            />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+          {/* Table Card Footer */}
+          <div className="flex-shrink-0 px-4 py-2.5 border-t border-border-default bg-surface-muted/50 text-xs text-muted flex items-center justify-between">
+            <span>Showing {records.length} of {allRecords.length} employees</span>
+            {departmentFilter !== 'ALL' && (
+              <span className="text-[11px] font-medium text-accent">Filtered by: {departmentFilter}</span>
             )}
           </div>
         </div>
+
+        {/* Right Column — Sticky Apple-Glass Paycheck Inspector (SELECTED LINE — lg:col-span-4 lg:sticky lg:top-6) */}
+        <div className="col-span-12 lg:col-span-4 min-w-0 lg:sticky lg:top-6">
+          {!selectedRecord ? (
+            <div className="bg-surface-raised rounded-2xl border border-border-default shadow-xs p-8 text-center text-muted">
+              <div className="w-12 h-12 rounded-2xl bg-surface-muted border border-border-default flex items-center justify-center mx-auto mb-3">
+                <Wallet size={20} className="text-muted" />
+              </div>
+              <p className="text-sm font-semibold text-heading">No employee selected</p>
+              <p className="text-xs text-muted mt-1">Select an employee from the payroll register to view complete compensation & tax breakdown</p>
+            </div>
+          ) : (
+            <div className="bg-gradient-to-b from-surface-raised to-surface-raised/80 backdrop-blur-xl border border-border-default rounded-2xl shadow-card flex flex-col overflow-hidden">
+              {/* 1. Header & Action Bar */}
+              <div className="p-4 border-b border-border-subtle bg-surface-raised/50 space-y-2.5">
+                <p className="text-[10px] font-bold text-muted uppercase tracking-wider leading-none">Selected Line</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-surface-muted border border-border-default flex items-center justify-center text-sm font-bold text-heading shrink-0 shadow-xs">
+                    {selectedRecord.employee?.name?.charAt(0) || 'E'}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-heading text-sm truncate">{selectedRecord.employee?.name || 'Selected Employee'}</p>
+                    <p className="text-xs text-muted truncate">{selectedRecord.employee?.title || selectedRecord.employee?.departmentName || 'Employee'}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-0.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    onClick={openLineEditor}
+                    disabled={!isAdmin || !activeRun || ['APPROVED', 'PAID'].includes(activeRun.status)}
+                    title={!isAdmin ? 'Requires the ADMIN role' : 'Adjust inputs and recalculate this line'}
+                    className="flex-1 h-8.5 px-3 rounded-xl border border-border-default bg-surface-raised hover:bg-surface-muted text-xs font-semibold inline-flex items-center justify-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer"
+                  >
+                    <FileText size={13} />
+                    <span>Edit payroll inputs</span>
+                  </Button>
+                  <div className="shrink-0">
+                    <PayslipButton
+                      runId={activeRunId}
+                      lineId={selectedRecord.id}
+                      onNotifyError={setPayslipError}
+                      className="h-8.5 px-3.5 rounded-xl text-xs font-semibold shadow-xs"
+                    />
+                  </div>
+                </div>
+                {payslipError && (
+                  <Alert variant="destructive" className="mt-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{payslipError}</AlertDescription>
+                  </Alert>
+                )}
+              </div>
+
+              {/* Inspector Breakdown: Display all information cleanly without scrolling */}
+              <div className="p-4 space-y-3.5">
+                {/* 2. Recessed EARNINGS Well */}
+                <div className="bg-surface-muted/60 border border-border-subtle rounded-xl p-3.5 space-y-2">
+                  <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Earnings</p>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted">Period base pay</span>
+                      <span className="font-semibold text-heading tabular-nums">{money(selectedRecord.baseSalary ?? selectedRecord.gross)}</span>
+                    </div>
+                    {selectedRecord.salaryRateSegments?.length <= 1 && selectedRecord.sourceSalary != null && (
+                      <p className="text-[11px] text-muted leading-relaxed">
+                        Source salary: {money(selectedRecord.sourceSalary)} {selectedRecord.salaryBasis?.toLowerCase()} · {run?.periodsPerYear} periods/year · {selectedRecord.eligibleDays}/{selectedRecord.periodDays} eligible calendar days. Period base pay may include manual adjustments.
+                      </p>
+                    )}
+                    {selectedRecord.salaryRateSegments?.length > 1 && (
+                      <div className="text-[11px] text-muted">
+                        <p className="font-medium text-body">Effective salary rates used · {selectedRecord.eligibleDays}/{selectedRecord.periodDays} eligible days</p>
+                        <ul className="mt-1 space-y-0.5">
+                          {selectedRecord.salaryRateSegments.map(segment => (
+                            <li key={segment.effectiveFrom}>
+                              {money(segment.salary)} {segment.salaryBasis.toLowerCase()} from {formatDate(segment.effectiveFrom)} · {segment.eligibleDays} eligible days
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted">Missed days ({selectedRecord.missedDaysCount || 0})</span>
+                      <span className="font-semibold text-heading tabular-nums">{formatNegativeDeduction(selectedRecord.missedDaysAmount || '0', run?.currency)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted">Bonus {selectedRecord.bonusLabel ? `(${selectedRecord.bonusLabel})` : ''}</span>
+                      <span className="font-semibold text-heading tabular-nums">{money(selectedRecord.bonusAmount || '0')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Recessed TAXES & DEDUCTIONS Well */}
+                <div className="bg-surface-muted/60 border border-border-subtle rounded-xl p-3.5 space-y-2">
+                  <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Taxes & Deductions</p>
+                  <div className="space-y-1.5">
+                    {(selectedRecord.taxLines || []).map(tax => (
+                      <div key={tax.id} className="flex justify-between items-center text-xs">
+                        <span className="text-muted flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-muted shrink-0" />
+                          {tax.label}
+                        </span>
+                        <span className="font-semibold text-heading tabular-nums">{formatNegativeDeduction(tax.amount, run?.currency)}</span>
+                      </div>
+                    ))}
+                    {(!selectedRecord.taxLines || selectedRecord.taxLines.length === 0) && (
+                      <p className="text-[11px] text-muted">No tax lines recorded for this employee.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* 4. Highlighted Net Pay Footer Well + Visual Pay Split Bar */}
+                {(() => {
+                  const grossVal = Number(selectedRecord.gross) || 0
+                  const netVal = Number(selectedRecord.net) || 0
+                  const dedVal = Number(selectedRecord.deductions) || 0
+                  const netPct = grossVal > 0 ? Math.min(100, Math.max(0, (netVal / grossVal) * 100)) : 100
+                  const dedPct = grossVal > 0 ? Math.min(100, Math.max(0, (dedVal / grossVal) * 100)) : (100 - netPct)
+                  return (
+                    <div className="bg-surface-muted/80 border border-border-default rounded-xl p-3.5 flex flex-col gap-2 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold text-heading">Net Pay</span>
+                        <span className="text-lg font-bold text-accent tabular-nums">{money(selectedRecord.net)}</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="h-1.5 w-full rounded-full overflow-hidden flex bg-surface-strong">
+                          <div
+                            className="bg-accent transition-all duration-300"
+                            style={{ width: `${netPct}%` }}
+                            title={`Net Take-Home: ${netPct.toFixed(1)}%`}
+                          />
+                          <div
+                            className="bg-amber-500 transition-all duration-300"
+                            style={{ width: `${dedPct}%` }}
+                            title={`Deductions: ${dedPct.toFixed(1)}%`}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] font-medium text-muted">
+                          <span>Take-Home ({netPct.toFixed(0)}%)</span>
+                          <span>Deductions ({dedPct.toFixed(0)}%)</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       <FormDialog
         open={isDialogOpen}

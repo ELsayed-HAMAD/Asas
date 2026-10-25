@@ -2,8 +2,8 @@
  * Settings contract — tenant general settings, notification preferences, and integrations.
  *
  * The wire shapes are defined exactly once here so `apps/api`'s settings module and `apps/web`
- * agree on them. Reads of integrations deliberately never include credential fields (see
- * `integrationSchema` below); the update input is the only place a credential may travel.
+ * agree on them. Integration reads contain only endpoint configuration/masked preview metadata;
+ * the encrypted endpoint URL is accepted only on create/update inputs.
  */
 import { z } from 'zod'
 import { integrationStatusSchema } from '../enums.generated.js'
@@ -156,9 +156,8 @@ export type NotificationSettingsUpdateInput = z.infer<typeof notificationSetting
 // ── Integrations ────────────────────────────────────────────────────────────
 
 /**
- * A connected integration's credential *mask*, e.g. `'sk_live_ab…1234'`. The real credential is
- * stored server-side and NEVER returned in a read — the client only ever learns that one exists
- * and what it looks like masked, which is the most a settings page should be able to say.
+ * A configured integration endpoint's masked URL preview. The full encrypted endpoint is stored
+ * server-side and NEVER returned in a read; the UI can show that one exists and a safe preview.
  */
 export interface CredentialMask {
   configured: boolean
@@ -189,19 +188,40 @@ export const integrationSchema = z.object({
 export type Integration = z.infer<typeof integrationSchema>
 
 /**
- * Create input. `credential.value` is the one place a secret travels in — see the update schema
- * for the masking rule on the way out.
+ * The current custom integration capability is an HTTPS endpoint health check. Its stored value
+ * is an endpoint URL, not a provider API token. Network-level public-address validation still
+ * happens immediately before a probe in the API to prevent SSRF and DNS rebinding.
  */
+const integrationEndpointUrlSchema = z.string().trim().min(1).max(4096).url().superRefine((value, context) => {
+  let endpoint: URL
+  try {
+    endpoint = new URL(value)
+  } catch {
+    return
+  }
+  const hostname = endpoint.hostname.toLowerCase()
+  if (endpoint.protocol !== 'https:') {
+    context.addIssue({ code: 'custom', message: 'Integration endpoint must use HTTPS' })
+  }
+  if (endpoint.username || endpoint.password) {
+    context.addIssue({ code: 'custom', message: 'Integration endpoint URL cannot contain credentials' })
+  }
+  if (!hostname.includes('.') || hostname === 'localhost' || hostname.endsWith('.localhost') || hostname.endsWith('.local')) {
+    context.addIssue({ code: 'custom', message: 'Integration endpoint must use a public, fully qualified host' })
+  }
+})
+
+/** Create input. The endpoint is encrypted at rest and never returned in full. */
 export const integrationWriteSchema = z.object({
   name: shortTextSchema,
   description: boundedText(500).optional().nullable(),
-  credential: boundedText(4096).optional().nullable(),
+  credential: integrationEndpointUrlSchema.nullable().optional(),
 }).strict()
 
 export type IntegrationWriteInput = z.infer<typeof integrationWriteSchema>
 
 /**
- * Per-integration update. The credential block is the one place a secret travels, and only in:
+ * Per-integration update. The credential block carries the HTTPS endpoint URL, and only in:
  *
  * - `credential.value` sets (or replaces) the stored credential.
  * - `credential.clear: true` deletes it; the two keys are mutually exclusive.
@@ -213,7 +233,7 @@ export const integrationUpdateSchema = z
     description: boundedText(500).nullable().optional(),
     credential: z
       .object({
-        value: boundedText(4096).optional(),
+        value: integrationEndpointUrlSchema.optional(),
         clear: z.literal(true).optional(),
       })
       .strict()

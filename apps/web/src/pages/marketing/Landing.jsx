@@ -86,6 +86,7 @@ export default function Landing() {
   const subtitleRef = useRef(null)
   const ctaRef = useRef(null)
   const mockupRef = useRef(null)
+  const personaPanelRef = useRef(null)
   // Interactive States
   const [activeCurrency, setActiveCurrency] = useState('USD')
   const [activePersona, setActivePersona] = useState(PERSONAS[0])
@@ -155,6 +156,25 @@ export default function Landing() {
   }, [])
 
   useEffect(() => {
+    if (!personaPanelRef.current || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
+    let cancelled = false
+    let transitionContext
+    void import('gsap').then(({ gsap }) => {
+      if (cancelled || !personaPanelRef.current) return
+      transitionContext = gsap.context(() => {
+        gsap.fromTo(personaPanelRef.current,
+          { autoAlpha: 0.76, y: 8 },
+          { autoAlpha: 1, y: 0, duration: 0.28, ease: 'power2.out', clearProps: 'transform,opacity,visibility' },
+        )
+      }, personaPanelRef)
+    })
+    return () => {
+      cancelled = true
+      transitionContext?.revert()
+    }
+  }, [activePersona.id])
+
+  useEffect(() => {
     if (!location.hash) return undefined
     let targetId
     try {
@@ -203,7 +223,7 @@ export default function Landing() {
             className="inline-flex items-center gap-2 glass border border-border-default/80 text-heading shadow-glass rounded-full px-4 py-1.5 text-xs font-medium hover:border-accent/40 transition-micro cursor-default"
           >
             <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-            <span>Asas Enterprise OS 2.0 • Multi-Currency Ledger Released</span>
+            <span>Finance, people, CRM, projects &amp; inventory in one workspace</span>
             <ChevronRight className="w-3.5 h-3.5 text-caption" />
           </Badge>
         </div>
@@ -358,14 +378,14 @@ export default function Landing() {
                   <svg viewBox="0 0 500 120" className="w-full h-24 overflow-visible">
                     <defs>
                       <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#4f46e5" stopOpacity="0.25" />
-                        <stop offset="100%" stopColor="#4f46e5" stopOpacity="0.0" />
+                        <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.25" />
+                        <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0.0" />
                       </linearGradient>
                     </defs>
                     <path
                       d="M0 90 Q60 50 120 70 T240 40 T360 65 T480 20 L500 25"
                       fill="none"
-                      stroke="#4f46e5"
+                      stroke="var(--color-primary)"
                       strokeWidth="2.5"
                       strokeLinecap="round"
                     />
@@ -373,7 +393,7 @@ export default function Landing() {
                       d="M0 90 Q60 50 120 70 T240 40 T360 65 T480 20 L500 25 L500 120 L0 120 Z"
                       fill="url(#chartGradient)"
                     />
-                    <circle cx="480" cy="20" r="4" fill="#4f46e5" />
+                    <circle cx="480" cy="20" r="4" fill="var(--color-primary)" />
                   </svg>
                 </div>
               </div>
@@ -395,7 +415,7 @@ export default function Landing() {
       <section data-gsap-reveal className="border-y border-border-default bg-surface-raised py-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <p className="text-center text-xs font-semibold uppercase tracking-widest text-caption mb-8">
-            One workspace for connected business operations
+            Product areas available in one workspace
           </p>
           <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-14">
             {PLATFORM_CAPABILITIES.map((client) => (
@@ -417,11 +437,11 @@ export default function Landing() {
             Engineered For Scale
           </Badge>
           <h2 className="text-3xl sm:text-5xl font-extrabold text-heading tracking-tight">
-            Comprehensive control over your entire enterprise.
+            Clear workflows for the work your teams manage every day.
           </h2>
           <p className="text-body-light text-base sm:text-lg max-w-2xl mx-auto mt-4 leading-relaxed">
-            Eliminate fragmented point solutions. Asas unifies your financial ledger, payroll, CRM,
-            and agile engineering into a single source of truth.
+            Review finance, people, customer, project, and inventory records in one workspace, with each
+            area keeping its own workflows and data relationships clear.
           </p>
           <p className="mt-3 text-xs text-caption">Screens and figures below are illustrative sample data.</p>
         </div>
@@ -488,8 +508,8 @@ export default function Landing() {
 
             <div className="pt-2 flex items-center justify-between text-xs text-caption border-t border-border-subtle">
               <span>Workspace-maintained exchange rates</span>
-              <Link to="/solutions" className="text-accent font-semibold hover:underline flex items-center gap-1 group">
-                <span>Explore Treasury Features</span>
+              <Link to="/solutions?area=finance" className="text-accent font-semibold hover:underline flex items-center gap-1 group">
+                <span>Explore Finance Workflows</span>
                 <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
               </Link>
             </div>
@@ -510,7 +530,7 @@ export default function Landing() {
                 {[
                   { label: 'Google and Apple sign-in when configured', ok: true },
                   { label: 'Workspace roles and permissions', ok: true },
-                  { label: 'Audit history for key actions', ok: true },
+                  { label: 'Audit history for supported actions', ok: true },
                   { label: 'Tenant-scoped data access', ok: true },
                 ].map((item) => (
                   <div key={item.label} className="flex items-center gap-2 text-xs text-body">
@@ -522,8 +542,8 @@ export default function Landing() {
             </div>
 
             <div className="pt-6 border-t border-border-subtle mt-6">
-              <Link to="/documentation" className="text-xs text-accent font-semibold hover:underline flex items-center gap-1 group">
-                <span>Read Security Whitepaper</span>
+              <Link to="/documentation#security" className="text-xs text-accent font-semibold hover:underline flex items-center gap-1 group">
+                <span>Review Access &amp; Data Handling</span>
                 <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
               </Link>
             </div>
@@ -558,7 +578,7 @@ export default function Landing() {
             </div>
 
             <div className="pt-6 border-t border-border-subtle mt-6">
-              <Link to="/solutions" className="text-xs text-accent font-semibold hover:underline flex items-center gap-1 group">
+              <Link to="/solutions?area=engineering" className="text-xs text-accent font-semibold hover:underline flex items-center gap-1 group">
                 <span>Explore Engineering Suite</span>
                 <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
               </Link>
@@ -598,7 +618,7 @@ export default function Landing() {
 
             <div className="pt-4 border-t border-border-subtle flex items-center justify-between text-xs text-caption">
               <span>Illustrative deal pipeline · sample figures</span>
-              <Link to="/solutions" className="text-accent font-semibold hover:underline flex items-center gap-1 group">
+              <Link to="/solutions?area=crm" className="text-accent font-semibold hover:underline flex items-center gap-1 group">
                 <span>Explore CRM Workflows</span>
                 <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
               </Link>
@@ -628,6 +648,7 @@ export default function Landing() {
                   key={p.id}
                   type="button"
                   onClick={() => setActivePersona(p)}
+                  aria-pressed={activePersona.id === p.id}
                   className={`px-4 py-2 rounded-full text-xs font-semibold transition-micro cursor-pointer active:scale-[0.98] ${
                     activePersona.id === p.id
                       ? 'bg-primary text-on-primary shadow-card hover:shadow-glow'
@@ -641,7 +662,7 @@ export default function Landing() {
           </div>
 
           {/* Active Persona Showcase */}
-          <div className="glass-strong border border-border-default/80 rounded-card p-6 sm:p-10 shadow-glass transition-premium">
+          <div ref={personaPanelRef} aria-live="polite" className="glass-strong border border-border-default/80 rounded-card p-6 sm:p-10 shadow-glass transition-premium">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
               <div className="lg:col-span-2 space-y-4">
                 <span className="text-xs font-semibold uppercase tracking-wider text-accent">

@@ -57,7 +57,7 @@ export default function Pricing() {
     <MarketingPageFrame
       eyebrow="Transparent Enterprise Pricing"
       title="Predictable plans tailored to your operating scale"
-      description="Zero hidden charges, transparent seat limits, and a permanent Free Starter tier. Upgrade whenever your operational volume requires greater capacity."
+      description="Compare the current workspace seat and storage limits. Product areas are shared across plans; paid checkout is available only when billing is configured for this deployment."
     >
       {!plansQuery.data?.stripeConfigured && (
         <div role="status" className="mb-8 rounded-card border border-warning-border bg-warning-light px-4 py-3 text-sm text-warning-text">

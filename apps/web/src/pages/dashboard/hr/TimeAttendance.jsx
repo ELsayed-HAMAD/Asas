@@ -6,6 +6,7 @@ import {
   Clock,
   Pencil,
   Loader2,
+  CheckCircle2,
 } from 'lucide-react';
 import FormDialog from '../../../components/common/FormDialog';
 import { hrApi } from '../../../lib/api/hr';
@@ -17,6 +18,7 @@ import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
 import { Switch } from '../../../components/ui/switch';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
+import { cn } from '../../../lib/utils';
 import {
   Table,
   TableHeader,
@@ -207,12 +209,12 @@ export default function TimeAttendance() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-y-auto min-w-0 px-6 py-5">
-      {/* ── Unified Single Toolbar: Filter Controls & Action Buttons ── */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 w-full mb-5">
+      {/* ── Unified Single Toolbar: Filter Controls & Action Buttons (Apple-Glass Bar) ── */}
+      <div className="bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-2.5 shadow-xs flex flex-wrap items-center justify-between gap-2.5 mb-5 shrink-0">
         {/* Left Filter Group */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
           <Select value={departmentId} onValueChange={setDepartmentId}>
-            <SelectTrigger aria-label="Department" className="h-8 text-xs font-medium w-auto min-w-[130px] bg-surface-raised shadow-card">
+            <SelectTrigger aria-label="Department" className="h-9 px-3 rounded-xl bg-surface-muted hover:bg-surface-muted/80 border border-border-default text-xs font-medium text-body shrink-0 shadow-xs w-auto min-w-[140px]">
               <span className="text-muted text-[11px] font-semibold uppercase mr-1">Dept</span>
               <SelectValue placeholder="All Departments" />
             </SelectTrigger>
@@ -230,7 +232,7 @@ export default function TimeAttendance() {
             value={needsActionOnly ? 'NEEDS_ACTION' : 'ALL'}
             onValueChange={(v) => setNeedsActionOnly(v === 'NEEDS_ACTION')}
           >
-            <SelectTrigger aria-label="Status filter" className="h-8 text-xs font-medium w-auto min-w-[95px] bg-surface-raised shadow-card">
+            <SelectTrigger aria-label="Status filter" className="h-9 px-3 rounded-xl bg-surface-muted hover:bg-surface-muted/80 border border-border-default text-xs font-medium text-body shrink-0 shadow-xs w-auto min-w-[105px]">
               <span className="text-muted text-[11px] font-semibold uppercase mr-1">Status</span>
               <SelectValue />
             </SelectTrigger>
@@ -244,7 +246,7 @@ export default function TimeAttendance() {
             value={String(attendanceRangeDays)}
             onValueChange={(v) => setAttendanceRangeDays(Number(v))}
           >
-            <SelectTrigger aria-label="Punch completion range" className="h-8 text-xs font-medium w-auto min-w-[105px] bg-surface-raised shadow-card">
+            <SelectTrigger aria-label="Punch completion range" className="h-9 px-3 rounded-xl bg-surface-muted hover:bg-surface-muted/80 border border-border-default text-xs font-medium text-body shrink-0 shadow-xs w-auto min-w-[115px]">
               <span className="text-muted text-[11px] font-semibold uppercase mr-1">Range</span>
               <SelectValue />
             </SelectTrigger>
@@ -255,36 +257,41 @@ export default function TimeAttendance() {
             </SelectContent>
           </Select>
 
-          <Select
-            value={String(overtimeThreshold)}
-            onValueChange={(e) => setOvertimeThreshold(Number(e))}
-          >
-            <SelectTrigger aria-label="Overtime threshold" className="h-8 text-xs font-medium w-auto min-w-[135px] bg-surface-raised shadow-card">
-              <span className="text-muted text-[11px] font-semibold uppercase mr-1">OT</span>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="40">40 hrs/wk</SelectItem>
-              <SelectItem value="35">35 hrs/wk</SelectItem>
-              <SelectItem value="45">45 hrs/wk</SelectItem>
-              <SelectItem value="48">48 hrs/wk</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Connected Overtime Rule Pill: OT select + divider + Auto-Flag OT toggle */}
+          <div className="flex items-center h-9 px-3 rounded-xl bg-surface-muted border border-border-default gap-2.5 text-xs font-medium text-body shrink-0 shadow-xs">
+            <Select
+              value={String(overtimeThreshold)}
+              onValueChange={(e) => setOvertimeThreshold(Number(e))}
+            >
+              <SelectTrigger aria-label="Overtime threshold" className="h-7 border-0 bg-transparent p-0 text-xs font-medium focus:ring-0 shadow-none gap-1">
+                <span className="text-muted text-[11px] font-semibold uppercase">OT</span>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="40">40 hrs/wk</SelectItem>
+                <SelectItem value="35">35 hrs/wk</SelectItem>
+                <SelectItem value="45">45 hrs/wk</SelectItem>
+                <SelectItem value="48">48 hrs/wk</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <div className="flex items-center gap-1.5 border border-border-default px-2 py-1 rounded-input text-xs font-medium bg-surface-raised shadow-card shrink-0">
-            <span className="text-body text-[11px] font-medium">Auto-Flag OT</span>
-            <Switch
-              color="primary"
-              checked={autoFlagOvertime}
-              onCheckedChange={setAutoFlagOvertime}
-              aria-label="Auto-Flag Overtime"
-              className="scale-90"
-            />
+            <div className="h-4 w-px bg-border-default" />
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-body text-[11px] font-medium whitespace-nowrap select-none">Auto-Flag OT</span>
+              <Switch
+                color="primary"
+                checked={autoFlagOvertime}
+                onCheckedChange={setAutoFlagOvertime}
+                aria-label="Auto-Flag Overtime"
+                className="scale-90"
+              />
+            </div>
           </div>
         </div>
 
         {/* Right Action Group */}
-        <div className="flex items-center gap-2 shrink-0 ml-auto">
+        <div className="flex items-center gap-2 shrink-0">
           {data?.selfClock && (
             <Button
               size="sm"
@@ -298,7 +305,7 @@ export default function TimeAttendance() {
                   data.selfClock.clockIn && !data.selfClock.clockOut ? 'OUT' : 'IN'
                 )
               }
-              className="shadow-sm font-semibold"
+              className="h-9 px-3.5 rounded-xl text-xs font-semibold shadow-xs"
             >
               {clockMutation.isPending
                 ? 'Saving...'
@@ -316,7 +323,7 @@ export default function TimeAttendance() {
             type="button"
             onClick={exportAttendance}
             disabled={isLoading || isError}
-            className="gap-1.5 shadow-sm"
+            className="h-9 px-3.5 rounded-xl bg-surface-raised hover:bg-surface-muted border border-border-default text-xs font-semibold text-body inline-flex items-center gap-1.5 shadow-xs"
           >
             <Download size={13} /> Export
           </Button>
@@ -326,7 +333,7 @@ export default function TimeAttendance() {
             type="button"
             onClick={() => approveAllMutation.mutate(eligibleTimesheets.map((item) => item.id))}
             disabled={!eligibleTimesheets.length || approveAllMutation.isPending}
-            className="shadow-sm font-semibold"
+            className="h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center justify-center shadow-sm whitespace-nowrap"
           >
             {approveAllMutation.isPending
               ? 'Approving...'
@@ -350,42 +357,64 @@ export default function TimeAttendance() {
         )}
       </div>
 
-      {/* ── 4 KPI Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-5 mb-5 flex-shrink-0">
-        <div className="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-auto flex flex-col justify-start">
-          <p className="text-[11px] font-bold text-muted uppercase tracking-wider leading-none">Total Timesheets</p>
-          <p className="text-2xl font-bold text-heading mt-1 leading-tight">{summary.timesheetCount}</p>
-          <p className="text-xs text-muted mt-1 leading-normal">Current period</p>
+      {/* ── 4 KPI Cards: Tactile Apple-Glass Surface with Squircle Badges ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-5 flex-shrink-0">
+        <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[122px]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">Total Timesheets</span>
+            <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 flex items-center justify-center shrink-0">
+              <Clock size={16} />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-heading tracking-tight my-1 leading-none">{summary.timesheetCount}</div>
+          <div className="pt-1.5 border-t border-border-subtle/80 text-[11px] text-muted leading-tight">Current period</div>
         </div>
 
-        <div className="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-auto flex flex-col justify-start">
-          <p className="text-[11px] font-bold text-muted uppercase tracking-wider leading-none">Total Exceptions</p>
-          <p className="text-2xl font-bold text-danger mt-1 leading-tight">{summary.exceptionCount}</p>
-          <p className="text-xs text-muted mt-1 leading-normal truncate">
+        <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[122px]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">Total Exceptions</span>
+            <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 flex items-center justify-center shrink-0">
+              <AlertTriangle size={16} />
+            </div>
+          </div>
+          <div className={`text-2xl font-bold tracking-tight my-1 leading-none ${summary.exceptionCount > 0 ? 'text-rose-600' : 'text-heading'}`}>
+            {summary.exceptionCount}
+          </div>
+          <div className="pt-1.5 border-t border-border-subtle/80 text-[11px] text-muted leading-tight truncate">
             {exceptionDelta > 0 ? '+' : ''}
             {exceptionDelta} vs prior {summary.attendanceRateRangeDays} days
-          </p>
+          </div>
         </div>
 
-        <div className="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-auto flex flex-col justify-start">
-          <p className="text-[11px] font-bold text-muted uppercase tracking-wider leading-none">Total Overtime</p>
-          <p className="text-2xl font-bold text-heading mt-1 leading-tight">
+        <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[122px]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">Total Overtime</span>
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 flex items-center justify-center shrink-0">
+              <Clock size={16} />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-heading tracking-tight my-1 leading-none">
             {Number(summary.overtimeHours || 0).toFixed(1)}h
-          </p>
-          <p className="text-xs text-muted mt-1 leading-normal">Across all departments</p>
+          </div>
+          <div className="pt-1.5 border-t border-border-subtle/80 text-[11px] text-muted leading-tight">Across all departments</div>
         </div>
 
-        <div className="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-raised rounded-card border border-border-subtle p-4 shadow-card h-auto flex flex-col justify-start">
-          <p className="text-[11px] font-bold text-muted uppercase tracking-wider leading-none">Punch Completion</p>
-          <p className="text-2xl font-bold text-heading mt-1 leading-tight">
+        <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[122px]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">Punch Completion</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 flex items-center justify-center shrink-0">
+              <CheckCircle2 size={16} />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-heading tracking-tight my-1 leading-none">
             {summary.attendanceRate != null ? `${Math.round(summary.attendanceRate)}%` : '—'}
-          </p>
-          <p className="text-xs text-muted mt-1 leading-normal truncate">
+          </div>
+          <div className="pt-1.5 border-t border-border-subtle/80 text-[11px] text-muted leading-tight truncate">
             Past {summary.attendanceRateRangeDays} days · {summary.attendanceRateRecordedDays} recorded days
             {attendanceRateDelta != null
               ? ` · ${attendanceRateDelta > 0 ? '+' : ''}${attendanceRateDelta.toFixed(1)} pts`
               : ''}
-          </p>
+          </div>
         </div>
       </div>
 
@@ -404,36 +433,42 @@ export default function TimeAttendance() {
       {/* ── Main Workspace: Left Column (Timesheets) & Right Column (Unified Tabbed Inspector) ── */}
       {!isLoading && !isError && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start flex-1 min-h-0">
-          {/* ── Left Column: Weekly Timesheets Table (col-span-12 lg:col-span-8) ── */}
-          <div className="col-span-12 lg:col-span-8 space-y-5 min-w-0">
-            <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card flex flex-col overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-border-subtle flex items-center justify-between bg-surface-raised">
-                <div className="flex items-center gap-2">
-                  <Clock size={15} className="text-accent" />
-                  <h2 className="text-sm font-bold text-heading">Weekly Timesheets</h2>
-                  <span className="text-xs text-muted font-medium">({timesheets.length} items)</span>
+          {/* ── Left Column: Weekly Timesheets Table (col-span-12 lg:col-span-7 xl:col-span-8) ── */}
+          <div className="col-span-12 lg:col-span-7 xl:col-span-8 min-w-0">
+            <div className="bg-surface-raised/95 backdrop-blur-xl border border-border-default rounded-2xl shadow-xs flex flex-col overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-border-default/60 flex items-center justify-between bg-surface-raised flex-wrap gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 flex items-center justify-center shrink-0">
+                    <Clock size={16} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm sm:text-base font-bold text-heading">Weekly Timesheets</h2>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-surface-muted text-muted border border-border-default/60">
+                      {timesheets.length} items
+                    </span>
+                  </div>
                 </div>
                 {isAdmin && eligibleTimesheets.length > 0 && (
-                  <span className="text-xs text-muted font-medium">
+                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shadow-xs">
                     {eligibleTimesheets.length} ready to approve
                   </span>
                 )}
               </div>
 
-              <div className="max-h-[580px] overflow-y-auto overflow-x-hidden">
-                <Table wrapperClassName="overflow-x-hidden" className="w-full table-fixed text-left border-collapse">
+              <div className="max-h-[540px] overflow-y-auto overflow-x-hidden">
+                <Table className="w-full table-fixed text-left border-collapse">
                   <colgroup>
-                    <col className="w-[27%]" />
-                    <col className="w-[23%]" />
-                    <col className="w-[26%]" />
+                    <col className="w-[36%]" />
                     <col className="w-[24%]" />
+                    <col className="w-[22%]" />
+                    <col className="w-[18%]" />
                   </colgroup>
-                  <TableHeader className="bg-surface-muted sticky top-0 z-10 text-[11px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-sm">
+                  <TableHeader className="bg-surface-muted/90 backdrop-blur-xs sticky top-0 z-10 text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border-default shadow-xs">
                     <TableRow className="hover:bg-transparent border-0">
-                      <TableHead className="px-4 py-2.5 text-left rtl:text-right bg-surface-muted truncate">Employee Name</TableHead>
-                      <TableHead className="px-4 py-2.5 text-left rtl:text-right bg-surface-muted truncate">Week</TableHead>
-                      <TableHead className="px-4 py-2.5 text-right rtl:text-left bg-surface-muted truncate">Hours</TableHead>
-                      <TableHead className="px-4 py-2.5 text-center bg-surface-muted truncate">Status</TableHead>
+                      <TableHead className="w-[36%] pl-4 pr-2 text-left rtl:text-right">Employee Name</TableHead>
+                      <TableHead className="w-[24%] px-2 text-left rtl:text-right whitespace-nowrap">Week</TableHead>
+                      <TableHead className="w-[22%] px-2 text-right rtl:text-left whitespace-nowrap">Hours</TableHead>
+                      <TableHead className="w-[18%] pl-2 pr-4 text-right rtl:text-left whitespace-nowrap">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-border-subtle">
@@ -449,38 +484,48 @@ export default function TimeAttendance() {
                             setSelectedTimesheetId(sheet.id);
                             setSelectedEmployeeId(sheet.employeeId);
                           }}
-                          className={`cursor-pointer transition-colors border-0 ${
+                          className={cn(
+                            'cursor-pointer transition-colors border-0',
                             isSelected
-                              ? 'bg-accent-light/50'
+                              ? 'bg-surface-row-selected hover:bg-surface-row-selected-hover'
                               : 'bg-surface-raised hover:bg-surface-muted/60'
-                          }`}
+                          )}
                         >
-                          <TableCell className="px-4 py-3">
+                          <TableCell className={cn(
+                            'w-[36%] pl-4 pr-2 py-2.5 transition-colors',
+                            isSelected ? 'border-l-2 border-l-accent' : 'border-l-2 border-l-transparent'
+                          )}>
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-subtle flex items-center justify-center text-xs font-bold text-heading shrink-0 overflow-hidden">
+                              <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-subtle flex items-center justify-center text-xs font-bold text-heading shrink-0 overflow-hidden shadow-xs">
                                 {(sheet.employeeName || '?').charAt(0)}
                               </div>
-                              <div className="min-w-0 truncate">
-                                <p className="text-sm font-semibold text-heading truncate">{sheet.employeeName}</p>
-                                <p className="text-[11px] text-muted truncate">{sheet.departmentName || 'General'}</p>
+                              <div className="min-w-0">
+                                <p className="text-xs sm:text-sm font-semibold text-heading truncate" title={sheet.employeeName}>
+                                  {sheet.employeeName}
+                                </p>
+                                <p className="text-[11px] text-muted truncate" title={sheet.departmentName || 'General'}>
+                                  {sheet.departmentName || 'General'}
+                                </p>
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell className="px-4 py-3 text-xs sm:text-sm text-body truncate">
+                          <TableCell className="w-[24%] px-2 py-2.5 text-xs sm:text-sm text-body whitespace-nowrap">
                             {sheet.weekStart ? `Week of ${formatShortDate(sheet.weekStart)}` : '—'}
                           </TableCell>
-                          <TableCell className="px-4 py-3 text-right rtl:text-left tabular-nums truncate">
-                            <span className="text-sm font-semibold text-heading">{sheet.totalHours || 0}h</span>
+                          <TableCell className="w-[22%] px-2 py-2.5 text-right rtl:text-left tabular-nums whitespace-nowrap">
+                            <span className="text-xs sm:text-sm font-semibold text-heading">{sheet.totalHours || 0}h</span>
                             {sheet.overtimeHours > 0 && (
                               <span className="text-[11px] text-warning font-medium ml-1">
                                 ({sheet.overtimeHours}h OT)
                               </span>
                             )}
                           </TableCell>
-                          <TableCell className="px-4 py-3 text-center">
-                            <Badge variant={sheet.approvedAt ? 'success' : 'warning'} className="truncate text-[11px]">
-                              {sheet.approvedAt ? 'Approved' : 'Pending'}
-                            </Badge>
+                          <TableCell className="w-[18%] pl-2 pr-4 py-2.5 text-right rtl:text-left whitespace-nowrap">
+                            <div className="flex items-center justify-end">
+                              <Badge variant={sheet.approvedAt ? 'success' : 'warning'} className="text-[11px] whitespace-nowrap">
+                                {sheet.approvedAt ? 'Approved' : 'Pending'}
+                              </Badge>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -499,55 +544,34 @@ export default function TimeAttendance() {
           </div>
 
           {/* ── Right Column: Single Unified Inspector Card (col-span-12 lg:col-span-4) ── */}
-          <div className="col-span-12 lg:col-span-4 space-y-5 min-w-0">
+          <div className="col-span-12 lg:col-span-4 space-y-5 min-w-0 sticky top-6 self-start">
             <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card flex flex-col overflow-hidden">
-              {/* Header: Employee Profile + Integrated Tab Switcher */}
-              <div className="p-4 border-b border-border-subtle flex items-center justify-between gap-2.5 bg-surface-raised flex-wrap">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-subtle flex items-center justify-center text-xs font-bold text-heading shrink-0 overflow-hidden">
-                    {selectedTimesheet?.avatar ? (
-                      <img
-                        src={selectedTimesheet.avatar}
-                        alt={activeEmployeeName}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      activeInitials
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <h2 className="text-sm font-semibold text-heading truncate">{activeEmployeeName}</h2>
-                    <p className="text-[11px] text-muted truncate">
-                      {selectedTimesheet?.departmentName || 'General'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Sub-Tabs: Daily Punches vs Exceptions */}
-                <div className="flex items-center p-0.5 rounded-lg bg-surface-muted border border-border-subtle shrink-0">
+              {/* Primary Segmented Tab Switcher at the very top of Inspector */}
+              <div className="p-3 border-b border-border-subtle bg-surface-muted/30">
+                <div className="flex items-center p-1 rounded-lg bg-surface-muted border border-border-subtle w-full">
                   <button
                     type="button"
                     onClick={() => setInspectorTab('punches')}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                       inspectorTab === 'punches'
                         ? 'bg-surface-raised text-heading shadow-xs'
                         : 'text-muted hover:text-heading'
                     }`}
                   >
-                    <Clock size={12} />
+                    <Clock size={13} />
                     <span>Daily Punches</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setInspectorTab('exceptions')}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                       inspectorTab === 'exceptions'
                         ? 'bg-surface-raised text-heading shadow-xs'
                         : 'text-muted hover:text-heading'
                     }`}
                   >
-                    <AlertTriangle size={12} className={visibleExceptions.length > 0 ? 'text-danger' : 'text-muted'} />
+                    <AlertTriangle size={13} className={visibleExceptions.length > 0 ? 'text-danger' : 'text-muted'} />
                     <span>Exceptions ({visibleExceptions.length})</span>
                   </button>
                 </div>
@@ -556,6 +580,30 @@ export default function TimeAttendance() {
               {/* ── View 1: Daily Punches Inspector ── */}
               {inspectorTab === 'punches' && (
                 <div>
+                  {/* Employee Profile Sub-header */}
+                  <div className="p-4 border-b border-border-subtle flex items-center justify-between gap-3 bg-surface-raised">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-surface-strong border border-border-subtle flex items-center justify-center text-xs font-bold text-heading shrink-0 overflow-hidden">
+                        {selectedTimesheet?.avatar ? (
+                          <img
+                            src={selectedTimesheet.avatar}
+                            alt={activeEmployeeName}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          activeInitials
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <h2 className="text-sm font-semibold text-heading truncate">{activeEmployeeName}</h2>
+                        <p className="text-xs text-muted truncate">
+                          {selectedTimesheet?.departmentName || 'General'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sub-bar: Weekly Log title + Approve Week action */}
                   <div className="px-4 py-2.5 bg-surface-muted/30 border-b border-border-subtle flex items-center justify-between text-xs">
                     <span className="font-medium text-muted">Weekly Log</span>
                     <Button
@@ -573,41 +621,34 @@ export default function TimeAttendance() {
                     </Button>
                   </div>
 
-                  <div className="w-full overflow-hidden">
-                    <Table wrapperClassName="overflow-x-hidden" className="w-full table-fixed text-left border-collapse text-xs">
-                      <colgroup>
-                        <col className="w-[28%]" />
-                        <col className="w-[22%]" />
-                        <col className="w-[22%]" />
-                        <col className="w-[18%]" />
-                        <col className="w-[10%]" />
-                      </colgroup>
+                  <div className="w-full overflow-x-auto">
+                    <Table wrapperClassName="overflow-x-auto" className="w-full text-left border-collapse text-xs">
                       <TableHeader className="bg-surface-muted/60 border-b border-border-subtle text-[10px] font-bold text-muted uppercase tracking-wider">
                         <TableRow className="hover:bg-transparent border-0">
-                          <TableHead className="px-2.5 py-2 text-left rtl:text-right truncate">Day</TableHead>
-                          <TableHead className="px-2 py-2 text-left rtl:text-right truncate">In</TableHead>
-                          <TableHead className="px-2 py-2 text-left rtl:text-right truncate">Out</TableHead>
-                          <TableHead className="px-2 py-2 text-right rtl:text-left truncate">Total</TableHead>
-                          <TableHead className="px-1 py-2 text-right rtl:text-left" />
+                          <TableHead className="px-3 py-2 text-left rtl:text-right whitespace-nowrap">Day</TableHead>
+                          <TableHead className="px-2 py-2 text-left rtl:text-right whitespace-nowrap">In</TableHead>
+                          <TableHead className="px-2 py-2 text-left rtl:text-right whitespace-nowrap">Out</TableHead>
+                          <TableHead className="px-2 py-2 text-right rtl:text-left whitespace-nowrap">Total</TableHead>
+                          <TableHead className="px-1 py-2 text-right rtl:text-left w-7" />
                         </TableRow>
                       </TableHeader>
                       <TableBody className="divide-y divide-border-subtle">
                         {ts && ts.days && ts.days.length > 0 ? (
                           ts.days.map((day, idx) => (
                             <TableRow key={day.id || idx} className="hover:bg-surface-muted/50 transition-colors border-0">
-                              <TableCell className="px-2.5 py-2 text-body font-medium truncate">
+                              <TableCell className="px-3 py-2.5 text-body font-medium whitespace-nowrap">
                                 {day.dayLabel || '—'}
                               </TableCell>
-                              <TableCell className="px-2 py-2 font-semibold text-heading tabular-nums text-xs truncate">
+                              <TableCell className="px-2 py-2.5 font-semibold text-heading tabular-nums text-xs whitespace-nowrap">
                                 {day.clockIn || '—'}
                               </TableCell>
-                              <TableCell className="px-2 py-2 font-semibold text-heading tabular-nums text-xs truncate">
+                              <TableCell className="px-2 py-2.5 font-semibold text-heading tabular-nums text-xs whitespace-nowrap">
                                 {day.clockOut || '—'}
                               </TableCell>
-                              <TableCell className="px-2 py-2 text-body text-right rtl:text-left tabular-nums truncate">
+                              <TableCell className="px-2 py-2.5 text-body text-right rtl:text-left tabular-nums whitespace-nowrap">
                                 {day.totalHours || '0'}h
                               </TableCell>
-                              <TableCell className="px-1 py-2 text-right rtl:text-left">
+                              <TableCell className="px-1 py-2.5 text-right rtl:text-left whitespace-nowrap">
                                 {isAdmin && !ts?.approvedAt && /^\d{4}-\d{2}-\d{2}$/.test(day.dayLabel) && (
                                   <Button
                                     variant="ghost"
@@ -648,14 +689,14 @@ export default function TimeAttendance() {
 
                   {/* Weekly Total Footer */}
                   {ts && (
-                    <div className="px-4 py-2.5 bg-surface-muted/40 border-t border-border-default flex items-center justify-between text-xs">
+                    <div className="px-4 py-3 bg-surface-muted/40 border-t border-border-default flex items-center justify-between text-xs">
                       <span className="font-semibold text-heading">Weekly Total</span>
                       <div className="flex gap-3 text-muted">
                         <span>
-                          Reg: <strong className="text-body">{ts.regularHours}h</strong>
+                          Reg: <strong className="text-body font-semibold">{ts.regularHours}h</strong>
                         </span>
                         <span>
-                          OT: <strong className="text-body">{ts.overtimeHours}h</strong>
+                          OT: <strong className="text-body font-semibold">{ts.overtimeHours}h</strong>
                         </span>
                         <span className="font-bold text-heading">Total: {ts.totalHours}h</span>
                       </div>
@@ -712,19 +753,19 @@ export default function TimeAttendance() {
               {inspectorTab === 'exceptions' && (
                 <div>
                   <div className="px-4 py-2.5 bg-surface-muted/30 border-b border-border-subtle flex items-center justify-between text-xs">
-                    <span className="font-medium text-muted">Attendance Anomalies</span>
+                    <span className="font-semibold text-heading">Attendance Anomalies</span>
                     <Button
                       variant="link"
                       size="sm"
                       type="button"
                       onClick={() => setNeedsActionOnly((c) => !c)}
-                      className="h-auto p-0 text-xs text-accent hover:underline"
+                      className="h-auto p-0 text-xs text-accent hover:underline font-medium"
                     >
                       {needsActionOnly ? 'Show All' : 'Action Only'}
                     </Button>
                   </div>
 
-                  <div className="divide-y divide-border-subtle max-h-[420px] overflow-y-auto">
+                  <div className="divide-y divide-border-subtle max-h-[480px] overflow-y-auto">
                     {visibleExceptions.map((item) => {
                       const isSelected = selectedId === item.id;
                       return (
@@ -734,7 +775,7 @@ export default function TimeAttendance() {
                             setSelectedId(item.id);
                             setSelectedEmployeeId(item.employeeId);
                           }}
-                          className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors ${
+                          className={`flex items-center justify-between px-4 py-3 cursor-pointer transition-colors ${
                             isSelected
                               ? 'bg-danger-light/40 border-l-4 border-l-danger'
                               : 'bg-surface-raised hover:bg-surface-muted/60 border-l-4 border-l-transparent'
@@ -744,14 +785,14 @@ export default function TimeAttendance() {
                             <div className="min-w-0">
                               <p className="text-xs font-semibold text-heading truncate">{item.name}</p>
                               <div
-                                className={`flex items-center gap-1 text-[11px] font-medium mt-0.5 ${
+                                className={`flex items-center gap-1.5 text-[11px] font-medium mt-0.5 ${
                                   item.alert ? 'text-danger' : 'text-muted'
                                 }`}
                               >
                                 {item.alert ? (
-                                  <AlertTriangle size={11} className="shrink-0" />
+                                  <AlertTriangle size={12} className="shrink-0" />
                                 ) : (
-                                  <Clock size={11} className="shrink-0" />
+                                  <Clock size={12} className="shrink-0" />
                                 )}
                                 <span className="truncate">{item.label}</span>
                               </div>
@@ -768,7 +809,7 @@ export default function TimeAttendance() {
                                   e.stopPropagation();
                                   resolveExceptionMutation.mutate(item.id);
                                 }}
-                                className="h-6 px-2 text-xs font-semibold shadow-sm"
+                                className="h-6 px-2.5 text-xs font-semibold shadow-xs"
                                 title="Resolve exception"
                               >
                                 Resolve

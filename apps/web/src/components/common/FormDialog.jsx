@@ -46,6 +46,7 @@ export default function FormDialog({
   return (
     <Dialog open={isDialogOpen} onOpenChange={(val) => { if (!val && !busy) onClose?.() }}>
       <DialogContent
+        aria-labelledby="form-dialog-title"
         className={`w-full ${width} bg-surface-raised rounded-card border border-border-default shadow-elevated p-0 flex flex-col max-h-[85vh] overflow-hidden`}
         onOpenAutoFocus={() => {
           returnFocusTo.current = document.activeElement

@@ -1,9 +1,93 @@
 import { Prisma } from '@prisma/client'
 import { PGlite } from '@electric-sql/pglite'
 import { describe, expect, it, vi } from 'vitest'
-import { expenseSettlementComparison, payableSettlementComparison, payrollSettlementComparison, receivableSettlementComparison, recordCashSettlement, recordInvoiceRecognition, recentSettlements, settlementCashFlow, settlementCashFlowComparison, trialBalance } from '../src/modules/finance/ledger.service.js'
+import { expenseSettlementComparison, payableSettlementComparison, payrollSettlementComparison, receivableSettlementComparison, migrationInvoiceBaseAmount, recordCashSettlement, recordInvoiceRecognition, recordMigrationInvoiceOpeningRecognition, recentSettlements, reverseInvoiceRecognitionIfPresent, settlementCashFlow, settlementCashFlowComparison, trialBalance } from '../src/modules/finance/ledger.service.js'
 
 describe('FX journal posting', () => {
+  it.each([
+    ['AP', 'MIGRATION_AP_OPENING', 'ACCOUNTS_PAYABLE', 'DEBIT', 'CREDIT'],
+    ['AR', 'MIGRATION_AR_OPENING', 'ACCOUNTS_RECEIVABLE', 'CREDIT', 'DEBIT'],
+  ] as const)('posts %s opening recognition against migration equity, not income or expense', async (kind, sourceType, controlCode, equitySide, controlSide) => {
+    const entries: Record<string, unknown>[] = []
+    const lines: Record<string, unknown>[] = []
+    const tx = {
+      journalEntry: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => { entries.push(data); return { id: 'opening_item_1' } }),
+      },
+      exchangeRate: { findFirst: vi.fn(async () => ({ id: 'fx_cutover', rateToBase: new Prisma.Decimal('1.2') })) },
+      ledgerAccount: { upsert: vi.fn(async ({ create }: { create: Record<string, unknown> }) => ({ id: `${create.code}_${create.currency}` })) },
+      journalLine: { createMany: vi.fn(async ({ data }: { data: Record<string, unknown>[] }) => { lines.push(...data); return { count: data.length } }) },
+    } as unknown as Prisma.TransactionClient
+
+    const result = await recordMigrationInvoiceOpeningRecognition(tx, {
+      tenantId: 'tenant_1', sourceId: 'invoice_1', kind, amount: '100.00', currency: 'EUR', workspaceCurrency: 'USD',
+      postedAt: new Date('2026-10-01T00:00:00Z'), actorId: 'admin_1', description: 'Imported opening item',
+    })
+
+    expect(result).toEqual({ journalId: 'opening_item_1', baseAmount: '120.00' })
+    expect(entries[0]).toMatchObject({ sourceType, recognizesPayableInvoiceId: kind === 'AP' ? 'invoice_1' : null, recognizesReceivableInvoiceId: kind === 'AR' ? 'invoice_1' : null, baseAmount: '120.00' })
+    const expectedLines = kind === 'AP'
+      ? [
+          expect.objectContaining({ accountId: 'MIGRATION_OPENING_EQUITY_EUR', side: equitySide, amount: '100.00', baseAmount: '120.00' }),
+          expect.objectContaining({ accountId: `${controlCode}_EUR`, side: controlSide, amount: '100.00', baseAmount: '120.00' }),
+        ]
+      : [
+          expect.objectContaining({ accountId: `${controlCode}_EUR`, side: controlSide, amount: '100.00', baseAmount: '120.00' }),
+          expect.objectContaining({ accountId: 'MIGRATION_OPENING_EQUITY_EUR', side: equitySide, amount: '100.00', baseAmount: '120.00' }),
+        ]
+    expect(lines).toEqual(expectedLines)
+  })
+
+  it('values a migration subledger balance using the rate effective at the cutover date', async () => {
+    const quoteDate = new Date('2026-10-01T00:00:00Z')
+    const findFirst = vi.fn(async () => ({ id: 'fx_cutover', rateToBase: new Prisma.Decimal('1.2') }))
+    const tx = { exchangeRate: { findFirst } } as unknown as Prisma.TransactionClient
+    await expect(migrationInvoiceBaseAmount(tx, { tenantId: 'tenant_1', amount: '100.00', currency: 'EUR', workspaceCurrency: 'USD', asOf: quoteDate })).resolves.toBe('120.00')
+    expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId: 'tenant_1', currency: 'EUR', effectiveAt: { lte: quoteDate } } }))
+  })
+
+  it('reuses a migration recognition during normal invoice recognition instead of posting income or expense twice', async () => {
+    const findFirst = vi.fn(async () => ({ id: 'migration_recognition', amount: new Prisma.Decimal('100'), currency: 'USD', baseAmount: new Prisma.Decimal('100'), sourceType: 'MIGRATION_AR_OPENING' }))
+    const tx = { journalEntry: { findFirst, create: vi.fn() } } as unknown as Prisma.TransactionClient
+    await expect(recordInvoiceRecognition(tx, {
+      tenantId: 'tenant_1', sourceId: 'invoice_1', sourceType: 'AR_RECOGNITION', amount: '100.00', currency: 'USD', workspaceCurrency: 'USD',
+      postedAt: new Date('2026-10-01T00:00:00Z'), actorId: 'admin_1', description: 'Normal recognition attempt',
+    })).resolves.toBe('migration_recognition')
+    expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ recognizesReceivableInvoiceId: 'invoice_1', sourceType: { in: ['AR_RECOGNITION', 'MIGRATION_AR_OPENING'] } }) }))
+    expect(tx.journalEntry.create).not.toHaveBeenCalled()
+  })
+
+  it('allows a migration-recognized open invoice to settle against its carrying amount', async () => {
+    const findFirst = vi.fn(async ({ where }: { where: any }) => where.recognizesPayableInvoiceId
+      ? { amount: new Prisma.Decimal('100'), currency: 'EUR', baseAmount: new Prisma.Decimal('120') }
+      : null)
+    const tx = {
+      journalEntry: { findFirst, create: vi.fn(async () => ({ id: 'ap_payment' })) },
+      exchangeRate: { findFirst: vi.fn(async () => ({ id: 'fx_payment', rateToBase: new Prisma.Decimal('1.2') })) },
+      ledgerAccount: { upsert: vi.fn(async ({ create }: { create: Record<string, unknown> }) => ({ id: `${create.code}_${create.currency}` })) },
+      journalLine: { createMany: vi.fn(async () => ({ count: 2 })) },
+    } as unknown as Prisma.TransactionClient
+    await expect(recordCashSettlement(tx, {
+      tenantId: 'tenant_1', sourceId: 'invoice_1', sourceType: 'AP_PAYMENT', amount: '100.00', documentCurrency: 'EUR', workspaceCurrency: 'USD',
+      postedAt: new Date('2026-10-10T00:00:00Z'), actorId: 'admin_1', description: 'Pay migrated opening item',
+    })).resolves.toBe('ap_payment')
+    expect(findFirst.mock.calls[0]?.[0].where.sourceType).toEqual({ in: ['AP_RECOGNITION', 'MIGRATION_AP_OPENING'] })
+  })
+
+  it('reverses migration recognition through the ordinary immutable reversal path', async () => {
+    const findFirst = vi.fn()
+      .mockResolvedValueOnce({ id: 'migration_recognition' })
+      .mockResolvedValueOnce({ id: 'migration_recognition', currency: 'USD', amount: new Prisma.Decimal('100'), baseCurrency: 'USD', baseAmount: new Prisma.Decimal('100'), baseMinorUnitDigits: 2, fxRate: new Prisma.Decimal(1), exchangeRateId: null, currencyProvenance: 'DOCUMENT', description: 'Opening AR', lines: [{ accountId: 'AR', side: 'DEBIT', amount: new Prisma.Decimal('100'), baseAmount: new Prisma.Decimal('100') }, { accountId: 'EQUITY', side: 'CREDIT', amount: new Prisma.Decimal('100'), baseAmount: new Prisma.Decimal('100') }] })
+      .mockResolvedValueOnce(null)
+    const tx = {
+      journalEntry: { findFirst, create: vi.fn(async () => ({ id: 'reversal_1' })) },
+      journalLine: { createMany: vi.fn(async () => ({ count: 2 })) },
+    } as unknown as Prisma.TransactionClient
+    await expect(reverseInvoiceRecognitionIfPresent(tx, { tenantId: 'tenant_1', sourceId: 'invoice_1', sourceType: 'AR_RECOGNITION', actorId: 'admin_1', reason: 'Imported item voided' })).resolves.toBe('reversal_1')
+    expect(findFirst.mock.calls[0]?.[0].where.sourceType).toEqual({ in: ['AR_RECOGNITION', 'MIGRATION_AR_OPENING'] })
+  })
+
   it('values foreign invoice recognition using the quote effective at recognition time', async () => {
     const created: Record<string, unknown>[] = []
     const lines: Record<string, unknown>[] = []

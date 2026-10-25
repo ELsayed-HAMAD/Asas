@@ -6,6 +6,7 @@ import {
   DollarSign,
   Sparkles,
   Briefcase,
+  FileSpreadsheet,
   Users,
   BarChart3,
   Boxes,
@@ -15,6 +16,7 @@ import {
   ArrowRight,
   Loader2,
   Check,
+  Database,
 } from 'lucide-react'
 import { http } from '../../lib/api/http'
 import { useActiveOrganization, useListOrganizations, useSession, authClient } from '../../lib/authClient'
@@ -22,6 +24,7 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Alert, AlertDescription } from '../../components/ui/alert'
 import { Badge } from '../../components/ui/badge'
+import EmployeeMigration from './EmployeeMigration'
 
 const currencyDisplayNames = new Intl.DisplayNames(undefined, { type: 'currency' })
 const CURRENCIES = listCurrencies().map(({ code }) => ({
@@ -99,6 +102,20 @@ export default function Onboarding() {
 
   // Sample data is explicit opt-in for a real workspace.
   const [dataMode, setDataMode] = useState('empty')
+  const [employeeRows, setEmployeeRows] = useState([])
+  const [migrationModules, setMigrationModules] = useState(['hr'])
+
+  const chooseDataMode = mode => {
+    setDataMode(mode)
+    if (mode !== 'import') setEmployeeRows([])
+  }
+
+  const toggleMigrationModule = moduleId => {
+    if (dataMode === 'import' && moduleId === 'hr') return
+    setMigrationModules(current => current.includes(moduleId)
+      ? current.filter(value => value !== moduleId)
+      : [...current, moduleId])
+  }
 
   useEffect(() => {
     const suggestedName = forceCreateWorkspace
@@ -128,6 +145,7 @@ export default function Onboarding() {
     setError('')
     setLoading(true)
     setLoadingMessage('Configuring executive workspace...')
+    let migrationProjectId = null
     try {
       // A session can retain an activeOrganizationId after that membership is removed.
       // Only reuse an ID that still appears in Better Auth's current membership list.
@@ -200,21 +218,36 @@ export default function Onboarding() {
       setLoadingMessage('Starting your Free plan...')
       await http.post('/billing/switch-plan', { body: { planId: 'free' } })
 
+      if (dataMode === 'import' || dataMode === 'migration') {
+        if (migrationModules.length === 0) throw new Error('Select at least one company area for the migration plan.')
+        setLoadingMessage('Saving your company migration plan...')
+        const migrationProject = await http.post('/onboarding/migration-project', {
+          body: {
+            name: `${companyName.trim()} data migration`,
+            modules: migrationModules.map(module => module.toUpperCase()),
+          },
+        })
+        migrationProjectId = migrationProject.id
+      }
+
       // Apply Data Mode last. Both initializers persist onboardingStatus, so there must be no
       // later setup step that can fail after this transition.
       try {
         if (dataMode === 'sample') {
           setLoadingMessage('Seeding enterprise dataset across ledgers, HR & CRM...')
           await http.post('/onboarding/sample', { body: {} })
+        } else if (dataMode === 'import') {
+          setLoadingMessage(`Importing ${employeeRows.length} employee records...`)
+          await http.post('/onboarding/import', { body: { employees: employeeRows, migrationProjectId } })
         } else {
-          setLoadingMessage('Initializing clean enterprise slate...')
+          setLoadingMessage(dataMode === 'migration' ? 'Preparing your workspace for the migration plan...' : 'Initializing clean enterprise slate...')
           await http.post('/onboarding/empty', { body: {} })
         }
       } catch (applyErr) {
         // An interrupted response may follow a committed initializer. Verify the persisted state
         // before treating a retry as successful; never swallow an unrelated 409 or service error.
         const status = await http.get('/onboarding/status')
-        const expectedStatus = dataMode === 'sample' ? 'SAMPLE_LOADED' : 'EMPTY'
+        const expectedStatus = dataMode === 'sample' ? 'SAMPLE_LOADED' : dataMode === 'import' ? 'IMPORTED' : 'EMPTY'
         if (status?.onboardingStatus !== expectedStatus) throw applyErr
       }
 
@@ -433,7 +466,7 @@ export default function Onboarding() {
                 </Badge>
                 <h2 className="text-2xl font-bold tracking-tight text-heading">Choose how to start</h2>
                 <p className="text-sm text-body-light mt-1">
-                  Your workspace starts on the Free plan. Choose a clean workspace or opt into clearly identified sample records.
+                  Set up the workspace first, then migrate company data by area. You can plan a migration now and continue from Settings later, import the currently supported employee CSV, or explore clearly marked sample data.
                 </p>
               </div>
 
@@ -441,7 +474,7 @@ export default function Onboarding() {
                 {/* Sample data is an explicit opt-in. */}
                 <button
                   type="button"
-                  onClick={() => setDataMode('sample')}
+                  onClick={() => chooseDataMode('sample')}
                   className={`w-full p-5 rounded-card-sm border text-left flex items-start gap-4 transition-all cursor-pointer ${
                     dataMode === 'sample'
                       ? 'bg-accent-light border-accent ring-2 ring-accent/20'
@@ -474,7 +507,7 @@ export default function Onboarding() {
                 {/* Option 2: Clean Slate */}
                 <button
                   type="button"
-                  onClick={() => setDataMode('empty')}
+                  onClick={() => chooseDataMode('empty')}
                   className={`w-full p-5 rounded-card-sm border text-left flex items-start gap-4 transition-all cursor-pointer ${
                     dataMode === 'empty'
                       ? 'bg-accent-light border-accent ring-2 ring-accent/20'
@@ -504,7 +537,70 @@ export default function Onboarding() {
                     </p>
                   </div>
                 </button>
+
+                {/* Guided migration keeps the supported scope visible and reviews all rows before commit. */}
+                <button
+                  type="button"
+                  onClick={() => chooseDataMode('import')}
+                  className={`w-full p-5 rounded-card-sm border text-left flex items-start gap-4 transition-all cursor-pointer ${
+                    dataMode === 'import'
+                      ? 'bg-accent-light border-accent ring-2 ring-accent/20'
+                      : 'bg-surface border-border-default hover:border-border-strong'
+                  }`}
+                >
+                  <div className="p-3 rounded-card-sm bg-primary-light text-primary flex-shrink-0 mt-0.5"><FileSpreadsheet className="w-6 h-6" /></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-sm font-bold text-heading">Bring existing employee data</h3>
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center ${dataMode === 'import' ? 'bg-accent text-on-primary' : 'border border-border-default'}`}>
+                        {dataMode === 'import' && <Check className="w-3.5 h-3.5" />}
+                      </div>
+                    </div>
+                    <p className="text-xs text-body-light mt-1.5 leading-relaxed">Upload a CSV export, map its columns, review validation and a record preview, then import up to 500 employee records in one transaction.</p>
+                  </div>
+                </button>
               </div>
+
+              <button
+                type="button"
+                onClick={() => chooseDataMode('migration')}
+                className={`w-full p-5 rounded-card-sm border text-left flex items-start gap-4 transition-all cursor-pointer ${
+                  dataMode === 'migration'
+                    ? 'bg-accent-light border-accent ring-2 ring-accent/20'
+                    : 'bg-surface border-border-default hover:border-border-strong'
+                }`}
+              >
+                <div className="p-3 rounded-card-sm bg-primary-light text-primary flex-shrink-0 mt-0.5"><Database className="w-6 h-6" /></div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-sm font-bold text-heading">Plan a company-wide migration</h3>
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center ${dataMode === 'migration' ? 'bg-accent text-on-primary' : 'border border-border-default'}`}>
+                      {dataMode === 'migration' && <Check className="w-3.5 h-3.5" />}
+                    </div>
+                  </div>
+                  <p className="text-xs text-body-light mt-1.5 leading-relaxed">Choose which business areas are in scope and finish workspace setup. The project will be saved in Settings so you can resume it later; selecting an area does not import its records.</p>
+                </div>
+              </button>
+
+              {dataMode === 'import' && <EmployeeMigration onRowsChange={setEmployeeRows} disabled={loading} />}
+
+              {(dataMode === 'import' || dataMode === 'migration') && (
+                <fieldset className="rounded-card-sm border border-border-default bg-surface-raised p-4">
+                  <legend className="px-1 text-sm font-semibold text-heading">Company migration scope</legend>
+                  <p className="mb-3 text-xs leading-5 text-muted">The selected areas are saved together in one company project. Each area uses its own data file and validation steps as its import workflow becomes available.</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {MODULES.map(({ id, name, icon: Icon }) => {
+                      const selected = migrationModules.includes(id)
+                      const locked = dataMode === 'import' && id === 'hr'
+                      return <button key={id} type="button" aria-pressed={selected} disabled={loading || locked} onClick={() => toggleMigrationModule(id)} className={`flex min-h-11 items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-70 ${selected ? 'border-primary/50 bg-primary/5 text-heading' : 'border-border-default bg-surface text-body hover:bg-surface-muted'}`}>
+                        <span className="flex items-center gap-2"><Icon className="h-4 w-4 text-primary" />{name}</span>
+                        <span className={`flex h-4 w-4 items-center justify-center rounded border ${selected ? 'border-primary bg-primary text-on-primary' : 'border-border-strong text-transparent'}`}><Check className="h-3 w-3" /></span>
+                      </button>
+                    })}
+                  </div>
+                  {dataMode === 'import' && <p className="mt-3 text-xs text-muted">People &amp; HR is required for this employee CSV. Other selected areas will be saved for later migration.</p>}
+                </fieldset>
+              )}
 
               {/* Summary pill */}
               <div className="bg-surface-muted rounded-card-sm p-4 border border-border-default text-xs text-caption space-y-1">
@@ -534,7 +630,7 @@ export default function Onboarding() {
                 </Button>
                 <Button
                   onClick={finishOnboarding}
-                  disabled={loading || organizationsPending}
+                  disabled={loading || organizationsPending || ((dataMode === 'import' || dataMode === 'migration') && migrationModules.length === 0) || (dataMode === 'import' && employeeRows.length === 0)}
                   className="bg-primary hover:bg-primary-hover text-on-primary font-medium px-7 h-11 rounded-button shadow-card flex items-center gap-2 cursor-pointer"
                 >
                   {loading ? (
@@ -544,7 +640,7 @@ export default function Onboarding() {
                     </>
                   ) : (
                     <>
-                      <span>Launch Enterprise Workspace</span>
+                      <span>{dataMode === 'import' ? `Import ${employeeRows.length} employees & launch` : dataMode === 'migration' ? 'Save migration plan & launch' : 'Launch Enterprise Workspace'}</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}

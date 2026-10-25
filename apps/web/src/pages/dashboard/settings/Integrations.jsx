@@ -420,7 +420,7 @@ export default function SettingsIntegrations() {
             <label className="mb-5 block text-sm font-semibold text-heading">Public HTTPS endpoint (optional)
               <Input type="url" maxLength={4096} value={newCredential} onChange={(event) => setNewCredential(event.target.value)} placeholder="https://hooks.example.com/asas" className="mt-1 w-full bg-surface" />
             </label>
-            {createMutation.isError && <p className="mb-3 text-sm text-danger">Could not create integration. Check the name and try again.</p>}
+            {createMutation.isError && <p role="alert" className="mb-3 text-sm text-danger">{createMutation.error?.message || 'Could not create the endpoint check. Verify the name and public HTTPS URL.'}</p>}
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
               <Button type="submit" disabled={!canManageIntegrations || createMutation.isPending || !newName.trim()}>{createMutation.isPending ? 'Adding…' : 'Add integration'}</Button>

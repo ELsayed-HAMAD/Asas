@@ -12,6 +12,7 @@ export default function SettingsTabs() {
     { name: 'Integrations', path: '/dashboard/settings/integrations' },
     { name: 'Notifications', path: '/dashboard/settings/notifications' },
     { name: 'Data Export', path: '/dashboard/settings/data-export' },
+    { name: 'Data Migration', path: '/dashboard/settings/data-migration' },
   ]
 
   const activeTab = tabs.find(t => t.path === pathname)?.path || '/dashboard/settings'

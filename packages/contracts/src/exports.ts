@@ -16,9 +16,43 @@ import { paginationQuerySchema, paginated } from './primitives/pagination.js'
 export const exportJobKindSchema = z.enum(['employees', 'ledger', 'projects', 'workspace'])
 export type ExportJobKind = z.infer<typeof exportJobKindSchema>
 
+export const exportFormatSchema = z.enum(['csv', 'xlsx', 'json'])
+export type ExportFormat = z.infer<typeof exportFormatSchema>
+
+export const exportDateRangeSchema = z.object({
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a calendar date in YYYY-MM-DD format'),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a calendar date in YYYY-MM-DD format'),
+}).strict().superRefine((range, context) => {
+  const from = new Date(`${range.from}T00:00:00.000Z`)
+  const to = new Date(`${range.to}T00:00:00.000Z`)
+  if (!Number.isFinite(from.getTime()) || from.toISOString().slice(0, 10) !== range.from) {
+    context.addIssue({ code: 'custom', path: ['from'], message: 'Enter a valid start date' })
+  }
+  if (!Number.isFinite(to.getTime()) || to.toISOString().slice(0, 10) !== range.to) {
+    context.addIssue({ code: 'custom', path: ['to'], message: 'Enter a valid end date' })
+  }
+  if (range.from > range.to) {
+    context.addIssue({ code: 'custom', path: ['to'], message: 'End date must be on or after the start date' })
+  }
+})
+export type ExportDateRange = z.infer<typeof exportDateRangeSchema>
+
 export const exportJobCreateSchema = z.object({
   kind: exportJobKindSchema,
-}).strict()
+  format: exportFormatSchema.optional(),
+  dateRange: exportDateRangeSchema.optional(),
+}).strict().superRefine((input, context) => {
+  if (input.kind === 'workspace') {
+    if (input.format && input.format !== 'json') {
+      context.addIssue({ code: 'custom', path: ['format'], message: 'Workspace archives are JSON exports' })
+    }
+    if (input.dateRange) {
+      context.addIssue({ code: 'custom', path: ['dateRange'], message: 'A workspace archive always includes the full workspace history' })
+    }
+  } else if (input.format === 'json') {
+    context.addIssue({ code: 'custom', path: ['format'], message: 'JSON is only available for a full workspace archive' })
+  }
+})
 export type ExportJobCreateInput = z.infer<typeof exportJobCreateSchema>
 
 export const exportJobSchema = z.object({
@@ -26,6 +60,8 @@ export const exportJobSchema = z.object({
   kind: exportJobKindSchema,
   status: exportJobStatusSchema,
   progressPct: z.number().min(0).max(100),
+  format: exportFormatSchema,
+  dateRange: exportDateRangeSchema.nullable(),
   /** Set once the file exists on disk; the download endpoint streams from it. */
   downloadUrl: z.string().nullable(),
   filename: z.string(),

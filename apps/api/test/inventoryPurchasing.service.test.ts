@@ -35,25 +35,34 @@ describe('inventory purchasing', () => {
 
   it('commits initial stock, opening movement, and product audit together', async () => {
     const product = {
-      id: 'product_1', name: 'Widget', sku: 'W-1', price: { toString: () => '2.5' }, stock: 8,
+      id: 'product_1', name: 'Widget', sku: 'W-1', price: { toString: () => '2.5' }, stock: 0,
       warehouse: null, aisle: null, bin: null, avgMonthlyUsage: null, leadTimeDays: null,
       minThreshold: 10, archivedAt: null, createdAt: new Date(), updatedAt: new Date(),
     }
     const tx = {
-      product: { create: vi.fn().mockResolvedValue(product) },
-      stockMovement: { create: vi.fn().mockResolvedValue({ id: 'opening_1' }) },
+      product: {
+        create: vi.fn().mockResolvedValue(product),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue({ stock: 8 }),
+      },
+      stockMovement: { create: vi.fn().mockResolvedValue({ id: 'opening_1', product: { name: 'Widget', warehouse: null } }) },
+      inventoryValuationConfig: { findUnique: vi.fn().mockResolvedValue(null) },
       auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit_1' }) },
     }
     const prisma = {
       product: { findFirst: vi.fn().mockResolvedValue(null) },
+      inventoryValuationConfig: { findUnique: vi.fn().mockResolvedValue(null) },
       $transaction: vi.fn(async (callback: (client: unknown) => unknown) => callback(tx)),
     } as unknown as PrismaClient
 
     await expect(createProduct(prisma, 'tenant_1', { name: 'Widget', sku: 'W-1', stock: 8 }, 'user_1'))
       .resolves.toMatchObject({ id: 'product_1', stock: 8 })
-    expect(tx.stockMovement.create).toHaveBeenCalledWith({ data: {
+    expect(tx.product.create).toHaveBeenCalledWith({ data: expect.objectContaining({ stock: 0 }) })
+    expect(tx.stockMovement.create).toHaveBeenCalledWith({
+      data: {
       tenantId: 'tenant_1', productId: 'product_1', delta: 8, note: 'Initial stock',
-    } })
+      }, include: { product: { select: { name: true, warehouse: true } } },
+    })
     expect(tx.auditLog.create).toHaveBeenCalledWith({ data: {
       tenantId: 'tenant_1', actorId: 'user_1', action: 'inventory.product.create',
       targetType: 'Product', targetId: 'product_1', metadata: null,
@@ -117,13 +126,14 @@ describe('inventory purchasing', () => {
 
   it('creates a draft purchase order with one validated, tenant-scoped line', async () => {
     const tx = {
-      product: { findFirst: vi.fn().mockResolvedValue({ id: 'product_1' }) },
+      product: { findFirst: vi.fn().mockResolvedValue({ id: 'product_1', currency: null }) },
+      tenant: { findUnique: vi.fn().mockResolvedValue({ currency: 'USD' }) },
       auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit_1' }) },
       purchaseOrder: { create: vi.fn().mockResolvedValue({
         id: 'po_1',
         status: 'DRAFT',
         createdAt: new Date('2026-10-05T10:00:00.000Z'),
-        lines: [{ quantity: 12, product: { id: 'product_1', name: 'Widget', sku: 'W-1' } }],
+        lines: [{ quantity: 12, unitCost: null, currency: null, product: { id: 'product_1', name: 'Widget', sku: 'W-1' } }],
       }) },
     }
     const prisma = { $transaction: vi.fn(async (callback: (client: unknown) => unknown) => callback(tx)) } as unknown as PrismaClient
@@ -131,21 +141,59 @@ describe('inventory purchasing', () => {
     await expect(createPurchaseOrder(prisma, 'tenant_1', { productId: 'product_1', quantity: 12 }, 'user_1')).resolves.toEqual({
       id: 'po_1', status: 'DRAFT', createdAt: '2026-10-05T10:00:00.000Z',
       productId: 'product_1', productName: 'Widget', sku: 'W-1', quantity: 12,
+      unitCost: null, currency: null,
     })
-    expect(tx.product.findFirst).toHaveBeenCalledWith({ where: { id: 'product_1', tenantId: 'tenant_1', archivedAt: null }, select: { id: true } })
+    expect(tx.product.findFirst).toHaveBeenCalledWith({ where: { id: 'product_1', tenantId: 'tenant_1', archivedAt: null }, select: { id: true, currency: true } })
     expect(tx.purchaseOrder.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: { tenantId: 'tenant_1', status: 'DRAFT', lines: { create: { productId: 'product_1', quantity: 12 } } },
+      data: { tenantId: 'tenant_1', status: 'DRAFT', lines: { create: { productId: 'product_1', quantity: 12, unitCost: null, currency: null } } },
     }))
     expect(tx.auditLog.create).toHaveBeenCalledWith({ data: {
       tenantId: 'tenant_1', actorId: 'user_1', action: 'inventory.purchase-order.create',
       targetType: 'PurchaseOrder', targetId: expect.any(String),
-      metadata: JSON.stringify({ productId: 'product_1', quantity: 12 }),
+      metadata: JSON.stringify({ productId: 'product_1', quantity: 12, unitCost: null, currency: null }),
     } })
+  })
+
+  it('stores a purchase-order cost in the product valuation currency', async () => {
+    const tx = {
+      product: { findFirst: vi.fn().mockResolvedValue({ id: 'product_1', currency: 'EUR' }) },
+      tenant: { findUnique: vi.fn().mockResolvedValue({ currency: 'USD' }) },
+      auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit_1' }) },
+      purchaseOrder: { create: vi.fn().mockResolvedValue({
+        id: 'po_1',
+        status: 'DRAFT',
+        createdAt: new Date('2026-10-05T10:00:00.000Z'),
+        lines: [{ quantity: 3, unitCost: new Prisma.Decimal('12.50'), currency: 'EUR', product: { id: 'product_1', name: 'Widget', sku: 'W-1' } }],
+      }) },
+    }
+    const prisma = { $transaction: vi.fn(async (callback: (client: unknown) => unknown) => callback(tx)) } as unknown as PrismaClient
+
+    await expect(createPurchaseOrder(prisma, 'tenant_1', { productId: 'product_1', quantity: 3, unitCost: '12.50' }, 'user_1'))
+      .resolves.toMatchObject({ unitCost: '12.5', currency: 'EUR' })
+    expect(tx.purchaseOrder.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        lines: { create: expect.objectContaining({ unitCost: '12.50', currency: 'EUR' }) },
+      }),
+    }))
+  })
+
+  it('rejects a purchase-order cost that is not exact in the valuation currency', async () => {
+    const tx = {
+      product: { findFirst: vi.fn().mockResolvedValue({ id: 'product_1', currency: null }) },
+      tenant: { findUnique: vi.fn().mockResolvedValue({ currency: 'USD' }) },
+      purchaseOrder: { create: vi.fn() },
+    }
+    const prisma = { $transaction: vi.fn(async (callback: (client: unknown) => unknown) => callback(tx)) } as unknown as PrismaClient
+
+    await expect(createPurchaseOrder(prisma, 'tenant_1', { productId: 'product_1', quantity: 1, unitCost: '12.555' }, 'user_1'))
+      .rejects.toMatchObject({ statusCode: 400, message: expect.stringContaining('not exact') })
+    expect(tx.purchaseOrder.create).not.toHaveBeenCalled()
   })
 
   it('does not create an order for a product outside the tenant', async () => {
     const tx = {
       product: { findFirst: vi.fn().mockResolvedValue(null) },
+      tenant: { findUnique: vi.fn().mockResolvedValue({ currency: 'USD' }) },
       purchaseOrder: { create: vi.fn() },
     }
     const prisma = { $transaction: vi.fn(async (callback: (client: unknown) => unknown) => callback(tx)) } as unknown as PrismaClient
@@ -353,15 +401,18 @@ describe('inventory purchasing', () => {
           findUniqueOrThrow: vi.fn().mockResolvedValue(receivedOrder),
         },
         product: {
-          update: vi.fn().mockResolvedValue({ id: 'product_1', stock: 25 }),
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+          findUniqueOrThrow: vi.fn().mockResolvedValue({ stock: 25 }),
         },
         stockMovement: {
-          create: vi.fn().mockResolvedValue({ id: 'sm_1' }),
+          create: vi.fn().mockResolvedValue({ id: 'sm_1', product: { name: 'Widget', warehouse: null } }),
         },
+        inventoryValuationConfig: { findUnique: vi.fn().mockResolvedValue(null) },
         auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit_1' }) },
       }
       const prisma = {
         purchaseOrder: { findFirst: vi.fn().mockResolvedValue(order) },
+        inventoryValuationConfig: { findUnique: vi.fn().mockResolvedValue(null) },
         $transaction: vi.fn(async (cb: (txClient: unknown) => unknown) => cb(tx)),
       } as unknown as PrismaClient
 
@@ -373,8 +424,8 @@ describe('inventory purchasing', () => {
         where: { id: 'po_1', tenantId: 'tenant_1', status: 'APPROVED' },
         data: { status: 'RECEIVED', receivedAt: expect.any(Date) },
       })
-      expect(tx.product.update).toHaveBeenCalledWith({
-        where: { id: 'product_1' },
+      expect(tx.product.updateMany).toHaveBeenCalledWith({
+        where: { id: 'product_1', tenantId: 'tenant_1', stock: { lte: 2_147_483_632 } },
         data: { stock: { increment: 15 } },
       })
       expect(tx.stockMovement.create).toHaveBeenCalledWith({
@@ -383,7 +434,7 @@ describe('inventory purchasing', () => {
           productId: 'product_1',
           delta: 15,
           note: 'PO #po_1 received',
-        },
+        }, include: { product: { select: { name: true, warehouse: true } } },
       })
       expect(tx.auditLog.create).toHaveBeenCalledWith({ data: {
         tenantId: 'tenant_1', actorId: 'user_1', action: 'inventory.purchase-order.receive',
@@ -415,15 +466,18 @@ describe('inventory purchasing', () => {
           }),
         },
         product: {
-          update: vi.fn().mockResolvedValue({ id: 'product_1', stock: 20 }),
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+          findUniqueOrThrow: vi.fn().mockResolvedValue({ stock: 20 }),
         },
         stockMovement: {
-          create: vi.fn().mockResolvedValue({ id: 'sm_1' }),
+          create: vi.fn().mockResolvedValue({ id: 'sm_1', product: { name: 'Widget', warehouse: null } }),
         },
+        inventoryValuationConfig: { findUnique: vi.fn().mockResolvedValue(null) },
         auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit_1' }) },
       }
       const prisma = {
         purchaseOrder: { findFirst: vi.fn().mockResolvedValue(order) },
+        inventoryValuationConfig: { findUnique: vi.fn().mockResolvedValue(null) },
         $transaction: vi.fn(async (cb: (txClient: unknown) => unknown) => cb(tx)),
       } as unknown as PrismaClient
 
@@ -444,7 +498,7 @@ describe('inventory purchasing', () => {
       expect(rejectionReason.message).toBe('Purchase order is not in an approvable state or was already received')
 
       // Crucial assertion: Product stock incremented exactly ONCE, StockMovement created ONCE
-      expect(tx.product.update).toHaveBeenCalledTimes(1)
+      expect(tx.product.updateMany).toHaveBeenCalledTimes(1)
       expect(tx.stockMovement.create).toHaveBeenCalledTimes(1)
     })
   })
