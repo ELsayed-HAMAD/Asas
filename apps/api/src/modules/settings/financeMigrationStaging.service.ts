@@ -6,11 +6,12 @@ import type { FinanceApOpenItemRow, FinanceArOpenItemRow, FinanceOpeningBalanceL
 import { migrationInvoiceBaseAmount } from '../finance/ledger.service.js'
 import { recordAuditLog } from '../../services/auditLog.js'
 import { AppError } from '../../utils/errors.js'
+import { reservedFinanceOpeningCodes, reservedOpeningMessage } from '../../services/openingBalanceAccounts.js'
 
 type FinanceEntity = 'FINANCE_AP_OPEN_ITEMS' | 'FINANCE_AR_OPEN_ITEMS' | 'FINANCE_OPENING_BALANCE'
 type FinanceRow = FinanceApOpenItemRow | FinanceArOpenItemRow | FinanceOpeningBalanceLine
 type StageMetadata = { asOf?: string; accountsReceivableControlTotal?: string; accountsPayableControlTotal?: string }
-type Reader = Pick<PrismaClient, 'dataMigrationProject' | 'dataMigrationImportJob' | 'dataMigrationRecordLink' | 'dataMigrationStageBatch' | 'dataMigrationStagedRecord' | 'tenant' | 'exchangeRate'>
+type Reader = Pick<PrismaClient, 'dataMigrationProject' | 'dataMigrationImportJob' | 'dataMigrationRecordLink' | 'dataMigrationStageBatch' | 'dataMigrationStagedRecord' | 'tenant' | 'exchangeRate' | 'inventoryValuationAccountMapping'>
 type Issue = { rowNumber: number; field: string; message: string }
 
 function normalizeRows(entity: FinanceEntity, input: FinanceRow[]): FinanceRow[] {
@@ -119,6 +120,7 @@ async function validateRows(reader: Reader, tenantId: string, projectId: string,
   if (entity === 'FINANCE_OPENING_BALANCE') {
     if (!asOf || !validDate(asOf)) issues.push({ rowNumber: 1, field: 'asOf', message: 'Opening balances require a valid as-of date.' })
     else if (project.targetCutoverAt && project.targetCutoverAt.toISOString().slice(0, 10) !== asOf) issues.push({ rowNumber: 1, field: 'asOf', message: 'As-of date must match the migration project cutover date.' })
+    const reservedCodes = await reservedFinanceOpeningCodes(reader, tenantId, workspace?.currency ?? '')
     const receivableControl = metadata?.accountsReceivableControlTotal
     const payableControl = metadata?.accountsPayableControlTotal
     try {
@@ -137,8 +139,8 @@ async function validateRows(reader: Reader, tenantId: string, projectId: string,
         break
       }
     }
-    if (rows.some(row => ['ACCOUNTS_PAYABLE', 'ACCOUNTS_RECEIVABLE', 'MIGRATION_OPENING_EQUITY'].includes((row as FinanceOpeningBalanceLine).code))) {
-      issues.push({ rowNumber: 1, field: 'lines', message: 'Do not stage AR/AP control accounts or the reserved migration equity account; cutover derives these from validated open items.' })
+    if (rows.some(row => reservedCodes.has((row as FinanceOpeningBalanceLine).code))) {
+      issues.push({ rowNumber: 1, field: 'lines', message: reservedOpeningMessage(reservedCodes) })
     }
   } else {
     const items = rows as Array<FinanceApOpenItemRow | FinanceArOpenItemRow>
@@ -217,6 +219,7 @@ export async function previewFinanceMigrationReconciliation(prisma: PrismaClient
     if (!project.modules.includes('FINANCE')) throw new AppError(409, 'Finance is not included in this migration project')
     const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } })
     if (!tenant) throw new AppError(404, 'Workspace not found')
+    const reservedCodes = await reservedFinanceOpeningCodes(tx, tenantId, tenant.currency)
     const cutoverDate = project.targetCutoverAt?.toISOString().slice(0, 10) ?? null
     const issues: Array<{ code: string; message: string }> = []
     if (!project.targetCutoverAt) issues.push({ code: 'CUTOVER_DATE_REQUIRED', message: 'Set the company migration cutover date before reconciling Finance.' })
@@ -243,6 +246,7 @@ export async function previewFinanceMigrationReconciliation(prisma: PrismaClient
     const apRows = apBatches.flatMap(batch => current(batch.records).map(record => record.payload as unknown as FinanceApOpenItemRow))
     const arRows = arBatches.flatMap(batch => current(batch.records).map(record => record.payload as unknown as FinanceArOpenItemRow))
     const trialRows = trialBatches.flatMap(batch => current(batch.records).map(record => record.payload as unknown as FinanceOpeningBalanceLine))
+    if (trialRows.some(row => reservedCodes.has(row.code))) issues.push({ code: 'RESERVED_ACCOUNT', message: reservedOpeningMessage(reservedCodes) })
     if (!apRows.length) issues.push({ code: 'AP_BATCH_REQUIRED', message: 'Stage the source AP open-item population before Finance reconciliation.' })
     if (!arRows.length) issues.push({ code: 'AR_BATCH_REQUIRED', message: 'Stage the source AR open-item population before Finance reconciliation.' })
     if (!trialRows.length || !trialBatches.length) issues.push({ code: 'OPENING_TRIAL_BALANCE_REQUIRED', message: 'Stage the source opening trial balance before Finance reconciliation.' })

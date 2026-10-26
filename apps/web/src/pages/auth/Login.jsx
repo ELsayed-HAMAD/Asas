@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Loader2, MailCheck, ArrowRight, RefreshCw } from 'lucide-react'
 import { authClient, signIn } from '../../lib/authClient'
+import { authErrorMessage } from '../../lib/authErrorMessage'
 import { authApi } from '../../lib/api/auth'
 import DevSocialModal from '../../components/auth/DevSocialModal'
 import { GoogleIcon, AppleIcon } from '../../components/common/BrandIcons'
@@ -11,22 +12,12 @@ import { Input } from '../../components/ui/input'
 import { Checkbox } from '../../components/ui/checkbox'
 import { Alert, AlertDescription, AlertTitle } from '../../components/ui/alert'
 
-function authErrorMessage(error) {
-  if (!error) return 'Unable to sign in. Please try again.'
-  if (typeof error === 'string') return error
-  if (error.name === 'TypeError' || /failed to fetch|networkerror|load failed/i.test(String(error.message ?? error))) {
-    return 'Cannot reach the API. Start the backend on port 4000 and try again.'
-  }
-  const nested = error.error?.message || error.message
-  if (nested) return nested
-  return 'Unable to sign in. Please try again.'
-}
-
 export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
 
   const [form, setForm]       = useState({ email: '', password: '' })
+  const [rememberMe, setRememberMe] = useState(true)
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
@@ -55,12 +46,12 @@ export default function Login() {
         redirectTo: window.location.origin + '/reset-password',
       })
       if (res?.error) {
-        setForgotError(res.error?.message || 'Could not send reset link.')
+        setForgotError(authErrorMessage(res.error, 'Could not send reset link.'))
       } else {
         setForgotSuccess('If an account exists for this email, password reset instructions have been sent.')
       }
     } catch (err) {
-      setForgotError(err?.message || 'Could not send reset link.')
+      setForgotError(authErrorMessage(err, 'Could not send reset link.'))
     } finally {
       setForgotLoading(false)
     }
@@ -84,10 +75,10 @@ export default function Login() {
     try {
       const redirectTo = location.state?.from?.pathname || '/dashboard'
       sessionStorage.setItem('asas.auth.redirectAfterTwoFactor', redirectTo)
-      const result = await signIn.email({ email: form.email, password: form.password })
+      const result = await signIn.email({ email: form.email, password: form.password, rememberMe })
       if (result?.error) {
         sessionStorage.removeItem('asas.auth.redirectAfterTwoFactor')
-        const msg = authErrorMessage(result.error)
+        const msg = authErrorMessage(result.error, 'Unable to sign in. Please try again.')
         const isUnverified =
           result.error?.code === 'EMAIL_NOT_VERIFIED' ||
           /email.*not.*verified|not.*verified/i.test(msg) ||
@@ -103,7 +94,7 @@ export default function Login() {
       navigate(redirectTo, { replace: true })
     } catch (requestError) {
       sessionStorage.removeItem('asas.auth.redirectAfterTwoFactor')
-      const msg = authErrorMessage(requestError)
+      const msg = authErrorMessage(requestError, 'Unable to sign in. Please try again.')
       if (/email.*not.*verified|not.*verified/i.test(msg)) {
         setUnverifiedEmail(form.email.trim())
       }
@@ -124,12 +115,12 @@ export default function Login() {
         callbackURL: `${window.location.origin}/dashboard`,
       })
       if (res?.error) {
-        setResendVerificationNotice(res.error?.message || 'Unable to resend confirmation email.')
+        setResendVerificationNotice(authErrorMessage(res.error, 'Unable to resend confirmation email.'))
       } else {
         setResendVerificationNotice(`Confirmation email sent to ${targetEmail}. Please check your inbox.`)
       }
     } catch (err) {
-      setResendVerificationNotice(err?.message || 'Unable to resend confirmation email.')
+      setResendVerificationNotice(authErrorMessage(err, 'Unable to resend confirmation email.'))
     } finally {
       setResendingVerification(false)
     }
@@ -156,10 +147,10 @@ export default function Login() {
         setDevModalProvider(provider)
         setDevModalOpen(true)
       } else {
-        setError(`${provider === 'apple' ? 'Apple' : 'Google'} single sign-on is not configured in this enterprise environment. Please sign in with your corporate email below.`)
+        setError(`${provider === 'apple' ? 'Apple' : 'Google'} single sign-on is not configured for this deployment. Please sign in with your work email below.`)
       }
     } catch (socialErr) {
-      setError(socialErr?.message || `${provider === 'apple' ? 'Apple' : 'Google'} sign-in is currently unavailable in this environment.`)
+      setError(authErrorMessage(socialErr, `${provider === 'apple' ? 'Apple' : 'Google'} sign-in is currently unavailable in this environment.`))
     }
   }
 
@@ -168,7 +159,7 @@ export default function Login() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-heading mb-1">Welcome back</h1>
-        <p className="text-sm text-muted">Sign in to your Asas enterprise workspace</p>
+        <p className="text-sm text-muted">Sign in to your Asas workspace</p>
       </div>
 
       {/* Social SSO Buttons */}
@@ -268,10 +259,11 @@ export default function Login() {
 
         {/* Email */}
         <div>
-          <label className="block text-sm font-medium text-body mb-1.5">
+          <label htmlFor="login-email" className="block text-sm font-medium text-body mb-1.5">
             Work email
           </label>
           <Input
+            id="login-email"
             type="email"
             name="email"
             value={form.email}
@@ -284,7 +276,7 @@ export default function Login() {
         {/* Password */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-sm font-medium text-body">Password</label>
+            <label htmlFor="login-password" className="text-sm font-medium text-body">Password</label>
             <Button
               type="button"
               variant="link"
@@ -301,6 +293,7 @@ export default function Login() {
           </div>
           <div className="relative">
             <Input
+              id="login-password"
               type={showPass ? 'text' : 'password'}
               name="password"
               value={form.password}
@@ -314,6 +307,8 @@ export default function Login() {
               variant="ghost"
               size="icon"
               onClick={() => setShowPass(p => !p)}
+              aria-label={showPass ? 'Hide password' : 'Show password'}
+              aria-controls="login-password"
               className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-caption hover:text-body transition-colors cursor-pointer"
             >
               {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -323,7 +318,11 @@ export default function Login() {
 
         {/* Remember me */}
         <div className="flex items-center gap-2">
-          <Checkbox id="remember" />
+          <Checkbox
+            id="remember"
+            checked={rememberMe}
+            onCheckedChange={checked => setRememberMe(checked === true)}
+          />
           <label htmlFor="remember" className="text-sm text-muted cursor-pointer select-none">
             Keep me signed in
           </label>
@@ -381,12 +380,14 @@ export default function Login() {
             </div>
           ) : (
             <div>
-              <label className="block text-xs font-medium text-body mb-1">Email address</label>
+              <label htmlFor="forgot-password-email" className="block text-xs font-medium text-body mb-1">Email address</label>
               <Input
+                id="forgot-password-email"
                 type="email"
                 value={forgotEmail}
                 onChange={(e) => setForgotEmail(e.target.value)}
                 placeholder="you@company.com"
+                autoComplete="email"
                 className="bg-surface-raised"
               />
             </div>

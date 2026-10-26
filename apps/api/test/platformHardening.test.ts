@@ -10,7 +10,11 @@ describe('platform hardening', () => {
     }
   })
   it('does not serve the API document in production by default', async () => {
-    const app = await buildApp(loadEnv({ NODE_ENV: 'production' }), { logger: false })
+    const app = await buildApp(loadEnv({
+      NODE_ENV: 'production',
+      AUTH_SECRET: '01234567890123456789012345678901',
+      BETTER_AUTH_URL: 'https://api.asas.local',
+    }), { logger: false })
     try {
       expect((await app.inject({ method: 'GET', url: '/docs/json' })).statusCode).toBe(404)
     } finally { await app.close() }

@@ -118,6 +118,7 @@ export default function FinanceOverview() {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised">
+        <h1 className="sr-only">Finance overview</h1>
         <Loader2 className="animate-spin text-muted" size={24} />
       </div>
     );
@@ -126,6 +127,7 @@ export default function FinanceOverview() {
   if (isError || !data) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised text-danger">
+        <h1 className="sr-only">Finance overview</h1>
         Failed to load finance overview.
       </div>
     );
@@ -211,6 +213,7 @@ export default function FinanceOverview() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-y-auto min-w-0 p-4 sm:p-6 space-y-4">
+      <h1 className="sr-only">Finance overview</h1>
 
       {/* ── 1. Unified Single-Row Apple-Glass Command Toolbar ── */}
       <div className="relative z-30 bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-2.5 shadow-xs flex flex-wrap xl:flex-nowrap items-center justify-between gap-2.5 flex-shrink-0">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { listCurrencies } from '@asas/domain/money'
 import { getAvailableTimeZones } from '../../lib/timeZones'
 import { Navigate, useSearchParams } from 'react-router-dom'
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { http } from '../../lib/api/http'
 import { useActiveOrganization, useListOrganizations, useSession, authClient } from '../../lib/authClient'
+import { authErrorMessage } from '../../lib/authErrorMessage'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Alert, AlertDescription } from '../../components/ui/alert'
@@ -35,35 +36,42 @@ const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 const TIMEZONES = getAvailableTimeZones(undefined, [localTimezone]).map(value => ({ value, label: value.replaceAll('_', ' ') }))
 const DEFAULT_TIMEZONE = TIMEZONES.some(({ value }) => value === localTimezone) ? localTimezone : 'UTC'
 
+const START_MODE_LABELS = {
+  empty: 'Clean workspace',
+  sample: 'Sample data',
+  import: 'Employee CSV import',
+  migration: 'Company migration plan',
+}
+
 const MODULES = [
   {
     id: 'finance',
-    name: 'Finance & Treasury',
-    description: 'Accounts, journal entries, receivables, and workspace-managed exchange rates.',
+    name: 'Finance & accounting',
+    description: 'Invoices, payments, reconciliation, ledger entries, and workspace-managed exchange rates.',
     icon: DollarSign,
   },
   {
     id: 'hr',
-    name: 'Human Capital & Payroll',
-    description: 'Employee records, attendance, leave requests, and payroll records for review.',
+    name: 'People & payroll',
+    description: 'Employee records, attendance, leave requests, and payroll runs for review.',
     icon: Users,
   },
   {
     id: 'crm',
-    name: 'Executive CRM & Pipeline',
-    description: 'Customer, contact, and sales opportunity records.',
+    name: 'CRM & pipeline',
+    description: 'Companies, contacts, deals, and sales activity.',
     icon: BarChart3,
   },
   {
     id: 'projects',
-    name: 'Engineering & Agile Sprints',
-    description: 'Project, task, and milestone tracking.',
+    name: 'Projects & sprints',
+    description: 'Projects, sprints, tasks, and roadmap milestones.',
     icon: Code2,
   },
   {
     id: 'inventory',
-    name: 'Supply Chain & Inventory',
-    description: 'Inventory items and recorded stock movements.',
+    name: 'Inventory & stock',
+    description: 'Products, stock movements, purchase orders, and reorder thresholds.',
     icon: Boxes,
   },
 ]
@@ -83,13 +91,24 @@ export default function Onboarding() {
   const [searchParams] = useSearchParams()
   const forceCreateWorkspace = searchParams.get('new') === '1'
   const { data: activeOrganization } = useActiveOrganization()
-  const { data: organizations, isPending: organizationsPending } = useListOrganizations()
+  const {
+    data: organizations,
+    isPending: organizationsPending,
+    error: organizationsError,
+    refetch: refetchOrganizations,
+  } = useListOrganizations()
   const { data: session } = useSession()
 
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [loadingMessage, setLoadingMessage] = useState('')
   const [error, setError] = useState('')
+  const [retryingWorkspaceCheck, setRetryingWorkspaceCheck] = useState(false)
+  const [createdOrganizationId, setCreatedOrganizationId] = useState(null)
+  const workspaceMembershipUnverified = Boolean(organizationsError) &&
+    !forceCreateWorkspace &&
+    !activeOrganization &&
+    !createdOrganizationId
 
   // Step 1: Profile
   const [companyName, setCompanyName] = useState(
@@ -104,6 +123,16 @@ export default function Onboarding() {
   const [dataMode, setDataMode] = useState('empty')
   const [employeeRows, setEmployeeRows] = useState([])
   const [migrationModules, setMigrationModules] = useState(['hr'])
+  const stepHeadingRef = useRef(null)
+  const hasRenderedStep = useRef(false)
+
+  useEffect(() => {
+    if (!hasRenderedStep.current) {
+      hasRenderedStep.current = true
+      return
+    }
+    stepHeadingRef.current?.focus()
+  }, [step])
 
   const chooseDataMode = mode => {
     setDataMode(mode)
@@ -141,10 +170,22 @@ export default function Onboarding() {
     }
   }
 
+  const retryWorkspaceCheck = async () => {
+    setRetryingWorkspaceCheck(true)
+    setError('')
+    try {
+      await refetchOrganizations?.()
+    } catch (err) {
+      setError(authErrorMessage(err, 'Could not check your existing workspaces. Check your connection and try again.'))
+    } finally {
+      setRetryingWorkspaceCheck(false)
+    }
+  }
+
   const finishOnboarding = async () => {
     setError('')
     setLoading(true)
-    setLoadingMessage('Configuring executive workspace...')
+    setLoadingMessage('Configuring your workspace...')
     let migrationProjectId = null
     try {
       // A session can retain an activeOrganizationId after that membership is removed.
@@ -160,13 +201,24 @@ export default function Onboarding() {
         : orgList.length === 1
           ? orgList[0].id
           : null
-      let currentOrgId = forceCreateWorkspace
-        ? null
-        : activeOrganization?.id || verifiedSessionOrganizationId || resumableOrganizationId
+      // If setup failed after creating the workspace, retry the setup on that same workspace
+      // instead of creating a duplicate. On a reload, match the pending workspace by name.
+      const matchingPendingOrganization = companyName.trim()
+        ? orgList.find(org => org.onboardingStatus === 'PENDING' && org.name === companyName.trim())
+        : null
+      let currentOrgId = createdOrganizationId || matchingPendingOrganization?.id ||
+        (forceCreateWorkspace ? null : activeOrganization?.id || verifiedSessionOrganizationId || resumableOrganizationId)
+
+      // A failed membership request must not be treated as "no workspaces". Creating here
+      // would silently duplicate a workspace the user already owns. A verified retry or an
+      // existing pending workspace is required before provisioning.
+      if (!currentOrgId && workspaceMembershipUnverified) {
+        throw new Error('We could not check your existing workspaces. Retry the workspace check before creating a new one to avoid a duplicate workspace.')
+      }
 
       if (!currentOrgId) {
-        setLoadingMessage('Registering organization...')
-        const nameToUse = companyName.trim() || 'Enterprise Workspace'
+        setLoadingMessage('Creating your workspace...')
+        const nameToUse = companyName.trim() || 'My Workspace'
         const slug = nameToUse.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || `org-${Date.now()}`
 
         let createRes = await authClient.organization.create({
@@ -193,18 +245,21 @@ export default function Onboarding() {
         if (!createRes?.data?.id) throw new Error('Workspace service returned success without a workspace ID.')
 
         currentOrgId = createRes.data.id
-        const activation = await authClient.organization.setActive({ organizationId: currentOrgId })
-        if (activation?.error) throw new Error(activation.error.message || 'Could not activate the new workspace.')
-      } else if (!activeOrganization?.id) {
+        setCreatedOrganizationId(currentOrgId)
+      }
+
+      // Always verify the target workspace is the active one before writing settings or
+      // applying the selected start mode. This also repairs a failed activation on retry.
+      if (activeOrganization?.id !== currentOrgId) {
+        setLoadingMessage('Activating your workspace...')
         const activation = await authClient.organization.setActive({ organizationId: currentOrgId })
         if (activation?.error) {
-          const status = activation.error.status ? ` (HTTP ${activation.error.status})` : ''
-          throw new Error(activation.error.message || activation.error.statusText || `Could not activate the selected workspace${status}.`)
+          throw new Error(authErrorMessage(activation.error, 'Could not activate the selected workspace.'))
         }
       }
 
       // Update General Settings (Currency, Timezone, Company Name)
-      setLoadingMessage('Setting base currency & reporting parameters...')
+      setLoadingMessage('Saving currency and timezone...')
       await http.patch('/settings/general', {
         body: {
           name: companyName.trim(),
@@ -234,13 +289,13 @@ export default function Onboarding() {
       // later setup step that can fail after this transition.
       try {
         if (dataMode === 'sample') {
-          setLoadingMessage('Seeding enterprise dataset across ledgers, HR & CRM...')
+          setLoadingMessage('Loading sample data for exploration...')
           await http.post('/onboarding/sample', { body: {} })
         } else if (dataMode === 'import') {
           setLoadingMessage(`Importing ${employeeRows.length} employee records...`)
           await http.post('/onboarding/import', { body: { employees: employeeRows, migrationProjectId } })
         } else {
-          setLoadingMessage(dataMode === 'migration' ? 'Preparing your workspace for the migration plan...' : 'Initializing clean enterprise slate...')
+          setLoadingMessage(dataMode === 'migration' ? 'Preparing your workspace for the migration plan...' : 'Preparing your clean workspace...')
           await http.post('/onboarding/empty', { body: {} })
         }
       } catch (applyErr) {
@@ -251,10 +306,10 @@ export default function Onboarding() {
         if (status?.onboardingStatus !== expectedStatus) throw applyErr
       }
 
-      setLoadingMessage('Redirecting to executive dashboard...')
+      setLoadingMessage('Opening your dashboard...')
       window.location.href = '/dashboard'
     } catch (err) {
-      const msg = err?.message || 'Unable to complete workspace configuration.'
+      const msg = authErrorMessage(err, 'Unable to complete workspace configuration.')
       setError(msg)
       setLoading(false)
     }
@@ -273,17 +328,17 @@ export default function Onboarding() {
             A
           </div>
           <div>
-            <h1 className="text-sm font-semibold text-heading leading-tight">Asas Enterprise Suite</h1>
-            <p className="text-xs text-caption">Executive Workspace Setup</p>
+            <p className="text-sm font-semibold text-heading leading-tight">Asas</p>
+            <p className="text-xs text-caption">Workspace setup</p>
           </div>
         </div>
 
         {/* Stepper Indicator */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" role="group" aria-label="Workspace setup progress">
           {[
             { num: 1, label: 'Profile' },
-            { num: 2, label: 'Capabilities' },
-            { num: 3, label: 'Deployment' },
+            { num: 2, label: 'Areas' },
+            { num: 3, label: 'Start' },
           ].map((s) => (
             <div key={s.num} className="flex items-center gap-2">
               <div
@@ -314,39 +369,66 @@ export default function Onboarding() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
+          {workspaceMembershipUnverified && (
+            <Alert variant="warning" className="mb-6">
+              <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span>We could not check your existing workspaces. Retry before creating a new one to avoid a duplicate workspace.</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={retryWorkspaceCheck}
+                  disabled={retryingWorkspaceCheck}
+                  className="shrink-0 border-warning-border bg-surface-raised text-heading hover:bg-surface-muted"
+                >
+                  {retryingWorkspaceCheck ? <Loader2 size={14} className="animate-spin" /> : null}
+                  {retryingWorkspaceCheck ? 'Checking…' : 'Retry workspace check'}
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+          <div className="sr-only" role="status" aria-live="polite">
+            {loading ? loadingMessage : ''}
+          </div>
 
-          {/* STEP 1: Enterprise Profile */}
+          {/* STEP 1: Workspace profile */}
           {step === 1 && (
             <div className="space-y-6">
               <div>
                 <Badge variant="outline" className="mb-2 text-accent border-accent-muted bg-accent-light">
                   Step 1 of 3
                 </Badge>
-                <h2 className="text-2xl font-bold tracking-tight text-heading">Configure your enterprise profile</h2>
+                <h1 ref={stepHeadingRef} tabIndex={-1} className="text-2xl font-bold tracking-tight text-heading focus:outline-none">Set up your workspace</h1>
                 <p className="text-sm text-body-light mt-1">
-                  Establish your organization's legal identity, operating timezone, and base reporting currency.
+                  Choose the organization name, base reporting currency, and headquarters timezone.
                 </p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-heading mb-1.5">
+                  <label htmlFor="onboarding-company-name" className="block text-xs font-semibold uppercase tracking-wider text-heading mb-1.5">
                     Company / Organization Name
                   </label>
                   <Input
+                    id="onboarding-company-name"
+                    name="organizationName"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
                     placeholder="e.g. Acme Global Holdings Inc."
+                    autoComplete="organization"
+                    aria-required="true"
                     className="bg-surface border-border-default text-heading placeholder:text-caption focus:border-accent h-11"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-heading mb-1.5">
+                    <label htmlFor="onboarding-currency" className="block text-xs font-semibold uppercase tracking-wider text-heading mb-1.5">
                       Base Reporting Currency
                     </label>
                     <select
+                      id="onboarding-currency"
+                      name="currency"
                       value={currency}
                       onChange={(e) => setCurrency(e.target.value)}
                       className="w-full bg-surface border border-border-default rounded-button text-sm text-heading px-3 h-11 focus:outline-none focus:border-accent"
@@ -360,10 +442,12 @@ export default function Onboarding() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-heading mb-1.5">
+                    <label htmlFor="onboarding-timezone" className="block text-xs font-semibold uppercase tracking-wider text-heading mb-1.5">
                       Headquarters Timezone
                     </label>
                     <select
+                      id="onboarding-timezone"
+                      name="timezone"
                       value={timezone}
                       onChange={(e) => setTimezone(e.target.value)}
                       className="w-full bg-surface border border-border-default rounded-button text-sm text-heading px-3 h-11 focus:outline-none focus:border-accent"
@@ -381,7 +465,7 @@ export default function Onboarding() {
               <div className="pt-4 flex justify-end">
                 <Button
                   onClick={handleNext}
-                  className="bg-primary hover:bg-primary-hover text-on-primary font-medium px-6 h-11 rounded-button shadow-card flex items-center gap-2 cursor-pointer"
+                  className="bg-primary hover:bg-primary-hover text-on-primary font-medium px-6 h-11 rounded-button shadow-card flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
                 >
                   <span>Review workspace areas</span>
                   <ChevronRight className="w-4 h-4" />
@@ -390,14 +474,14 @@ export default function Onboarding() {
             </div>
           )}
 
-          {/* STEP 2: Strategic Capabilities Focus */}
+          {/* STEP 2: Workspace areas */}
           {step === 2 && (
             <div className="space-y-6">
               <div>
                 <Badge variant="outline" className="mb-2 text-accent border-accent-muted bg-accent-light">
                   Step 2 of 3
                 </Badge>
-                <h2 className="text-2xl font-bold tracking-tight text-heading">Workspace areas</h2>
+                <h1 ref={stepHeadingRef} tabIndex={-1} className="text-2xl font-bold tracking-tight text-heading focus:outline-none">Workspace areas</h1>
                 <p className="text-sm text-body-light mt-1">
                   All current product areas are available on the Free plan. Your selection here does not enable or disable access.
                 </p>
@@ -406,29 +490,20 @@ export default function Onboarding() {
               <div className="space-y-3">
                 {MODULES.map((mod) => {
                   const Icon = mod.icon
-                  const active = true
                   return (
                     <div
                       key={mod.id}
-                      className="w-full p-4 rounded-button border bg-accent-light border-accent ring-1 ring-accent text-left flex items-start gap-4"
+                      className="w-full p-4 rounded-button border border-border-default bg-surface text-left flex items-start gap-4"
                     >
-                      <div
-                        className={`p-2.5 rounded-card-sm flex-shrink-0 ${
-                          active ? 'bg-accent text-on-primary' : 'bg-surface-muted text-muted'
-                        }`}
-                      >
+                      <div className="p-2.5 rounded-card-sm flex-shrink-0 bg-primary-light text-primary">
                         <Icon className="w-5 h-5" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-3">
                           <h3 className="text-sm font-semibold text-heading">{mod.name}</h3>
-                          <div
-                            className={`w-5 h-5 rounded-md flex items-center justify-center text-xs transition-colors ${
-                              active ? 'bg-accent text-on-primary' : 'border border-border-default text-transparent'
-                            }`}
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                          </div>
+                          <Badge variant="outline" className="shrink-0 border-success-border bg-success-light text-success-text">
+                            Available
+                          </Badge>
                         </div>
                         <p className="text-xs text-body-light mt-1 leading-relaxed">{mod.description}</p>
                       </div>
@@ -437,18 +512,18 @@ export default function Onboarding() {
                 })}
               </div>
 
-              <div className="pt-4 flex items-center justify-between">
+              <div className="pt-4 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
                 <Button
                   variant="outline"
                   onClick={() => setStep(1)}
-                  className="border-border-default text-body hover:bg-surface-muted h-11 rounded-button flex items-center gap-2"
+                  className="border-border-default text-body hover:bg-surface-muted h-11 rounded-button flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
                   <ChevronLeft className="w-4 h-4" />
                   <span>Back</span>
                 </Button>
                 <Button
                   onClick={handleNext}
-                  className="bg-primary hover:bg-primary-hover text-on-primary font-medium px-6 h-11 rounded-button shadow-card flex items-center gap-2 cursor-pointer"
+                  className="bg-primary hover:bg-primary-hover text-on-primary font-medium px-6 h-11 rounded-button shadow-card flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
                 >
                   <span>Choose how to start</span>
                   <ChevronRight className="w-4 h-4" />
@@ -464,17 +539,53 @@ export default function Onboarding() {
                 <Badge variant="outline" className="mb-2 text-accent border-accent-muted bg-accent-light">
                   Step 3 of 3
                 </Badge>
-                <h2 className="text-2xl font-bold tracking-tight text-heading">Choose how to start</h2>
+                <h1 ref={stepHeadingRef} tabIndex={-1} className="text-2xl font-bold tracking-tight text-heading focus:outline-none">Choose how to start</h1>
                 <p className="text-sm text-body-light mt-1">
                   Set up the workspace first, then migrate company data by area. You can plan a migration now and continue from Settings later, import the currently supported employee CSV, or explore clearly marked sample data.
                 </p>
               </div>
 
               <div className="space-y-4">
-                {/* Sample data is an explicit opt-in. */}
+                {/* The recommended path is first so a real workspace is the default choice. */}
+                <button
+                  type="button"
+                  onClick={() => chooseDataMode('empty')}
+                  aria-pressed={dataMode === 'empty'}
+                  className={`w-full p-5 rounded-card-sm border text-left flex items-start gap-4 transition-all cursor-pointer ${
+                    dataMode === 'empty'
+                      ? 'bg-accent-light border-accent ring-2 ring-accent/20'
+                      : 'bg-surface border-border-default hover:border-border-strong'
+                  }`}
+                >
+                  <div className="p-3 rounded-card-sm bg-surface-muted text-muted flex-shrink-0 mt-0.5">
+                    <Briefcase className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <h3 className="text-sm font-bold text-heading">Start with a clean workspace</h3>
+                        <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-success-light text-success-text border border-success-border">Recommended</span>
+                      </div>
+                      <div
+                        className={`w-5 h-5 shrink-0 rounded-full flex items-center justify-center ${
+                          dataMode === 'empty' ? 'bg-accent text-on-primary' : 'border border-border-default'
+                        }`}
+                      >
+                        {dataMode === 'empty' && <Check className="w-3.5 h-3.5" />}
+                      </div>
+                    </div>
+                    <p className="text-xs text-body-light mt-1.5 leading-relaxed">
+                      Starts without demonstration records. You can then enter business information through the available
+                      workflows, including CSV bank-statement reconciliation where available.
+                    </p>
+                  </div>
+                </button>
+
+                {/* Sample data remains an explicit opt-in for exploration only. */}
                 <button
                   type="button"
                   onClick={() => chooseDataMode('sample')}
+                  aria-pressed={dataMode === 'sample'}
                   className={`w-full p-5 rounded-card-sm border text-left flex items-start gap-4 transition-all cursor-pointer ${
                     dataMode === 'sample'
                       ? 'bg-accent-light border-accent ring-2 ring-accent/20'
@@ -490,7 +601,7 @@ export default function Onboarding() {
                         <h3 className="text-sm font-bold text-heading">Load sample data</h3>
                       </div>
                       <div
-                        className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                        className={`w-5 h-5 shrink-0 rounded-full flex items-center justify-center ${
                           dataMode === 'sample' ? 'bg-accent text-on-primary' : 'border border-border-default'
                         }`}
                       >
@@ -504,44 +615,11 @@ export default function Onboarding() {
                   </div>
                 </button>
 
-                {/* Option 2: Clean Slate */}
-                <button
-                  type="button"
-                  onClick={() => chooseDataMode('empty')}
-                  className={`w-full p-5 rounded-card-sm border text-left flex items-start gap-4 transition-all cursor-pointer ${
-                    dataMode === 'empty'
-                      ? 'bg-accent-light border-accent ring-2 ring-accent/20'
-                      : 'bg-surface border-border-default hover:border-border-strong'
-                  }`}
-                >
-                  <div className="p-3 rounded-card-sm bg-surface-muted text-muted flex-shrink-0 mt-0.5">
-                    <Briefcase className="w-6 h-6" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-bold text-heading">Start with a clean workspace</h3>
-                        <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-success-light text-success-text border border-success-border">Recommended</span>
-                      </div>
-                      <div
-                        className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                          dataMode === 'empty' ? 'bg-accent text-on-primary' : 'border border-border-default'
-                        }`}
-                      >
-                        {dataMode === 'empty' && <Check className="w-3.5 h-3.5" />}
-                      </div>
-                    </div>
-                    <p className="text-xs text-body-light mt-1.5 leading-relaxed">
-                      Starts without demonstration records. You can then enter business information through the available
-                      workflows, including CSV bank-statement reconciliation where available.
-                    </p>
-                  </div>
-                </button>
-
                 {/* Guided migration keeps the supported scope visible and reviews all rows before commit. */}
                 <button
                   type="button"
                   onClick={() => chooseDataMode('import')}
+                  aria-pressed={dataMode === 'import'}
                   className={`w-full p-5 rounded-card-sm border text-left flex items-start gap-4 transition-all cursor-pointer ${
                     dataMode === 'import'
                       ? 'bg-accent-light border-accent ring-2 ring-accent/20'
@@ -552,7 +630,7 @@ export default function Onboarding() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-3">
                       <h3 className="text-sm font-bold text-heading">Bring existing employee data</h3>
-                      <div className={`w-5 h-5 rounded-full flex items-center justify-center ${dataMode === 'import' ? 'bg-accent text-on-primary' : 'border border-border-default'}`}>
+                      <div className={`w-5 h-5 shrink-0 rounded-full flex items-center justify-center ${dataMode === 'import' ? 'bg-accent text-on-primary' : 'border border-border-default'}`}>
                         {dataMode === 'import' && <Check className="w-3.5 h-3.5" />}
                       </div>
                     </div>
@@ -564,6 +642,7 @@ export default function Onboarding() {
               <button
                 type="button"
                 onClick={() => chooseDataMode('migration')}
+                aria-pressed={dataMode === 'migration'}
                 className={`w-full p-5 rounded-card-sm border text-left flex items-start gap-4 transition-all cursor-pointer ${
                   dataMode === 'migration'
                     ? 'bg-accent-light border-accent ring-2 ring-accent/20'
@@ -574,7 +653,7 @@ export default function Onboarding() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="text-sm font-bold text-heading">Plan a company-wide migration</h3>
-                    <div className={`w-5 h-5 rounded-full flex items-center justify-center ${dataMode === 'migration' ? 'bg-accent text-on-primary' : 'border border-border-default'}`}>
+                    <div className={`w-5 h-5 shrink-0 rounded-full flex items-center justify-center ${dataMode === 'migration' ? 'bg-accent text-on-primary' : 'border border-border-default'}`}>
                       {dataMode === 'migration' && <Check className="w-3.5 h-3.5" />}
                     </div>
                   </div>
@@ -599,31 +678,46 @@ export default function Onboarding() {
                     })}
                   </div>
                   {dataMode === 'import' && <p className="mt-3 text-xs text-muted">People &amp; HR is required for this employee CSV. Other selected areas will be saved for later migration.</p>}
+                  {dataMode === 'migration' && migrationModules.length === 0 && (
+                    <p role="alert" className="mt-3 text-xs text-danger">Select at least one company area to save a migration plan.</p>
+                  )}
                 </fieldset>
               )}
 
               {/* Summary pill */}
-              <div className="bg-surface-muted rounded-card-sm p-4 border border-border-default text-xs text-caption space-y-1">
-                <div className="flex justify-between text-body font-medium">
+              <div className="bg-surface-muted rounded-card-sm p-4 border border-border-default text-xs text-caption space-y-1.5">
+                <div className="flex justify-between gap-4 text-body font-medium">
                   <span>Workspace:</span>
-                  <span className="text-heading font-semibold">{companyName}</span>
+                  <span className="text-right text-heading font-semibold break-words min-w-0">{companyName}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Reporting Currency & Timezone:</span>
-                  <span>{currency} • {timezone.split('/')[1] || timezone}</span>
+                <div className="flex justify-between gap-4">
+                  <span>Start mode:</span>
+                  <span className="text-right font-medium text-heading">{START_MODE_LABELS[dataMode]}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Available areas:</span>
-                  <span>{MODULES.length} available areas</span>
+                <div className="flex justify-between gap-4">
+                  <span>Reporting currency &amp; timezone:</span>
+                  <span className="text-right">{currency} • {timezone.split('/')[1] || timezone}</span>
+                </div>
+                {(dataMode === 'import' || dataMode === 'migration') && (
+                  <div className="flex justify-between gap-4">
+                    <span>Migration scope:</span>
+                    <span className="text-right font-medium text-heading break-words min-w-0">
+                      {MODULES.filter(module => migrationModules.includes(module.id)).map(module => module.name).join(', ') || 'None selected'}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between gap-4">
+                  <span>Product areas:</span>
+                  <span className="text-right">{MODULES.length} available</span>
                 </div>
               </div>
 
-              <div className="pt-4 flex items-center justify-between">
+              <div className="pt-4 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
                 <Button
                   variant="outline"
                   onClick={() => setStep(2)}
                   disabled={loading}
-                  className="border-border-default text-body hover:bg-surface-muted h-11 rounded-button flex items-center gap-2"
+                  className="border-border-default text-body hover:bg-surface-muted h-11 rounded-button flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
                   <ChevronLeft className="w-4 h-4" />
                   <span>Back</span>
@@ -631,7 +725,7 @@ export default function Onboarding() {
                 <Button
                   onClick={finishOnboarding}
                   disabled={loading || organizationsPending || ((dataMode === 'import' || dataMode === 'migration') && migrationModules.length === 0) || (dataMode === 'import' && employeeRows.length === 0)}
-                  className="bg-primary hover:bg-primary-hover text-on-primary font-medium px-7 h-11 rounded-button shadow-card flex items-center gap-2 cursor-pointer"
+                  className="bg-primary hover:bg-primary-hover text-on-primary font-medium px-7 h-11 rounded-button shadow-card flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
                 >
                   {loading ? (
                     <>
@@ -640,7 +734,7 @@ export default function Onboarding() {
                     </>
                   ) : (
                     <>
-                      <span>{dataMode === 'import' ? `Import ${employeeRows.length} employees & launch` : dataMode === 'migration' ? 'Save migration plan & launch' : 'Launch Enterprise Workspace'}</span>
+                      <span>{dataMode === 'import' ? `Import ${employeeRows.length} employees & launch` : dataMode === 'migration' ? 'Save migration plan & launch' : 'Launch workspace'}</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}

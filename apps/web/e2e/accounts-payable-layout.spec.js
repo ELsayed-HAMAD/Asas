@@ -4,6 +4,13 @@ function json(route, body, status = 200) {
   return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
 }
 
+function kpiCard(page, label, value) {
+  return page.locator('div')
+    .filter({ has: page.getByText(label, { exact: true }) })
+    .filter({ has: page.getByText(value, { exact: true }) })
+    .last()
+}
+
 async function mockAuth(context, account, apiHandler) {
   let signedIn = false
   await context.route('**/api/auth/**', async route => {
@@ -155,21 +162,21 @@ test('accounts payable strictly satisfies Apple-Glass polish, exact currency, an
 
     // 3. Top Row KPI cards with precision compact currency
     // TOTAL OUTSTANDING: $74.1K (title has full $74,104.00)
-    const card1 = page.locator('text=Total Outstanding').locator('..')
+    const card1 = kpiCard(page, 'Total Outstanding', '$74.1K')
     await expect(card1.getByText('$74.1K')).toBeVisible()
     await expect(card1.getByText('18 open bills')).toBeVisible()
 
     // Card 2: PAST DUE ($0.00 / $0, 'No overdue bills')
-    const card2 = page.locator('text=Past Due').locator('..')
+    const card2 = kpiCard(page, 'Past Due', 'No overdue bills')
     await expect(card2.getByText('No overdue bills')).toBeVisible()
 
-    // Card 3: DUE IN 7 DAYS
-    const card3 = page.locator('text=Due in 7 Days').locator('..')
-    await expect(card3.getByText('$1.5M')).toBeVisible()
+    // Card 3: DUE IN 7 DAYS ($1,540,000 minor units = $15.4K)
+    const card3 = kpiCard(page, 'Due in 7 Days', '$15.4K')
+    await expect(card3.getByText('$15.4K')).toBeVisible()
     await expect(card3.getByText('Upcoming payments scheduled')).toBeVisible()
 
     // Card 4: PAID THIS MONTH ('Unavailable until journal history complete')
-    const card4 = page.locator('text=Paid This Month').locator('..')
+    const card4 = kpiCard(page, 'Paid This Month', 'Unavailable until journal history complete')
     await expect(card4.getByText('Unavailable until journal history complete')).toBeVisible()
 
     // 4. Segmented tabs in the bills card
@@ -189,7 +196,7 @@ test('accounts payable strictly satisfies Apple-Glass polish, exact currency, an
     await expect(page.getByRole('button', { name: 'Approve' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Request Changes' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Reject' })).toBeVisible()
-    await expect(page.getByText('LINE ITEMS')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Line Items' })).toBeVisible()
     await expect(page.getByText('No line items recorded for this invoice.')).toBeVisible()
 
     // 7. Unclipped attachment bar with invoice-AP-2018.pdf
@@ -202,3 +209,209 @@ test('accounts payable strictly satisfies Apple-Glass polish, exact currency, an
   await context.close()
 })
 
+
+test('new bill can exact-match a valued purchase receipt and prefills its value', async ({ browser }) => {
+  const account = { id: 'ap_match_admin', name: 'AP Match Admin', email: 'ap.match@example.test', emailVerified: true, role: 'ADMIN' }
+  let createBody = null
+
+  const context = await browser.newContext()
+  await mockAuth(context, account, async route => {
+    const url = new URL(route.request().url())
+    const path = url.pathname
+
+    if (path.endsWith('/finance/payables/matchable-purchase-orders')) {
+      return json(route, {
+        data: {
+          items: [{
+            id: 'po_1',
+            productName: 'Widget',
+            sku: 'W-1',
+            quantity: 5,
+            receivedValue: '62.5',
+            receivedValueMoney: { amount: 6250, currency: 'USD' },
+            currency: 'USD',
+            receivedAt: '2026-10-25T10:00:00.000Z',
+          }],
+        },
+      })
+    }
+
+    if (path.endsWith('/finance/payables') && route.request().method() === 'POST') {
+      createBody = route.request().postDataJSON()
+      return json(route, {
+        data: {
+          id: 'bill_matched',
+          vendor: 'Google Cloud',
+          vendorId: 'vendor_1',
+          purchaseOrderId: 'po_1',
+          invoiceNumber: 'BILL-1',
+          status: 'PENDING',
+          amount: { amount: 6250, currency: 'USD' },
+          date: '2026-10-25T00:00:00.000Z',
+          dueDate: '2026-10-25T00:00:00.000Z',
+        },
+      }, 201)
+    }
+
+    if (path.endsWith('/finance/payables') && route.request().method() === 'GET') {
+      return json(route, {
+        data: {
+          items: [],
+          pagination: { page: 1, limit: 100, total: 0, pages: 0 },
+          summary: {
+            openOutstanding: { amount: 0, currency: 'USD' },
+            pastDueTotal: { amount: 0, currency: 'USD' },
+            dueIn7DaysTotal: { amount: 0, currency: 'USD' },
+            paidThisMonthTotal: null,
+            paidThisMonthComparison: null,
+            openCount: 0,
+          },
+        },
+      })
+    }
+
+    if (path.endsWith('/finance/vendors')) {
+      return json(route, { data: { items: [{ id: 'vendor_1', name: 'Google Cloud' }] } })
+    }
+
+    return json(route, { data: {} })
+  })
+
+  const page = await context.newPage()
+  await signIn(page, account)
+  await page.goto('/dashboard/finance/accounts-payable')
+
+  await page.getByRole('button', { name: 'New Bill' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('heading', { name: 'New bill' })).toBeVisible()
+
+  await dialog.getByRole('combobox', { name: 'Vendor' }).click()
+  await page.getByRole('option', { name: 'Google Cloud' }).click()
+
+  await dialog.getByRole('combobox', { name: 'Match received purchase order' }).click()
+  await page.getByRole('option', { name: /Widget/ }).click()
+  await expect(dialog.getByText(/Exact receipt value \$62\.50/)).toBeVisible()
+  await expect(dialog.getByLabel('Amount')).toHaveValue('62.5')
+
+  await dialog.getByLabel('Invoice number').fill('BILL-1')
+  await dialog.getByRole('button', { name: 'Create bill' }).click()
+  await expect(dialog).toBeHidden()
+
+  expect(createBody).toMatchObject({
+    vendorId: 'vendor_1',
+    purchaseOrderId: 'po_1',
+    invoiceNumber: 'BILL-1',
+    amount: '62.5',
+  })
+
+  await context.close()
+})
+
+test('a pending bill can correct its exact purchase-order link', async ({ browser }) => {
+  const account = { id: 'ap_edit_admin', name: 'AP Edit Admin', email: 'ap.edit@example.test', emailVerified: true, role: 'ADMIN' }
+  let updateBody = null
+
+  const bill = {
+    id: 'bill_edit',
+    vendor: 'Google Cloud',
+    vendorId: 'vendor_1',
+    purchaseOrderId: null,
+    invoiceNumber: 'BILL-EDIT',
+    status: 'PENDING',
+    amount: { amount: 6000, currency: 'USD' },
+    date: '2026-10-24T00:00:00.000Z',
+    dueDate: '2026-10-30T00:00:00.000Z',
+    projectId: null,
+  }
+
+  const context = await browser.newContext()
+  await mockAuth(context, account, async route => {
+    const url = new URL(route.request().url())
+    const path = url.pathname
+
+    if (path.endsWith('/finance/payables/matchable-purchase-orders')) {
+      return json(route, {
+        data: {
+          items: [{
+            id: 'po_1',
+            productName: 'Widget',
+            sku: 'W-1',
+            quantity: 5,
+            receivedValue: '62.5',
+            receivedValueMoney: { amount: 6250, currency: 'USD' },
+            currency: 'USD',
+            receivedAt: '2026-10-25T10:00:00.000Z',
+          }],
+        },
+      })
+    }
+
+    if (path.endsWith('/finance/payables/bill_edit') && route.request().method() === 'PATCH') {
+      updateBody = route.request().postDataJSON()
+      return json(route, { data: { ...bill, ...updateBody, amount: { amount: 6250, currency: 'USD' }, updatedAt: '2026-10-26T00:00:00.000Z' } })
+    }
+
+    if (path.includes('/finance/payables/bill_edit/pdf')) {
+      // The embedded Chrome PDF viewer can steal focus and collapse a Select that is open
+      // in the inspector. This flow does not inspect the PDF, so keep the iframe absent.
+      return json(route, { error: { message: 'Preview not part of this flow' } }, 404)
+    }
+
+    if (path.endsWith('/finance/payables/bill_edit')) {
+      return json(route, { data: { ...bill, lineItems: [], purchaseOrderMatch: null } })
+    }
+
+    if (path.endsWith('/finance/payables') && route.request().method() === 'GET') {
+      return json(route, {
+        data: {
+          items: [bill],
+          pagination: { page: 1, limit: 100, total: 1, pages: 1 },
+          summary: {
+            openOutstanding: { amount: 6000, currency: 'USD' },
+            pastDueTotal: { amount: 0, currency: 'USD' },
+            dueIn7DaysTotal: { amount: 6000, currency: 'USD' },
+            paidThisMonthTotal: null,
+            paidThisMonthComparison: null,
+            openCount: 1,
+          },
+        },
+      })
+    }
+
+    if (path.endsWith('/finance/vendors')) {
+      return json(route, { data: { items: [{ id: 'vendor_1', name: 'Google Cloud' }] } })
+    }
+
+    return json(route, { data: {} })
+  })
+
+  const page = await context.newPage()
+  await signIn(page, account)
+  await page.goto('/dashboard/finance/accounts-payable')
+
+  await page.getByRole('button', { name: 'Edit bill' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('heading', { name: 'Edit bill' })).toBeVisible()
+  await expect(dialog.getByRole('combobox', { name: 'Vendor' })).toBeDisabled()
+
+  const purchaseOrderSelect = dialog.getByRole('combobox', { name: 'Match received purchase order' })
+  await expect(purchaseOrderSelect).toBeEnabled()
+  await purchaseOrderSelect.click()
+  const receiptOption = page.getByRole('option', { name: /Widget/ })
+  await expect(receiptOption).toBeVisible()
+  await receiptOption.click()
+  await expect(dialog.getByLabel('Amount')).toHaveValue('62.5')
+
+  await dialog.getByRole('button', { name: 'Save changes' }).click()
+  await expect(dialog).toBeHidden()
+
+  expect(updateBody).toMatchObject({
+    purchaseOrderId: 'po_1',
+    invoiceNumber: 'BILL-EDIT',
+    amount: '62.5',
+  })
+  expect(updateBody).not.toHaveProperty('vendorId')
+  expect(updateBody).not.toHaveProperty('projectId')
+
+  await context.close()
+})

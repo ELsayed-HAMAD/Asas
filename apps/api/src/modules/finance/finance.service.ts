@@ -39,6 +39,7 @@ import type {
   PayableInvoice,
   PayableDetail,
   PayableListQuery,
+  PayablePurchaseOrderCandidate,
   PayableSummary,
   PayableUpdateInput,
   PayableWriteInput,
@@ -62,7 +63,15 @@ import { computeAgingBuckets } from './aging.service.js'
 import { expenseSettlementComparison, getJournal as getLedgerJournal, listJournals as listLedgerJournals, payableSettlementComparison, receivableSettlementComparison, postOpeningBalance as postLedgerOpeningBalance, recentSettlements, recordCashSettlement, recordExpenseRecognition, recordInvoiceRecognition, reverseCashSettlement, reverseExpenseRecognitionIfPresent, reverseInvoiceRecognitionIfPresent, settlementCashFlow, settlementCashFlowComparison, trialBalance as getLedgerTrialBalance } from './ledger.service.js'
 import { postValuedIssue, reverseValuedSaleIssue } from '../inventory/inventoryValuation.service.js'
 import { writeStockMovement } from '../inventory/stockMovementWriter.js'
+import {
+  activatePurchaseOrderMatch,
+  listMatchablePurchaseOrders,
+  resolvePurchaseOrderMatch,
+  reversePurchaseOrderMatchIfPresent,
+  type PurchaseOrderMatchEvidence,
+} from './purchaseOrderMatch.service.js'
 import type { InvoiceDoc } from '../../services/pdf.js'
+import { reservedInventoryOpeningCodes, reservedOpeningMessage } from '../../services/openingBalanceAccounts.js'
 
 export type FinanceClient = PrismaClient | Prisma.TransactionClient
 
@@ -246,11 +255,15 @@ export async function deleteVendor(
   const existing = await prisma.vendor.findFirst({ where: { id, tenantId } })
   if (!existing) throw new AppError(404, 'Vendor not found')
 
-  const invoiceCount = await prisma.payableInvoice.count({
-    where: { tenantId, vendorId: id },
-  })
+  const [invoiceCount, purchaseOrderCount] = await Promise.all([
+    prisma.payableInvoice.count({ where: { tenantId, vendorId: id } }),
+    prisma.purchaseOrder.count({ where: { tenantId, vendorId: id } }),
+  ])
   if (invoiceCount > 0) {
     throw new AppError(400, `Cannot delete vendor with ${invoiceCount} associated payable invoice(s)`)
+  }
+  if (purchaseOrderCount > 0) {
+    throw new AppError(400, `Cannot delete vendor with ${purchaseOrderCount} associated purchase order(s)`)
   }
 
   await prisma.vendor.delete({ where: { id } })
@@ -358,8 +371,8 @@ export async function listPayables(
   const { skip, take } = toPrismaPage(query)
   const now = tenantToday(timezone)
   if (query.dateRange === 'CURRENT_MONTH') {
-    const startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10)
-    const endDateExclusive = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString().slice(0, 10)
+    const startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+    const endDateExclusive = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
     where.date = { gte: startDate, lt: endDateExclusive }
   }
   const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
@@ -410,6 +423,7 @@ function mapPayable(
   return {
     id: invoice.id,
     projectId: invoice.projectId,
+    purchaseOrderId: invoice.purchaseOrderId ?? null,
     vendorId: invoice.vendorId,
     vendor: invoice.vendor?.name ?? null,
     invoiceNumber: invoice.invoiceNumber,
@@ -425,13 +439,41 @@ function mapPayable(
   }
 }
 
+export function listPayablePurchaseOrderCandidates(
+  prisma: FinanceClient,
+  tenantId: string,
+  vendorId: string,
+): Promise<PayablePurchaseOrderCandidate[]> {
+  return listMatchablePurchaseOrders(prisma, tenantId, vendorId)
+}
+
 export async function getPayable(prisma: FinanceClient, tenantId: string, id: string): Promise<PayableDetail> {
   const currency = await getTenantCurrency(prisma, tenantId)
   const invoice = await prisma.payableInvoice.findFirst({
     where: { id, tenantId },
-    include: { vendor: true, lineItems: { orderBy: { id: 'asc' } }, _count: { select: { lineItems: true } } },
+    include: {
+      vendor: true,
+      lineItems: { orderBy: { id: 'asc' } },
+      _count: { select: { lineItems: true } },
+      purchaseOrderMatches: {
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: 1,
+        include: {
+          purchaseOrder: {
+            select: {
+              lines: {
+                take: 1,
+                select: { quantity: true, product: { select: { name: true, sku: true } } },
+              },
+            },
+          },
+        },
+      },
+    },
   })
   if (!invoice) throw new AppError(404, 'Invoice not found')
+  const latestMatch = invoice.purchaseOrderMatches?.[0]
+  const matchedLine = latestMatch?.purchaseOrder.lines[0]
   return {
     ...mapPayable(invoice, currency),
     lineItems: invoice.lineItems.map(item => ({
@@ -440,6 +482,19 @@ export async function getPayable(prisma: FinanceClient, tenantId: string, id: st
       periodOrUsage: item.periodOrUsage,
       amount: moneyWire(item.amount, invoice.currency ?? currency),
     })),
+    purchaseOrderMatch: latestMatch && matchedLine && latestMatch.purchaseOrderId === invoice.purchaseOrderId
+      ? {
+          purchaseOrderId: latestMatch.purchaseOrderId,
+          status: latestMatch.status === 'REVERSED' ? 'REVERSED' : 'ACTIVE',
+          productName: matchedLine.product.name,
+          sku: matchedLine.product.sku,
+          quantity: matchedLine.quantity,
+          receivedValue: moneyWire(latestMatch.amount, latestMatch.currency),
+          currency: latestMatch.currency,
+          matchedAt: latestMatch.createdAt.toISOString(),
+          reversedAt: latestMatch.reversedAt?.toISOString() ?? null,
+        }
+      : null,
   }
 }
 
@@ -463,11 +518,21 @@ export async function createPayable(
   const currency = await getTenantCurrency(prisma, tenantId)
   await assertVendorInTenant(prisma, tenantId, input.vendorId)
   await assertProjectInTenant(prisma, tenantId, input.projectId)
+  if (input.purchaseOrderId) {
+    await resolvePurchaseOrderMatch(prisma, {
+      tenantId,
+      vendorId: input.vendorId,
+      purchaseOrderId: input.purchaseOrderId,
+      invoiceAmount: input.amount,
+      invoiceCurrency: currency,
+    })
+  }
 
   const invoice = await prisma.payableInvoice.create({
     data: {
       tenantId,
       projectId: input.projectId ?? null,
+      purchaseOrderId: input.purchaseOrderId ?? null,
       currency,
       vendorId: input.vendorId,
       invoiceNumber: input.invoiceNumber ?? null,
@@ -497,11 +562,22 @@ export async function updatePayable(
     const date = input.date ? dayToDate(input.date) : existing.date
     const dueDate = input.dueDate === undefined ? existing.dueDate : input.dueDate ? dayToDate(input.dueDate) : null
     if (dueDate && dueDate < date) throw new AppError(400, 'The due date cannot be before the invoice date')
+    const purchaseOrderId = input.purchaseOrderId === undefined ? existing.purchaseOrderId : input.purchaseOrderId
+    if (purchaseOrderId && (input.purchaseOrderId !== undefined || input.amount !== undefined)) {
+      await resolvePurchaseOrderMatch(tx, {
+        tenantId,
+        vendorId: existing.vendorId,
+        purchaseOrderId,
+        invoiceAmount: input.amount ?? existing.amount.toString(),
+        invoiceCurrency: currency,
+      })
+    }
     const invoice = await tx.payableInvoice.update({
       where: { id_tenantId: { id, tenantId } },
       data: {
         ...(input.invoiceNumber !== undefined && { invoiceNumber: input.invoiceNumber }),
         ...(input.projectId !== undefined && { projectId: input.projectId }),
+        ...(input.purchaseOrderId !== undefined && { purchaseOrderId: input.purchaseOrderId }),
         ...(input.date !== undefined && { date }),
         ...(input.dueDate !== undefined && { dueDate }),
         ...(input.amount !== undefined && { amount: toStoredDecimal(input.amount, currency) }),
@@ -525,7 +601,32 @@ export async function updatePayableStatus(
     const existing = await tx.payableInvoice.findFirstOrThrow({ where: { id, tenantId } })
     assertTransition(PAYABLE_TRANSITIONS, existing.status, status)
     if (status === 'APPROVED') await assertIndependentApproval(tx, tenantId, existing.createdById, userId)
-    if (status === 'REJECTED') await reverseInvoiceRecognitionIfPresent(tx, { tenantId, sourceId: id, sourceType: 'AP_RECOGNITION', actorId: userId, reason: 'Payable rejected' })
+    const activeMatch = existing.purchaseOrderId
+      ? await tx.purchaseOrderInvoiceMatch.findFirst({
+          where: { tenantId, payableInvoiceId: id, status: 'ACTIVE' },
+          select: { purchaseOrderId: true },
+        })
+      : null
+    if (activeMatch && activeMatch.purchaseOrderId !== existing.purchaseOrderId) {
+      throw new AppError(409, 'This bill has an active match to a different purchase order')
+    }
+    let matchEvidence: PurchaseOrderMatchEvidence | null = null
+    if (status === 'APPROVED' && existing.purchaseOrderId && !activeMatch) {
+      // Revalidate at the moment GRNI would be cleared. The receipt, vendor, amount, and original
+      // GRNI account must all still agree with what the bill was created against. A bill moving
+      // back from SCHEDULED to APPROVED already has an active match and must not clear GRNI twice.
+      matchEvidence = await resolvePurchaseOrderMatch(tx, {
+        tenantId,
+        vendorId: existing.vendorId,
+        purchaseOrderId: existing.purchaseOrderId,
+        invoiceAmount: existing.amount.toString(),
+        invoiceCurrency: existing.currency ?? currency,
+      })
+    }
+    if (status === 'REJECTED') {
+      await reverseInvoiceRecognitionIfPresent(tx, { tenantId, sourceId: id, sourceType: 'AP_RECOGNITION', actorId: userId, reason: 'Payable rejected' })
+      await reversePurchaseOrderMatchIfPresent(tx, tenantId, id)
+    }
     const invoice = await tx.payableInvoice.update({
       where: { id_tenantId: { id, tenantId } },
       data: {
@@ -539,8 +640,13 @@ export async function updatePayableStatus(
       await recordInvoiceRecognition(tx, {
         tenantId, sourceId: invoice.id, sourceType: 'AP_RECOGNITION', amount: invoice.amount.toString(),
         currency: invoice.currency ?? currency, workspaceCurrency: currency, postedAt: invoice.approvedAt ?? invoice.paidAt ?? new Date(),
-        actorId: userId, description: `Payable recognized: ${invoice.vendor.name}${invoice.invoiceNumber ? ` · ${invoice.invoiceNumber}` : ''}`,
+        actorId: userId,
+        ...(matchEvidence && { recognizedDebitAccountId: matchEvidence.grniAccountId }),
+        description: `Payable recognized: ${invoice.vendor.name}${invoice.invoiceNumber ? ` · ${invoice.invoiceNumber}` : ''}`,
       })
+    }
+    if (matchEvidence) {
+      await activatePurchaseOrderMatch(tx, { tenantId, payableInvoiceId: invoice.id, evidence: matchEvidence })
     }
     if (status === 'PAID' && invoice.paidAt) {
       await recordCashSettlement(tx, {
@@ -562,6 +668,7 @@ export async function requestPayableChanges(prisma: FinanceClient, tenantId: str
       throw new AppError(409, 'Changes can only be requested for an approved or scheduled invoice')
     }
     await reverseInvoiceRecognitionIfPresent(tx, { tenantId, sourceId: id, sourceType: 'AP_RECOGNITION', actorId, reason: 'Changes requested for payable' })
+    await reversePurchaseOrderMatchIfPresent(tx, tenantId, id)
     const invoice = await tx.payableInvoice.update({
       where: { id_tenantId: { id, tenantId } },
       data: { status: 'PENDING', approvedById: null, approvedAt: null },
@@ -614,6 +721,7 @@ export async function deletePayable(prisma: FinanceClient, tenantId: string, id:
     const history = await tx.journalEntry.findFirst({ where: { tenantId, recognizesPayableInvoiceId: id }, select: { id: true } })
     if (history) {
       await reverseInvoiceRecognitionIfPresent(tx, { tenantId, sourceId: id, sourceType: 'AP_RECOGNITION', actorId, reason: 'Payable removed' })
+      await reversePurchaseOrderMatchIfPresent(tx, tenantId, id)
       await tx.payableInvoice.update({ where: { id_tenantId: { id, tenantId } }, data: { status: 'VOID' } })
     } else {
       await tx.payableInvoice.delete({ where: { id_tenantId: { id, tenantId } } })
@@ -629,6 +737,7 @@ export async function voidPayable(prisma: FinanceClient, tenantId: string, id: s
     if (existing.status === 'VOID') throw new AppError(409, 'This invoice is already void')
     if (existing.status === 'PAID') await reverseCashSettlement(tx, { tenantId, sourceId: id, sourceType: 'AP_PAYMENT', reason, actorId, postedAt: new Date() })
     await reverseInvoiceRecognitionIfPresent(tx, { tenantId, sourceId: id, sourceType: 'AP_RECOGNITION', actorId, reason })
+    await reversePurchaseOrderMatchIfPresent(tx, tenantId, id)
     const invoice = await tx.payableInvoice.update({
       where: { id_tenantId: { id, tenantId } },
       data: { status: 'VOID' },
@@ -1722,7 +1831,13 @@ export function getTrialBalance(prisma: FinanceClient, tenantId: string, asOf?: 
   return getLedgerTrialBalance(prisma, tenantId, asOf ?? new Date().toISOString().slice(0, 10))
 }
 
-export function postOpeningBalance(tx: Prisma.TransactionClient, tenantId: string, actorId: string, input: import('@asas/contracts').OpeningBalanceWriteInput) {
+export async function postOpeningBalance(tx: Prisma.TransactionClient, tenantId: string, actorId: string, input: import('@asas/contracts').OpeningBalanceWriteInput) {
+  const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } })
+  if (!tenant) throw new AppError(404, 'Workspace not found')
+  const reservedCodes = await reservedInventoryOpeningCodes(tx, tenantId, tenant.currency)
+  if (input.lines.some(line => reservedCodes.has(line.code))) {
+    throw new AppError(409, reservedOpeningMessage(reservedCodes))
+  }
   return postLedgerOpeningBalance(tx, tenantId, actorId, input)
 }
 

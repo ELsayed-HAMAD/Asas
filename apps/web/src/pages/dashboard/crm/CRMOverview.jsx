@@ -112,6 +112,7 @@ export default function CRMOverview() {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised">
+        <h1 className="sr-only">CRM overview</h1>
         <Loader2 className="animate-spin text-muted" size={24} />
       </div>
     );
@@ -120,6 +121,7 @@ export default function CRMOverview() {
   if (isError || !data) {
     return (
       <div className="flex flex-col h-full items-center justify-center gap-2 bg-surface-raised text-danger">
+        <h1 className="sr-only">CRM overview</h1>
         <p className="text-sm font-medium">{error?.message || 'Failed to load CRM overview.'}</p>
         <Button
           type="button"
@@ -172,6 +174,7 @@ export default function CRMOverview() {
 
   return (
     <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-0">
+      <h1 className="sr-only">CRM overview</h1>
       {/* Kept empty to clear the top global bar and avoid search collisions */}
       <TopBarActions><div /></TopBarActions>
 
@@ -351,7 +354,8 @@ export default function CRMOverview() {
                 type="button"
                 variant="ghost"
                 size="icon"
-                onClick={() => navigate('/dashboard/crm/forecast')}
+                onClick={() => navigate('/dashboard/crm/revenue-forecast')}
+                aria-label="View full revenue forecast"
                 title="View full revenue forecast"
                 className="text-slate-400 hover:text-slate-800 h-8 w-8 rounded-xl hover:bg-slate-100"
               >

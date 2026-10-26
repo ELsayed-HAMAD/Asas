@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Outlet, Navigate, useLocation, Link } from 'react-router-dom'
 import { useSession, useActiveOrganization, useListOrganizations, authClient } from '../lib/authClient'
+import { authErrorMessage } from '../lib/authErrorMessage'
 import { setQueryScope } from '../lib/queryKeys'
 
 /**
@@ -42,19 +43,23 @@ export default function RequireAuth() {
     try {
       const result = await authClient.organization.setActive({ organizationId })
       if (result?.error) {
-        setActivationError(result.error.message || 'We could not open that workspace. Choose a workspace or try again.')
+        setActivationError(authErrorMessage(result.error, 'We could not open that workspace. Choose a workspace or try again.'))
       }
     } catch (error) {
-      setActivationError(error?.message || 'We could not open that workspace. Choose a workspace or try again.')
+      setActivationError(authErrorMessage(error, 'We could not open that workspace. Choose a workspace or try again.'))
     } finally {
       setIsSyncing(false)
     }
   }, [])
 
-  // Cache active workspace ID when available
+  // Cache active workspace ID when available. Storage can be unavailable in hardened
+  // browser modes; the server session remains the source of truth for access.
   useEffect(() => {
-    if (activeOrganization?.id) {
+    if (!activeOrganization?.id) return
+    try {
       localStorage.setItem('asas.lastActiveOrgId', activeOrganization.id)
+    } catch {
+      // The optional cache is not required to render the dashboard.
     }
   }, [activeOrganization?.id])
 
@@ -91,7 +96,12 @@ export default function RequireAuth() {
       }
 
       // If user has multiple organizations, check if lastActiveOrgId is valid
-      const lastId = localStorage.getItem('asas.lastActiveOrgId')
+      let lastId = null
+      try {
+        lastId = localStorage.getItem('asas.lastActiveOrgId')
+      } catch {
+        // Without the optional cache, default to the chooser instead of failing workspace loading.
+      }
       if (lastId && orgList.some(o => o.id === lastId) && attemptedOrganizationRef.current !== lastId) {
         void activateOrganization(lastId)
       }

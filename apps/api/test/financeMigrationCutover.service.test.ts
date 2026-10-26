@@ -36,6 +36,7 @@ function setup() {
   const tx: any = {
     dataMigrationProject: { findFirst: vi.fn(async () => ({ id: projectId, name: 'Legacy migration', sourceSystem: 'Legacy ERP', modules: ['FINANCE'], status: 'IN_PROGRESS', targetCutoverAt: new Date('2026-09-30T00:00:00.000Z') })) },
     tenant: { findFirst: vi.fn(async () => ({ currency: 'USD' })) },
+    inventoryValuationAccountMapping: { findUnique: vi.fn(async () => state.inventoryMapping ?? null) },
     dataMigrationStageBatch: {
       findMany: vi.fn(async () => state.batches.map((batch: any) => ({ ...batch, records: [...batch.records] }))),
       updateMany: vi.fn(async ({ where, data }: any) => { for (const batch of state.batches) if (where.id.in.includes(batch.id)) Object.assign(batch, data); return { count: where.id.in.length } }),
@@ -120,5 +121,21 @@ describe('Finance migration atomic cutover', () => {
     await expect(cutoverFinanceMigration(prisma, tenantId, projectId, actorId)).rejects.toThrow(/unused Finance ledger/)
     expect(ledger.postOpeningBalance).not.toHaveBeenCalled()
     expect(state.invoices).toHaveLength(0)
+  })
+
+  it('blocks a mapped inventory asset control account in the residual trial balance', async () => {
+    const { prisma, state } = setup()
+    state.inventoryMapping = { inventoryAssetAccountCode: 'INVENTORY_ASSET' }
+    state.batches.find((batch: any) => batch.entity === 'FINANCE_OPENING_BALANCE').records.push({
+      id: 'record-inventory', tenantId, projectId, entity: 'FINANCE_OPENING_BALANCE', batchId: 'batch-tb',
+      sourceId: 'ACCOUNT:INVENTORY_ASSET', payload: { code: 'INVENTORY_ASSET', name: 'Inventory', kind: 'ASSET', side: 'DEBIT', amount: '1.00' },
+    })
+    ;(globalThis as any).__cutoverTestState = state
+
+    await expect(cutoverFinanceMigration(prisma, tenantId, projectId, actorId))
+      .rejects.toThrow(/Reserved control accounts .*INVENTORY_ASSET/)
+    expect(ledger.postOpeningBalance).not.toHaveBeenCalled()
+    expect(state.invoices).toHaveLength(0)
+    expect(state.batches.every((batch: any) => batch.status === 'STAGED')).toBe(true)
   })
 })

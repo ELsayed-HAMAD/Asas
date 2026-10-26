@@ -16,6 +16,12 @@ export interface AsasEnv {
   port: number
   host: string
   frontendOrigin: string
+  /**
+   * Public origin of this API. Better Auth uses it for OAuth callbacks, emailed links, and
+   * secure-cookie prefixes. Development defaults to loopback; production must set an HTTPS
+   * public origin so cookies are `Secure` and callbacks never point at the server's loopback.
+   */
+  betterAuthUrl: string
   nodeEnv: string
   isProduction: boolean
   /**
@@ -60,11 +66,32 @@ export interface AsasEnv {
   devSocialAuthEnabled: boolean
 }
 
+function resolveBetterAuthUrl(value: string | undefined, nodeEnv: string, port: number): string {
+  const configured = value?.trim()
+  const raw = configured || (nodeEnv === 'production' ? '' : `http://127.0.0.1:${port}`)
+  if (!raw) return ''
+
+  let parsed: URL
+  try {
+    parsed = new URL(raw)
+  } catch {
+    throw new Error('BETTER_AUTH_URL must be a valid absolute URL')
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('BETTER_AUTH_URL must use http or https')
+  }
+  return raw.replace(/\/+$/, '')
+}
+
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
   const nodeEnv = source.NODE_ENV || 'development'
+  const authSecret = source.AUTH_SECRET ?? source.BETTER_AUTH_SECRET ?? ''
   const devSocialAuthRequested = source.DEV_SOCIAL_AUTH_ENABLED === 'true'
   if (devSocialAuthRequested && nodeEnv !== 'development') {
     throw new Error('DEV_SOCIAL_AUTH_ENABLED may only be enabled when NODE_ENV=development')
+  }
+  if (devSocialAuthRequested && !authSecret.trim()) {
+    throw new Error('AUTH_SECRET is required when DEV_SOCIAL_AUTH_ENABLED=true')
   }
   const frontendOrigin = source.FRONTEND_ORIGIN || (nodeEnv === 'production' ? 'https://app.asas.local' : 'http://localhost:5173,http://127.0.0.1:5173')
   const objectStorageDriver = source.OBJECT_STORAGE_DRIVER ?? 'local'
@@ -75,13 +102,15 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
   if (!Number.isInteger(rawPort) || rawPort < 1 || rawPort > 65535) {
     throw new Error(`PORT must be an integer between 1 and 65535, received: ${source.PORT}`)
   }
+  const betterAuthUrl = resolveBetterAuthUrl(source.BETTER_AUTH_URL, nodeEnv, rawPort)
   return {
     databaseUrl: source.DATABASE_URL ?? '',
-    authSecret: source.AUTH_SECRET ?? source.BETTER_AUTH_SECRET ?? '',
+    authSecret,
     bankDataEncryptionKey: source.BANK_DATA_ENCRYPTION_KEY?.trim() ?? '',
     port: rawPort,
     host: source.HOST || '127.0.0.1',
     frontendOrigin,
+    betterAuthUrl,
     nodeEnv,
     isProduction: nodeEnv === 'production',
     queueUrl: source.QUEUE_URL ?? '',
@@ -113,6 +142,15 @@ export function assertEnv(environment: AsasEnv = loadEnv()): AsasEnv {
   }
   if (environment.nodeEnv === 'production' && !environment.authSecret) {
     throw new Error('Missing required environment variable: AUTH_SECRET (required in production)')
+  }
+  if (environment.isProduction && environment.authSecret.length < 32) {
+    throw new Error('AUTH_SECRET must contain at least 32 characters in production')
+  }
+  if (environment.isProduction && !environment.betterAuthUrl) {
+    throw new Error('Missing required environment variable: BETTER_AUTH_URL (required in production)')
+  }
+  if (environment.isProduction && !environment.betterAuthUrl.startsWith('https://')) {
+    throw new Error('BETTER_AUTH_URL must use HTTPS in production so session cookies are Secure and OAuth callbacks are correct')
   }
   if (environment.isProduction) {
     const origins = environment.frontendOrigin.split(',').map(o => o.trim())

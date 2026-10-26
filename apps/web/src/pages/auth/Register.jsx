@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { signUp, useSession, signOut, authClient } from '../../lib/authClient'
+import { authErrorMessage } from '../../lib/authErrorMessage'
 import { authApi } from '../../lib/api/auth'
 import DevSocialModal from '../../components/auth/DevSocialModal'
 import { GoogleIcon, AppleIcon } from '../../components/common/BrandIcons'
@@ -75,19 +76,20 @@ export default function Register() {
     setIsLoading(true)
     try {
       const name = form.name.trim()
+      const email = form.email.trim()
       const signUpResult = await signUp.email({
-        email: form.email,
+        email,
         password: form.password,
         name: name || undefined,
         callbackURL: `${window.location.origin}/onboarding`,
       })
       if (signUpResult?.error) {
-        throw new Error(signUpResult.error.message || 'Could not create your account.')
+        throw new Error(authErrorMessage(signUpResult.error, 'Could not create your account.'))
       }
 
-      navigate('/verify-email', { state: { email: form.email, name } })
+      navigate('/verify-email', { state: { email, name } })
     } catch (requestError) {
-      setError(requestError?.message || requestError?.error?.message || 'Unable to create your account.')
+      setError(authErrorMessage(requestError, 'Unable to create your account.'))
     } finally {
       setIsLoading(false)
     }
@@ -113,10 +115,10 @@ export default function Register() {
         setDevModalProvider(provider)
         setDevModalOpen(true)
       } else {
-        setError(`${provider === 'apple' ? 'Apple' : 'Google'} single sign-on is not configured in this enterprise environment. Please register with your corporate email below.`)
+        setError(`${provider === 'apple' ? 'Apple' : 'Google'} single sign-on is not configured for this deployment. Please register with your work email below.`)
       }
     } catch (socialErr) {
-      setError(socialErr?.message || `${provider === 'apple' ? 'Apple' : 'Google'} sign-up is currently unavailable in this environment.`)
+      setError(authErrorMessage(socialErr, `${provider === 'apple' ? 'Apple' : 'Google'} sign-up is currently unavailable in this environment.`))
     }
   }
 
@@ -124,8 +126,8 @@ export default function Register() {
     <div className="flex flex-col">
       {/* Header */}
       <div className="mb-6 text-center">
-        <h1 className="text-2xl font-semibold text-heading mb-1.5">Create your enterprise workspace</h1>
-        <p className="text-sm text-muted">Create a secure workspace for your company’s finance, people, and daily operations.</p>
+        <h1 className="text-2xl font-semibold text-heading mb-1.5">Create your workspace</h1>
+        <p className="text-sm text-muted">Set up a secure workspace for your company’s finance, people, and daily operations.</p>
       </div>
 
       {/* Social SSO Buttons */}
@@ -194,6 +196,7 @@ export default function Register() {
             value={form.name}
             onChange={handleChange}
             placeholder="Jane Doe"
+            autoComplete="name"
             required
           />
         </div>
@@ -209,6 +212,7 @@ export default function Register() {
             value={form.email}
             onChange={handleChange}
             placeholder="name@company.com"
+            autoComplete="email"
             required
           />
         </div>
@@ -224,9 +228,11 @@ export default function Register() {
             value={form.password}
             onChange={handleChange}
             placeholder="Create a strong password"
+            autoComplete="new-password"
+            aria-describedby="password-policy"
             required
           />
-          <p className="text-[11px] text-caption mt-1.5">{PASSWORD_POLICY_DESCRIPTION}</p>
+          <p id="password-policy" className="text-[11px] text-caption mt-1.5">{PASSWORD_POLICY_DESCRIPTION}</p>
         </div>
 
         <Button

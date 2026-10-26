@@ -165,6 +165,18 @@ export const NOTIFICATION_MODULES = [
 
 const DEFAULT_PREFERENCES = { inApp: true, email: false, slack: false }
 
+function isQuietHoursConstraintError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const candidate = error as {
+    name?: string
+    code?: string
+    meta?: { database_error?: unknown; message?: unknown }
+  }
+  if (candidate.name !== 'PrismaClientKnownRequestError' || candidate.code !== 'P2004') return false
+  return [candidate.meta?.database_error, candidate.meta?.message].some(value =>
+    typeof value === 'string' && value.includes('QuietHours_start_end_distinct'))
+}
+
 type PreferenceRow = { module: string; eventType: string; inApp: boolean; email: boolean; slack: boolean }
 
 function groupByModule(rows: readonly PreferenceRow[]): Record<string, NotificationModule> {
@@ -246,18 +258,41 @@ export async function updateNotificationSettings(
     }
 
     if (input.quietHours) {
-      await tx.quietHours.upsert({
+      // The contract can reject equal start/end values only when both are supplied. A partial
+      // PATCH still has to be checked against the stored window, or changing one side to the
+      // other side's current time would silence notifications all day.
+      const existingQuietHours = await tx.quietHours.findFirst({
         where: { tenantId },
-        create: {
-          tenantId,
-          start: input.quietHours.start ?? '22:00',
-          end: input.quietHours.end ?? '07:00',
-        },
-        update: {
-          ...(input.quietHours.start !== undefined && { start: input.quietHours.start }),
-          ...(input.quietHours.end !== undefined && { end: input.quietHours.end }),
-        },
+        select: { start: true, end: true },
       })
+      const nextStart = input.quietHours.start ?? existingQuietHours?.start ?? '22:00'
+      const nextEnd = input.quietHours.end ?? existingQuietHours?.end ?? '07:00'
+      if (nextStart === nextEnd) {
+        throw new AppError(400, 'Quiet hours start and end times must differ')
+      }
+
+      try {
+        await tx.quietHours.upsert({
+          where: { tenantId },
+          create: {
+            tenantId,
+            start: nextStart,
+            end: nextEnd,
+          },
+          update: {
+            ...(input.quietHours.start !== undefined && { start: input.quietHours.start }),
+            ...(input.quietHours.end !== undefined && { end: input.quietHours.end }),
+          },
+        })
+      } catch (error) {
+        // A concurrent partial update can pass the merged pre-check and still produce an equal
+        // window at write time. The database constraint is the final guard; keep the API error
+        // stable instead of turning that race into a 500.
+        if (isQuietHoursConstraintError(error)) {
+          throw new AppError(400, 'Quiet hours start and end times must differ')
+        }
+        throw error
+      }
     }
   }
 

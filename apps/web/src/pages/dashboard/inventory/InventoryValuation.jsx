@@ -59,7 +59,7 @@ const ACCOUNT_ROLES = [
     key: 'goodsReceivedNotInvoiced',
     label: 'Goods received not invoiced',
     kind: 'LIABILITY',
-    description: 'Credited on a purchase receipt. Supplier-invoice matching and clearing are not automated yet.',
+    description: 'Credited on a purchase receipt. A supplier bill explicitly linked to one fully received, valued purchase order clears this account at approval; partial, multi-line, tax/freight, and price-variance matching are not supported.',
   },
   {
     key: 'adjustmentExpense',
@@ -919,13 +919,15 @@ export default function InventoryValuation() {
               <h3 className="text-xs font-bold text-slate-800">Architecture note</h3>
               <p className="text-[11px] text-slate-500 leading-relaxed">
                 New receivable invoices can optionally issue valued stock and post the related cost-of-goods
-                journal; an invoice without stock lines remains total-only. Voiding or deleting that invoice
-                through the API reverses the exact original quantity, value, and journal lines, and historical
-                unvalued issues are not backfilled. The New Invoice page does not yet expose a void/delete
-                action. A purchase receipt credits goods received not invoiced without an automated
-                supplier-invoice match or clearing step. Manual stock-movement requests are not deduplicated by
-                a client retry key, so a retried movement can be recorded twice; purchase-order receiving is
-                protected by its status transition.
+                journal; an invoice without stock lines remains total-only. The Accounts Receivable action menu
+                exposes the exact-reversal void and the unpaid-only delete action, and historical unvalued issues
+                are not backfilled. A purchase receipt credits goods received not invoiced. Accounts Payable can
+                link one bill to one fully received, valued, single-line purchase order; a pending or rejected bill
+                can correct or clear that link. Approval debits the exact GRNI account from that receipt. Partial
+                receipts, multi-line orders, taxes/freight, and price differences remain unsupported and cannot be
+                matched. Every manual stock movement now carries a client request key: an unchanged retry returns
+                the original movement, while a changed payload reusing the key is rejected. Purchase-order receiving
+                and other system movements remain protected by their state transitions and transactions.
               </p>
             </div>
 

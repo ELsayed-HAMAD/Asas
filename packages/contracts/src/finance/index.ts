@@ -116,6 +116,12 @@ export type VendorUpdateInput = z.infer<typeof vendorUpdateSchema>
 export const payableInvoiceSchema = z.object({
   id: idSchema,
   projectId: idSchema.nullable().default(null),
+  /**
+   * The received purchase order this bill is intended to settle. It is optional because most
+   * bills are not purchase-order backed, and it remains set after a rejected/voided bill so the
+   * historical link is not erased. Only an ACTIVE match has cleared GRNI.
+   */
+  purchaseOrderId: idSchema.nullable().default(null),
   vendorId: idSchema,
   /** Denormalised vendor name so a list row never needs a second fetch. */
   vendor: z.string(),
@@ -142,8 +148,24 @@ export const payableLineItemSchema = z.object({
   amount: moneySchema,
 })
 
+export const payablePurchaseOrderMatchSchema = z.object({
+  purchaseOrderId: idSchema,
+  status: z.enum(['ACTIVE', 'REVERSED']),
+  productName: z.string(),
+  sku: z.string(),
+  quantity: z.int().min(1),
+  receivedValue: moneySchema,
+  currency: currencyCodeSchema,
+  matchedAt: isoDateTimeSchema,
+  reversedAt: isoDateTimeSchema.nullable(),
+})
+
+export type PayablePurchaseOrderMatch = z.infer<typeof payablePurchaseOrderMatchSchema>
+
 export const payableDetailSchema = payableInvoiceSchema.extend({
   lineItems: z.array(payableLineItemSchema),
+  /** Present when this bill was created against a received purchase order. */
+  purchaseOrderMatch: payablePurchaseOrderMatchSchema.nullable().default(null),
 })
 
 export type PayableDetail = z.infer<typeof payableDetailSchema>
@@ -200,6 +222,12 @@ export const payableWriteSchema = z
   .object({
     vendorId: idSchema,
     projectId: idSchema.optional().nullable(),
+    /**
+     * Optional exact-match link to one received, valued purchase order. The API rejects a link
+     * when the vendor differs, when the receipt is quantity-only, or when the amount/currency is
+     * not exactly the receipt value.
+     */
+    purchaseOrderId: idSchema.optional().nullable(),
     invoiceNumber: boundedText(64).optional().nullable(),
     /** Calendar date the invoice is dated, `YYYY-MM-DD`. */
     date: calendarDateSchema,
@@ -211,11 +239,44 @@ export const payableWriteSchema = z
 
 export type PayableWriteInput = z.infer<typeof payableWriteSchema>
 
-/** Edit a bill's details. Rejected with 409 once the bill is approved, scheduled, or paid. */
+/**
+ * An exact-match candidate produced by a received, valued purchase order. The string value is
+ * provided for form prefill; the money form is the display contract. Partial receipts, multiple
+ * lines, taxes/freight, and price differences are deliberately excluded from this first slice.
+ */
+export const payablePurchaseOrderCandidateSchema = z.object({
+  id: idSchema,
+  productName: z.string(),
+  sku: z.string(),
+  quantity: z.int().min(1),
+  receivedValue: decimalStringSchema,
+  receivedValueMoney: moneySchema,
+  currency: currencyCodeSchema,
+  receivedAt: isoDateTimeSchema,
+})
+
+export type PayablePurchaseOrderCandidate = z.infer<typeof payablePurchaseOrderCandidateSchema>
+
+export const payablePurchaseOrderCandidatesResponseSchema = collection(payablePurchaseOrderCandidateSchema)
+
+export type PayablePurchaseOrderCandidatesResponse = z.infer<typeof payablePurchaseOrderCandidatesResponseSchema>
+
+export const payablePurchaseOrderCandidatesQuerySchema = z.object({
+  vendorId: idSchema,
+})
+
+export type PayablePurchaseOrderCandidatesQuery = z.infer<typeof payablePurchaseOrderCandidatesQuerySchema>
+
+/**
+ * Edit a bill's details. Rejected with 409 once the bill is approved, scheduled, or paid.
+ * `purchaseOrderId` can link or clear an exact receipt while the bill is still PENDING or
+ * REJECTED; the API revalidates the effective amount and vendor against that receipt.
+ */
 export const payableUpdateSchema = z
   .object({
     invoiceNumber: boundedText(64).optional().nullable(),
     projectId: idSchema.optional().nullable(),
+    purchaseOrderId: idSchema.optional().nullable(),
     date: calendarDateSchema.optional(),
     dueDate: calendarDateSchema.optional().nullable(),
     amount: positiveDecimalStringSchema.optional(),

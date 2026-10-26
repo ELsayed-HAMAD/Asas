@@ -26,6 +26,7 @@ import type {
   PayableBatchPaymentInput,
   PayableInvoice,
   PayableListQuery,
+  PayablePurchaseOrderCandidate,
   PayableStatus,
   PayableUpdateInput,
   PayableWriteInput,
@@ -74,6 +75,14 @@ export function listPayables(prisma: FinanceClient, tenantId: string, query: Pay
 
 export function getPayable(prisma: FinanceClient, tenantId: string, id: string): Promise<PayableDetail> {
   return service.getPayable(prisma, tenantId, id)
+}
+
+export function listPayablePurchaseOrderCandidates(
+  prisma: FinanceClient,
+  tenantId: string,
+  vendorId: string,
+): Promise<PayablePurchaseOrderCandidate[]> {
+  return service.listPayablePurchaseOrderCandidates(prisma, tenantId, vendorId)
 }
 
 export function createPayable(prisma: FinanceClient, tenantId: string, input: PayableWriteInput, userId: string): Promise<PayableInvoice> {

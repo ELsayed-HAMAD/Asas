@@ -32,6 +32,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     if (!env.devSocialAuthEnabled) {
       throw new AppError(403, 'Development social authentication is disabled. Enable DEV_SOCIAL_AUTH_ENABLED only for local development.')
     }
+    if (!env.authSecret) {
+      throw new AppError(503, 'Development social authentication requires AUTH_SECRET.')
+    }
 
     const parseResult = devSocialLoginBodySchema.safeParse(request.body)
     if (!parseResult.success) {
@@ -102,8 +105,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       },
     })
 
-    // Sign the session cookie with Better Auth's secret for full tamper-proof validation
-    const secret = env.authSecret || 'development_fallback_secret_for_signing_cookies_32_bytes'
+    // Sign the session cookie with Better Auth's configured secret. `loadEnv` rejects enabling
+    // this sandbox without AUTH_SECRET, so no known fallback signing key can ever be used.
+    const secret = env.authSecret
     const signature = await makeSignature(token, secret)
     const signedCookieValue = `${token}.${signature}`
 

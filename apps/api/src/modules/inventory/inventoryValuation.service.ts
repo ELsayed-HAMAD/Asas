@@ -413,6 +413,8 @@ export async function postValuedReceipt(tx: Tx, input: {
   offsetAccountCode?: string
   /** Explicit offset account id, for accounts outside the valuation mapping (opening equity). */
   offsetAccountId?: string
+  /** Purchase order that produced this receipt, when the receipt came from purchasing. */
+  purchaseOrderId?: string
 }): Promise<{ eventId: string; journalEntryId: string | null; value: string }> {
   if (!Number.isSafeInteger(input.quantity) || input.quantity <= 0) {
     throw new AppError(400, 'A valued receipt quantity must be a positive whole number')
@@ -475,6 +477,7 @@ export async function postValuedReceipt(tx: Tx, input: {
     data: {
       tenantId: context.tenantId,
       productId: context.product.id,
+      ...(input.purchaseOrderId && { purchaseOrderId: input.purchaseOrderId }),
       stockMovementId: input.stockMovementId,
       costingMethod: context.method,
       reason: input.reason,

@@ -340,6 +340,11 @@ export async function recordMigrationInvoiceOpeningRecognition(tx: Prisma.Transa
 export async function recordInvoiceRecognition(tx: Prisma.TransactionClient, input: {
   tenantId: string; sourceId: string; sourceType: 'AP_RECOGNITION' | 'AR_RECOGNITION';
   amount: string; currency: string; workspaceCurrency: string; postedAt: Date; actorId: string | null; description: string;
+  /**
+   * Exact debit account for an AP bill matched to a valued purchase receipt. In that case the
+   * receipt's GRNI liability is debited instead of an unclassified expense.
+   */
+  recognizedDebitAccountId?: string;
 }): Promise<string> {
   let amount: Money
   try { amount = Money.fromDecimal(input.amount, input.currency) } catch {
@@ -355,7 +360,18 @@ export async function recordInvoiceRecognition(tx: Prisma.TransactionClient, inp
   }
   const existing = await tx.journalEntry.findFirst({ where, select: { id: true, amount: true, currency: true, baseAmount: true, sourceType: true } })
   if (existing) {
-    if (existing.amount.eq(amount.toDecimalString()) && existing.currency === input.currency && existing.baseAmount != null) return existing.id
+    if (existing.amount.eq(amount.toDecimalString()) && existing.currency === input.currency && existing.baseAmount != null) {
+      if (input.recognizedDebitAccountId) {
+        const existingDebit = await tx.journalLine.findFirst({
+          where: { tenantId: input.tenantId, entryId: existing.id, side: 'DEBIT' },
+          select: { accountId: true },
+        })
+        if (existingDebit?.accountId !== input.recognizedDebitAccountId) {
+          throw new AppError(409, 'The existing invoice recognition does not debit the matched purchase receipt account')
+        }
+      }
+      return existing.id
+    }
     await reverseCashSettlement(tx, {
       tenantId: input.tenantId, sourceId: input.sourceId, sourceType: input.sourceType,
       reason: existing.baseAmount == null ? 'Invoice recognition FX basis recorded' : 'Invoice amount corrected', actorId: input.actorId, postedAt: input.postedAt,
@@ -365,13 +381,20 @@ export async function recordInvoiceRecognition(tx: Prisma.TransactionClient, inp
   const basis = baseJournalFields(amount.toDecimalString(), input.currency, input.workspaceCurrency, fx.rate, fx.exchangeRateId)
   const debitCode = recognizedPayable ? 'UNCLASSIFIED_EXPENSE' : 'ACCOUNTS_RECEIVABLE'
   const creditCode = recognizedPayable ? 'ACCOUNTS_PAYABLE' : 'UNCLASSIFIED_REVENUE'
-  const [debitAccount, creditAccount] = await Promise.all([debitCode, creditCode].map(async code => {
-    const details = accounts[code as keyof typeof accounts]
-    return tx.ledgerAccount.upsert({
-      where: { tenantId_code_currency: { tenantId: input.tenantId, code, currency: input.currency } },
-      create: { tenantId: input.tenantId, code, currency: input.currency, ...details }, update: {},
-    })
-  }))
+  const debitAccount = input.recognizedDebitAccountId
+    ? await tx.ledgerAccount.findFirst({
+        where: { id: input.recognizedDebitAccountId, tenantId: input.tenantId, currency: input.currency },
+        select: { id: true },
+      })
+    : await tx.ledgerAccount.upsert({
+        where: { tenantId_code_currency: { tenantId: input.tenantId, code: debitCode, currency: input.currency } },
+        create: { tenantId: input.tenantId, code: debitCode, currency: input.currency, ...accounts[debitCode] }, update: {},
+      })
+  if (!debitAccount) throw new AppError(409, 'The matched purchase receipt GRNI account is not available in this workspace')
+  const creditAccount = await tx.ledgerAccount.upsert({
+    where: { tenantId_code_currency: { tenantId: input.tenantId, code: creditCode, currency: input.currency } },
+    create: { tenantId: input.tenantId, code: creditCode, currency: input.currency, ...accounts[creditCode] }, update: {},
+  })
   const decimal = amount.toDecimalString()
   const entry = await tx.journalEntry.create({ data: {
     tenantId: input.tenantId, currency: input.currency, amount: decimal, sourceType: input.sourceType, ...basis,

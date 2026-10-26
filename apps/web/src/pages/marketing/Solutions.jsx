@@ -134,7 +134,7 @@ const SOLUTIONS = [
       'Invite and manage workspace members',
       'Assign supported workspace roles and permissions',
       'Review recorded administrative and business activity where available',
-      'Manage sign-in and session settings',
+      'Manage two-factor enrollment and account security where supported',
       'Check deployment-specific backup and retention arrangements with your operator',
     ],
     architecture: {
@@ -170,7 +170,7 @@ export default function Solutions() {
 
   return (
     <MarketingPageFrame
-      eyebrow="Enterprise Solutions Architecture"
+      eyebrow="Workspace solutions"
       title="Business workflows in one workspace"
       description="Explore the current Asas product areas, the records they manage, and the practical limits to confirm before using them in production."
     >
@@ -183,7 +183,9 @@ export default function Solutions() {
             <button
               key={s.id}
               type="button"
-              onClick={() => setActiveSolutionId(s.id)}
+              onClick={() => selectSolution(s.id)}
+              aria-pressed={active}
+              aria-controls="solution-detail"
               className={`flex items-center gap-2 px-4 py-2.5 rounded-button text-xs font-semibold hover-lift transition-micro cursor-pointer active:scale-[0.98] ${
                 active
                   ? 'bg-primary text-on-primary shadow-card hover:shadow-glow'
@@ -199,6 +201,7 @@ export default function Solutions() {
 
       {/* Featured Architecture Canvas */}
       <div id="solution-detail" className="glass-strong scroll-mt-28 rounded-card border border-border-default/80 p-6 sm:p-10 shadow-glass mb-16 hover-lift transition-premium">
+        <p className="sr-only" role="status">Showing {currentSolution.title}. {currentSolution.subtitle}</p>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
           <div className="lg:col-span-2 space-y-5">
             <div className="flex items-center gap-2">
@@ -263,7 +266,7 @@ export default function Solutions() {
             </div>
 
             <Button asChild className="w-full mt-4 bg-accent hover:bg-accent-hover text-on-primary text-xs h-10 rounded-button shadow-card hover-lift transition-micro active:scale-[0.98]">
-              <Link to="/register">Deploy This Solution Free</Link>
+              <Link to="/register">Start Free Workspace</Link>
             </Button>
           </div>
         </div>
@@ -271,7 +274,7 @@ export default function Solutions() {
 
       {/* Grid of All Solutions */}
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-heading">Complete Module Directory</h2>
+        <h2 className="text-2xl font-bold text-heading">Available product areas</h2>
         <p className="text-xs text-caption mt-1">Explore the current product areas included in Asas.</p>
       </div>
 
@@ -284,6 +287,7 @@ export default function Solutions() {
               type="button"
               onClick={() => selectSolution(item.id)}
               aria-pressed={activeSolutionId === item.id}
+              aria-controls="solution-detail"
               className="w-full text-left bg-surface-raised rounded-card border border-border-default/80 p-6 flex flex-col justify-between hover:border-accent/40 shadow-card hover:shadow-card-hover hover-lift transition-premium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
             >
               <div>

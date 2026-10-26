@@ -43,6 +43,7 @@ async function setup() {
       findMany: vi.fn(async ({ where }: any) => state.links.filter((link: any) => link.tenantId === where.tenantId && link.projectId === where.projectId && link.sourceEntity === where.sourceEntity && where.sourceId.in.includes(link.sourceId))),
     },
     tenant: { findUnique: vi.fn(async () => ({ currency: 'USD' })) },
+    inventoryValuationAccountMapping: { findUnique: vi.fn(async () => state.mapping ?? null) },
     journalEntry: { count: vi.fn(async () => 0) },
     payableInvoice: { count: vi.fn(async () => 0) },
     receivableInvoice: { count: vi.fn(async () => 0) },
@@ -137,6 +138,52 @@ describe('Finance migration staging', () => {
     expect(reconciled).toMatchObject({ validRows: 2, issues: [] })
     const unbalanced = await validateFinanceMigrationStage(prisma, tenantId, projectId, 'FINANCE_OPENING_BALANCE', [{ ...lines[0], amount: '100.00' }, { ...lines[1], amount: '90.00' }], metadata)
     expect(unbalanced).toMatchObject({ validRows: 2, issues: [] })
+  })
+
+  it('reserves the mapped inventory asset and inventory opening equity accounts in trial-balance staging', async () => {
+    const { prisma, state } = await setup()
+    state.mapping = { inventoryAssetAccountCode: 'INVENTORY_ASSET' }
+    const metadata = { asOf: '2026-09-30', accountsReceivableControlTotal: '0.00', accountsPayableControlTotal: '0.00' }
+    const inventoryAsset = await validateFinanceMigrationStage(prisma, tenantId, projectId, 'FINANCE_OPENING_BALANCE', [
+      { code: 'CASH', name: 'Cash', kind: 'ASSET', side: 'DEBIT', amount: '100.00' },
+      { code: 'INVENTORY_ASSET', name: 'Inventory', kind: 'ASSET', side: 'DEBIT', amount: '50.00' },
+      { code: 'CAPITAL', name: 'Capital', kind: 'EQUITY', side: 'CREDIT', amount: '150.00' },
+    ], metadata)
+    expect(inventoryAsset.issues).toEqual([
+      expect.objectContaining({ field: 'lines', message: expect.stringContaining('INVENTORY_ASSET') }),
+    ])
+
+    const openingEquity = await validateFinanceMigrationStage(prisma, tenantId, projectId, 'FINANCE_OPENING_BALANCE', [
+      { code: 'CASH', name: 'Cash', kind: 'ASSET', side: 'DEBIT', amount: '100.00' },
+      { code: 'INVENTORY_OPENING_EQUITY', name: 'Inventory opening equity', kind: 'EQUITY', side: 'CREDIT', amount: '100.00' },
+    ], metadata)
+    expect(openingEquity.issues).toEqual([
+      expect.objectContaining({ field: 'lines', message: expect.stringContaining('INVENTORY_OPENING_EQUITY') }),
+    ])
+  })
+
+  it('surfaces reserved control accounts in reconciliation before cutover', async () => {
+    const { prisma, state } = await setup()
+    state.mapping = { inventoryAssetAccountCode: 'INVENTORY_ASSET' }
+    const asOf = '2026-09-30'
+    for (const [index, batch] of [
+      { entity: 'FINANCE_AP_OPEN_ITEMS', records: [{ sourceId: 'ap-1', status: 'APPROVED', openAmount: '800.00', currency: 'USD' }] },
+      { entity: 'FINANCE_AR_OPEN_ITEMS', records: [{ sourceId: 'ar-1', status: 'OVERDUE', openAmount: '600.00', currency: 'USD' }] },
+      { entity: 'FINANCE_OPENING_BALANCE', metadata: { asOf, accountsReceivableControlTotal: '600.00', accountsPayableControlTotal: '800.00' }, records: [
+        { code: 'CASH', side: 'DEBIT', amount: '12200.00' },
+        { code: 'INVENTORY_ASSET', side: 'DEBIT', amount: '1.00' },
+        { code: 'CAPITAL', side: 'CREDIT', amount: '12000.00' },
+      ] },
+    ].entries()) {
+      const id = `batch-reserved-${index}`
+      state.batches.push({ id, tenantId, projectId, entity: batch.entity, status: 'STAGED', metadata: batch.metadata ?? null })
+      state.records.push(...batch.records.map(record => ({ id: `${id}-${record.sourceId ?? record.code}`, tenantId, projectId, entity: batch.entity, batchId: id, payload: record })))
+    }
+    const result = await previewFinanceMigrationReconciliation(prisma, tenantId, projectId)
+    expect(result.state).toBe('RECONCILIATION_REQUIRED')
+    expect(result.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'RESERVED_ACCOUNT', message: expect.stringContaining('INVENTORY_ASSET') }),
+    ]))
   })
 
   it('reconciles staged eligible AP and AR against control totals without enabling cutover writes', async () => {

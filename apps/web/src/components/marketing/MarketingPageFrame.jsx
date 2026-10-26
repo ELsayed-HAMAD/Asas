@@ -4,6 +4,12 @@ import MarketingNavbar from './MarketingNavbar'
 export default function MarketingPageFrame({ eyebrow, title, description, children }) {
   return (
     <div className="relative min-h-screen bg-surface text-body flex flex-col justify-between selection:bg-primary-light selection:text-primary overflow-hidden">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-on-primary focus:shadow-card"
+      >
+        Skip to content
+      </a>
       {/* Subtle ambient light orb */}
       <div className="absolute top-12 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-accent/4 rounded-full blur-3xl pointer-events-none -z-10 animate-float" />
 
@@ -13,7 +19,7 @@ export default function MarketingPageFrame({ eyebrow, title, description, childr
           <MarketingNavbar />
         </div>
 
-        <main>
+        <main id="main-content" tabIndex={-1} className="focus:outline-none">
           {/* Header Section */}
           <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-12 pb-8 sm:pt-16 sm:pb-12 text-center md:text-left animate-fade-in-up">
             {eyebrow && (
@@ -38,14 +44,14 @@ export default function MarketingPageFrame({ eyebrow, title, description, childr
         </main>
       </div>
 
-      {/* Enterprise Footer */}
+      {/* Footer */}
       <footer className="bg-primary text-on-primary border-t border-border-default py-10 px-4 sm:px-6 mt-auto">
         <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2.5 group">
             <div className="w-6 h-6 rounded-card-sm bg-accent text-on-primary flex items-center justify-center font-bold text-xs shadow-card group-hover:scale-105 transition-micro">
               A
             </div>
-            <span className="text-sm font-semibold text-on-primary">Asas Enterprise OS</span>
+            <span className="text-sm font-semibold text-on-primary">Asas</span>
             <span className="text-xs text-primary-subtle ml-2">© {new Date().getFullYear()} All rights reserved.</span>
           </div>
 

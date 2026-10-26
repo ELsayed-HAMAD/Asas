@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   LayoutGrid,
   Filter,
@@ -13,11 +13,18 @@ import {
 } from 'lucide-react';
 import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { inventoryApi } from '../../../lib/api/inventory';
+import { financeApi } from '../../../lib/api/finance';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatCompactNumber, formatCompactTableMoney, formatMoney, formatDate } from '../../../lib/format';
-import { useActiveMemberRole } from '../../../lib/authClient';
+import { useActiveMemberRole, useActiveOrganization, useSession } from '../../../lib/authClient';
 import { getMemberRoleName } from '../../../lib/memberRole';
 import { useDebouncedValue } from '../../../lib/useDebouncedValue';
+import {
+  clearStockMovementDraft,
+  readStockMovementDraft,
+  saveStockMovementDraft,
+  stockMovementDraftStorageKey,
+} from '../../../lib/stockMovementDraft';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import TopBarActions from '../../../components/TopBarActions';
@@ -44,6 +51,18 @@ import {
 } from '../../../components/ui/select';
 import { reasonsFor } from '../../../lib/inventoryReasons';
 
+function catalogDraftStorage() {
+  try { return window.sessionStorage; } catch { return null; }
+}
+
+const EMPTY_MOVEMENT_FORM = {
+  kind: 'receive',
+  qty: '',
+  note: '',
+  reason: 'PURCHASE_RECEIPT',
+  unitCost: '',
+};
+
 export default function Inventory() {
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState(null);
@@ -59,6 +78,7 @@ export default function Inventory() {
   const [productPage, setProductPage] = useState(1);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [purchaseOrderOpen, setPurchaseOrderOpen] = useState(false);
+  const [purchaseVendorId, setPurchaseVendorId] = useState('');
   const [purchaseQuantity, setPurchaseQuantity] = useState('1');
   const [purchaseUnitCost, setPurchaseUnitCost] = useState('');
   const [purchaseOrderError, setPurchaseOrderError] = useState('');
@@ -70,6 +90,21 @@ export default function Inventory() {
     return () => clearTimeout(timer);
   }, [createdOrder]);
 
+  const { data: activeOrganization } = useActiveOrganization();
+  const { data: sessionData } = useSession();
+  const catalogDraftStorageKey = stockMovementDraftStorageKey(activeOrganization?.id, sessionData?.user?.id, 'catalog');
+
+  const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
+  const [movementForm, setMovementForm] = useState(EMPTY_MOVEMENT_FORM);
+  const [movementError, setMovementError] = useState('');
+  const movementRequestRef = useRef(null);
+  const [savedRetry, setSavedRetry] = useState(null);
+  const [retryProduct, setRetryProduct] = useState(null);
+  const [restoringRetry, setRestoringRetry] = useState(false);
+  const [restoreError, setRestoreError] = useState('');
+  // Server-side on-hand count after the last successful movement (newStock) — surfaced next
+  // to the Adjust Stock button until the list refetch lands.
+  const [freshStock, setFreshStock] = useState(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.inventory.products.list({ page: productPage, search: search || undefined, status: stockFilter || undefined, archived: showArchived, limit: 25 }),
@@ -86,15 +121,27 @@ export default function Inventory() {
 
   const products = data?.items ?? [];
 
-  // Auto-select the first product once the list lands (and the user hasn't dismissed it).
+  // A retry draft belongs to the user, organization, and product catalog entry point.
+  // It is separate from the Stock Movements page draft so one page cannot overwrite another.
   useEffect(() => {
-    if (products.length > 0 && (!manualDeselect && selectedId == null || selectedId && !products.some(product => product.id === selectedId))) {
+    if (!catalogDraftStorageKey) {
+      setSavedRetry(null);
+      return;
+    }
+    setSavedRetry(readStockMovementDraft(catalogDraftStorage(), catalogDraftStorageKey));
+  }, [catalogDraftStorageKey]);
+
+  // Auto-select the first product once the list lands (and the user hasn't dismissed it).
+  // Keep a product fetched only for a saved retry selected until that retry is handled.
+  useEffect(() => {
+    if (products.length > 0 && (!manualDeselect && selectedId == null || selectedId && !products.some(product => product.id === selectedId) && retryProduct?.id !== selectedId)) {
       setSelectedId(products[0].id);
       setManualDeselect(false);
     }
-  }, [products, selectedId, manualDeselect]);
+  }, [products, selectedId, manualDeselect, retryProduct]);
 
-  const selectedProduct = products.find(p => p.id === selectedId);
+  const selectedProduct = products.find(p => p.id === selectedId)
+    ?? (retryProduct?.id === selectedId ? retryProduct : null);
 
   // History tab — real stock movements for the selected product (lazy, only while visible).
   useEffect(() => setMovementPage(1), [selectedId]);
@@ -122,10 +169,16 @@ export default function Inventory() {
     enabled: activeTab === 'orders' && !!selectedProduct,
   });
   const purchaseOrders = ordersData?.items ?? [];
+  const { data: financeVendorsData } = useQuery({
+    queryKey: [...queryKeys.finance.all(), 'vendors'],
+    queryFn: financeApi.listVendors,
+    enabled: purchaseOrderOpen,
+  });
+  const financeVendors = financeVendorsData?.items ?? [];
 
   // Inventory valuation policy - determines whether opening stock, movements, and purchase
   // orders must carry an explicit cost.
-  const { data: valuationSetup } = useQuery({
+  const { data: valuationSetup, isLoading: isValuationLoading } = useQuery({
     queryKey: queryKeys.inventory.valuationSetup(),
     queryFn: () => inventoryApi.getValuationSetup(),
   });
@@ -151,13 +204,6 @@ export default function Inventory() {
   });
   const [productError, setProductError] = useState('');
 
-  const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
-  const [movementForm, setMovementForm] = useState({ kind: 'receive', qty: '', note: '', reason: 'PURCHASE_RECEIPT', unitCost: '' });
-  const [movementError, setMovementError] = useState('');
-  // Server-side on-hand count after the last successful movement (newStock) — surfaced next
-  // to the Adjust Stock button until the list refetch lands.
-  const [freshStock, setFreshStock] = useState(null);
-
   const createProductMutation = useMutation({
     mutationFn: (body) => inventoryApi.createProduct(body),
     onSuccess: () => {
@@ -180,7 +226,15 @@ export default function Inventory() {
   const recordMovementMutation = useMutation({
     mutationFn: (body) => inventoryApi.recordStockMovement(body),
     onSuccess: (result) => {
-      setFreshStock(typeof result?.newStock === 'number' ? result.newStock : null);
+      clearStockMovementDraft(catalogDraftStorage(), catalogDraftStorageKey);
+      movementRequestRef.current = null;
+      setSavedRetry(null);
+      setRetryProduct(null);
+      setRestoreError('');
+      setFreshStock(typeof result?.newStock === 'number'
+        ? { productId: selectedProduct.id, stock: result.newStock }
+        : null);
+      setMovementError('');
       setAdjustDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.products.all() });
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.movements.all() });
@@ -192,6 +246,7 @@ export default function Inventory() {
       productId: selectedProduct.id,
       quantity: Number(purchaseQuantity),
       ...(purchaseUnitCost.trim() !== '' && { unitCost: purchaseUnitCost.trim() }),
+      ...(purchaseVendorId && { vendorId: purchaseVendorId }),
     }),
     onSuccess: order => {
       setCreatedOrder(order);
@@ -378,7 +433,10 @@ export default function Inventory() {
   };
 
   const openAdjustDialog = () => {
-    setMovementForm({ kind: 'receive', qty: '', note: '', reason: 'PURCHASE_RECEIPT', unitCost: '' });
+    movementRequestRef.current = null;
+    setRetryProduct(null);
+    setRestoreError('');
+    setMovementForm(EMPTY_MOVEMENT_FORM);
     setMovementError('');
     setAdjustDialogOpen(true);
   };
@@ -387,6 +445,49 @@ export default function Inventory() {
     if (recordMovementMutation.isPending) return;
     setAdjustDialogOpen(false);
     setMovementError('');
+  };
+
+  const restoreSavedRetry = async () => {
+    if (!savedRetry || restoringRetry) return;
+    setRestoringRetry(true);
+    setRestoreError('');
+    try {
+      const product = await inventoryApi.getProduct(savedRetry.payload.productId);
+      if (!product?.id) throw new Error('The saved product could not be loaded.');
+      if (product.archivedAt) {
+        throw new Error('This product is archived. Restore it before retrying the movement.');
+      }
+      const isReceive = savedRetry.payload.delta > 0;
+      movementRequestRef.current = savedRetry;
+      setRetryProduct(product);
+      setSelectedId(product.id);
+      setManualDeselect(false);
+      setMovementForm({
+        kind: isReceive ? 'receive' : 'issue',
+        qty: String(Math.abs(savedRetry.payload.delta)),
+        note: savedRetry.payload.note ?? '',
+        reason: savedRetry.payload.reason ?? (isReceive ? 'PURCHASE_RECEIPT' : 'SALE'),
+        unitCost: savedRetry.payload.unitCost ?? '',
+      });
+      setMovementError('');
+      setFreshStock(null);
+      setAdjustDialogOpen(true);
+    } catch (error) {
+      setRestoreError(error?.message || 'The saved product could not be loaded.');
+    } finally {
+      setRestoringRetry(false);
+    }
+  };
+
+  const discardSavedRetry = () => {
+    clearStockMovementDraft(catalogDraftStorage(), catalogDraftStorageKey);
+    movementRequestRef.current = null;
+    setSavedRetry(null);
+    setRetryProduct(null);
+    setRestoreError('');
+    setMovementForm(EMPTY_MOVEMENT_FORM);
+    setMovementError('');
+    setAdjustDialogOpen(false);
   };
 
   const handleMovementConfirm = () => {
@@ -413,7 +514,7 @@ export default function Inventory() {
         return;
       }
     }
-    recordMovementMutation.mutate({
+    const payload = {
       productId: selectedProduct.id,
       delta: isReceive ? qtyN : -qtyN,
       note: movementForm.note.trim() === '' ? null : movementForm.note.trim(),
@@ -421,12 +522,31 @@ export default function Inventory() {
         reason: movementForm.reason,
         ...(isReceive && { unitCost: movementForm.unitCost.trim() }),
       }),
-    });
+    };
+    const signature = JSON.stringify(payload);
+    if (movementRequestRef.current?.signature !== signature) {
+      movementRequestRef.current = { signature, requestKey: crypto.randomUUID(), payload };
+    } else {
+      movementRequestRef.current.payload = payload;
+    }
+    const persisted = saveStockMovementDraft(
+      catalogDraftStorage(),
+      catalogDraftStorageKey,
+      payload,
+      movementRequestRef.current.requestKey,
+    );
+    if (persisted) {
+      setSavedRetry({ payload, requestKey: movementRequestRef.current.requestKey, signature });
+    }
+    setRestoreError('');
+    setMovementError('');
+    recordMovementMutation.mutate({ ...payload, requestKey: movementRequestRef.current.requestKey });
   };
 
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised">
+        <h1 className="sr-only">Product Catalog</h1>
         <Loader2 className="animate-spin text-muted" size={24} />
       </div>
     );
@@ -435,6 +555,7 @@ export default function Inventory() {
   if (isError || !data) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised text-danger">
+        <h1 className="sr-only">Product Catalog</h1>
         Failed to load product catalog.
       </div>
     );
@@ -444,6 +565,10 @@ export default function Inventory() {
     setSelectedId(id);
     setManualDeselect(false);
   };
+
+  const showRetryNotice = Boolean(
+    savedRetry && movementRequestRef.current?.requestKey === savedRetry.requestKey,
+  );
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-hidden min-w-0">
@@ -459,6 +584,42 @@ export default function Inventory() {
           New Product
         </Button>
       </TopBarActions>
+
+      {savedRetry && (
+        <div
+          role="status"
+          className="mx-4 mt-4 min-[1100px]:mx-6 min-[1100px]:mt-6 flex flex-col gap-2 rounded-card border border-accent/30 bg-accent/5 px-4 py-3 text-xs text-body"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="min-w-0">
+              A previous stock adjustment may have reached the server before its response was lost.
+              Restore it to retry with the same request key.
+            </p>
+            <div className="flex shrink-0 items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={restoreSavedRetry}
+                disabled={restoringRetry || isValuationLoading}
+                className="h-8 px-3 text-xs font-semibold"
+              >
+                {restoringRetry ? 'Loading…' : 'Restore retry'}
+              </Button>
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                onClick={discardSavedRetry}
+                className="h-auto p-0 text-xs font-semibold text-accent hover:underline"
+              >
+                Discard
+              </Button>
+            </div>
+          </div>
+          {restoreError && <p role="alert" className="text-danger">{restoreError}</p>}
+        </div>
+      )}
 
       {/* ── Main Split View ── */}
       <div className="flex-1 min-h-0 grid grid-cols-1 min-[1100px]:grid-cols-[1fr_400px] gap-4 p-4 min-[1100px]:p-6 min-[1100px]:overflow-hidden overflow-y-auto items-stretch">
@@ -856,7 +1017,7 @@ export default function Inventory() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => { setPurchaseQuantity('1'); setPurchaseUnitCost(''); setPurchaseOrderError(''); setPurchaseOrderOpen(true); }}
+                      onClick={() => { setPurchaseVendorId(''); setPurchaseQuantity('1'); setPurchaseUnitCost(''); setPurchaseOrderError(''); setPurchaseOrderOpen(true); }}
                       disabled={!canWrite || Boolean(selectedProduct.archivedAt)}
                       className="h-7 px-2 text-xs font-semibold text-primary hover:text-primary-hover gap-1.5"
                     >
@@ -898,6 +1059,7 @@ export default function Inventory() {
                               <TableRow key={po.id} className="hover:bg-surface-muted/50 transition-colors border-0">
                                 <TableCell className="px-4 py-3 text-xs font-semibold text-heading">
                                   #{po.id.slice(-6).toUpperCase()}
+                                  {po.vendorName && <span className="mt-0.5 block text-[10px] font-normal text-muted">{po.vendorName}</span>}
                                 </TableCell>
                                 <TableCell className="px-4 py-3 text-xs text-muted">
                                   {formatDate(po.createdAt)}
@@ -1062,9 +1224,9 @@ export default function Inventory() {
               <div className="p-4 px-5 border-t border-border-default bg-surface-raised shrink-0 mt-auto flex flex-col gap-2">
                 {/* Transient confirmation: shows the server's post-movement count until the
                     refetch has synced the list (at which point it equals the displayed stock). */}
-                {freshStock != null && freshStock !== selectedProduct.stock && (
+                {freshStock?.productId === selectedProduct.id && freshStock.stock !== selectedProduct.stock && (
                   <div className="flex items-center justify-center gap-1.5 mb-1 text-xs font-semibold text-success-text">
-                    <Check size={14} /> On hand: {freshStock} units
+                    <Check size={14} /> On hand: {freshStock.stock} units
                   </div>
                 )}
                 {/* Row 1: Edit and Adjust Stock, a 2-column grid, equal width */}
@@ -1092,7 +1254,7 @@ export default function Inventory() {
                 {/* Row 2: Create Purchase Order, full width */}
                 <Button
                   type="button"
-                  onClick={() => { setPurchaseQuantity('1'); setPurchaseUnitCost(''); setPurchaseOrderError(''); setPurchaseOrderOpen(true); }}
+                  onClick={() => { setPurchaseVendorId(''); setPurchaseQuantity('1'); setPurchaseUnitCost(''); setPurchaseOrderError(''); setPurchaseOrderOpen(true); }}
                   disabled={!canWrite || Boolean(selectedProduct.archivedAt)}
                   title={selectedProduct.archivedAt ? 'Restore this product before creating an order' : canWrite ? undefined : noRoleTitle}
                   className="w-full h-9 gap-2 text-sm font-semibold whitespace-nowrap"
@@ -1191,6 +1353,10 @@ export default function Inventory() {
                   placeholder="0"
                   className="w-full"
                 />
+                <p className="mt-1.5 text-[11px] text-muted">
+                  Starting stock is an opening position. It is blocked after a Finance opening balance;
+                  create the product with zero stock and add operational stock instead.
+                </p>
               </div>
             )}
             {productDialog.mode === 'create' && valuationConfigured && Number(productForm.stock || 0) > 0 && (
@@ -1240,6 +1406,26 @@ export default function Inventory() {
           setPurchaseOrderError('');
           purchaseOrderMutation.mutate();
         }} confirmLabel="Create draft order">
+          <label className="block text-sm font-medium text-body">
+            Finance vendor <span className="font-normal text-muted">(optional)</span>
+            <Select value={purchaseVendorId || '__none__'} onValueChange={value => setPurchaseVendorId(value === '__none__' ? '' : value)}>
+              <SelectTrigger aria-label="Finance vendor" className="mt-1 w-full">
+                <SelectValue placeholder="No vendor selected" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__" className="text-xs">No vendor selected</SelectItem>
+                {financeVendors.map(vendor => (
+                  <SelectItem key={vendor.id} value={vendor.id} className="text-xs">
+                    {vendor.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="mt-1 block text-[11px] font-normal text-muted">
+              A Finance vendor is required before a received order can be matched to a supplier bill.
+              {!valuationConfigured && ' Inventory valuation must also be configured so the receipt carries a real GRNI value.'}
+            </span>
+          </label>
           <label className="block text-sm font-medium text-body">
             Quantity
             <Input type="number" min={1} step={1} value={purchaseQuantity} onChange={event => setPurchaseQuantity(event.target.value)} className="mt-1 w-full" />
@@ -1295,6 +1481,26 @@ export default function Inventory() {
           width="max-w-md"
         >
           <div className="space-y-4">
+            {showRetryNotice && (
+              <div
+                role="status"
+                className="flex items-start justify-between gap-3 rounded-input border border-accent/30 bg-accent/5 p-3 text-xs text-body"
+              >
+                <span>
+                  A previous request may have reached the server before its response was lost. Retry unchanged to
+                  reuse its request key; changing details creates a new request.
+                </span>
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  onClick={discardSavedRetry}
+                  className="h-auto p-0 font-semibold text-accent hover:underline shrink-0"
+                >
+                  Discard saved retry
+                </Button>
+              </div>
+            )}
             <div>
               <label className="block text-xs font-bold text-heading mb-1.5">Movement type</label>
               <div className="grid grid-cols-2 gap-3">

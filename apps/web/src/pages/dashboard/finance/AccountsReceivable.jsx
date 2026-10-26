@@ -10,7 +10,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { financeApi } from '../../../lib/api/finance';
 import { inventoryApi } from '../../../lib/api/inventory';
 import { queryKeys } from '../../../lib/queryKeys';
-import { formatDate, formatMoney, formatCompactTableMoney } from '../../../lib/format';
+import { formatDate, formatMoney } from '../../../lib/format';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import FormDialog from '../../../components/common/FormDialog';
 import SearchInput from '../../../components/common/SearchInput';
@@ -18,7 +18,6 @@ import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
-import { Checkbox } from '../../../components/ui/checkbox';
 import { Textarea } from '../../../components/ui/textarea';
 import {
   DropdownMenu,
@@ -46,7 +45,6 @@ import {
 
 // The old page rendered receivable money with no forced decimals (e.g. $320,000) — keep that.
 const money = (v) => formatMoney(v, { minimumFractionDigits: 0 });
-const compactMoney = (v) => formatCompactTableMoney(v, { minimumFractionDigits: 0 });
 const metricFontSize = (v) => {
   const label = money(v)
   return `clamp(0.75rem, ${Math.min(14, 130 / Math.max(1, label.length))}cqw, 1.5rem)`
@@ -191,7 +189,6 @@ export default function AccountsReceivable() {
   const [ageFilter, setAgeFilter] = useState('all')
   const [oldestFirst, setOldestFirst] = useState(true)
   const [paymentTargetId, setPaymentTargetId] = useState(null)
-  const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [searchParams, setSearchParams] = useSearchParams();
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [newInvoiceCustomerId, setNewInvoiceCustomerId] = useState('');
@@ -395,7 +392,6 @@ export default function AccountsReceivable() {
   const batchRemindMutation = useMutation({
     mutationFn: (customerIds) => financeApi.sendBatchReminders(customerIds),
     onSuccess: () => {
-      setSelectedIds(new Set());
       queryClient.invalidateQueries({ queryKey: queryKeys.finance.all() });
     },
   });
@@ -414,7 +410,15 @@ export default function AccountsReceivable() {
       }))
       .filter(c => c.openBalance && c.openBalance.amount > 0)
       .filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase()))
-      .filter(c => ageFilter === 'all' || (ageFilter === 'overdue' ? c.oldest > 0 : c.oldest === 0))
+      .filter(c => {
+        if (ageFilter === 'all') return true;
+        if (ageFilter === 'overdue') return c.oldest > 0;
+        if (ageFilter === 'current') return c.oldest === 0;
+        if (ageFilter === '1-30') return c.oldest >= 1 && c.oldest <= 30;
+        if (ageFilter === '31-60') return c.oldest >= 31 && c.oldest <= 60;
+        if (ageFilter === '60+') return c.oldest > 60;
+        return true;
+      })
       .sort((a, b) => oldestFirst ? b.oldest - a.oldest : a.oldest - b.oldest),
   [customers, search, ageFilter, oldestFirst]);
 
@@ -443,6 +447,7 @@ export default function AccountsReceivable() {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised">
+        <h1 className="sr-only">Accounts Receivable</h1>
         <Loader2 className="animate-spin text-muted" size={24} />
       </div>
     );
@@ -451,6 +456,7 @@ export default function AccountsReceivable() {
   if (isError || !data) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised text-danger">
+        <h1 className="sr-only">Accounts Receivable</h1>
         Failed to load accounts receivable.
       </div>
     );
@@ -483,52 +489,48 @@ export default function AccountsReceivable() {
   const selectedInvoices = selectedInvoicesData?.items ?? []
   const paymentTarget = selectedInvoices.find(invoice => invoice.id === paymentTargetId)
 
-  const toggleSelection = (id) => {
-    setSelectedIds(current => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const handleBatchRemind = () => {
-    if (selectedIds.size === 0) return;
-    batchRemindMutation.mutate(Array.from(selectedIds));
+  const handleSendReminder = () => {
+    if (!selectedId) return;
+    batchRemindMutation.mutate([selectedId]);
   };
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-y-auto min-w-0 px-6 py-5">
+      <h1 className="sr-only">Accounts Receivable</h1>
 
       {/* ── Top Page Toolbar ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 w-full mb-5 flex-shrink-0">
+      <div className="relative z-30 bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-2.5 shadow-xs flex flex-wrap xl:flex-nowrap items-center justify-between gap-2.5 flex-shrink-0 mb-5">
         {/* Left group */}
-        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap flex-1 min-w-0">
           <SearchInput
             type="text"
             value={search}
             onChange={event => { setSearch(event.target.value); setCustomerPage(1); }}
             placeholder="Search customers..."
-            wrapperClassName="w-72 max-w-full"
+            wrapperClassName="w-72 max-w-full shrink-0"
+            className="h-9 pl-9 pr-3 text-xs sm:text-sm"
           />
           <Select
             value={ageFilter}
             onValueChange={v => { setAgeFilter(v); setCustomerPage(1); }}
           >
-            <SelectTrigger aria-label="Filter customers by aging status" className="h-9 w-auto min-w-[90px] text-xs bg-surface-raised border-border-default shadow-card">
+            <SelectTrigger aria-label="Filter customers by aging status" className="w-auto inline-flex items-center justify-between gap-2 h-9 px-3.5 rounded-xl text-xs font-medium shrink-0 bg-surface-muted hover:bg-surface-muted/80 border border-border-default shadow-xs text-body hover:text-heading">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all" className="text-xs">All</SelectItem>
               <SelectItem value="overdue" className="text-xs">Overdue</SelectItem>
               <SelectItem value="current" className="text-xs">Current</SelectItem>
+              <SelectItem value="1-30" className="text-xs">1-30 Days</SelectItem>
+              <SelectItem value="31-60" className="text-xs">31-60 Days</SelectItem>
+              <SelectItem value="60+" className="text-xs">60+ Days</SelectItem>
             </SelectContent>
           </Select>
           <Select
             value={oldestFirst ? 'oldest' : 'newest'}
             onValueChange={v => { setOldestFirst(v === 'oldest'); setCustomerPage(1); }}
           >
-            <SelectTrigger aria-label="Sort customers" className="h-9 w-auto min-w-[140px] text-xs bg-surface-raised border-border-default shadow-card">
+            <SelectTrigger aria-label="Sort customers" className="w-auto inline-flex items-center justify-between gap-2 h-9 px-3.5 rounded-xl text-xs font-medium shrink-0 bg-surface-muted hover:bg-surface-muted/80 border border-border-default shadow-xs text-body hover:text-heading">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -539,27 +541,28 @@ export default function AccountsReceivable() {
         </div>
 
         {/* Right group */}
-        <div className="flex items-center gap-2.5 shrink-0 ml-auto">
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            disabled={selectedIds.size === 0 || batchRemindMutation.isPending}
-            onClick={handleBatchRemind}
-            className="gap-1.5 bg-surface-raised shadow-card font-medium h-9"
+            disabled={!selectedId || batchRemindMutation.isPending}
+            onClick={handleSendReminder}
+            className="h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 border border-border-default bg-surface-raised hover:bg-surface-muted shadow-xs whitespace-nowrap cursor-pointer disabled:opacity-50"
+            title={selectedRecord ? `Send collection reminder to ${selectedRecord.name}` : 'Select a customer to send reminder'}
           >
             {batchRemindMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-            <span>Send Batch Reminders ({selectedIds.size})</span>
+            <span>Send Reminder</span>
           </Button>
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => { setCustomerError(''); setCustomerModalOpen(true); }}
-            className="gap-1.5 bg-surface-raised shadow-card font-medium h-9"
+            className="h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 border border-border-default bg-surface-raised hover:bg-surface-muted shadow-xs whitespace-nowrap cursor-pointer"
             title="Manage customers"
           >
-            <Users size={13} className="text-muted" />
+            <Users size={14} className="text-muted" />
             <span>Customers</span>
           </Button>
           <Button
@@ -577,7 +580,7 @@ export default function AccountsReceivable() {
               if (selectedId && !newInvoiceCustomerId) setNewInvoiceCustomerId(selectedId);
               setInvoiceModalOpen(true);
             }}
-            className="gap-1.5 font-medium h-9 bg-primary text-on-primary hover:bg-primary-hover shadow-sm cursor-pointer"
+            className="h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 bg-[#0f172a] text-white hover:bg-slate-800 shadow-sm whitespace-nowrap cursor-pointer"
             title="Create new customer invoice"
           >
             <Plus size={14} />
@@ -589,20 +592,28 @@ export default function AccountsReceivable() {
       {/* ── 5 Aging KPI Cards ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-5 flex-shrink-0">
         {/* Card 1: Total Outstanding */}
-        <div className="border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col" style={{ containerType: 'inline-size' }}>
+        <div
+          onClick={() => { setAgeFilter('all'); setCustomerPage(1); }}
+          className={`border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col cursor-pointer hover:border-slate-300 transition-colors ${ageFilter === 'all' ? 'ring-2 ring-accent/30' : ''}`}
+          style={{ containerType: 'inline-size' }}
+        >
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">Total Outstanding</p>
-          <p className="min-w-0 text-2xl font-bold text-heading tracking-tight mt-1.5 leading-tight" style={{ fontSize: metricFontSize(totalOutstanding) }}>
+          <p className="min-w-0 text-2xl font-bold text-heading tracking-tight mt-1.5 leading-tight tabular-nums" style={{ fontSize: metricFontSize(totalOutstanding) }}>
             {money(totalOutstanding)}
           </p>
-          <p className="mt-1.5 text-xs text-muted truncate" title={mtdSubtext}>
-            {mtdSubtext}
+          <p className="mt-1.5 text-[11px] text-slate-500 leading-snug truncate" title={mtdSubtext}>
+            {collectedThisMonth ? `Collected MTD: ${money(collectedThisMonth)}` : 'Collected MTD: —'}
           </p>
         </div>
 
         {/* Card 2: Current */}
-        <div className="border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col" style={{ containerType: 'inline-size' }}>
+        <div
+          onClick={() => { setAgeFilter(current => current === 'current' ? 'all' : 'current'); setCustomerPage(1); }}
+          className={`border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col cursor-pointer hover:border-slate-300 transition-colors ${ageFilter === 'current' ? 'ring-2 ring-accent/30' : ''}`}
+          style={{ containerType: 'inline-size' }}
+        >
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">Current</p>
-          <p className="min-w-0 text-2xl font-bold text-heading tracking-tight mt-1.5 leading-tight" style={{ fontSize: metricFontSize(current) }}>
+          <p className="min-w-0 text-2xl font-bold text-heading tracking-tight mt-1.5 leading-tight tabular-nums" style={{ fontSize: metricFontSize(current) }}>
             {money(current)}
           </p>
           <p className="mt-1.5 text-xs text-muted truncate">
@@ -611,9 +622,13 @@ export default function AccountsReceivable() {
         </div>
 
         {/* Card 3: 1-30 Days */}
-        <div className="border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col" style={{ containerType: 'inline-size' }}>
+        <div
+          onClick={() => { setAgeFilter(current => current === '1-30' ? 'all' : '1-30'); setCustomerPage(1); }}
+          className={`border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col cursor-pointer hover:border-slate-300 transition-colors ${ageFilter === '1-30' ? 'ring-2 ring-accent/30' : ''}`}
+          style={{ containerType: 'inline-size' }}
+        >
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">1-30 Days</p>
-          <p className="min-w-0 text-2xl font-bold text-heading tracking-tight mt-1.5 leading-tight" style={{ fontSize: metricFontSize(days1to30) }}>
+          <p className="min-w-0 text-2xl font-bold text-heading tracking-tight mt-1.5 leading-tight tabular-nums" style={{ fontSize: metricFontSize(days1to30) }}>
             {money(days1to30)}
           </p>
           <p className="mt-1.5 text-xs text-muted truncate">
@@ -622,9 +637,13 @@ export default function AccountsReceivable() {
         </div>
 
         {/* Card 4: 31-60 Days */}
-        <div className="border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col" style={{ containerType: 'inline-size' }}>
+        <div
+          onClick={() => { setAgeFilter(current => current === '31-60' ? 'all' : '31-60'); setCustomerPage(1); }}
+          className={`border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col cursor-pointer hover:border-slate-300 transition-colors ${ageFilter === '31-60' ? 'ring-2 ring-accent/30' : ''}`}
+          style={{ containerType: 'inline-size' }}
+        >
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">31-60 Days</p>
-          <p className="min-w-0 text-2xl font-bold text-heading tracking-tight mt-1.5 leading-tight" style={{ fontSize: metricFontSize(days31to60) }}>
+          <p className="min-w-0 text-2xl font-bold text-heading tracking-tight mt-1.5 leading-tight tabular-nums" style={{ fontSize: metricFontSize(days31to60) }}>
             {money(days31to60)}
           </p>
           <p className="mt-1.5 text-xs text-muted truncate">
@@ -632,10 +651,14 @@ export default function AccountsReceivable() {
           </p>
         </div>
 
-        {/* Card 5: 60+ Days */}
-        <div className={`border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col ${days60plus.amount > 0 ? 'border-l-4 border-l-red-600' : ''}`} style={{ containerType: 'inline-size' }}>
+        {/* Card 5: 60+ Days (STRICT: Exact Card Design Preserved with red border accent & red text) */}
+        <div
+          onClick={() => { setAgeFilter(current => current === '60+' ? 'all' : '60+'); setCustomerPage(1); }}
+          className={`border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col cursor-pointer hover:border-slate-300 transition-colors ${days60plus.amount > 0 ? 'border-l-4 border-l-red-600' : ''} ${ageFilter === '60+' ? 'ring-2 ring-red-400/40' : ''}`}
+          style={{ containerType: 'inline-size' }}
+        >
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">60+ Days</p>
-          <p className={`min-w-0 text-2xl font-bold tracking-tight mt-1.5 leading-tight ${days60plus.amount > 0 ? 'text-danger' : 'text-heading'}`} style={{ fontSize: metricFontSize(days60plus) }}>
+          <p className={`min-w-0 text-2xl font-bold tracking-tight mt-1.5 leading-tight tabular-nums ${days60plus.amount > 0 ? 'text-danger' : 'text-heading'}`} style={{ fontSize: metricFontSize(days60plus) }}>
             {money(days60plus)}
           </p>
           <p className="mt-1.5 text-xs text-muted truncate">
@@ -654,28 +677,7 @@ export default function AccountsReceivable() {
               <Table className="w-full min-w-[560px] text-left border-collapse">
                 <TableHeader className="bg-surface-muted/60 border-b border-border-default">
                   <TableRow className="hover:bg-transparent border-0">
-                    <TableHead className="w-12 px-4 py-2.5 text-center">
-                      <Checkbox
-                        aria-label="Select all customers"
-                        checked={paginatedCustomers.length > 0 && paginatedCustomers.every(c => selectedIds.has(c.id))}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedIds(current => {
-                              const next = new Set(current);
-                              paginatedCustomers.forEach(c => next.add(c.id));
-                              return next;
-                            });
-                          } else {
-                            setSelectedIds(current => {
-                              const next = new Set(current);
-                              paginatedCustomers.forEach(c => next.delete(c.id));
-                              return next;
-                            });
-                          }
-                        }}
-                      />
-                    </TableHead>
-                    <TableHead className="px-3 py-2.5 h-auto text-[10px] font-bold text-caption uppercase tracking-wider rtl:text-right">Customer</TableHead>
+                    <TableHead className="px-4 py-2.5 h-auto text-[10px] font-bold text-caption uppercase tracking-wider rtl:text-right">Customer</TableHead>
                     <TableHead className="px-4 py-2.5 h-auto text-[10px] font-bold text-caption uppercase tracking-wider text-center">Oldest</TableHead>
                     <TableHead className="px-4 py-2.5 h-auto text-[10px] font-bold text-caption uppercase tracking-wider text-right rtl:text-left">Outstanding</TableHead>
                   </TableRow>
@@ -693,19 +695,12 @@ export default function AccountsReceivable() {
                       isSelected ? 'bg-accent-light/40 border-l-4 border-l-blue-600' : 'bg-surface-raised hover:bg-surface-muted border-l-4 border-l-transparent'
                     }`}
                   >
-                    <TableCell className="w-12 px-4 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        aria-label={`Select ${account.name}`}
-                        checked={selectedIds.has(account.id)}
-                        onCheckedChange={() => toggleSelection(account.id)}
-                      />
-                    </TableCell>
-                    <TableCell className="px-3 py-2.5">
+                    <TableCell className="px-4 py-2.5">
                       <div className="flex items-center gap-3">
                         {account.avatar ? (
-                          <img src={account.avatar} alt="Avatar" className="w-7 h-7 rounded-full shadow-card shrink-0" />
+                          <img src={account.avatar} alt="Avatar" className="w-8 h-8 rounded-xl border border-slate-200/80 object-cover shadow-2xs shrink-0" />
                         ) : (
-                          <div className="w-7 h-7 rounded-full bg-[#3d3121] flex items-center justify-center text-[11px] font-bold text-white shadow-card shrink-0">
+                          <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200/80 text-slate-700 text-xs font-bold flex items-center justify-center shrink-0 shadow-2xs">
                             {account.name?.substring(0, 2).toUpperCase()}
                           </div>
                         )}
@@ -722,8 +717,8 @@ export default function AccountsReceivable() {
                         {account.oldest} {account.oldest === 1 ? 'Day' : 'Days'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="px-4 py-2.5 text-right text-sm font-semibold text-heading tabular-nums whitespace-nowrap" title={money(account.openBalance)}>
-                      {compactMoney(account.openBalance)}
+                    <TableCell className="px-4 py-2.5 text-right text-sm font-bold text-heading tabular-nums whitespace-nowrap" title={money(account.openBalance)}>
+                      {money(account.openBalance)}
                     </TableCell>
                   </TableRow>
                 );
@@ -731,8 +726,12 @@ export default function AccountsReceivable() {
 
               {paginatedCustomers.length === 0 && (
                 <TableRow className="hover:bg-transparent border-0">
-                   <TableCell colSpan={4} className="px-6 py-8 text-center text-muted text-xs">
-                     No customers found with outstanding balances.
+                   <TableCell colSpan={3} className="px-6 py-8 text-center text-muted text-xs">
+                     {customers.length === 0
+                       ? 'No customers yet. Use Customers to add one before creating an invoice.'
+                       : search.trim() || ageFilter !== 'all'
+                       ? 'No customers match the current search and aging filter. Clear the filters to see all open balances.'
+                       : 'No outstanding balances. Paid invoices are excluded from this list; use New Invoice to bill a customer.'}
                    </TableCell>
                 </TableRow>
               )}
@@ -774,8 +773,8 @@ export default function AccountsReceivable() {
       </div>
     </div>
 
-    {/* Right: Customer Inspector Column (col-span-4 space-y-4) */}
-    <div className="col-span-12 lg:col-span-4 space-y-4">
+    {/* Right: Customer Inspector Column (col-span-4 flex flex-col gap-3.5) */}
+    <div className="col-span-12 lg:col-span-4 flex flex-col gap-3.5">
       {selectedRecord ? (
         <>
           {/* Customer Header Card */}
@@ -783,9 +782,9 @@ export default function AccountsReceivable() {
             {/* Header: Customer Info & Status */}
             <div className="flex items-center gap-3 min-w-0">
               {selectedRecord.avatar ? (
-                <img src={selectedRecord.avatar} alt="Avatar" className="w-12 h-12 rounded-button shadow-card shrink-0" />
+                <img src={selectedRecord.avatar} alt="Avatar" className="w-11 h-11 rounded-2xl border border-slate-200/80 object-cover shadow-2xs shrink-0" />
               ) : (
-                <div className="w-12 h-12 bg-[#3d3121] rounded-button flex items-center justify-center text-xl font-bold text-white shadow-card shrink-0">
+                <div className="w-11 h-11 bg-slate-100 border border-slate-200/80 text-slate-800 rounded-2xl flex items-center justify-center text-lg font-bold shadow-2xs shrink-0">
                   {selectedRecord.name?.substring(0, 1).toUpperCase()}
                 </div>
               )}
@@ -797,7 +796,7 @@ export default function AccountsReceivable() {
                     onValueChange={(val) => updateCustomerMutation.mutate({ id: selectedRecord.id, collectionStatus: val })}
                     disabled={updateCustomerMutation.isPending}
                   >
-                    <SelectTrigger aria-label="Collection status" className="h-6 w-auto text-xs font-semibold text-heading bg-surface-raised border border-border-default px-2 py-0.5">
+                    <SelectTrigger aria-label="Collection status" className="h-6 w-auto text-xs font-semibold text-heading bg-surface-raised border border-border-default px-2 py-0.5 rounded-lg">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -815,7 +814,7 @@ export default function AccountsReceivable() {
             <div className="pt-2 border-t border-border-subtle flex items-end justify-between">
               <div>
                 <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-0.5">Total Outstanding</p>
-                <p className="text-3xl font-extrabold text-heading tracking-tight">{money(selectedRecord.openBalance)}</p>
+                <p className="text-3xl font-extrabold text-heading tracking-tight tabular-nums">{money(selectedRecord.openBalance)}</p>
               </div>
               <div className="text-right">
                 <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-0.5">Oldest Invoice</p>
@@ -860,79 +859,84 @@ export default function AccountsReceivable() {
             <div className="divide-y divide-border-subtle">
               {isInvoicesLoading && <div className="p-4 flex justify-center text-muted"><Loader2 size={16} className="animate-spin" /></div>}
 
-              {selectedInvoices.map(inv => (
-                <div key={inv.id} className="flex items-center justify-between p-3.5 hover:bg-surface-muted transition-colors">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="p-2 bg-surface-muted border border-border-default rounded-input text-muted shrink-0">
-                      <FileText size={16} />
+              {selectedInvoices.map(inv => {
+                const isOverdue = inv.daysPastDue > 0;
+                return (
+                  <div key={inv.id} className="p-3 border-b border-border-subtle last:border-b-0 hover:bg-surface-muted/60 transition-colors flex items-center justify-between gap-2.5 bg-slate-50/40">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-white border border-slate-200/80 flex items-center justify-center shrink-0 shadow-2xs text-slate-500">
+                        <FileText size={15} />
+                      </div>
+                      <div className="min-w-0 space-y-0.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-bold text-slate-900 truncate">{inv.number || 'No Number'}</span>
+                          {isOverdue ? (
+                            <span className="text-[11px] font-semibold text-rose-600 whitespace-nowrap">Overdue ({inv.daysPastDue}d)</span>
+                          ) : (
+                            <span className="text-[11px] font-semibold text-emerald-600 whitespace-nowrap">Current</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 whitespace-nowrap">
+                          {inv.dueDate && <span>Due {formatDate(inv.dueDate)}</span>}
+                          {inv.inventoryLines?.length > 0 && (
+                            <span
+                              className="inline-flex items-center gap-1 text-slate-500"
+                              title={inv.inventoryLines.map(line => `${line.productName} × ${line.quantity} — ${formatMoney(line.costValue)}`).join('\n')}
+                            >
+                              • <Package size={11} /> {inv.inventoryLines.length} line{inv.inventoryLines.length === 1 ? '' : 's'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-heading truncate">{inv.number || 'No Number'}</p>
-                      <p className="text-[11px] font-medium text-muted mt-0.5 truncate">
-                        {inv.daysPastDue > 0 ? (
-                          <span className="text-danger font-semibold">Overdue ({inv.daysPastDue}d)</span>
-                        ) : (
-                          <span className="text-success font-semibold">Current</span>
-                        )}
-                        {inv.dueDate && ` • Due ${formatDate(inv.dueDate)}`}
-                        {inv.inventoryLines?.length > 0 && (
-                          <span
-                            className="inline-flex items-center gap-1 ml-1 text-body-light"
-                            title={inv.inventoryLines.map(line => `${line.productName} × ${line.quantity} — ${formatMoney(line.costValue)}`).join('\n')}
+                    <div className="flex items-center gap-2.5 shrink-0 ml-2">
+                      <span className="text-xs font-bold text-slate-900 tabular-nums whitespace-nowrap" title={money(inv.amount)}>{money(inv.amount)}</span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={paymentMutation.isPending || voidInvoiceMutation.isPending || deleteInvoiceMutation.isPending}
+                            aria-label={`Invoice actions for ${inv.number || inv.id}`}
+                            className="gap-1 h-7.5 px-2.5 rounded-lg text-xs font-medium bg-white hover:bg-slate-50 border border-slate-200/80 shadow-2xs inline-flex items-center cursor-pointer"
                           >
-                            <Package size={10} /> {inv.inventoryLines.length} stock line{inv.inventoryLines.length === 1 ? '' : 's'}
-                          </span>
-                        )}
-                      </p>
+                            Action <ChevronDown size={12} className="text-slate-400" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuItem
+                            disabled={!canManageInvoices || paymentMutation.isPending || inv.status === 'PAID'}
+                            onSelect={() => setPaymentTargetId(inv.id)}
+                          >
+                            <Check size={13} /> Mark as paid
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={!canManageInvoices || voidInvoiceMutation.isPending || inv.status === 'VOID'}
+                            onSelect={() => {
+                              setVoidError('');
+                              setVoidReason('');
+                              setVoidTarget({ id: inv.id, number: inv.number || inv.id, inventoryLineCount: inv.inventoryLines?.length ?? 0 });
+                            }}
+                          >
+                            <X size={13} /> Void invoice
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={!canManageInvoices || deleteInvoiceMutation.isPending || ['PAID', 'VOID'].includes(inv.status)}
+                            onSelect={() => {
+                              setDeleteError('');
+                              setDeleteTarget({ id: inv.id, number: inv.number || inv.id, inventoryLineCount: inv.inventoryLines?.length ?? 0 });
+                            }}
+                            className="text-danger focus:text-danger"
+                          >
+                            <Trash2 size={13} /> Delete invoice
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0 ml-2">
-                    <span className="text-xs font-bold text-heading tabular-nums" title={money(inv.amount)}>{compactMoney(inv.amount)}</span>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={paymentMutation.isPending || voidInvoiceMutation.isPending || deleteInvoiceMutation.isPending}
-                          aria-label={`Invoice actions for ${inv.number || inv.id}`}
-                          className="gap-1 h-7 px-2 text-xs font-semibold"
-                        >
-                          Action <ChevronDown size={12} className="text-caption" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44">
-                        <DropdownMenuItem
-                          disabled={!canManageInvoices || paymentMutation.isPending || inv.status === 'PAID'}
-                          onSelect={() => setPaymentTargetId(inv.id)}
-                        >
-                          <Check size={13} /> Mark as paid
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={!canManageInvoices || voidInvoiceMutation.isPending || inv.status === 'VOID'}
-                          onSelect={() => {
-                            setVoidError('');
-                            setVoidReason('');
-                            setVoidTarget({ id: inv.id, number: inv.number || inv.id, inventoryLineCount: inv.inventoryLines?.length ?? 0 });
-                          }}
-                        >
-                          <X size={13} /> Void invoice
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={!canManageInvoices || deleteInvoiceMutation.isPending || ['PAID', 'VOID'].includes(inv.status)}
-                          onSelect={() => {
-                            setDeleteError('');
-                            setDeleteTarget({ id: inv.id, number: inv.number || inv.id, inventoryLineCount: inv.inventoryLines?.length ?? 0 });
-                          }}
-                          className="text-danger focus:text-danger"
-                        >
-                          <Trash2 size={13} /> Delete invoice
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
 
               {selectedInvoices.length === 0 && (
                 <div className="p-4 text-center text-muted text-xs">
@@ -942,11 +946,15 @@ export default function AccountsReceivable() {
             </div>
             <div className="flex items-center justify-between border-t border-border-subtle px-4 py-2 text-xs text-muted">
               <span>Showing {selectedInvoicesData?.pagination?.total ? (invoicePage - 1) * 10 + 1 : 0}–{Math.min(invoicePage * 10, selectedInvoicesData?.pagination?.total ?? 0)} of {selectedInvoicesData?.pagination?.total ?? 0}</span>
-              <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" size="sm" disabled={invoicePage <= 1} onClick={() => setInvoicePage(current => current - 1)} className="h-6 px-2 text-xs font-medium">Previous</Button>
-                <span>Page {selectedInvoicesData?.pagination?.pages ? invoicePage : 0} of {selectedInvoicesData?.pagination?.pages ?? 0}</span>
-                <Button type="button" variant="outline" size="sm" disabled={invoicePage >= (selectedInvoicesData?.pagination?.pages ?? 0)} onClick={() => setInvoicePage(current => current + 1)} className="h-6 px-2 text-xs font-medium">Next</Button>
-              </div>
+              {(selectedInvoicesData?.pagination?.pages ?? 0) > 1 ? (
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" disabled={invoicePage <= 1} onClick={() => setInvoicePage(current => current - 1)} className="h-6 px-2 text-xs font-medium">Previous</Button>
+                  <span>Page {selectedInvoicesData?.pagination?.pages ? invoicePage : 0} of {selectedInvoicesData?.pagination?.pages ?? 0}</span>
+                  <Button type="button" variant="outline" size="sm" disabled={invoicePage >= (selectedInvoicesData?.pagination?.pages ?? 0)} onClick={() => setInvoicePage(current => current + 1)} className="h-6 px-2 text-xs font-medium">Next</Button>
+                </div>
+              ) : (
+                <span className="text-[11px] text-muted">All invoices shown</span>
+              )}
             </div>
           </div>
 
@@ -964,7 +972,7 @@ export default function AccountsReceivable() {
                   placeholder="Add a note or log a call..."
                   value={activityBody}
                   onChange={event => setActivityBody(event.target.value)}
-                  className="w-full bg-transparent text-xs p-2.5 outline-none resize-none min-h-[68px] text-body placeholder-muted"
+                  className="w-full bg-transparent text-xs p-2 outline-none resize-none h-16 min-h-[48px] text-body placeholder-muted"
                 />
                 <div className="flex items-center justify-between px-2.5 py-1.5 border-t border-border-subtle">
                   <div className="flex items-center gap-2 text-caption">

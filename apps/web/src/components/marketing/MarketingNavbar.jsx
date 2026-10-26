@@ -124,7 +124,6 @@ export default function MarketingNavbar() {
 
   useEffect(() => {
     setMobileOpen(false)
-    setResourcesOpen(false)
   }, [location.pathname, location.search, location.hash])
 
   return (
@@ -134,7 +133,7 @@ export default function MarketingNavbar() {
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-sm font-bold text-on-primary shadow-card transition-colors group-hover:bg-primary-hover">A</span>
           <span className="flex flex-col">
             <span className="text-sm font-bold leading-tight tracking-tight text-heading">Asas</span>
-            <span className="text-[10px] font-medium uppercase tracking-wider text-caption">Enterprise workspace</span>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-caption">Business workspace</span>
           </span>
         </Link>
 

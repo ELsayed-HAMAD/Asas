@@ -327,7 +327,11 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
       preHandler: requirePermission('inventory.write'),
       schema: {
         body: stockMovementWriteSchema,
-        response: { 201: envelope(stockMovementRecordedSchema), ...errorResponses },
+        response: {
+          200: envelope(stockMovementRecordedSchema),
+          201: envelope(stockMovementRecordedSchema),
+          ...errorResponses,
+        },
       },
     },
     async (request, reply) => {
@@ -338,8 +342,10 @@ export async function inventoryRoutes(app: FastifyInstance): Promise<void> {
         request.body,
         userId,
       )
-      request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory'), moduleKeyPrefix('finance')])
-      reply.code(201)
+      if (!movement.creationReplayed) {
+        request.server.ssePublish(tenantId, [moduleKeyPrefix('inventory'), moduleKeyPrefix('finance')])
+      }
+      reply.code(movement.creationReplayed ? 200 : 201)
       return { data: movement }
     },
   )

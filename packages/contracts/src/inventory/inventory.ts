@@ -70,6 +70,11 @@ export const purchaseOrderWriteSchema = z.object({
    * perpetual inventory valuation; preserved as NULL for quantity-only historical orders.
    */
   unitCost: decimalStringSchema.optional(),
+  /**
+   * Optional Finance vendor. A received order can only be matched to a supplier bill when both
+   * this link and a valued receipt exist; orders without a vendor remain valid.
+   */
+  vendorId: idSchema.optional().nullable(),
 })
 export type PurchaseOrderWriteInput = z.infer<typeof purchaseOrderWriteSchema>
 export const purchaseOrderStatusSchema = z.enum(['DRAFT', 'APPROVED', 'RECEIVED', 'CANCELLED'])
@@ -86,6 +91,8 @@ export const purchaseOrderSchema = z.object({
   quantity: z.int().min(1),
   unitCost: decimalStringSchema.nullable().optional(),
   currency: z.string().nullable().optional(),
+  vendorId: idSchema.nullable().optional(),
+  vendorName: z.string().nullable().optional(),
 })
 export type PurchaseOrder = z.infer<typeof purchaseOrderSchema>
 export const purchaseOrderListQuerySchema = z.object({
@@ -261,13 +268,21 @@ export const stockMovementWriteSchema = z.object({
    * unit in the product/workspace currency; the product selling price is never used as a cost.
    */
   unitCost: decimalStringSchema.optional(),
+  /**
+   * Stable client-generated key for this logical manual movement. Retry with the same key and
+   * payload to receive the original movement instead of recording it twice; reusing a key with
+   * a different payload is rejected. System-generated movements do not use this field.
+   */
+  requestKey: z.uuid(),
 })
 
 export type StockMovementWriteInput = z.infer<typeof stockMovementWriteSchema>
 
 export const stockMovementRecordedSchema = stockMovementSchema.extend({
-  /** The product's stock after the transaction, so the caller does not have to refetch. */
+  /** The product's current stock after the request, so the caller does not have to refetch. */
   newStock: z.int().min(0),
+  /** True when the request key matched an earlier movement and no new stock movement was written. */
+  creationReplayed: z.boolean().optional(),
 })
 
 export type StockMovementRecorded = z.infer<typeof stockMovementRecordedSchema>

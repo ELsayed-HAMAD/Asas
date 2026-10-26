@@ -747,6 +747,7 @@ export default function DealsPipeline() {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised">
+        <h1 className="sr-only">Deals Pipeline</h1>
         <Loader2 className="animate-spin text-muted" size={24} />
       </div>
     );
@@ -755,6 +756,7 @@ export default function DealsPipeline() {
   if (isError) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised text-danger">
+        <h1 className="sr-only">Deals Pipeline</h1>
         Failed to load deals pipeline.
       </div>
     );
@@ -773,6 +775,7 @@ export default function DealsPipeline() {
 
   return (
     <div className="flex-1 min-w-0 flex flex-col bg-surface-raised">
+      <h1 className="sr-only">Deals Pipeline</h1>
 
       {/* ── Main Workspace ── */}
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
@@ -808,7 +811,7 @@ export default function DealsPipeline() {
                 onClick={() => { setShowArchived(value => !value); setSelectedId(null); setPageByStage(Object.fromEntries(STAGE_ORDER.map(stage => [stage, 1]))); }}
                 className="h-9 px-3.5 text-xs sm:text-sm font-medium rounded-xl shrink-0"
               >
-                {showArchived ? 'Archived deals' : 'View archived'}
+                {showArchived ? 'Back to active deals' : 'View archived'}
               </Button>
 
               {!showArchived && (
@@ -879,8 +882,12 @@ export default function DealsPipeline() {
                   />
                 ))}
                 {activeGroup.deals.length === 0 && (
-                  <div className="py-12 flex items-center justify-center text-[13px] text-muted">
-                    No deals in this stage
+                  <div className="py-12 px-6 flex items-center justify-center text-center text-[13px] text-muted">
+                    {deferredSearch
+                      ? 'No deals match this search in the selected stage.'
+                      : showArchived
+                        ? 'No archived deals in this stage.'
+                        : 'No deals in this stage. Use New Deal to add the first one.'}
                   </div>
                 )}
               </div>

@@ -116,6 +116,7 @@ export default function RevenueForecast() {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised">
+        <h1 className="sr-only">Revenue Forecast</h1>
         <Loader2 className="animate-spin text-gray-400" size={24} />
       </div>
     );
@@ -124,6 +125,7 @@ export default function RevenueForecast() {
   if (isError || !data) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised text-red-500">
+        <h1 className="sr-only">Revenue Forecast</h1>
         Failed to load revenue forecast.
       </div>
     );
@@ -185,6 +187,7 @@ export default function RevenueForecast() {
 
   return (
     <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-0">
+      <h1 className="sr-only">Revenue Forecast</h1>
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
         {/* ── 1. Top Filter & Action Toolbar (Standard Apple-Glass Bar) ── */}
         <div className="bg-white/85 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-2.5 shadow-[0_2px_10px_-3px_rgba(15,23,42,0.04)] flex flex-wrap items-center justify-between gap-2.5">
@@ -403,8 +406,9 @@ export default function RevenueForecast() {
               </BarChart>
             </ResponsiveContainer>
             {chartData.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-400">
-                No open deals with a close date yet.
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 px-6 text-center text-sm text-slate-400">
+                <span>No open deals with a close date yet.</span>
+                <span className="text-xs">Add expected close dates in Deals Pipeline to build the forecast.</span>
               </div>
             )}
           </div>
@@ -440,8 +444,10 @@ export default function RevenueForecast() {
                 {displayedReps.length === 0 ? (
                   <TableRow className="border-0 hover:bg-transparent">
                     <TableCell colSpan={5} className="py-2">
-                      <div className="my-2 bg-slate-50/60 border border-dashed border-slate-200/80 rounded-xl py-6 text-center text-xs text-slate-400">
-                        No owned deals with a close date in {selectedYear} yet.
+                      <div className="my-2 bg-slate-50/60 border border-dashed border-slate-200/80 rounded-xl py-6 px-4 text-center text-xs text-slate-400">
+                        {search.trim()
+                          ? 'No reps match this search. Clear the search to see the full forecast.'
+                          : `No owned deals with a close date in ${selectedYear} yet. Add close dates in Deals Pipeline or choose another year.`}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -555,7 +561,7 @@ export default function RevenueForecast() {
         <div className="space-y-4">
           <div className="max-h-40 space-y-2 overflow-y-auto border-b border-gray-200 pb-3">
             <p className="text-xs font-semibold uppercase text-gray-500">Existing quotas</p>
-            {quotas.length === 0 ? <p className="text-sm text-gray-500">No quotas recorded for this year.</p> : quotas.map(quota => <div key={quota.id} className="flex items-center justify-between gap-3 text-sm">
+            {quotas.length === 0 ? <p className="text-sm text-gray-500">No quotas recorded for this year. Enter a representative and quota below to add one.</p> : quotas.map(quota => <div key={quota.id} className="flex items-center justify-between gap-3 text-sm">
               <Button
                 type="button"
                 variant="link"

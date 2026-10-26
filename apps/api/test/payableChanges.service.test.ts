@@ -17,6 +17,7 @@ function setup(status: string | null = 'SCHEDULED') {
       }),
     },
     journalEntry: { findFirst: vi.fn().mockResolvedValue(null) },
+    purchaseOrderInvoiceMatch: { findFirst: vi.fn().mockResolvedValue(null) },
   } as unknown as PrismaClient
   return prisma
 }

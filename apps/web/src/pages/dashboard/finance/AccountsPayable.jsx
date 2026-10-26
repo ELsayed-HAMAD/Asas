@@ -22,7 +22,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { financeApi } from '../../../lib/api/finance';
 import { projectsApi } from '../../../lib/api/projects';
 import { queryKeys } from '../../../lib/queryKeys';
-import { formatMoney, formatCompactCurrency } from '../../../lib/format';
+import { formatMoney, formatCompactCurrency, moneyToMajor } from '../../../lib/format';
 import { http } from '../../../lib/api/http';
 import { useDebouncedValue } from '../../../lib/useDebouncedValue';
 import FormDialog from '../../../components/common/FormDialog';
@@ -73,6 +73,7 @@ export default function AccountsPayable() {
   const [selectedId, setSelectedId] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [billOpen, setBillOpen] = useState(false)
+  const [editingBillId, setEditingBillId] = useState(null)
   const [vendorModalOpen, setVendorModalOpen] = useState(false);
   const [newVendorName, setNewVendorName] = useState('');
   const [editingVendorId, setEditingVendorId] = useState(null);
@@ -81,6 +82,8 @@ export default function AccountsPayable() {
   const [deletingVendor, setDeletingVendor] = useState(null);
   useEffect(() => {
     if (searchParams.get('new') === '1') {
+      setEditingBillId(null);
+      setBillForm(emptyBillForm());
       setBillOpen(true);
       const next = new URLSearchParams(searchParams);
       next.delete('new');
@@ -103,11 +106,11 @@ export default function AccountsPayable() {
   const projectSearch = useDebouncedValue(projectSearchInput)
   const [projectPage, setProjectPage] = useState(1)
   const [selectedProject, setSelectedProject] = useState(null)
-  const emptyBillForm = () => ({ vendorId: '', projectId: '', invoiceNumber: '', date: new Date().toISOString().slice(0, 10), dueDate: new Date().toISOString().slice(0, 10), amount: '' })
+  const emptyBillForm = () => ({ vendorId: '', projectId: '', purchaseOrderId: '', invoiceNumber: '', date: new Date().toISOString().slice(0, 10), dueDate: new Date().toISOString().slice(0, 10), amount: '' })
   const [billForm, setBillForm] = useState(emptyBillForm)
   useEffect(() => { setProjectPage(1) }, [projectSearch])
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: queryKeys.finance.payables.list({ page: 1, limit: 100, search: search || undefined, statusGroup, dateRange: dateFilter === 'ALL' ? 'ALL' : 'CURRENT_MONTH' }),
     queryFn: () => financeApi.listPayables({ page: 1, limit: 100, search: search || undefined, statusGroup, dateRange: dateFilter === 'ALL' ? 'ALL' : 'CURRENT_MONTH' }),
     placeholderData: keepPreviousData,
@@ -149,10 +152,17 @@ export default function AccountsPayable() {
     queryKey: [...queryKeys.finance.all(), 'vendors'],
     queryFn: financeApi.listVendors,
   });
+  const { data: matchablePurchaseOrders, isLoading: matchableLoading, isError: matchableError } = useQuery({
+    queryKey: [...queryKeys.finance.payables.all(), 'matchable-purchase-orders', billForm.vendorId],
+    queryFn: () => financeApi.listPayablePurchaseOrderCandidates(billForm.vendorId),
+    enabled: billOpen && Boolean(billForm.vendorId),
+  });
+  const matchableItems = matchablePurchaseOrders?.items ?? [];
+  const selectedMatchCandidate = matchableItems.find(item => item.id === billForm.purchaseOrderId) ?? null;
   const { data: projectsData } = useQuery({
     queryKey: queryKeys.projects.portfolio.list({ page: projectPage, limit: 25, search: projectSearch || undefined }),
     queryFn: () => projectsApi.listProjects({ page: projectPage, limit: 25, search: projectSearch || undefined }),
-    enabled: billOpen,
+    enabled: billOpen && !editingBillId,
     placeholderData: keepPreviousData,
   });
   useEffect(() => {
@@ -171,13 +181,40 @@ export default function AccountsPayable() {
   });
   const getVendorAvatar = (vendorId) => vendorAvatar[vendorId] || null;
 
+  const resetBillForm = () => {
+    setBillOpen(false)
+    setEditingBillId(null)
+    setBillForm(emptyBillForm())
+    setSelectedProject(null)
+    setProjectSearchInput('')
+    setProjectPage(1)
+  }
   const statusMutation = useMutation({
     mutationFn: (status) => financeApi.updatePayableStatus(selectedId, status),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.finance.payables.all() }),
   });
   const createBill = useMutation({
-    mutationFn: () => financeApi.createPayable({ ...billForm, projectId: billForm.projectId || null, invoiceNumber: billForm.invoiceNumber || null, status: 'PENDING' }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.finance.payables.all() }); setBillOpen(false); setBillForm(emptyBillForm()); setSelectedProject(null); setProjectSearchInput(''); setProjectPage(1) },
+    mutationFn: () => financeApi.createPayable({
+      ...billForm,
+      projectId: billForm.projectId || null,
+      purchaseOrderId: billForm.purchaseOrderId || null,
+      invoiceNumber: billForm.invoiceNumber || null,
+      status: 'PENDING',
+    }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.finance.payables.all() }); resetBillForm() },
+  })
+  const updateBill = useMutation({
+    mutationFn: () => financeApi.updatePayable(editingBillId, {
+      purchaseOrderId: billForm.purchaseOrderId || null,
+      invoiceNumber: billForm.invoiceNumber || null,
+      date: billForm.date,
+      dueDate: billForm.dueDate,
+      amount: billForm.amount,
+    }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.finance.payables.all() })
+      resetBillForm()
+    },
   })
   const requestChanges = useMutation({
     mutationFn: ({ id, reason }) => financeApi.requestPayableChanges(id, reason),
@@ -227,6 +264,7 @@ export default function AccountsPayable() {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised">
+        <h1 className="sr-only">Accounts Payable</h1>
         <Loader2 className="animate-spin text-muted" size={24} />
       </div>
     );
@@ -234,8 +272,19 @@ export default function AccountsPayable() {
 
   if (isError || !data) {
     return (
-      <div className="flex h-full items-center justify-center bg-surface-raised text-danger">
-        Failed to load accounts payable.
+      <div className="flex flex-col gap-2 h-full items-center justify-center bg-surface-raised text-center p-6">
+        <h1 className="sr-only">Accounts Payable</h1>
+        <p className="font-semibold text-sm text-danger">Failed to load accounts payable.</p>
+        {error?.message && <p className="text-xs text-muted max-w-md">{error.message}</p>}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => refetch()}
+          className="mt-2 text-xs font-medium cursor-pointer"
+        >
+          Try Again
+        </Button>
       </div>
     );
   }
@@ -245,6 +294,25 @@ export default function AccountsPayable() {
 
   const selectedRecord = items.find(i => i.id === selectedId);
   const selectedDetail = detailData?.id === selectedId ? detailData : null;
+  const canEditBill = Boolean(selectedRecord && ['PENDING', 'REJECTED'].includes(selectedRecord.status));
+  const openEditBill = () => {
+    if (!selectedRecord || !canEditBill) return
+    setEditingBillId(selectedRecord.id)
+    setBillForm({
+      vendorId: selectedRecord.vendorId,
+      projectId: selectedRecord.projectId || '',
+      purchaseOrderId: selectedRecord.purchaseOrderId || '',
+      invoiceNumber: selectedRecord.invoiceNumber || '',
+      date: selectedRecord.date.slice(0, 10),
+      dueDate: (selectedRecord.dueDate || selectedRecord.date).slice(0, 10),
+      amount: String(moneyToMajor(selectedRecord.amount)),
+    })
+    setSelectedProject(null)
+    setProjectSearchInput('')
+    setProjectPage(1)
+    updateBill.reset()
+    setBillOpen(true)
+  }
   const needsApproval = items.filter(i => i.status === 'PENDING');
   const scheduled = items.filter(i => i.status === 'SCHEDULED' || i.status === 'APPROVED');
   const historyItems = statusGroup === 'HISTORY' ? items : [];
@@ -308,6 +376,7 @@ export default function AccountsPayable() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-surface overflow-y-auto min-w-0 p-4 sm:p-6 space-y-4">
+      <h1 className="sr-only">Accounts Payable</h1>
 
       {/* ── 1. Unified Single-Row Apple-Glass Command Toolbar ── */}
       <div className="relative z-30 bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-2.5 shadow-xs flex flex-wrap xl:flex-nowrap items-center justify-between gap-2.5 flex-shrink-0">
@@ -370,7 +439,7 @@ export default function AccountsPayable() {
           <Button
             type="button"
             size="sm"
-            onClick={() => { setProjectSearchInput(''); setProjectPage(1); setSelectedProject(null); setBillOpen(true); }}
+            onClick={() => { setEditingBillId(null); setBillForm(emptyBillForm()); setProjectSearchInput(''); setProjectPage(1); setSelectedProject(null); createBill.reset(); updateBill.reset(); setBillOpen(true); }}
             className="h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm shrink-0 cursor-pointer"
           >
             <Plus size={14} /> New Bill
@@ -644,13 +713,15 @@ export default function AccountsPayable() {
                   {displayedItems.length === 0 && (
                     <TableRow className="hover:bg-transparent border-0">
                       <TableCell colSpan={4} className="px-6 py-12 text-center text-muted text-xs">
-                        {statusGroup === 'HISTORY'
-                          ? 'No historical invoices found.'
+                        {search || dateFilter !== 'ALL'
+                          ? 'No bills match the current search and date range. Clear the filters to see every bill.'
+                          : statusGroup === 'HISTORY'
+                          ? 'No historical invoices yet. Paid and voided bills will appear here.'
                           : queueTab === 'PENDING'
-                          ? 'No invoices needing approval.'
+                          ? 'No bills need approval. Pending bills will appear here for review.'
                           : queueTab === 'SCHEDULED'
-                          ? 'No scheduled invoices.'
-                          : 'No invoices found.'}
+                          ? 'No scheduled bills yet. Approved bills appear here for payment.'
+                          : 'No open bills yet. Use New Bill to add the first vendor invoice.'}
                       </TableCell>
                     </TableRow>
                   )}
@@ -689,9 +760,24 @@ export default function AccountsPayable() {
                     <p className="text-xs text-muted mt-0.5 truncate leading-tight">Invoice #{selectedRecord.invoiceNumber || 'N/A'}</p>
                   </div>
                 </div>
-                <span className={cn('px-2.5 py-0.5 rounded-full text-[11px] font-medium shrink-0 border', getStatusBadgeStyle(selectedRecord.status))}>
-                  {selectedRecord.status}
-                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {canEditBill && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Edit bill"
+                      title="Edit bill"
+                      onClick={openEditBill}
+                      className="w-7.5 h-7.5 rounded-lg text-muted hover:text-heading hover:bg-surface-muted cursor-pointer"
+                    >
+                      <Pencil size={13} />
+                    </Button>
+                  )}
+                  <span className={cn('px-2.5 py-0.5 rounded-full text-[11px] font-medium shrink-0 border', getStatusBadgeStyle(selectedRecord.status))}>
+                    {selectedRecord.status}
+                  </span>
+                </div>
               </div>
 
               {/* 2. Recessed TOTAL AMOUNT DUE & Calm Action Row */}
@@ -699,6 +785,47 @@ export default function AccountsPayable() {
                 <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1">Total Amount Due</p>
                 <p className="text-2xl font-bold text-heading tracking-tight tabular-nums">{formatMoney(selectedRecord.amount)}</p>
               </div>
+
+              {selectedRecord.purchaseOrderId && (
+                <div className="rounded-xl border border-border-subtle bg-surface-muted/25 p-3 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Purchase order match</p>
+                    <span className={cn(
+                      'px-2 py-0.5 rounded-full text-[10px] font-semibold border',
+                      selectedDetail?.purchaseOrderMatch?.status === 'ACTIVE'
+                        ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
+                        : selectedDetail?.purchaseOrderMatch?.status === 'REVERSED'
+                        ? 'bg-surface-muted text-muted border-border-default'
+                        : 'bg-amber-500/10 text-amber-700 border-amber-500/20',
+                    )}>
+                      {selectedDetail?.purchaseOrderMatch?.status === 'ACTIVE'
+                        ? 'GRNI cleared'
+                        : selectedDetail?.purchaseOrderMatch?.status === 'REVERSED'
+                        ? 'Reversed'
+                        : 'Pending approval'}
+                    </span>
+                  </div>
+                  {selectedDetail?.purchaseOrderMatch ? (
+                    <>
+                      <p className="text-xs font-semibold text-heading truncate">
+                        {selectedDetail.purchaseOrderMatch.productName} · {selectedDetail.purchaseOrderMatch.sku}
+                      </p>
+                      <p className="text-[11px] text-muted">
+                        {selectedDetail.purchaseOrderMatch.quantity} units · exact receipt {formatMoney(selectedDetail.purchaseOrderMatch.receivedValue)}
+                      </p>
+                      {selectedDetail.purchaseOrderMatch.status === 'REVERSED' && (
+                        <p className="text-[11px] text-muted">
+                          The original receipt and match history are retained; the GRNI balance was restored by the reversal.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-[11px] text-muted">
+                      Linked to a received purchase order. Approval clears the exact GRNI balance posted by that receipt.
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="flex items-center gap-2 pt-1">
                 <Button
@@ -845,15 +972,32 @@ export default function AccountsPayable() {
           )}
         </div>
       </div>
-      <FormDialog open={billOpen} onClose={() => { setBillOpen(false); setSelectedProject(null); createBill.reset() }} title="New bill" subtitle="Add a vendor invoice to accounts payable." busy={createBill.isPending} error={createBill.isError ? createBill.error?.message || 'Could not create the bill.' : undefined} onConfirm={() => createBill.mutate()} confirmLabel="Create bill">
+      <FormDialog
+        open={billOpen}
+        onClose={() => { resetBillForm(); createBill.reset(); updateBill.reset() }}
+        title={editingBillId ? 'Edit bill' : 'New bill'}
+        subtitle={editingBillId ? 'Correct this bill and its exact purchase-order link. Vendor and project assignment stay unchanged.' : 'Add a vendor invoice to accounts payable.'}
+        busy={editingBillId ? updateBill.isPending : createBill.isPending}
+        error={editingBillId
+          ? updateBill.isError ? updateBill.error?.message || 'Could not update the bill.' : undefined
+          : createBill.isError ? createBill.error?.message || 'Could not create the bill.' : undefined}
+        onConfirm={() => (editingBillId ? updateBill.mutate() : createBill.mutate())}
+        confirmLabel={editingBillId ? 'Save changes' : 'Create bill'}
+      >
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-body mb-1">Vendor</label>
             <Select
               value={billForm.vendorId}
-              onValueChange={val => setBillForm(current => ({ ...current, vendorId: val }))}
+              onValueChange={val => setBillForm(current => ({
+                ...current,
+                vendorId: val,
+                purchaseOrderId: '',
+                ...(current.purchaseOrderId && { amount: '' }),
+              }))}
+              disabled={Boolean(editingBillId)}
             >
-              <SelectTrigger className="w-full bg-surface-raised text-xs">
+              <SelectTrigger aria-label="Vendor" className="w-full bg-surface-raised text-xs">
                 <SelectValue placeholder="Select a vendor" />
               </SelectTrigger>
               <SelectContent>
@@ -864,7 +1008,47 @@ export default function AccountsPayable() {
                 ))}
               </SelectContent>
             </Select>
+            {editingBillId && <p className="mt-1 text-[11px] text-muted">The vendor cannot be changed. Reject this bill and create a new one if the vendor is wrong.</p>}
           </div>
+          <div>
+            <label className="block text-sm font-medium text-body mb-1">Received purchase order <span className="font-normal text-muted">(optional)</span></label>
+            <Select
+              value={billForm.purchaseOrderId || '__none__'}
+              onValueChange={val => {
+                const nextId = val === '__none__' ? '' : val
+                const candidate = matchableItems.find(item => item.id === nextId)
+                setBillForm(current => ({
+                  ...current,
+                  purchaseOrderId: nextId,
+                  ...(candidate && { amount: candidate.receivedValue }),
+                }))
+              }}
+              disabled={!billForm.vendorId || matchableLoading || !matchablePurchaseOrders}
+            >
+              <SelectTrigger aria-label="Match received purchase order" className="w-full bg-surface-raised text-xs">
+                <SelectValue placeholder={billForm.vendorId ? 'No purchase order match' : 'Select a vendor first'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__" className="text-xs">No purchase order match</SelectItem>
+                {matchableItems.map(candidate => (
+                  <SelectItem key={candidate.id} value={candidate.id} className="text-xs">
+                    {candidate.productName} · {candidate.sku} · {candidate.quantity} units · {formatMoney(candidate.receivedValueMoney)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {billForm.vendorId && (matchableLoading || (!matchablePurchaseOrders && !matchableError)) && <p className="mt-1 text-[11px] text-muted">Checking received purchase orders…</p>}
+            {matchableError && <p role="alert" className="mt-1 text-[11px] text-danger">Could not load matchable purchase orders.</p>}
+            {!matchableLoading && matchablePurchaseOrders && billForm.vendorId && matchableItems.length === 0 && !matchableError && (
+              <p className="mt-1 text-[11px] text-muted">No exact, fully valued purchase-order receipt is available for this vendor.</p>
+            )}
+            {selectedMatchCandidate && (
+              <p className="mt-1 text-[11px] text-success-text">
+                Exact receipt value {formatMoney(selectedMatchCandidate.receivedValueMoney)}. The bill amount must match it; partial and price-variance matching are not supported.
+              </p>
+            )}
+          </div>
+          {!editingBillId && (
           <div>
             <label className="block text-sm font-medium text-body mb-1">Project</label>
             <Input type="search" aria-label="Search projects" value={projectSearchInput} onChange={event => setProjectSearchInput(event.target.value)} placeholder="Search projects..." className="text-xs mb-1" />
@@ -899,6 +1083,7 @@ export default function AccountsPayable() {
               </div>
             )}
           </div>
+          )}
           <label className="block text-sm font-medium text-body">Invoice number
             <Input value={billForm.invoiceNumber} onChange={event => setBillForm(current => ({ ...current, invoiceNumber: event.target.value }))} className="mt-1 text-xs" />
           </label>

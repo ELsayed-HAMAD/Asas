@@ -55,11 +55,16 @@ export default function Pricing() {
 
   return (
     <MarketingPageFrame
-      eyebrow="Transparent Enterprise Pricing"
-      title="Predictable plans tailored to your operating scale"
+      eyebrow="Workspace pricing"
+      title="Plans for your team and workspace"
       description="Compare the current workspace seat and storage limits. Product areas are shared across plans; paid checkout is available only when billing is configured for this deployment."
     >
-      {!plansQuery.data?.stripeConfigured && (
+      {plansQuery.isError && (
+        <div role="status" className="mb-8 rounded-card border border-warning-border bg-warning-light px-4 py-3 text-sm text-warning-text">
+          Could not confirm the paid-checkout configuration. You can still create a workspace on the Free plan; paid checkout may be unavailable.
+        </div>
+      )}
+      {plansQuery.isSuccess && plansQuery.data?.stripeConfigured !== true && (
         <div role="status" className="mb-8 rounded-card border border-warning-border bg-warning-light px-4 py-3 text-sm text-warning-text">
           Paid checkout is not configured in this environment. You can create a workspace on the Free plan.
         </div>
@@ -149,7 +154,7 @@ export default function Pricing() {
       <section className="mb-20">
         <div className="text-center mb-8">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-heading">
-            Compare platform features across tiers
+            Compare plan limits across tiers
           </h2>
           <p className="text-sm text-body-light mt-2">
             Product modules are shared across tiers; plans currently differ by seat and storage allowances.
@@ -193,7 +198,7 @@ export default function Pricing() {
             Frequently Asked Questions
           </h2>
           <p className="text-sm text-body-light mt-2">
-            Everything you need to know about billing, security, and workspace entitlements.
+            Billing, limits, and provider configuration.
           </p>
         </div>
 

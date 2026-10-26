@@ -296,6 +296,7 @@ export default function EmployeeDirectory() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-y-auto min-w-0 px-6 py-5 space-y-5">
+      <h1 className="sr-only">HR overview</h1>
       {/* ── Single-Row Apple-Glass Top Command Toolbar ── */}
       <div className="relative z-30 bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-2.5 shadow-xs flex flex-wrap xl:flex-nowrap items-center justify-between gap-3 flex-shrink-0">
         {/* Left Cluster: Search + Dept Select + Depts Button */}
@@ -492,7 +493,7 @@ export default function EmployeeDirectory() {
               error={error}
               isEmpty={!employees.length}
               emptyTitle="No employees yet"
-              emptyDescription="This workspace is empty. Add an employee or reload sample data from onboarding."
+              emptyDescription="This workspace is empty. Use Add Employee to create the first profile."
             >
               <Table wrapperClassName="overflow-visible" className="w-full text-left border-collapse table-fixed">
                 <colgroup>

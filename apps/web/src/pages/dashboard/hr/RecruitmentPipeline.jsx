@@ -641,6 +641,7 @@ export default function RecruitmentPipeline() {
   const periodDelta = (current, previous, unit, digits = 0) => current == null || previous == null
     ? 'No comparable period data'
     : `${current - previous > 0 ? '+' : ''}${(current - previous).toFixed(digits)} ${unit} vs prior MTD`
+  const hasCandidateFilters = Boolean(search.trim() || roleFilter !== 'ALL' || stageFilter !== 'ALL')
   const displayStats = [
     { label: 'ACTIVE CANDIDATES', value: summary?.activeCandidates ?? '—', trend: 'neutral', sub: 'Current pipeline' },
     { label: 'HIRED (MTD)', value: summary?.hiredThisPeriod ?? '—', trend: 'neutral', sub: periodDelta(summary?.hiredThisPeriod, summary?.hiredPreviousPeriod, 'hires') },
@@ -655,6 +656,7 @@ export default function RecruitmentPipeline() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-y-auto min-w-0 px-6 py-5 space-y-4">
+      <h1 className="sr-only">Recruitment</h1>
       {/* ── Row 1: Spacious Single-Row Command Toolbar ── */}
       <div className="relative z-20 bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-2.5 shadow-xs flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 shrink-0">
         {/* Left Cluster: Search + Role Select */}
@@ -816,8 +818,14 @@ export default function RecruitmentPipeline() {
               isError={isError}
               error={error}
               isEmpty={!visibleCandidates.length}
-              emptyTitle="No candidates found"
-              emptyDescription="Add a candidate or load the sample pack to see data."
+              emptyTitle={hasCandidateFilters ? 'No candidates match these filters' : 'No candidates yet'}
+              emptyDescription={
+                hasCandidateFilters
+                  ? 'Adjust the search, role, or stage filter to see other candidates.'
+                  : canWrite
+                  ? 'Use + Add Candidate to start the pipeline.'
+                  : 'Candidates will appear here after an administrator adds them.'
+              }
             >
               <Table className="w-full text-left border-collapse">
                 <TableHeader className="bg-surface-muted/80 sticky top-0 z-10 text-[11px] font-semibold text-muted uppercase tracking-wider border-b border-border-default">

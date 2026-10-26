@@ -84,8 +84,8 @@ export default function SettingsDataMigration() {
     setModules(previous => previous.includes(module) ? previous.filter(value => value !== module) : [...previous, module])
   }
 
-  if (isLoading) return <div className="flex flex-1 items-center justify-center bg-surface"><Loader2 className="animate-spin text-muted" size={24} /></div>
-  if (isError || !data) return <div className="flex flex-1 items-center justify-center bg-surface text-danger">Could not load migration projects. Refresh and try again.</div>
+  if (isLoading) return <div className="flex flex-1 items-center justify-center bg-surface"><h1 className="sr-only">Data Migration</h1><Loader2 className="animate-spin text-muted" size={24} /></div>
+  if (isError || !data) return <div className="flex flex-1 items-center justify-center bg-surface text-danger"><h1 className="sr-only">Data Migration</h1>Could not load migration projects. Refresh and try again.</div>
 
   const hasChanges = currentProject
     ? name !== currentProject.name
@@ -176,7 +176,7 @@ export default function SettingsDataMigration() {
 
               <section className="rounded-xl border border-warning-border bg-warning-light p-5">
                 <div className="flex items-center gap-2 text-warning-text"><ArrowDownToLine size={17} /><h2 className="text-sm font-semibold">Import availability</h2></div>
-                <p className="mt-2 text-xs leading-5 text-warning-text">CRM companies/deals, Inventory products and opening stock (with a source cost when valuation is configured), suppliers and product links, Finance customers/vendors, and project portfolio CSV imports are available when those areas are in scope. Finance AP/AR open items and the opening trial balance can now be staged and validated, but are not posted into live invoices or journals until the atomic, reconciled cutover is complete. Inventory valuation, valued receipts/issues, opening valuation, and optional sales-invoice stock/COGS fulfillment on new receivables are available when valuation is configured. Supplier-invoice/GRNI matching, a coordinated Inventory/Finance cutover, other module entities, and direct ERP connectors remain in development.</p>
+                <p className="mt-2 text-xs leading-5 text-warning-text">CRM companies/deals, Inventory products and opening stock (with a source cost when valuation is configured), suppliers and product links, Finance customers/vendors, and project portfolio CSV imports are available when those areas are in scope. Finance AP/AR open items and the opening trial balance can now be staged and validated, but are not posted into live invoices or journals until the atomic, reconciled cutover is complete. Inventory valuation, valued receipts/issues, opening valuation, and optional sales-invoice stock/COGS fulfillment on new receivables are available when valuation is configured. Exact supplier-invoice/GRNI matching is available for one fully received, valued, single-line purchase order from the same Finance vendor at an exact amount and currency; pending or rejected bills can correct or clear that link. Partial, multi-line, tax/freight, and price-variance matching, a coordinated Inventory/Finance cutover, other module entities, and direct ERP connectors remain in development.</p>
                 <p className="mt-2 text-xs leading-5 text-warning-text">The employee CSV flow remains available during initial setup and its completed batch is recorded here. Other HR datasets and post-setup employee imports are not available yet.</p>
               </section>
 

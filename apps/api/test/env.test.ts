@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { assertEnv, loadEnv } from '../src/config/env.js'
 
+const productionAuthSecret = '01234567890123456789012345678901'
+const productionUrl = 'https://api.asas.test'
+const bankKey = 'bank-data-encryption-key-that-is-at-least-32-chars'
+
+function productionEnv(overrides: NodeJS.ProcessEnv = {}) {
+  return loadEnv({
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgres://db',
+    AUTH_SECRET: productionAuthSecret,
+    BETTER_AUTH_URL: productionUrl,
+    ...overrides,
+  })
+}
+
 describe('email environment', () => {
   it('loads Resend credentials and sender separately', () => {
     const env = loadEnv({ RESEND_API_KEY: 're_test_key', MAIL_FROM: 'Asas <mail@example.com>' })
@@ -9,17 +23,63 @@ describe('email environment', () => {
   })
 
   it('requires an explicit sender when Resend is configured in production', () => {
-    expect(() => assertEnv(loadEnv({ NODE_ENV: 'production', DATABASE_URL: 'postgres://db', AUTH_SECRET: 'secret', RESEND_API_KEY: 're_test_key', OBJECT_STORAGE_DRIVER: 's3', S3_BUCKET: 'asas-files' })))
-      .toThrow('Missing required environment variable: MAIL_FROM')
-    expect(() => assertEnv(loadEnv({ NODE_ENV: 'production', DATABASE_URL: 'postgres://db', AUTH_SECRET: 'secret', BANK_DATA_ENCRYPTION_KEY: 'bank-data-encryption-key-that-is-at-least-32-chars', RESEND_API_KEY: 're_test_key', MAIL_FROM: 'Asas <mail@example.com>', OBJECT_STORAGE_DRIVER: 's3', S3_BUCKET: 'asas-files' })))
-      .not.toThrow()
+    expect(() => assertEnv(productionEnv({
+      RESEND_API_KEY: 're_test_key',
+      OBJECT_STORAGE_DRIVER: 's3',
+      S3_BUCKET: 'asas-files',
+    }))).toThrow('Missing required environment variable: MAIL_FROM')
+    expect(() => assertEnv(productionEnv({
+      BANK_DATA_ENCRYPTION_KEY: bankKey,
+      RESEND_API_KEY: 're_test_key',
+      MAIL_FROM: 'Asas <mail@example.com>',
+      OBJECT_STORAGE_DRIVER: 's3',
+      S3_BUCKET: 'asas-files',
+    }))).not.toThrow()
   })
 
   it('enforces HTTPS for FRONTEND_ORIGIN in production', () => {
-    expect(() => assertEnv(loadEnv({ NODE_ENV: 'production', DATABASE_URL: 'postgres://db', AUTH_SECRET: 'secret', OBJECT_STORAGE_DRIVER: 's3', S3_BUCKET: 'asas-files', FRONTEND_ORIGIN: 'http://insecure.example.com' })))
-      .toThrow('FRONTEND_ORIGIN must use HTTPS in production to prevent cookie leakage over plaintext')
-    expect(() => assertEnv(loadEnv({ NODE_ENV: 'production', DATABASE_URL: 'postgres://db', AUTH_SECRET: 'secret', BANK_DATA_ENCRYPTION_KEY: 'bank-data-encryption-key-that-is-at-least-32-chars', OBJECT_STORAGE_DRIVER: 's3', S3_BUCKET: 'asas-files', FRONTEND_ORIGIN: 'https://app.asas.com' })))
-      .not.toThrow()
+    expect(() => assertEnv(productionEnv({
+      OBJECT_STORAGE_DRIVER: 's3',
+      S3_BUCKET: 'asas-files',
+      FRONTEND_ORIGIN: 'http://insecure.example.com',
+    }))).toThrow('FRONTEND_ORIGIN must use HTTPS in production to prevent cookie leakage over plaintext')
+    expect(() => assertEnv(productionEnv({
+      BANK_DATA_ENCRYPTION_KEY: bankKey,
+      OBJECT_STORAGE_DRIVER: 's3',
+      S3_BUCKET: 'asas-files',
+      FRONTEND_ORIGIN: 'https://app.asas.com',
+    }))).not.toThrow()
+  })
+})
+
+describe('Better Auth public URL environment', () => {
+  it('defaults to loopback in development and strips trailing slashes', () => {
+    expect(loadEnv({}).betterAuthUrl).toBe('http://127.0.0.1:4000')
+    expect(loadEnv({ PORT: '8080' }).betterAuthUrl).toBe('http://127.0.0.1:8080')
+    expect(loadEnv({ BETTER_AUTH_URL: 'https://api.asas.test/' }).betterAuthUrl).toBe('https://api.asas.test')
+  })
+
+  it('requires a valid HTTPS public URL in production', () => {
+    expect(() => assertEnv(productionEnv({ BETTER_AUTH_URL: '' })))
+      .toThrow('Missing required environment variable: BETTER_AUTH_URL')
+    expect(() => assertEnv(productionEnv({ BETTER_AUTH_URL: 'http://api.asas.test' })))
+      .toThrow('BETTER_AUTH_URL must use HTTPS in production')
+    expect(() => loadEnv({ NODE_ENV: 'production', BETTER_AUTH_URL: 'not-a-url' }))
+      .toThrow('BETTER_AUTH_URL must be a valid absolute URL')
+    expect(() => assertEnv(productionEnv({
+      BANK_DATA_ENCRYPTION_KEY: bankKey,
+      OBJECT_STORAGE_DRIVER: 's3',
+      S3_BUCKET: 'asas-files',
+    }))).not.toThrow()
+  })
+
+  it('rejects a short AUTH_SECRET in production', () => {
+    expect(() => assertEnv(productionEnv({
+      AUTH_SECRET: 'short',
+      BANK_DATA_ENCRYPTION_KEY: bankKey,
+      OBJECT_STORAGE_DRIVER: 's3',
+      S3_BUCKET: 'asas-files',
+    }))).toThrow('AUTH_SECRET must contain at least 32 characters in production')
   })
 })
 
@@ -45,7 +105,7 @@ describe('object storage environment', () => {
     expect(() => assertEnv(loadEnv({ DATABASE_URL: 'postgres://db', OBJECT_STORAGE_DRIVER: 's3' }))).toThrow('S3_BUCKET')
     expect(() => assertEnv(loadEnv({ DATABASE_URL: 'postgres://db', OBJECT_STORAGE_DRIVER: 's3', S3_BUCKET: 'asas-files', S3_ENDPOINT: 'https://objects.example.test', S3_ACCESS_KEY_ID: 'access' })))
       .toThrow('must be configured together')
-    expect(() => assertEnv(loadEnv({ NODE_ENV: 'production', DATABASE_URL: 'postgres://db', AUTH_SECRET: 'secret' })))
+    expect(() => assertEnv(productionEnv()))
       .toThrow('OBJECT_STORAGE_DRIVER=s3 is required in production')
   })
 })
@@ -90,20 +150,22 @@ describe('development social authentication environment', () => {
     expect(() => loadEnv({ NODE_ENV: 'staging', DEV_SOCIAL_AUTH_ENABLED: 'true' }))
       .toThrow('DEV_SOCIAL_AUTH_ENABLED may only be enabled when NODE_ENV=development')
     expect(loadEnv({ NODE_ENV: 'development' }).devSocialAuthEnabled).toBe(false)
-    expect(loadEnv({ NODE_ENV: 'development', DEV_SOCIAL_AUTH_ENABLED: 'true' }).devSocialAuthEnabled).toBe(true)
+  })
+
+  it('requires a real signing secret when the sandbox is enabled', () => {
+    expect(() => loadEnv({ NODE_ENV: 'development', DEV_SOCIAL_AUTH_ENABLED: 'true' }))
+      .toThrow('AUTH_SECRET is required when DEV_SOCIAL_AUTH_ENABLED=true')
+    expect(loadEnv({ NODE_ENV: 'development', DEV_SOCIAL_AUTH_ENABLED: 'true', AUTH_SECRET: 'dev-secret' }).devSocialAuthEnabled).toBe(true)
   })
 })
 
 describe('employee bank-data encryption environment', () => {
   it('requires a dedicated 32-character key in production', () => {
-    expect(() => assertEnv(loadEnv({
-      NODE_ENV: 'production', DATABASE_URL: 'postgres://db', AUTH_SECRET: 'auth-secret',
+    expect(() => assertEnv(productionEnv({
       OBJECT_STORAGE_DRIVER: 's3', S3_BUCKET: 'asas-files',
     }))).toThrow('BANK_DATA_ENCRYPTION_KEY must contain at least 32 characters in production')
-    expect(() => assertEnv(loadEnv({
-      NODE_ENV: 'production', DATABASE_URL: 'postgres://db', AUTH_SECRET: 'auth-secret',
+    expect(() => assertEnv(productionEnv({
       BANK_DATA_ENCRYPTION_KEY: 'short', OBJECT_STORAGE_DRIVER: 's3', S3_BUCKET: 'asas-files',
     }))).toThrow('BANK_DATA_ENCRYPTION_KEY must contain at least 32 characters in production')
   })
 })
-

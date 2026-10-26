@@ -18,6 +18,8 @@ export async function writeStockMovement(
     productId: string
     delta: number
     note?: string | null
+    requestKey?: string
+    requestHash?: string
     createdAt?: Date
     allowArchived?: boolean
     requireEmpty?: boolean
@@ -25,6 +27,9 @@ export async function writeStockMovement(
 ) {
   if (!Number.isInteger(input.delta) || input.delta < -MAX_STOCK || input.delta > MAX_STOCK) {
     throw new AppError(400, 'Stock movement must be a whole number within the supported quantity range')
+  }
+  if (Boolean(input.requestKey) !== Boolean(input.requestHash)) {
+    throw new AppError(400, 'A stock movement request key and its payload hash must be stored together')
   }
 
   const where: Prisma.ProductWhereInput = {
@@ -54,6 +59,10 @@ export async function writeStockMovement(
       productId: input.productId,
       delta: input.delta,
       note: input.note ?? null,
+      ...(input.requestKey && {
+        requestKey: input.requestKey,
+        requestHash: input.requestHash,
+      }),
       ...(input.createdAt && { createdAt: input.createdAt }),
     },
     include: { product: { select: { name: true, warehouse: true } } },

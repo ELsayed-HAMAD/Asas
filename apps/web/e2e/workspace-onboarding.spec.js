@@ -1,5 +1,85 @@
 import { expect, test } from '@playwright/test'
 
+test('workspace chooser reports a failed workspace list and can retry without claiming the user has no memberships', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' })
+  const firstWorkspace = {
+    id: 'workspace_retry_one',
+    name: 'Retry Workspace One',
+    slug: 'retry-workspace-one',
+    logo: null,
+    currency: 'USD',
+    onboardingStatus: 'IMPORTED',
+    createdAt: new Date().toISOString(),
+  }
+  const secondWorkspace = {
+    ...firstWorkspace,
+    id: 'workspace_retry_two',
+    name: 'Retry Workspace Two',
+    slug: 'retry-workspace-two',
+  }
+  const user = {
+    id: 'owner_retry',
+    name: 'Retry Owner',
+    email: 'owner.with.a.long.address@example.test',
+    emailVerified: true,
+  }
+  let failWorkspaceList = true
+
+  await context.route('**/api/auth/**', async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/get-session')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          session: {
+            id: 'session_retry',
+            token: 'token-retry',
+            userId: user.id,
+            activeOrganizationId: firstWorkspace.id,
+          },
+          user,
+        }),
+      })
+    }
+    if (path.endsWith('/organization/list')) {
+      if (failWorkspaceList) return route.abort('failed')
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([firstWorkspace, secondWorkspace]) })
+    }
+    if (path.endsWith('/organization/get-full-organization')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(firstWorkspace) })
+    }
+    if (path.endsWith('/organization/get-active-member-role')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ role: 'ADMIN' }) })
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' })
+  })
+
+  try {
+    const page = await context.newPage()
+    await page.goto('/choose-workspace')
+
+    await expect(page.getByRole('heading', { name: 'Select a workspace' })).toBeVisible()
+    await expect(page.getByRole('alert')).toContainText('We could not load your workspaces')
+    await expect(page.getByText('No workspaces found', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Retry workspace list' })).toBeVisible()
+
+    failWorkspaceList = false
+    await page.getByRole('button', { name: 'Retry workspace list' }).click()
+    await expect(page.getByRole('button', { name: 'Open Retry Workspace One (active workspace)' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Open Retry Workspace Two' })).toBeVisible()
+    await expect(page.getByRole('alert')).toHaveCount(0)
+
+    const dimensions = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }))
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1)
+  } finally {
+    await context.close()
+  }
+})
+
 test('an existing workspace owner can create a second workspace from the chooser', async ({ browser }) => {
   const context = await browser.newContext({ reducedMotion: 'reduce' })
   const workspace = {
@@ -39,11 +119,226 @@ test('an existing workspace owner can create a second workspace from the chooser
   try {
     const page = await context.newPage()
     await page.goto('/choose-workspace')
+    await expect(page.getByRole('button', { name: 'Open Existing Workspace (active workspace)' })).toHaveAttribute('aria-current', 'true')
     await page.getByRole('link', { name: 'Create New Workspace' }).click()
 
     await expect(page).toHaveURL(/\/onboarding\?new=1$/)
-    await expect(page.getByRole('heading', { name: 'Configure your enterprise profile' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Set up your workspace' })).toBeVisible()
     await expect(page.getByPlaceholder('e.g. Acme Global Holdings Inc.')).toHaveValue("Existing Owner's Workspace")
+  } finally {
+    await context.close()
+  }
+})
+
+test('onboarding refuses to create a duplicate workspace while memberships cannot be verified, then recovers on retry', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' })
+  const user = {
+    id: 'owner_membership_check',
+    name: 'Membership Owner',
+    email: 'membership.owner@example.test',
+    emailVerified: true,
+  }
+  let failWorkspaceList = true
+  let createCalls = 0
+
+  const json = (route, body, status = 200) => route.fulfill({
+    status, contentType: 'application/json', body: JSON.stringify(body),
+  })
+
+  await context.route('**/api/auth/**', async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/get-session')) {
+      return json(route, {
+        session: { id: 'session_membership_check', token: 'token', userId: user.id, activeOrganizationId: null },
+        user,
+      })
+    }
+    if (path.endsWith('/organization/get-full-organization')) return json(route, null)
+    if (path.endsWith('/organization/list')) {
+      if (failWorkspaceList) return route.abort('failed')
+      return json(route, [])
+    }
+    if (path.endsWith('/organization/create')) {
+      createCalls += 1
+      return json(route, {
+        id: 'workspace_should_not_exist',
+        name: 'Membership Owner Workspace',
+        slug: 'membership-owner-workspace',
+        onboardingStatus: 'PENDING',
+      })
+    }
+    if (path.endsWith('/organization/get-active-member-role')) return json(route, { role: 'OWNER' })
+    return json(route, {})
+  })
+
+  try {
+    const page = await context.newPage()
+    await page.goto('/onboarding')
+
+    await expect(page.getByText(/We could not check your existing workspaces\./)).toBeVisible()
+    await page.getByRole('button', { name: 'Review workspace areas' }).click()
+    await page.getByRole('button', { name: 'Choose how to start' }).click()
+    await page.getByRole('button', { name: 'Launch workspace' }).click()
+
+    await expect(page.getByText(/Retry the workspace check before creating a new one/)).toBeVisible()
+    expect(createCalls).toBe(0)
+
+    failWorkspaceList = false
+    await page.getByRole('button', { name: 'Retry workspace check' }).click()
+    await expect(page.getByRole('button', { name: 'Retry workspace check' })).toHaveCount(0)
+    await expect(page.getByText(/We could not check your existing workspaces\./)).toHaveCount(0)
+    expect(createCalls).toBe(0)
+
+    const dimensions = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }))
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1)
+  } finally {
+    await context.close()
+  }
+})
+
+test('onboarding retries on the same workspace after a setup failure', async ({ browser }) => {
+  const context = await browser.newContext({ reducedMotion: 'reduce' })
+  const existingWorkspace = {
+    id: 'workspace_existing_retry',
+    name: 'Existing Workspace',
+    slug: 'existing-workspace',
+    logo: null,
+    currency: 'USD',
+    onboardingStatus: 'IMPORTED',
+    createdAt: new Date().toISOString(),
+  }
+  const newWorkspace = {
+    id: 'workspace_retry',
+    name: "Existing Owner's Workspace",
+    slug: 'existing-owners-workspace',
+    logo: null,
+    currency: 'USD',
+    onboardingStatus: 'PENDING',
+    createdAt: new Date().toISOString(),
+  }
+  const user = { id: 'owner_retry', name: 'Existing Owner', email: 'owner@example.test', emailVerified: true }
+  let activeOrganizationId = existingWorkspace.id
+  let created = false
+  let createCalls = 0
+  let settingsPatchCalls = 0
+  let emptyCalls = 0
+
+  const json = (route, body, status = 200) => route.fulfill({
+    status, contentType: 'application/json', body: JSON.stringify(body),
+  })
+
+  await context.route('**/api/auth/**', async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/get-session')) {
+      return json(route, {
+        session: { id: 'session_retry', token: 'token', userId: user.id, activeOrganizationId },
+        user,
+      })
+    }
+    if (path.endsWith('/organization/list')) {
+      return json(route, created ? [existingWorkspace, newWorkspace] : [existingWorkspace])
+    }
+    if (path.endsWith('/organization/get-full-organization')) {
+      return json(route, activeOrganizationId === newWorkspace.id ? newWorkspace : existingWorkspace)
+    }
+    if (path.endsWith('/organization/get-active-member-role')) return json(route, { role: 'OWNER' })
+    if (path.endsWith('/organization/create')) {
+      createCalls += 1
+      created = true
+      activeOrganizationId = newWorkspace.id
+      return json(route, newWorkspace)
+    }
+    if (path.endsWith('/organization/set-active')) {
+      const body = route.request().postDataJSON()
+      activeOrganizationId = body.organizationId
+      return json(route, { id: activeOrganizationId })
+    }
+    return json(route, {})
+  })
+  await context.route('**/api/v1/settings/general', route => {
+    if (route.request().method() !== 'PATCH') return json(route, { data: {} })
+    settingsPatchCalls += 1
+    if (settingsPatchCalls === 1) {
+      return json(route, { error: { message: 'Simulated settings outage.' } }, 500)
+    }
+    return json(route, { data: {} })
+  })
+  await context.route('**/api/v1/billing/switch-plan', route => json(route, { data: {} }))
+  await context.route('**/api/v1/onboarding/empty', route => {
+    emptyCalls += 1
+    return json(route, { data: { onboardingStatus: 'EMPTY' } })
+  })
+  await context.route('**/api/v1/onboarding/status', route => json(route, { data: { onboardingStatus: 'PENDING' } }))
+
+  try {
+    const page = await context.newPage()
+    await page.goto('/onboarding?new=1')
+    await page.getByRole('button', { name: 'Review workspace areas' }).click()
+    await page.getByRole('button', { name: 'Choose how to start' }).click()
+    await page.getByRole('button', { name: 'Launch workspace' }).click()
+
+    await expect(page.getByRole('alert')).toContainText('Simulated settings outage.')
+    await expect(page).toHaveURL(/\/onboarding\?new=1$/)
+    expect(createCalls).toBe(1)
+
+    const applyRequest = page.waitForResponse(response => (
+      response.url().endsWith('/api/v1/onboarding/empty') &&
+      response.request().method() === 'POST'
+    ))
+    await page.getByRole('button', { name: 'Launch workspace' }).click()
+    await applyRequest
+
+    expect(createCalls).toBe(1)
+    expect(settingsPatchCalls).toBe(2)
+    expect(emptyCalls).toBe(1)
+  } finally {
+    await context.close()
+  }
+})
+
+test('onboarding labels its fields, moves focus between steps, and fits a mobile viewport', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' })
+  const workspace = {
+    id: 'workspace_mobile_setup', name: 'Pending Workspace', slug: 'pending-workspace', logo: null,
+    currency: 'USD', onboardingStatus: 'PENDING', createdAt: new Date().toISOString(),
+  }
+  const user = { id: 'owner_mobile_setup', name: 'Mobile Owner', email: 'owner@example.test', emailVerified: true }
+  await context.route('**/api/auth/**', async route => {
+    const path = new URL(route.request().url()).pathname
+    let body = {}
+    if (path.endsWith('/get-session')) body = { session: { id: 'session_mobile_setup', token: 'token', userId: user.id, activeOrganizationId: workspace.id }, user }
+    else if (path.endsWith('/organization/list')) body = [workspace]
+    else if (path.endsWith('/organization/get-full-organization')) body = workspace
+    else if (path.endsWith('/organization/get-active-member-role')) body = { role: 'OWNER' }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
+  })
+
+  try {
+    const page = await context.newPage()
+    await page.goto('/onboarding')
+
+    await expect(page.getByRole('heading', { name: 'Set up your workspace', level: 1 })).toBeVisible()
+    await expect(page.getByLabel(/Company \/ Organization Name/)).toHaveValue('Pending Workspace')
+    await expect(page.getByLabel('Base Reporting Currency')).toHaveValue('USD')
+    await expect(page.getByLabel('Headquarters Timezone')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Review workspace areas' }).click()
+    await expect(page.getByRole('heading', { name: 'Workspace areas', level: 1 })).toBeFocused()
+    await page.getByRole('button', { name: 'Choose how to start' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose how to start', level: 1 })).toBeFocused()
+
+    const cleanWorkspace = page.getByRole('button', { name: /Start with a clean workspace/ })
+    await cleanWorkspace.click()
+    await expect(cleanWorkspace).toHaveAttribute('aria-pressed', 'true')
+
+    for (const locator of [cleanWorkspace, page.getByRole('button', { name: 'Launch workspace' })]) {
+      const box = await locator.boundingBox()
+      expect(box.x).toBeGreaterThanOrEqual(0)
+      expect(box.x + box.width).toBeLessThanOrEqual(390.5)
+    }
   } finally {
     await context.close()
   }
@@ -130,9 +425,19 @@ test('onboarding saves a resumable company migration project before launching a 
     await page.goto('/onboarding')
     await page.getByRole('button', { name: 'Review workspace areas' }).click()
     await page.getByRole('button', { name: 'Choose how to start' }).click()
+    await expect(page.getByRole('button', { name: /Start with a clean workspace/ })).toHaveAttribute('aria-pressed', 'true')
     await page.getByRole('button', { name: /Plan a company-wide migration/ }).click()
-    await page.getByRole('button', { name: /Executive CRM/ }).click()
-    await page.getByRole('button', { name: /Finance & Treasury/ }).click()
+    await expect(page.getByRole('button', { name: /Start with a clean workspace/ })).toHaveAttribute('aria-pressed', 'false')
+    await expect(page.getByRole('button', { name: /Plan a company-wide migration/ })).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('button', { name: /People & payroll/ }).click()
+    await expect(page.getByRole('alert')).toContainText('Select at least one company area')
+    await expect(page.getByRole('button', { name: /Save migration plan & launch/ })).toBeDisabled()
+    await page.getByRole('button', { name: /People & payroll/ }).click()
+    await page.getByRole('button', { name: /CRM & pipeline/ }).click()
+    await page.getByRole('button', { name: /Finance & accounting/ }).click()
+    await expect(page.getByText('Start mode:')).toBeVisible()
+    await expect(page.getByText('Company migration plan', { exact: true })).toBeVisible()
+    await expect(page.getByText('Finance & accounting, People & payroll, CRM & pipeline', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: /Save migration plan & launch/ }).click()
     await expect.poll(() => migrationPlan).not.toBeNull()
     await expect.poll(() => workspaceInitialized).toBe(true)

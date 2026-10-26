@@ -6,7 +6,7 @@ import {
   updatePayableStatus, updateReceivableStatus, updateExpenseStatus,
 } from '../src/modules/finance/finance.service.js'
 
-function setup(status: string, createdById: string | null = null) {
+function setup(status: string, createdById: string | null = null, overrides: Record<string, unknown> = {}) {
   const now = new Date('2026-10-07T00:00:00Z')
   const row = {
     id: 'doc_1', tenantId: 'tenant_1', status, createdById,
@@ -14,6 +14,7 @@ function setup(status: string, createdById: string | null = null) {
     customerId: 'customer_1', customer: { name: 'Customer' }, number: 'INV-1',
     employeeId: null, employee: null, name: 'Expense', category: 'OTHER', merchant: null, policyMatch: null,
     amount: new Prisma.Decimal('100'), tax: new Prisma.Decimal('10'), date: now, dueDate: now, createdAt: now, updatedAt: now,
+    ...overrides,
   }
   const delegate = {
     findFirstOrThrow: vi.fn().mockResolvedValue(row),
@@ -26,6 +27,7 @@ function setup(status: string, createdById: string | null = null) {
     ledgerAccount: { upsert: vi.fn(async ({ create }: { create: Record<string, unknown> }) => ({ id: String(create.code) })) },
     journalEntry: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({ id: 'journal_1' })) },
     journalLine: { createMany: vi.fn(async () => ({ count: 2 })) },
+    purchaseOrderInvoiceMatch: { findFirst: vi.fn(async () => null), update: vi.fn(async () => ({})) },
   }
   const prisma = {
     tenant: { findUnique: vi.fn().mockResolvedValue({ currency: 'USD', timezone: 'UTC' }) },
@@ -159,5 +161,129 @@ describe('finance workflow integrity', () => {
     const sql = tx.$queryRaw.mock.calls[0]
     expect(sql).toContain('tenant_1')
     expect(sql).toContain('foreign')
+  })
+
+  it('links or clears an exact purchase receipt while a bill is still editable', async () => {
+    const postedAt = new Date('2026-10-25T10:00:00.000Z')
+    const { prisma, tx, delegate } = setup('PENDING', 'creator', {
+      purchaseOrderId: null,
+      amount: new Prisma.Decimal('62.5000'),
+    })
+    ;(tx as unknown as Record<string, unknown>).purchaseOrder = {
+      findFirst: vi.fn().mockResolvedValue({
+        id: 'po_1', tenantId: 'tenant_1', vendorId: 'vendor_1', status: 'RECEIVED', receivedAt: postedAt,
+        lines: [{ productId: 'product_1', quantity: 5, product: { name: 'Widget', sku: 'W-1' } }],
+        valuationEvents: [{
+          id: 'event_1', reason: 'PURCHASE_RECEIPT', productId: 'product_1', quantityDelta: 5,
+          costValue: new Prisma.Decimal('62.5000'), currency: 'USD', journalEntryId: 'receipt_journal', postedAt,
+          journalEntry: {
+            id: 'receipt_journal', amount: new Prisma.Decimal('62.5000'), sourceType: 'INVENTORY_RECEIPT', reversedBy: null,
+            lines: [
+              { side: 'DEBIT', amount: new Prisma.Decimal('62.5000'), accountId: 'inventory_account', account: { tenantId: 'tenant_1', kind: 'ASSET', currency: 'USD' } },
+              { side: 'CREDIT', amount: new Prisma.Decimal('62.5000'), accountId: 'grni_account', account: { tenantId: 'tenant_1', kind: 'LIABILITY', currency: 'USD' } },
+            ],
+          },
+        }],
+        invoiceMatches: [],
+      }),
+    }
+
+    await updatePayable(prisma, 'tenant_1', 'doc_1', { purchaseOrderId: 'po_1', amount: '62.5' })
+    expect(delegate.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ purchaseOrderId: 'po_1', amount: expect.anything() }),
+    }))
+
+    const unlink = setup('REJECTED', 'creator', {
+      purchaseOrderId: 'po_1',
+      amount: new Prisma.Decimal('62.5000'),
+    })
+    await updatePayable(unlink.prisma, 'tenant_1', 'doc_1', { purchaseOrderId: null, amount: '75' })
+    expect(unlink.delegate.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ purchaseOrderId: null, amount: expect.anything() }),
+    }))
+  })
+
+  it('revalidates the effective amount when relinking a bill to a receipt', async () => {
+    const postedAt = new Date('2026-10-25T10:00:00.000Z')
+    const { prisma, tx, delegate } = setup('PENDING', 'creator', {
+      purchaseOrderId: null,
+      amount: new Prisma.Decimal('63.0000'),
+    })
+    ;(tx as unknown as Record<string, unknown>).purchaseOrder = {
+      findFirst: vi.fn().mockResolvedValue({
+        id: 'po_1', tenantId: 'tenant_1', vendorId: 'vendor_1', status: 'RECEIVED', receivedAt: postedAt,
+        lines: [{ productId: 'product_1', quantity: 5, product: { name: 'Widget', sku: 'W-1' } }],
+        valuationEvents: [{
+          id: 'event_1', reason: 'PURCHASE_RECEIPT', productId: 'product_1', quantityDelta: 5,
+          costValue: new Prisma.Decimal('62.5000'), currency: 'USD', journalEntryId: 'receipt_journal', postedAt,
+          journalEntry: {
+            id: 'receipt_journal', amount: new Prisma.Decimal('62.5000'), sourceType: 'INVENTORY_RECEIPT', reversedBy: null,
+            lines: [
+              { side: 'DEBIT', amount: new Prisma.Decimal('62.5000'), accountId: 'inventory_account', account: { tenantId: 'tenant_1', kind: 'ASSET', currency: 'USD' } },
+              { side: 'CREDIT', amount: new Prisma.Decimal('62.5000'), accountId: 'grni_account', account: { tenantId: 'tenant_1', kind: 'LIABILITY', currency: 'USD' } },
+            ],
+          },
+        }],
+        invoiceMatches: [],
+      }),
+    }
+
+    await expect(updatePayable(prisma, 'tenant_1', 'doc_1', { purchaseOrderId: 'po_1' }))
+      .rejects.toMatchObject({ statusCode: 409 })
+    expect(delegate.update).not.toHaveBeenCalled()
+  })
+
+  it('clears the exact receipt GRNI account when approving an exact-matched bill', async () => {
+    const postedAt = new Date('2026-10-25T10:00:00.000Z')
+    const { prisma, tx, delegate } = setup('PENDING', 'creator', {
+      purchaseOrderId: 'po_1',
+      amount: new Prisma.Decimal('62.5000'),
+    })
+    const matchCreate = vi.fn().mockResolvedValue({ id: 'match_1' })
+    ;(tx as unknown as Record<string, unknown>).purchaseOrder = {
+      findFirst: vi.fn().mockResolvedValue({
+        id: 'po_1', tenantId: 'tenant_1', vendorId: 'vendor_1', status: 'RECEIVED', receivedAt: postedAt,
+        lines: [{ productId: 'product_1', quantity: 5, product: { name: 'Widget', sku: 'W-1' } }],
+        valuationEvents: [{
+          id: 'event_1', reason: 'PURCHASE_RECEIPT', productId: 'product_1', quantityDelta: 5,
+          costValue: new Prisma.Decimal('62.5000'), currency: 'USD', journalEntryId: 'receipt_journal', postedAt,
+          journalEntry: {
+            id: 'receipt_journal', amount: new Prisma.Decimal('62.5000'), sourceType: 'INVENTORY_RECEIPT', reversedBy: null,
+            lines: [
+              { side: 'DEBIT', amount: new Prisma.Decimal('62.5000'), accountId: 'inventory_account', account: { tenantId: 'tenant_1', kind: 'ASSET', currency: 'USD' } },
+              { side: 'CREDIT', amount: new Prisma.Decimal('62.5000'), accountId: 'grni_account', account: { tenantId: 'tenant_1', kind: 'LIABILITY', currency: 'USD' } },
+            ],
+          },
+        }],
+        invoiceMatches: [],
+      }),
+    }
+    const ledgerFindFirst = vi.fn().mockResolvedValue({ id: 'grni_account' })
+    ;(tx.ledgerAccount as unknown as Record<string, unknown>).findFirst = ledgerFindFirst
+    tx.purchaseOrderInvoiceMatch.create = matchCreate
+
+    await updatePayableStatus(prisma, 'tenant_1', 'doc_1', 'APPROVED', 'approver')
+
+    expect(ledgerFindFirst).toHaveBeenCalledWith({
+      where: { id: 'grni_account', tenantId: 'tenant_1', currency: 'USD' },
+      select: { id: true },
+    })
+    expect(tx.journalLine.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.arrayContaining([
+        expect.objectContaining({ accountId: 'grni_account', side: 'DEBIT' }),
+      ]),
+    }))
+    expect(matchCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: 'tenant_1',
+        purchaseOrderId: 'po_1',
+        payableInvoiceId: 'doc_1',
+        activePurchaseOrderId: 'po_1',
+        journalEntryId: 'receipt_journal',
+        amount: '62.5',
+        status: 'ACTIVE',
+      }),
+    })
+    expect(delegate.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'APPROVED' }) }))
   })
 })

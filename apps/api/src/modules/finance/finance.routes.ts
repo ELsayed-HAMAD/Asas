@@ -33,6 +33,8 @@ import {
   payableStatusUpdateSchema,
   payableUpdateSchema,
   payableWriteSchema,
+  payablePurchaseOrderCandidatesQuerySchema,
+  payablePurchaseOrderCandidatesResponseSchema,
   payableBatchPaymentSchema,
   payableChangeRequestSchema,
   receivableBatchRemindSchema,
@@ -361,6 +363,26 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
   )
 
   server.get(
+    '/payables/matchable-purchase-orders',
+    {
+      preHandler: requirePermission('finance.invoice.write'),
+      schema: {
+        querystring: payablePurchaseOrderCandidatesQuerySchema,
+        response: { 200: envelope(payablePurchaseOrderCandidatesResponseSchema), ...errorResponses },
+      },
+    },
+    async request => {
+      const { tenantId } = requireAuthContext(request)
+      const items = await financeController.listPayablePurchaseOrderCandidates(
+        request.server.prisma,
+        tenantId,
+        request.query.vendorId,
+      )
+      return { data: { items } }
+    },
+  )
+
+  server.get(
     '/payables/:id',
     {
       preHandler: requireRole('MEMBER'),
@@ -395,7 +417,7 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
           action: 'finance.payable.create',
           targetType: 'PayableInvoice',
           targetId: invoice.id,
-          metadata: { amount: invoice.amount },
+          metadata: { amount: invoice.amount, purchaseOrderId: invoice.purchaseOrderId },
         })
         await notifyWorkspaceRoles(tx, {
           tenantId,
@@ -441,7 +463,7 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
           action: 'finance.payable.update',
           targetType: 'PayableInvoice',
           targetId: invoice.id,
-          metadata: { fields: Object.keys(request.body) },
+          metadata: { fields: Object.keys(request.body), purchaseOrderId: invoice.purchaseOrderId },
         })
         return invoice
       })
@@ -482,7 +504,7 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
           action: 'finance.payable.status',
           targetType: 'PayableInvoice',
           targetId: invoice.id,
-          metadata: { status: invoice.status },
+          metadata: { status: invoice.status, purchaseOrderId: invoice.purchaseOrderId },
         })
         return invoice
       })

@@ -22,7 +22,11 @@ describe('void documents do not represent money still owed', () => {
 
       await listPayables(prisma, 'tenant_1', { page: 1, limit: 25, statusGroup: 'OPEN', dateRange: 'CURRENT_MONTH' })
       expect(delegate.findMany).toHaveBeenLastCalledWith(expect.objectContaining({
-        where: expect.objectContaining({ tenantId: 'tenant_1', status: { in: ['PENDING', 'APPROVED', 'SCHEDULED'] }, date: { gte: '2026-10-01', lt: '2026-11-01' } }),
+        where: expect.objectContaining({
+          tenantId: 'tenant_1',
+          status: { in: ['PENDING', 'APPROVED', 'SCHEDULED'] },
+          date: { gte: new Date('2026-10-01T00:00:00.000Z'), lt: new Date('2026-11-01T00:00:00.000Z') },
+        }),
         skip: 0, take: 25,
       }))
 

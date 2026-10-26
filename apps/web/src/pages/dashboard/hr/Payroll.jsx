@@ -482,6 +482,7 @@ export default function Payroll() {
     if (isLoadingMyPayslips) {
       return (
         <div className="flex h-full items-center justify-center bg-surface-raised">
+          <h1 className="sr-only">My Payslips</h1>
           <Loader2 className="animate-spin text-muted" size={24} />
         </div>
       )
@@ -490,6 +491,7 @@ export default function Payroll() {
     if (isMyPayslipsError) {
       return (
         <div className="flex h-full items-center justify-center bg-surface-raised text-danger px-6 text-center">
+          <h1 className="sr-only">My Payslips</h1>
           {myPayslipsError?.message || 'Failed to load your payslips.'}
         </div>
       )
@@ -585,12 +587,13 @@ export default function Payroll() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-y-auto min-w-0 px-6 py-5 space-y-5">
+      <h1 className="sr-only">Payroll</h1>
       {/* ── Unified Apple-Glass Top Command Toolbar + Run Metadata Strip ── */}
       <div className="relative z-30 bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-3 shadow-xs space-y-2.5 flex-shrink-0">
-        {/* Row 1 — Interactive Controls (Spacious Single Row) */}
-        <div className="flex flex-wrap xl:flex-nowrap items-center justify-between gap-2 min-w-0">
+        {/* Row 1 — Interactive Controls (Wraps when the viewport needs it) */}
+        <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
           {/* Left Cluster: Search + Dept + Run Select */}
-          <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap xl:flex-none">
             <SearchInput
               value={tableSearch}
               onChange={e => setTableSearch(e.target.value)}
@@ -677,7 +680,7 @@ export default function Payroll() {
           </div>
 
           {/* Right Cluster: Calculators + Export + Void run + + New Payroll Run */}
-          <div className="flex items-center gap-1.5 shrink-0 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap sm:flex-nowrap ml-auto">
             {/* Calculators dropdown */}
             <DropdownMenu open={toolsMenuOpen} onOpenChange={setToolsMenuOpen}>
               <DropdownMenuTrigger asChild>

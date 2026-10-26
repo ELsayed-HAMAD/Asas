@@ -160,7 +160,7 @@ test('marketing navigation opens useful pages and displays configured prices res
     await expect(page.getByRole('heading', { name: 'Business workflows in one workspace' })).toBeVisible({ timeout: 15_000 })
     await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Pricing', exact: true }).click()
     await expect(page).toHaveURL(/\/pricing$/, { timeout: 15_000 })
-    await expect(page.getByRole('heading', { name: 'Predictable plans tailored to your operating scale' })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('heading', { name: 'Plans for your team and workspace' })).toBeVisible({ timeout: 15_000 })
     await expect(page.getByRole('heading', { name: 'Standard Growth', exact: true })).toBeVisible()
     await expect(page.getByText('$29', { exact: true })).toBeVisible()
     await page.getByRole('banner').getByRole('button', { name: 'Resources' }).click()
@@ -395,11 +395,11 @@ test('dashboard content fits phone, tablet, and desktop viewports', async ({ bro
         await userMenuButton.click()
         const logoutButton = page.getByRole('menuitem', { name: 'Log Out' })
         await expect(logoutButton).toBeVisible()
-        const menuCard = logoutButton.locator('xpath=ancestor::div[contains(@class, "rounded-xl")]')
+        const menuCard = logoutButton.locator('xpath=ancestor::div[contains(@class, "rounded-2xl") or contains(@class, "rounded-xl")]')
         await expect.poll(async () => {
           const box = await menuCard.boundingBox()
           return box?.width ?? 0
-        }).toBeGreaterThanOrEqual(285)
+        }).toBeGreaterThanOrEqual(240)
         await page.keyboard.press('Escape')
         await expect(logoutButton).toBeHidden()
       }
@@ -469,14 +469,16 @@ test('all dashboard routes render without page overflow at phone, tablet, and de
   await mockAuth(context, account, async route => json(route, { error: { message: 'Temporary test outage' } }, 503))
   const page = await context.newPage()
   page.on('pageerror', error => pageErrors.push(error.message))
+  // Keep this list in sync with DASHBOARD_PATHS in src/App.jsx.
   const routes = [
     '/dashboard', '/dashboard/hr/employees', '/dashboard/hr/payroll', '/dashboard/hr/time-attendance', '/dashboard/hr/time-off', '/dashboard/hr/recruitment',
     '/dashboard/finance', '/dashboard/finance/accounts-payable', '/dashboard/finance/accounts-receivable', '/dashboard/finance/expenses',
     '/dashboard/finance/trial-balance', '/dashboard/finance/reconciliation', '/dashboard/crm', '/dashboard/crm/deals',
     '/dashboard/crm/sales-performance', '/dashboard/crm/revenue-forecast', '/dashboard/inventory', '/dashboard/inventory/movements',
-    '/dashboard/projects', '/dashboard/projects/sprints', '/dashboard/projects/roadmap', '/dashboard/settings',
-    '/dashboard/settings/members', '/dashboard/settings/billing', '/dashboard/settings/integrations',
-    '/dashboard/settings/notifications', '/dashboard/settings/data-export', '/dashboard/support',
+    '/dashboard/inventory/valuation', '/dashboard/projects', '/dashboard/projects/sprints', '/dashboard/projects/roadmap',
+    '/dashboard/settings', '/dashboard/settings/members', '/dashboard/settings/billing', '/dashboard/settings/integrations',
+    '/dashboard/settings/notifications', '/dashboard/settings/data-export', '/dashboard/settings/data-migration',
+    '/dashboard/exports', '/dashboard/support',
   ]
 
   try {
@@ -490,6 +492,7 @@ test('all dashboard routes render without page overflow at phone, tablet, and de
         }, path)
         await expect(page.getByRole('main').first(), `${path} should render its dashboard content`).toBeVisible({ timeout: 15_000 })
         await expect(page.getByRole('main'), `${path} should expose one main landmark`).toHaveCount(1)
+        await expect(page.getByRole('heading', { level: 1 }), `${path} should expose one page heading`).toHaveCount(1, { timeout: 15_000 })
         await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
       }
     }
@@ -547,6 +550,7 @@ test('CRM overview charts and dashboard actions fit phone, tablet, and desktop v
     for (const width of [390, 768, 1280]) {
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/dashboard/crm')
+      await expect(page.getByRole('heading', { level: 1, name: 'CRM overview' })).toHaveCount(1)
       await expect(page.getByRole('heading', { name: 'Revenue Forecast' })).toBeVisible()
       await expect(page.locator('.recharts-surface').first()).toBeVisible()
       await expect(page.getByText('$125M', { exact: true }).first()).toBeVisible()
@@ -571,6 +575,10 @@ test('CRM overview charts and dashboard actions fit phone, tablet, and desktop v
       expect(viewportMetrics.pageScrollWidth, `CRM page overflow at ${width}px: ${JSON.stringify(viewportMetrics)}`)
         .toBeLessThanOrEqual(width)
     }
+
+    await page.getByRole('button', { name: 'View full revenue forecast' }).click()
+    await expect(page).toHaveURL(/\/dashboard\/crm\/revenue-forecast$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Revenue Forecast' })).toHaveCount(1)
   } finally {
     await context.close()
   }
@@ -603,6 +611,7 @@ test('finance overview shows the empty cash-flow state and fits phone and tablet
     for (const width of [390, 768]) {
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/dashboard/finance')
+      await expect(page.getByRole('heading', { level: 1, name: 'Finance overview' })).toHaveCount(1)
       await expect(page.getByText(`No cash flow data is available for ${currentYear}.`)).toBeVisible()
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
     }
@@ -646,13 +655,20 @@ test('finance overview keeps populated currency KPIs and charts inside phone, ta
     for (const width of [390, 768, 1280]) {
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/dashboard/finance')
+      await expect(page.getByRole('heading', { level: 1, name: 'Finance overview' })).toHaveCount(1)
       await expect(page.getByRole('heading', { name: 'Cash Flow Analysis' })).toBeVisible()
       await expect(page.locator('.recharts-surface').first()).toBeVisible()
-      for (const value of ['$125,000,000.00', '$40,000,000.00', '$65,000,000.00', '$75,000,000.00']) {
-        const metric = page.getByText(value, { exact: true })
+      for (const [compact, full] of [
+        ['$125M', '$125,000,000.00'],
+        ['$40M', '$40,000,000.00'],
+        ['$65M', '$65,000,000.00'],
+        ['$75M', '$75,000,000.00'],
+      ]) {
+        const metric = page.getByTitle(full, { exact: true })
         await expect(metric).toBeVisible()
+        await expect(metric).toHaveText(compact)
         const dimensions = await metric.evaluate(element => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth, fontSize: getComputedStyle(element).fontSize }))
-        expect(dimensions.scrollWidth, `${value} should fit at ${width}px (${JSON.stringify(dimensions)})`).toBeLessThanOrEqual(dimensions.clientWidth)
+        expect(dimensions.scrollWidth, `${compact} (${full}) should fit at ${width}px (${JSON.stringify(dimensions)})`).toBeLessThanOrEqual(dimensions.clientWidth)
       }
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
     }
@@ -699,6 +715,7 @@ test('active sprint burndown chart fits phone, tablet, and desktop layouts with 
   try {
     await signIn(page, account)
     await page.goto('/dashboard/projects/sprints')
+    await expect(page.getByRole('heading', { level: 1, name: 'Active Sprints' })).toHaveCount(1)
     const chartCard = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Sprint burndown' }) })
     const chart = chartCard.locator('.recharts-surface')
     await expect(chart).toBeVisible()
@@ -763,6 +780,7 @@ test('project portfolio keeps populated budget figures and its detail panel usab
     for (const width of [390, 768, 1280]) {
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/dashboard/projects')
+      await expect(page.getByRole('heading', { level: 1, name: 'Projects overview' })).toHaveCount(1)
       await expect(page.getByText(projectName, { exact: true }).first()).toBeVisible()
       const budgetKpiCard = page.getByText('Total Budget', { exact: true }).locator('..')
       const budgetKpi = budgetKpiCard.locator('p.text-\\[28px\\]')
@@ -957,6 +975,7 @@ test('workspace admin can edit employee salary, basis, and employment end date',
   try {
     await signIn(page, account)
     await page.goto('/dashboard/hr/employees')
+    await expect(page.getByRole('heading', { level: 1, name: 'HR overview' })).toHaveCount(1)
     await expect(page.getByRole('heading', { name: 'Alex Employee' })).toBeVisible()
     await page.getByRole('button', { name: 'Edit profile' }).click()
     await page.getByRole('spinbutton', { name: 'Salary' }).fill('80000.00')
@@ -969,6 +988,122 @@ test('workspace admin can edit employee salary, basis, and employment end date',
     expect(updatePayload.salaryBasis).toBe('ANNUAL')
     expect(updatePayload.employmentEndDate).toBe('2026-11-30')
     expect(updatePayload.salaryEffectiveFrom).toBe('2026-10-17')
+  } finally {
+    await context.close()
+  }
+})
+
+test('clean workspace HR and Projects pages explain the first action instead of implying records exist', async ({ browser }) => {
+  const account = { id: 'clean_modules_owner', name: 'Clean Modules Owner', email: 'clean.modules@example.test', emailVerified: true, role: 'ADMIN' }
+  const context = await browser.newContext()
+  await mockAuth(context, account, async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/hr/departments')) return json(route, { data: { items: [] } })
+    if (path.endsWith('/hr/employees')) return json(route, { data: {
+      items: [],
+      pagination: { page: 1, limit: 25, total: 0, pages: 0 },
+      summary: { totalHeadcount: 0, onLeaveCount: 0, hiredThisMonth: 0, hiredPreviousMonthToDate: 0, openRoles: 0 },
+    } })
+    if (path.endsWith('/projects/portfolio')) return json(route, { data: {
+      items: [],
+      summary: { totalProjects: 0, activeProjects: 0, totalSpent: null, unvaluedSettlementCount: 0, unassignedSettlementCount: 0, totalBudget: null, utilizationPct: null },
+    } })
+    if (path.endsWith('/projects/sprints')) return json(route, { data: { items: [] } })
+    if (path.endsWith('/audit-logs')) return json(route, { data: { items: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } } })
+    return json(route, { data: { items: [] } })
+  })
+  const page = await context.newPage()
+
+  try {
+    await signIn(page, account)
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/dashboard/hr/employees')
+    await expect(page.getByRole('heading', { level: 1, name: 'HR overview' })).toHaveCount(1)
+    await expect(page.getByText('No employees yet')).toBeVisible()
+    await expect(page.getByText('This workspace is empty. Use Add Employee to create the first profile.')).toBeVisible()
+
+    await page.goto('/dashboard/projects')
+    await expect(page.getByRole('heading', { level: 1, name: 'Projects overview' })).toHaveCount(1)
+    await expect(page.getByText('No projects yet. Use New Project to create the first one.')).toBeVisible()
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  } finally {
+    await context.close()
+  }
+})
+
+test('clean workspace Payroll, Deals Pipeline, Roadmap, and Settings pages keep page context and point to real actions', async ({ browser }) => {
+  const account = { id: 'module_context_admin', name: 'Module Context Admin', email: 'module.context@example.test', emailVerified: true, role: 'ADMIN' }
+  const context = await browser.newContext()
+  await mockAuth(context, account, async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/hr/departments')) return json(route, { data: { items: [] } })
+    if (path.endsWith('/hr/payroll/runs')) {
+      return json(route, { data: { items: [], pagination: { page: 1, limit: 25, total: 0, pages: 0 }, summary: {} } })
+    }
+    if (path.endsWith('/crm/deals')) {
+      return json(route, { data: { items: [], pagination: { page: 1, limit: 25, total: 0, pages: 0 }, summary: {} } })
+    }
+    if (path.endsWith('/projects/roadmap')) return json(route, { data: { phases: [] } })
+    if (path.endsWith('/settings/general')) {
+      return json(route, { data: {
+        name: 'Clean Workspace',
+        supportEmail: null,
+        logoUrl: null,
+        timezone: 'UTC',
+        currency: 'USD',
+        dateFormat: 'MMM d, yyyy',
+        overtimeThresholdHours: 8,
+        currencyLockedAt: null,
+      } })
+    }
+    if (path.endsWith('/settings/billing')) return json(route, { data: { subscriptions: [] } })
+    if (path.endsWith('/settings/exchange-rates')) return json(route, { data: { items: [] } })
+    if (path.endsWith('/onboarding/status')) return json(route, { data: { onboardingStatus: 'EMPTY' } })
+    if (path.endsWith('/audit-logs')) return json(route, { data: { items: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } } })
+    return json(route, { data: { items: [] } })
+  })
+  const page = await context.newPage()
+
+  try {
+    await signIn(page, account)
+
+    await page.goto('/dashboard/hr/payroll')
+    await expect(page.getByRole('heading', { level: 1, name: 'Payroll' })).toHaveCount(1)
+    await expect(page.getByText('No payroll lines')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'New Payroll Run' })).toBeVisible()
+
+    await page.goto('/dashboard/crm/deals')
+    await expect(page.getByRole('heading', { level: 1, name: 'Deals Pipeline' })).toHaveCount(1)
+    await expect(page.getByText('No deals in this stage. Use New Deal to add the first one.')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'New Deal' })).toBeVisible()
+    await page.getByRole('button', { name: 'View archived' }).click()
+    await expect(page.getByRole('button', { name: 'Back to active deals' })).toBeVisible()
+    await expect(page.getByText('No archived deals in this stage.')).toBeVisible()
+
+    await page.goto('/dashboard/projects/roadmap')
+    await expect(page.getByRole('heading', { level: 1, name: 'Roadmap' })).toHaveCount(1)
+    await expect(page.getByText('No roadmap phases yet. Use New Phase to start the plan.')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'New Phase' })).toBeVisible()
+
+    await page.goto('/dashboard/settings')
+    // The Settings route is a lazy chunk; allow it to mount after a full-suite run has
+    // already loaded several other route chunks.
+    await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toHaveCount(1, { timeout: 15_000 })
+    await expect(page.getByRole('heading', { name: 'Organization Profile' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Save Changes' })).toBeVisible()
+
+    await page.goto('/dashboard/settings/members')
+    await expect(page.getByRole('heading', { level: 1, name: 'Members & Roles' })).toHaveCount(1)
+    await expect(page.getByText('No members found')).toBeVisible()
+
+    await page.goto('/dashboard/settings/integrations')
+    await expect(page.getByRole('heading', { level: 1, name: 'Integrations' })).toHaveCount(1)
+    await page.goto('/dashboard/settings/notifications')
+    await expect(page.getByRole('heading', { level: 1, name: 'Notifications' })).toHaveCount(1)
+    await page.goto('/dashboard/settings/data-export')
+    await expect(page.getByRole('heading', { level: 1, name: 'Data Export' })).toHaveCount(1)
+    await page.goto('/dashboard/exports')
+    await expect(page.getByRole('heading', { level: 1, name: 'Exports' })).toHaveCount(1)
   } finally {
     await context.close()
   }

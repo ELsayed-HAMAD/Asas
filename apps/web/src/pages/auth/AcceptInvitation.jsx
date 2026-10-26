@@ -7,9 +7,11 @@ import {
   Loader2,
   ArrowRight,
   UserCheck,
-  LogOut
+  LogOut,
+  RefreshCw
 } from 'lucide-react'
 import { authClient, useSession, signIn, signUp, signOut } from '../../lib/authClient'
+import { authErrorMessage, AUTH_SERVICE_UNREACHABLE } from '../../lib/authErrorMessage'
 import { validatePasswordPolicy, PASSWORD_POLICY_DESCRIPTION } from '../../lib/passwordPolicy'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -26,10 +28,14 @@ export default function AcceptInvitation() {
   const [invitation, setInvitation] = useState(null)
   const [loadingInvite, setLoadingInvite] = useState(true)
   const [inviteError, setInviteError] = useState('')
+  const [inviteReloadKey, setInviteReloadKey] = useState(0)
 
   const [actionLoading, setActionLoading] = useState(false)
   const [actionError, setActionError] = useState('')
   const [declined, setDeclined] = useState(false)
+  const [resetLoading, setResetLoading] = useState(false)
+  const [resetNotice, setResetNotice] = useState('')
+  const [resetError, setResetError] = useState('')
 
   // Auth form states for signed-out users
   const [mode, setMode] = useState('register') // 'register' | 'login'
@@ -46,6 +52,7 @@ export default function AcceptInvitation() {
     let isMounted = true
     async function fetchInvitation() {
       setLoadingInvite(true)
+      setInvitation(null)
       setInviteError('')
       try {
         const res = await authClient.organization.getInvitation({
@@ -60,7 +67,7 @@ export default function AcceptInvitation() {
         setInvitation(res.data)
       } catch (err) {
         if (!isMounted) return
-        setInviteError(err?.message || 'Unable to load invitation details.')
+        setInviteError(authErrorMessage(err, 'Unable to load invitation details.'))
       } finally {
         if (isMounted) setLoadingInvite(false)
       }
@@ -68,7 +75,30 @@ export default function AcceptInvitation() {
 
     fetchInvitation()
     return () => { isMounted = false }
-  }, [invitationId])
+  }, [invitationId, inviteReloadKey])
+
+  const activateJoinedWorkspace = async organizationId => {
+    if (!organizationId) return true
+    try {
+      localStorage.setItem('asas.lastActiveOrgId', organizationId)
+    } catch {
+      // The cache is optional; activation below is the source of truth.
+    }
+    try {
+      const activeRes = await authClient.organization.setActive({ organizationId })
+      if (activeRes?.error) {
+        // Acceptance succeeded, so send the member to the chooser rather than opening an old workspace.
+        navigate('/choose-workspace', { replace: true })
+        return false
+      }
+      return true
+    } catch {
+      // The invitation may already be accepted. Do not imply acceptance failed just because
+      // activation could not be confirmed over the network.
+      navigate('/choose-workspace', { replace: true })
+      return false
+    }
+  }
 
   // Handle Accept for signed-in user
   const handleAccept = async () => {
@@ -78,18 +108,14 @@ export default function AcceptInvitation() {
     try {
       const res = await authClient.organization.acceptInvitation({ invitationId })
       if (res?.error) {
-        throw new Error(res.error.message || 'Failed to accept invitation.')
+        throw new Error(authErrorMessage(res.error, 'Failed to accept invitation.'))
       }
 
       const orgId = invitation?.organizationId || res?.data?.organizationId
-      if (orgId) {
-        localStorage.setItem('asas.lastActiveOrgId', orgId)
-        await authClient.organization.setActive({ organizationId: orgId })
-      }
-
+      if (!(await activateJoinedWorkspace(orgId))) return
       navigate('/dashboard', { replace: true })
     } catch (err) {
-      setActionError(err?.message || 'Failed to accept invitation.')
+      setActionError(authErrorMessage(err, 'Failed to accept invitation.'))
       setActionLoading(false)
     }
   }
@@ -102,11 +128,11 @@ export default function AcceptInvitation() {
     try {
       const res = await authClient.organization.rejectInvitation({ invitationId })
       if (res?.error) {
-        throw new Error(res.error.message || 'Failed to decline invitation.')
+        throw new Error(authErrorMessage(res.error, 'Failed to decline invitation.'))
       }
       setDeclined(true)
     } catch (err) {
-      setActionError(err?.message || 'Failed to decline invitation.')
+      setActionError(authErrorMessage(err, 'Failed to decline invitation.'))
     } finally {
       setActionLoading(false)
     }
@@ -126,6 +152,9 @@ export default function AcceptInvitation() {
     setActionLoading(true)
     try {
       const targetEmail = invitation?.email || ''
+      if (!targetEmail) {
+        throw new Error('This invitation has no email address. Ask the workspace owner to send a new invitation.')
+      }
       const res = await signUp.email({
         email: targetEmail,
         password: authForm.password,
@@ -134,7 +163,7 @@ export default function AcceptInvitation() {
       })
 
       if (res?.error) {
-        throw new Error(res.error.message || 'Failed to create your account.')
+        throw new Error(authErrorMessage(res.error, 'Failed to create your account.'))
       }
 
       // Email/password accounts must verify their address before Better Auth creates a session.
@@ -146,7 +175,7 @@ export default function AcceptInvitation() {
         state: { email: targetEmail, callbackURL, invitationId },
       })
     } catch (err) {
-      setActionError(err?.message || 'Failed to create your account. The invitation is unchanged and you can retry.')
+      setActionError(authErrorMessage(err, 'Failed to create your account. The invitation is unchanged and you can retry.'))
       setActionLoading(false)
     }
   }
@@ -158,30 +187,43 @@ export default function AcceptInvitation() {
     setActionLoading(true)
     try {
       const targetEmail = invitation?.email || ''
+      if (!targetEmail) {
+        throw new Error('This invitation has no email address. Ask the workspace owner to send a new invitation.')
+      }
       const res = await signIn.email({
         email: targetEmail,
         password: authForm.password,
       })
 
       if (res?.error) {
-        throw new Error(res.error.message || 'Invalid credentials.')
+        const message = authErrorMessage(res.error, 'Invalid email or password.')
+        const isUnverified =
+          res.error?.code === 'EMAIL_NOT_VERIFIED' ||
+          /email.*not.*verified|not.*verified/i.test(message) ||
+          /email.*not.*verified|not.*verified/i.test(String(res.error?.message || ''))
+        if (isUnverified) {
+          const callbackURL = `${window.location.origin}/accept-invitation?invitationId=${encodeURIComponent(invitationId)}`
+          const verifyQuery = new URLSearchParams({ email: targetEmail, callbackURL })
+          navigate(`/verify-email?${verifyQuery.toString()}`, {
+            replace: true,
+            state: { email: targetEmail, callbackURL, invitationId },
+          })
+          return
+        }
+        throw new Error(message)
       }
 
       // Automatically accept the invitation
       const acceptRes = await authClient.organization.acceptInvitation({ invitationId })
       if (acceptRes?.error) {
-        throw new Error(acceptRes.error.message || 'Signed in, but failed to accept workspace invitation.')
+        throw new Error(authErrorMessage(acceptRes.error, 'Signed in, but failed to accept workspace invitation.'))
       }
 
       const orgId = invitation?.organizationId || acceptRes?.data?.organizationId
-      if (orgId) {
-        localStorage.setItem('asas.lastActiveOrgId', orgId)
-        await authClient.organization.setActive({ organizationId: orgId })
-      }
-
+      if (!(await activateJoinedWorkspace(orgId))) return
       navigate('/dashboard', { replace: true })
     } catch (err) {
-      setActionError(err?.message || 'Failed to sign in and accept.')
+      setActionError(authErrorMessage(err, 'Failed to sign in and accept.'))
       setActionLoading(false)
     }
   }
@@ -192,6 +234,27 @@ export default function AcceptInvitation() {
       await signOut()
     } finally {
       setActionLoading(false)
+    }
+  }
+
+  const handleInvitationPasswordReset = async () => {
+    const targetEmail = invitation?.email || ''
+    if (!targetEmail || resetLoading) return
+    setResetLoading(true)
+    setResetNotice('')
+    setResetError('')
+    try {
+      const invitationPath = `/accept-invitation?invitationId=${encodeURIComponent(invitationId)}`
+      const redirectTo = `${window.location.origin}/reset-password?returnTo=${encodeURIComponent(invitationPath)}`
+      const res = await authClient.forgetPassword({ email: targetEmail, redirectTo })
+      if (res?.error) {
+        throw new Error(authErrorMessage(res.error, 'Could not send a password reset link.'))
+      }
+      setResetNotice(`If an account exists for ${targetEmail}, a reset link was sent. It will return you to this invitation.`)
+    } catch (err) {
+      setResetError(authErrorMessage(err, 'Could not send a password reset link.'))
+    } finally {
+      setResetLoading(false)
     }
   }
 
@@ -207,20 +270,38 @@ export default function AcceptInvitation() {
 
   // Error state
   if (inviteError || !invitation) {
+    const serviceUnavailable = inviteError === AUTH_SERVICE_UNREACHABLE
     return (
       <div className="flex flex-col text-center">
         <div className="w-12 h-12 rounded-full bg-danger/10 text-danger flex items-center justify-center mx-auto mb-4">
           <AlertTriangle size={24} />
         </div>
-        <h1 className="text-2xl font-semibold text-heading mb-2">Invitation Unavailable</h1>
+        <h1 className="text-2xl font-semibold text-heading mb-2">
+          {serviceUnavailable ? 'Cannot Load Invitation' : 'Invitation Unavailable'}
+        </h1>
         <p className="text-sm text-muted mb-6 leading-relaxed">
-          {inviteError || 'This invitation link is invalid, has expired, or has already been accepted.'}
+          {serviceUnavailable
+            ? inviteError
+            : inviteError || 'This invitation link is invalid, has expired, or has already been accepted.'}
         </p>
-        <Button asChild className="w-full h-10">
-          <Link to="/login" className="flex items-center justify-center gap-2">
-            Continue to Sign In <ArrowRight size={16} />
-          </Link>
-        </Button>
+        <div className="w-full space-y-2">
+          {invitationId && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setInviteReloadKey(key => key + 1)}
+              className="w-full h-10 flex items-center justify-center gap-2"
+            >
+              <RefreshCw size={16} />
+              Try Again
+            </Button>
+          )}
+          <Button asChild className="w-full h-10">
+            <Link to="/login" className="flex items-center justify-center gap-2">
+              Continue to Sign In <ArrowRight size={16} />
+            </Link>
+          </Button>
+        </div>
       </div>
     )
   }
@@ -245,9 +326,13 @@ export default function AcceptInvitation() {
   }
 
   const orgName = invitation.organizationName || 'Workspace'
-  const invitedEmail = invitation.email
+  const invitedEmail = invitation.email || ''
   const invitedRole = invitation.role || 'MEMBER'
-  const isEmailMismatch = session?.user && session.user.email.toLowerCase() !== invitedEmail.toLowerCase()
+  const isEmailMismatch = Boolean(
+    session?.user?.email &&
+    invitedEmail &&
+    session.user.email.toLowerCase() !== invitedEmail.toLowerCase()
+  )
 
   return (
     <div className="flex flex-col">
@@ -283,7 +368,7 @@ export default function AcceptInvitation() {
         </div>
         <div className="flex items-center justify-between text-sm">
           <span className="text-caption">Invited Email</span>
-          <span className="text-body font-mono text-xs">{invitedEmail}</span>
+          <span className="text-body font-mono text-xs">{invitedEmail || 'Not provided'}</span>
         </div>
       </div>
 
@@ -350,7 +435,10 @@ export default function AcceptInvitation() {
           <div className="flex border-b border-border-subtle mb-4">
             <button
               type="button"
-              onClick={() => setMode('register')}
+              onClick={() => { setMode('register'); setActionError('') }}
+              aria-label="Create account and join workspace"
+              aria-pressed={mode === 'register'}
+              aria-controls="invitation-register-form"
               className={`flex-1 pb-2.5 text-xs font-medium text-center border-b-2 transition-colors cursor-pointer ${
                 mode === 'register'
                   ? 'border-primary text-primary font-semibold'
@@ -361,7 +449,10 @@ export default function AcceptInvitation() {
             </button>
             <button
               type="button"
-              onClick={() => setMode('login')}
+              onClick={() => { setMode('login'); setActionError('') }}
+              aria-label="Sign in and join workspace"
+              aria-pressed={mode === 'login'}
+              aria-controls="invitation-login-form"
               className={`flex-1 pb-2.5 text-xs font-medium text-center border-b-2 transition-colors cursor-pointer ${
                 mode === 'login'
                   ? 'border-primary text-primary font-semibold'
@@ -373,7 +464,7 @@ export default function AcceptInvitation() {
           </div>
 
           {mode === 'register' ? (
-            <form onSubmit={handleRegisterAndJoin} className="space-y-4">
+            <form id="invitation-register-form" onSubmit={handleRegisterAndJoin} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-body mb-1" htmlFor="name">
                   Full Name
@@ -384,6 +475,7 @@ export default function AcceptInvitation() {
                   value={authForm.name}
                   onChange={(e) => setAuthForm((prev) => ({ ...prev, name: e.target.value }))}
                   placeholder="Your full name"
+                  autoComplete="name"
                   required
                 />
               </div>
@@ -396,6 +488,7 @@ export default function AcceptInvitation() {
                   id="email"
                   type="email"
                   value={invitedEmail}
+                  autoComplete="email"
                   disabled
                   className="bg-surface-muted cursor-not-allowed opacity-80"
                 />
@@ -411,9 +504,11 @@ export default function AcceptInvitation() {
                   value={authForm.password}
                   onChange={(e) => setAuthForm((prev) => ({ ...prev, password: e.target.value }))}
                   placeholder="Create a strong password"
+                  autoComplete="new-password"
+                  aria-describedby="invitation-password-policy"
                   required
                 />
-                <p className="text-[11px] text-caption mt-1">{PASSWORD_POLICY_DESCRIPTION}</p>
+                <p id="invitation-password-policy" className="text-[11px] text-caption mt-1">{PASSWORD_POLICY_DESCRIPTION}</p>
               </div>
 
               <Button
@@ -425,7 +520,7 @@ export default function AcceptInvitation() {
               </Button>
             </form>
           ) : (
-            <form onSubmit={handleLoginAndJoin} className="space-y-4">
+            <form id="invitation-login-form" onSubmit={handleLoginAndJoin} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-body mb-1" htmlFor="loginEmail">
                   Work Email
@@ -434,6 +529,7 @@ export default function AcceptInvitation() {
                   id="loginEmail"
                   type="email"
                   value={invitedEmail}
+                  autoComplete="email"
                   disabled
                   className="bg-surface-muted cursor-not-allowed opacity-80"
                 />
@@ -449,6 +545,7 @@ export default function AcceptInvitation() {
                   value={authForm.password}
                   onChange={(e) => setAuthForm((prev) => ({ ...prev, password: e.target.value }))}
                   placeholder="Enter your password"
+                  autoComplete="current-password"
                   required
                 />
               </div>
@@ -460,6 +557,20 @@ export default function AcceptInvitation() {
               >
                 {actionLoading ? <Loader2 size={16} className="animate-spin" /> : 'Sign In & Join'}
               </Button>
+
+              <div className="rounded-card-sm border border-border-subtle bg-surface-muted/40 px-3 py-3 text-center">
+                <p className="text-xs text-muted">Forgot the password for this invitation email?</p>
+                <button
+                  type="button"
+                  onClick={handleInvitationPasswordReset}
+                  disabled={resetLoading || !invitedEmail}
+                  className="mt-1 text-xs font-semibold text-heading hover:underline disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {resetLoading ? 'Sending reset link...' : 'Email me a reset link'}
+                </button>
+                {resetNotice && <p role="status" className="mt-2 text-[11px] leading-relaxed text-success-text">{resetNotice}</p>}
+                {resetError && <p role="alert" className="mt-2 text-[11px] leading-relaxed text-danger">{resetError}</p>}
+              </div>
             </form>
           )}
         </div>

@@ -191,6 +191,7 @@ export default function TimeOff() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-y-auto min-w-0 px-6 py-5">
+      <h1 className="sr-only">Time Off & Leave</h1>
       {/* ── Toolbar: Filters & Primary Actions (Apple-Glass Unified Bar) ── */}
       <div className="bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-2.5 shadow-xs flex flex-wrap items-center justify-between gap-2.5 mb-5 shrink-0">
         {/* Left Filter Cluster: Employee Search + Dept + Type */}
@@ -498,7 +499,9 @@ export default function TimeOff() {
                     {filteredLeaveRequests.length === 0 && (
                       <TableRow className="hover:bg-transparent border-0">
                         <TableCell colSpan={isAdmin ? 5 : 4} className="p-8 text-center text-sm text-muted">
-                          No time off requests match the selected filters.
+                          {searchQuery.trim() || departmentId !== 'ALL' || typeFilter !== 'ALL' || statusFilter !== 'ALL'
+                            ? 'No time off requests match the selected filters. Clear them to see every request.'
+                            : 'No time off requests yet. Submitted requests will appear here for review.'}
                         </TableCell>
                       </TableRow>
                     )}
@@ -602,7 +605,13 @@ export default function TimeOff() {
                       ))}
 
                       {filteredBalances.length === 0 && (
-                        <p className="py-12 text-center text-xs text-muted">No annual leave balances recorded.</p>
+                        <p className="py-12 text-center text-xs text-muted">
+                          {(leaveBalanceData?.items ?? []).length === 0
+                            ? isAdmin
+                              ? 'No annual leave balances recorded yet. Open Policies to set an allowance.'
+                              : 'No annual leave balances recorded yet. Ask an administrator to configure leave policies.'
+                            : 'No leave balances match the current search or department filter. Clear them to see every balance.'}
+                        </p>
                       )}
                     </div>
                   </div>

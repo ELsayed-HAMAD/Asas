@@ -146,6 +146,7 @@ export default function PortfolioOverview() {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised">
+        <h1 className="sr-only">Projects overview</h1>
         <Loader2 className="animate-spin text-muted" size={24} />
       </div>
     );
@@ -154,6 +155,7 @@ export default function PortfolioOverview() {
   if (isError || !responseData) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised text-danger">
+        <h1 className="sr-only">Projects overview</h1>
         Failed to load portfolio overview.
       </div>
     );
@@ -187,6 +189,7 @@ export default function PortfolioOverview() {
 
   return (
     <div className="flex h-full flex-col bg-surface-raised overflow-hidden min-w-0">
+      <h1 className="sr-only">Projects overview</h1>
 
       {/* ── KPIs Row ── */}
       <div className="px-4 xl:px-5 pt-4 pb-1 flex-shrink-0">
@@ -334,7 +337,9 @@ export default function PortfolioOverview() {
                 {visibleProjects.length === 0 ? (
                   <TableRow className="h-28 hover:bg-transparent border-0">
                     <TableCell colSpan={4} className="px-6 py-6 text-center text-sm text-slate-500">
-                      No projects found matching the selected filters.
+                      {projects.length === 0
+                        ? 'No projects yet. Use New Project to create the first one.'
+                        : 'No projects found matching the selected filters.'}
                     </TableCell>
                   </TableRow>
                 ) : (

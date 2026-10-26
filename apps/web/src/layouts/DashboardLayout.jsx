@@ -24,7 +24,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
 } from '../components/ui/dropdown-menu'
 import {
   Dialog,
@@ -395,6 +394,12 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
 
   const [deferredPrompt, setDeferredPrompt] = useState(null)
   const [installInfoOpen, setInstallInfoOpen] = useState(false)
+  const [isDarkTheme, setIsDarkTheme] = useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.classList.contains('dark')
+    }
+    return false
+  })
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e) => {
@@ -449,7 +454,11 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
         setSwitchingOrgId(null)
         return
       }
-      localStorage.setItem('asas.lastActiveOrgId', organizationId)
+      try {
+        localStorage.setItem('asas.lastActiveOrgId', organizationId)
+      } catch {
+        // The server-side active organization is authoritative; the cache is optional.
+      }
       queryClient.clear()
       window.location.assign('/dashboard')
     } catch (err) {
@@ -489,7 +498,12 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
   const toggleTheme = () => {
     setUserMenuOpen(false)
     const isDark = document.documentElement.classList.toggle('dark')
-    localStorage.setItem('theme', isDark ? 'dark' : 'light')
+    try {
+      localStorage.setItem('theme', isDark ? 'dark' : 'light')
+    } catch {
+      // Theme still applies for this session when storage is unavailable.
+    }
+    setIsDarkTheme(isDark)
   }
 
   const handleInstallApp = async () => {
@@ -678,86 +692,97 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
           </DropdownMenuTrigger>
 
           <DropdownMenuContent
-            side="top"
-            align="start"
-            sideOffset={8}
-            className="w-72 p-0 glass-strong border border-border-default/60 rounded-xl shadow-glass z-50 overflow-hidden animate-scale-in"
+            side={isCollapsed ? 'right' : 'top'}
+            align={isCollapsed ? 'end' : 'start'}
+            sideOffset={isCollapsed ? 12 : 8}
+            className="w-[248px] p-2 glass-popover bg-white/78 backdrop-blur-2xl backdrop-saturate-180 border border-white/90 ring-1 ring-slate-900/[0.08] rounded-2xl shadow-[0_20px_48px_-12px_rgba(15,23,42,0.16),0_4px_12px_-2px_rgba(15,23,42,0.06),inset_0_1px_0_0_rgba(255,255,255,0.95)] space-y-1.5 text-slate-800 z-50 overflow-hidden animate-scale-in"
           >
-            {/* 1. Identity Header */}
-            <div className="p-4 flex items-center gap-4">
-              <div className="relative">
-                <div className="w-12 h-12 rounded-full bg-surface-strong flex items-center justify-center text-lg font-bold text-body shadow-inner">
+            {/* 1. Top Translucent Glass Pod: Identity & Workspace */}
+            <div className="glass-well bg-slate-100/65 border border-slate-200/60 rounded-xl p-2.5 space-y-2 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.8)]">
+              {/* User Identity Row */}
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/80 text-xs font-bold text-slate-800 flex items-center justify-center shadow-2xs relative shrink-0">
                   {initials}
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white absolute -bottom-0.5 -right-0.5" />
                 </div>
-                <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-success rounded-full border-2 border-surface-raised shadow-sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-slate-900 leading-tight truncate">{displayName}</p>
+                  <p className="text-[11px] text-slate-500 leading-tight mt-0.5 tracking-tight truncate" title={email}>{email}</p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-base font-bold text-heading truncate leading-tight">{displayName}</p>
-                <p className="text-sm text-muted truncate mt-0.5">{email}</p>
+
+              {/* Workspace Switcher Sub-Pod */}
+              <div className="pt-2 border-t border-slate-200/60 space-y-1">
+                <p className="px-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  WORKSPACE
+                </p>
+                {orgList.length > 1 ? (
+                  <>
+                    {orgList.map(org => {
+                      const isActive = org.id === activeOrganization?.id
+                      return (
+                        <DropdownMenuItem
+                          key={org.id}
+                          disabled={Boolean(switchingOrgId)}
+                          onClick={isActive ? undefined : () => handleSwitchOrganization(org.id)}
+                          className={`w-full px-2 py-1.5 rounded-lg flex items-center justify-between text-xs transition-colors cursor-pointer ${
+                            isActive
+                              ? 'bg-white/80 border border-slate-200/50 shadow-2xs font-semibold text-slate-900'
+                              : 'hover:bg-white/60 font-medium text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <div className="w-5 h-5 rounded-md bg-white border border-slate-200/80 flex items-center justify-center text-[10px] font-bold text-slate-700 shrink-0 shadow-2xs">
+                              {org.name?.slice(0, 1).toUpperCase()}
+                            </div>
+                            <span className="truncate">{org.name}</span>
+                          </div>
+                          {isActive && <Check size={14} className="text-indigo-600 shrink-0 ml-1.5" />}
+                        </DropdownMenuItem>
+                      )
+                    })}
+                    {orgSwitchError && (
+                      <p className="px-2 py-1 text-xs text-danger">{orgSwitchError}</p>
+                    )}
+                    <DropdownMenuItem
+                      onClick={() => navigate('/choose-workspace')}
+                      className="w-full px-2 py-1 rounded-lg hover:bg-white/60 flex items-center gap-2 text-[11px] text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+                    >
+                      <Building2 size={13} className="text-slate-400" />
+                      <span className="truncate">Switch or View All Workspaces</span>
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={() => navigate('/dashboard/settings')}
+                    className="w-full px-2 py-1.5 rounded-lg bg-white/80 border border-slate-200/50 shadow-2xs flex items-center justify-between text-xs font-semibold text-slate-900 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="w-5 h-5 rounded-md bg-white border border-slate-200/80 flex items-center justify-center text-[10px] font-bold text-slate-700 shrink-0 shadow-2xs">
+                        {tenantName?.slice(0, 1).toUpperCase() || 'W'}
+                      </div>
+                      <span className="truncate">{tenantName}</span>
+                    </div>
+                    <Check size={14} className="text-indigo-600 shrink-0 ml-1.5" />
+                  </DropdownMenuItem>
+                )}
+
+                <DropdownMenuItem
+                  onClick={() => {
+                    setNewWorkspaceName('')
+                    setCreateWorkspaceError('')
+                    setCreateWorkspaceOpen(true)
+                  }}
+                  className="w-full px-2 py-1.5 rounded-lg hover:bg-white/60 flex items-center gap-2 text-xs font-semibold text-indigo-600 transition-colors cursor-pointer"
+                >
+                  <Plus size={14} />
+                  <span>{t('common.createWorkspace', 'Create New Workspace')}</span>
+                </DropdownMenuItem>
               </div>
             </div>
 
-            <DropdownMenuSeparator className="my-0" />
-
-            {/* 2. Workspace Switcher */}
-            <div className="p-2 space-y-1">
-              {orgList.length > 1 ? (
-                <>
-                  {orgList.map(org => {
-                    const isActive = org.id === activeOrganization?.id
-                    return (
-                      <DropdownMenuItem
-                        key={org.id}
-                        disabled={Boolean(switchingOrgId)}
-                        onClick={isActive ? undefined : () => handleSwitchOrganization(org.id)}
-                        className={`px-3 py-2 flex items-center justify-between rounded-input transition-colors cursor-pointer ${
-                          isActive ? 'font-semibold text-heading' : 'font-medium text-heading hover:bg-surface-muted'
-                        }`}
-                      >
-                        <span className="text-sm truncate">{org.name}</span>
-                        {isActive && <Check size={16} className="text-accent shrink-0" />}
-                      </DropdownMenuItem>
-                    )
-                  })}
-                  {orgSwitchError && (
-                    <p className="px-3 py-1.5 text-xs text-danger">{orgSwitchError}</p>
-                  )}
-                </>
-              ) : (
-                <DropdownMenuItem
-                  onClick={() => navigate('/dashboard/settings')}
-                  className="px-3 py-2 flex items-center justify-between hover:bg-surface-muted rounded-input cursor-pointer transition-colors"
-                >
-                  <span className="text-sm font-semibold text-heading truncate">{tenantName}</span>
-                  <Check size={16} className="text-accent shrink-0" />
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem
-                onClick={() => {
-                  setNewWorkspaceName('')
-                  setCreateWorkspaceError('')
-                  setCreateWorkspaceOpen(true)
-                }}
-                className="w-full px-3 py-2 flex items-center gap-3 text-sm font-semibold text-accent hover:bg-surface-muted rounded-input cursor-pointer transition-colors"
-              >
-                <Plus size={16} />
-                {t('common.createWorkspace', 'Create New Workspace')}
-              </DropdownMenuItem>
-              {orgList.length > 1 && (
-                <DropdownMenuItem
-                  onClick={() => navigate('/choose-workspace')}
-                  className="w-full px-3 py-1.5 flex items-center gap-2.5 text-xs text-muted hover:text-heading hover:bg-surface-muted rounded-input cursor-pointer transition-colors"
-                >
-                  <Building2 size={14} />
-                  <span>Switch or View All Workspaces</span>
-                </DropdownMenuItem>
-              )}
-            </div>
-
-            <DropdownMenuSeparator className="my-0" />
-
-            {/* 3. Account Actions */}
-            <div className="p-2 flex flex-col gap-1">
+            {/* 2. Middle Section — Full-Width Tactile Menu Rows */}
+            <div className="space-y-0.5 px-0.5">
               <DropdownMenuItem
                 onClick={() => {
                   setProfileName(displayName)
@@ -768,46 +793,57 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
                   setProfileSuccess('')
                   setProfileOpen(true)
                 }}
-                className="flex items-center gap-3 px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
+                className="w-full px-2.5 py-1.5 rounded-xl hover:bg-slate-900/[0.05] active:bg-slate-900/[0.08] flex items-center gap-2.5 text-xs font-medium text-slate-700 transition-all cursor-pointer"
               >
-                <User size={16} className="text-caption" />
-                {t('common.profilePreferences', 'Profile & Preferences')}
+                <User size={14} className="text-slate-400 shrink-0" />
+                <span>{t('common.profilePreferences', 'Profile & Preferences')}</span>
               </DropdownMenuItem>
+
               <DropdownMenuItem
                 onClick={toggleTheme}
-                className="flex items-center gap-3 px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
+                className="w-full px-2.5 py-1.5 rounded-xl hover:bg-slate-900/[0.05] active:bg-slate-900/[0.08] flex items-center justify-between text-xs font-medium text-slate-700 transition-all cursor-pointer"
               >
-                <Moon size={16} className="text-caption" />
-                {t('common.toggleTheme', 'Toggle Theme')}
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Moon size={14} className="text-slate-400 shrink-0" />
+                  <span className="whitespace-nowrap">{t('common.toggleTheme', 'Toggle Theme')}</span>
+                </div>
+                <span className="px-1.5 py-0.5 rounded-md bg-slate-200/60 text-[10px] font-semibold text-slate-500 uppercase shrink-0">
+                  {isDarkTheme ? 'Dark' : 'Light'}
+                </span>
               </DropdownMenuItem>
+
               <DropdownMenuItem
                 data-testid="language-toggle"
                 onClick={() => changeLanguage(i18n.language === 'ar' ? 'en' : 'ar')}
-                className="flex items-center gap-3 px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
+                className="w-full px-2.5 py-1.5 rounded-xl hover:bg-slate-900/[0.05] active:bg-slate-900/[0.08] flex items-center justify-between text-xs font-medium text-slate-700 transition-all cursor-pointer"
                 title={i18n.language === 'ar' ? 'Switch to English' : 'التحويل إلى العربية'}
               >
-                <Globe size={16} className="text-caption" />
-                <span>{i18n.language === 'ar' ? 'English' : 'العربية'}</span>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Globe size={14} className="text-slate-400 shrink-0" />
+                  <span>{i18n.language === 'ar' ? 'English' : 'العربية'}</span>
+                </div>
+                <span className="px-1.5 py-0.5 rounded-md bg-slate-200/60 text-[10px] font-semibold text-slate-500 uppercase shrink-0">
+                  {i18n.language === 'ar' ? 'EN' : 'AR'}
+                </span>
               </DropdownMenuItem>
+
               <DropdownMenuItem
                 onClick={handleInstallApp}
-                className="flex items-center gap-3 px-3 py-2 hover:bg-surface-muted rounded-input text-heading text-sm font-medium transition-colors cursor-pointer"
+                className="w-full px-2.5 py-1.5 rounded-xl hover:bg-slate-900/[0.05] active:bg-slate-900/[0.08] flex items-center gap-2.5 text-xs font-medium text-slate-700 transition-all cursor-pointer"
               >
-                <Download size={16} className="text-caption" />
-                {t('common.downloadApp', 'Download Desktop App')}
+                <Download size={14} className="text-slate-400 shrink-0" />
+                <span>{t('common.downloadApp', 'Download Desktop App')}</span>
               </DropdownMenuItem>
             </div>
 
-            <DropdownMenuSeparator className="my-0" />
-
-            {/* 4. Destructive Action */}
-            <div className="p-2">
+            {/* 3. Bottom Section — Crisp Log Out Row */}
+            <div className="pt-1 border-t border-slate-200/60">
               <DropdownMenuItem
                 onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-3 py-2 text-danger hover:bg-danger-light hover:text-danger-hover rounded-input text-sm font-bold transition-colors cursor-pointer"
+                className="w-full px-2.5 py-1.5 rounded-xl hover:bg-rose-500/10 flex items-center gap-2.5 text-xs font-semibold text-rose-600 transition-all cursor-pointer"
               >
-                <LogOut size={16} />
-                {t('common.logout', 'Log Out')}
+                <LogOut size={14} />
+                <span>{t('common.logout', 'Log Out')}</span>
               </DropdownMenuItem>
             </div>
           </DropdownMenuContent>
@@ -1130,6 +1166,12 @@ export default function DashboardLayout() {
 
   return (
     <div className="flex h-screen bg-surface overflow-hidden">
+      <a
+        href="#dashboard-main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-on-primary focus:shadow-card"
+      >
+        Skip to dashboard content
+      </a>
 
       {/* ── Desktop sidebar ── */}
       <TooltipProvider delayDuration={150}>
@@ -1234,7 +1276,7 @@ export default function DashboardLayout() {
         </header>
 
         {/* Page content */}
-        <main className="relative flex-1 min-w-0 min-h-0 overflow-x-auto overflow-y-auto flex flex-col">
+        <main id="dashboard-main-content" tabIndex={-1} className="relative flex-1 min-w-0 min-h-0 overflow-x-auto overflow-y-auto flex flex-col focus:outline-none">
           {session?.user && !session.user.emailVerified && (
             <div className="bg-warning-light border-b border-warning/20 px-6 py-2 flex items-center justify-between text-xs text-warning-text">
               <div className="flex items-center gap-2">

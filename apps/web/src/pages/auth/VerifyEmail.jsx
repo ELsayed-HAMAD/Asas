@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
-import { MailCheck, ExternalLink, Loader2, CheckCircle2, ArrowRight, RefreshCw, AlertCircle } from 'lucide-react'
+import { MailCheck, Mail, ExternalLink, Loader2, CheckCircle2, ArrowRight, RefreshCw, AlertCircle } from 'lucide-react'
 import { authClient, useSession, signOut } from '../../lib/authClient'
+import { authErrorMessage } from '../../lib/authErrorMessage'
 import { getSafeAuthCallbackPath } from '../../lib/authRedirect'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
@@ -71,13 +72,13 @@ export default function VerifyEmail() {
       })
 
       if (result?.error) {
-        throw new Error(result.error.message || 'Unable to resend verification email.')
+        throw new Error(authErrorMessage(result.error, 'Unable to resend verification email.'))
       }
 
       setResendMessage(`A fresh verification link was sent to ${email}.`)
       setCountdown(60)
     } catch (err) {
-      setResendError(err?.message || 'Failed to resend verification email. Please try again.')
+      setResendError(authErrorMessage(err, 'Failed to resend verification email. Please try again.'))
     } finally {
       setIsResending(false)
     }
@@ -156,15 +157,19 @@ export default function VerifyEmail() {
             </a>
           </Button>
         ) : (
-          <Button asChild className="w-full h-10 font-medium">
-            <a
-              href={`mailto:${email}`}
-              className="flex items-center justify-center gap-2"
-            >
-              <span>Open Email Inbox</span>
-              <ExternalLink size={15} />
-            </a>
-          </Button>
+          <div className="rounded-button border border-border-subtle bg-surface-muted/50 px-4 py-3 text-left">
+            <div className="flex items-start gap-2.5">
+              <Mail size={16} className="mt-0.5 flex-shrink-0 text-muted" />
+              <div>
+                <p className="text-xs font-medium text-body">Open your email app or webmail</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-muted">
+                  {email
+                    ? `We cannot detect the inbox provider for ${email}. Open that inbox to find the confirmation message.`
+                    : 'Open the inbox for the account you signed up with to find the confirmation message.'}
+                </p>
+              </div>
+            </div>
+          </div>
         )}
 
         {session?.user ? (

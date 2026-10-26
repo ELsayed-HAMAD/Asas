@@ -107,7 +107,11 @@ describe('health probe', () => {
       $disconnect: async () => {},
     } as any
 
-    const env = loadEnv({ NODE_ENV: 'production' })
+    const env = loadEnv({
+      NODE_ENV: 'production',
+      AUTH_SECRET: '01234567890123456789012345678901',
+      BETTER_AUTH_URL: 'https://api.asas.local',
+    })
     const app = await buildApp(env, { logger: false, prisma: mockPrisma })
     apps.push(app)
 

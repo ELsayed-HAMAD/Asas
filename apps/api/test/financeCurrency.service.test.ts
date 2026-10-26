@@ -37,6 +37,28 @@ describe('finance currency snapshots', () => {
     expect(invoice.lineItems[0].amount).toEqual({ amount: 1234, currency: 'KWD' })
     expect(await getInvoiceDoc(prisma, 'tenant_1', 'invoice_1')).toMatchObject({ currency: 'KWD', total: '1.234' })
   })
+  it('does not show a historical match after a bill is relinked to a different receipt', async () => {
+    const prisma = {
+      tenant: { findUnique: async () => ({ name: 'Workspace', currency: 'USD', timezone: 'UTC' }) },
+      payableInvoice: {
+        findFirst: async () => ({
+          id: 'invoice_1', tenantId: 'tenant_1', currency: 'USD', purchaseOrderId: 'po_new',
+          projectId: null, vendorId: 'vendor_1', vendor: { name: 'Vendor' }, invoiceNumber: null,
+          date: now, dueDate: null, amount: new Prisma.Decimal('62.5'),
+          sourceOriginalAmount: null, sourcePaidAmount: null, status: 'REJECTED',
+          createdById: null, approvedById: null, approvedAt: null, paidAt: null, createdAt: now, updatedAt: now,
+          lineItems: [],
+          _count: { lineItems: 0 },
+          purchaseOrderMatches: [{
+            purchaseOrderId: 'po_old', status: 'REVERSED', amount: new Prisma.Decimal('62.5'), currency: 'USD',
+            createdAt: now, reversedAt: now,
+            purchaseOrder: { lines: [{ quantity: 5, product: { name: 'Old widget', sku: 'OLD-1' } }] },
+          }],
+        }),
+      },
+    } as unknown as Prisma.TransactionClient
+    expect((await getPayable(prisma, 'tenant_1', 'invoice_1')).purchaseOrderMatch).toBeNull()
+  })
   it('uses snapshot currency for receivables and expense amount/tax', async () => {
     const { prisma } = setup()
     expect((await getReceivable(prisma, 'tenant_1', 'invoice_1')).amount).toEqual({ amount: 1234, currency: 'KWD' })

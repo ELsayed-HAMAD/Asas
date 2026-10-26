@@ -91,6 +91,7 @@ describe('inventory valuation posting', () => {
       reason: 'PURCHASE_RECEIPT',
       postedAt,
       actorId: 'user_1',
+      purchaseOrderId: 'po_1',
     })
 
     expect(result).toEqual({ eventId: 'event_1', journalEntryId: 'journal_1', value: '50.00' })
@@ -105,7 +106,7 @@ describe('inventory valuation posting', () => {
     })
     expect(tx.inventoryValuationEvent.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        stockMovementId: 'movement_1', costingMethod: 'FIFO', reason: 'PURCHASE_RECEIPT',
+        stockMovementId: 'movement_1', purchaseOrderId: 'po_1', costingMethod: 'FIFO', reason: 'PURCHASE_RECEIPT',
         quantityDelta: 10, costValue: '50.00', currency: 'USD',
       }),
     })

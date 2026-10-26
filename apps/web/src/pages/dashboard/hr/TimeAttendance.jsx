@@ -209,6 +209,7 @@ export default function TimeAttendance() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-y-auto min-w-0 px-6 py-5">
+      <h1 className="sr-only">Time & Attendance</h1>
       {/* ── Unified Single Toolbar: Filter Controls & Action Buttons (Apple-Glass Bar) ── */}
       <div className="bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-2.5 shadow-xs flex flex-wrap items-center justify-between gap-2.5 mb-5 shrink-0">
         {/* Left Filter Group */}
@@ -533,7 +534,9 @@ export default function TimeAttendance() {
                     {timesheets.length === 0 && (
                       <TableRow className="hover:bg-transparent border-0">
                         <TableCell colSpan={4} className="p-8 text-center text-sm text-muted">
-                          No weekly timesheets match the selected filters.
+                          {departmentId !== 'ALL'
+                            ? 'No weekly timesheets match the selected department filter. Choose All Departments to see every timesheet.'
+                            : 'No weekly timesheets yet. Clocked-in shifts will appear here for approval.'}
                         </TableCell>
                       </TableRow>
                     )}
@@ -824,7 +827,9 @@ export default function TimeAttendance() {
 
                     {visibleExceptions.length === 0 && (
                       <div className="p-8 text-center text-xs text-muted">
-                        No attendance exceptions found.
+                        {departmentId !== 'ALL' || needsActionOnly || !autoFlagOvertime
+                          ? 'No attendance exceptions match the selected filters. Clear them to see every exception.'
+                          : 'No attendance exceptions recorded for this period.'}
                       </div>
                     )}
                   </div>

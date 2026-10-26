@@ -10,6 +10,9 @@ import {
   receivableListQuerySchema,
   receivableInvoiceSchema,
   payableInvoiceSchema,
+  payableDetailSchema,
+  payablePurchaseOrderCandidateSchema,
+  payablePurchaseOrderCandidatesQuerySchema,
   journalSourceTypeSchema,
 } from './index.js'
 
@@ -108,6 +111,50 @@ describe('finance boundary validation', () => {
     expect(payableWriteSchema.parse({ ...payable, projectId: null }).projectId).toBeNull()
     expect(payableWriteSchema.parse({ ...payable, projectId: vendorId }).projectId).toBe(vendorId)
     expect(expenseWriteSchema.parse({ ...expense, projectId: vendorId }).projectId).toBe(vendorId)
+  })
+  it('links a payable to one optional purchase order and carries exact-match evidence', () => {
+    const payable = { vendorId, date: '2026-10-07', amount: '62.50' }
+    expect(payableWriteSchema.parse({ ...payable, purchaseOrderId: vendorId }).purchaseOrderId).toBe(vendorId)
+    expect(payableWriteSchema.parse({ ...payable, purchaseOrderId: null }).purchaseOrderId).toBeNull()
+    expect(payableWriteSchema.safeParse({ ...payable, purchaseOrderId: 'not-an-id' }).success).toBe(false)
+    expect(payableUpdateSchema.parse({ purchaseOrderId: vendorId }).purchaseOrderId).toBe(vendorId)
+    expect(payableUpdateSchema.parse({ purchaseOrderId: null }).purchaseOrderId).toBeNull()
+    expect(payableUpdateSchema.safeParse({ purchaseOrderId: 'not-an-id' }).success).toBe(false)
+
+    const candidate = {
+      id: vendorId,
+      productName: 'Widget',
+      sku: 'W-1',
+      quantity: 5,
+      receivedValue: '62.50',
+      receivedValueMoney: { amount: 6250, currency: 'USD' },
+      currency: 'USD',
+      receivedAt: '2026-10-25T10:00:00.000Z',
+    }
+    expect(payablePurchaseOrderCandidateSchema.parse(candidate)).toEqual(candidate)
+    expect(payablePurchaseOrderCandidateSchema.safeParse({ ...candidate, receivedValueMoney: { amount: 6250, currency: 'US' } }).success).toBe(false)
+    expect(payablePurchaseOrderCandidatesQuerySchema.safeParse({ vendorId }).success).toBe(true)
+    expect(payablePurchaseOrderCandidatesQuerySchema.safeParse({}).success).toBe(false)
+
+    const ap = {
+      id: vendorId, vendorId, vendor: 'Vendor', projectId: null, invoiceNumber: null,
+      date: '2026-10-01T00:00:00.000Z', dueDate: null, amount: { amount: 6250, currency: 'USD' },
+      status: 'PENDING', lineItemCount: 0, createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z',
+    }
+    const match = {
+      purchaseOrderId: vendorId,
+      status: 'ACTIVE',
+      productName: 'Widget',
+      sku: 'W-1',
+      quantity: 5,
+      receivedValue: { amount: 6250, currency: 'USD' },
+      currency: 'USD',
+      matchedAt: '2026-10-25T10:00:00.000Z',
+      reversedAt: null,
+    }
+    expect(payableDetailSchema.parse({ ...ap, lineItems: [] }).purchaseOrderMatch).toBeNull()
+    expect(payableInvoiceSchema.parse(ap).purchaseOrderId).toBeNull()
+    expect(payableDetailSchema.parse({ ...ap, lineItems: [], purchaseOrderMatch: match }).purchaseOrderMatch).toEqual(match)
   })
   it('requires non-negative tax no greater than the total, with exact decimal comparison', () => {
     const input = { name: 'Expense', date: '2026-10-07', amount: '10.01' }

@@ -187,6 +187,7 @@ export default function MembersRoles() {
 
   return (
     <div className="flex-1 min-h-0 min-w-0 flex flex-col bg-surface overflow-hidden relative">
+      <h1 className="sr-only">Members &amp; Roles</h1>
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
           <SearchInput
@@ -241,6 +242,11 @@ export default function MembersRoles() {
               </div>
 
               <div className="divide-y divide-border-subtle">
+                {filteredMembers.length === 0 && (
+                  <p className="px-5 py-8 text-center text-sm text-muted">
+                    No members match this search.
+                  </p>
+                )}
                 {filteredMembers.map((member) => {
                   const isSelf = member.userId === session?.user?.id
                   const isMemberOwner = member.role === 'OWNER'

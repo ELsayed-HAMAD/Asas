@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -16,8 +16,14 @@ import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tansta
 import { inventoryApi } from '../../../lib/api/inventory'
 import { queryKeys } from '../../../lib/queryKeys'
 import { formatDate } from '../../../lib/format'
-import { useActiveMemberRole } from '../../../lib/authClient'
+import { useActiveMemberRole, useActiveOrganization, useSession } from '../../../lib/authClient'
 import { useDebouncedValue } from '../../../lib/useDebouncedValue'
+import {
+  clearStockMovementDraft,
+  readStockMovementDraft,
+  saveStockMovementDraft,
+  stockMovementDraftStorageKey,
+} from '../../../lib/stockMovementDraft'
 import FormDialog from '../../../components/common/FormDialog'
 import SearchInput from '../../../components/common/SearchInput'
 import { Button } from '../../../components/ui/button'
@@ -40,9 +46,25 @@ import {
 } from '../../../components/ui/select'
 import { RECEIPT_REASONS, ISSUE_REASONS } from '../../../lib/inventoryReasons'
 
+function movementDraftStorage() {
+  try { return window.sessionStorage } catch { return null }
+}
+
+const EMPTY_MOVEMENT_FORM = {
+  productId: '',
+  kind: 'receive',
+  quantity: '1',
+  note: '',
+  reason: 'PURCHASE_RECEIPT',
+  unitCost: '',
+}
+
 export default function StockMovements() {
   const queryClient = useQueryClient()
   const { data: roleData } = useActiveMemberRole()
+  const { data: activeOrganization } = useActiveOrganization()
+  const { data: sessionData } = useSession()
+  const draftStorageKey = stockMovementDraftStorageKey(activeOrganization?.id, sessionData?.user?.id)
   const canWrite = roleData?.role === 'ADMIN' || roleData?.role === 'OWNER'
   const noRoleTitle = canWrite ? undefined : 'Only workspace admins can record stock movements.'
 
@@ -62,15 +84,21 @@ export default function StockMovements() {
 
   // Record movement dialog state
   const [movementDialogOpen, setMovementDialogOpen] = useState(false)
-  const [movementForm, setMovementForm] = useState({
-    productId: '',
-    kind: 'receive', // 'receive' | 'issue'
-    quantity: '1',
-    note: '',
-    reason: 'PURCHASE_RECEIPT',
-    unitCost: '',
-  })
+  const [movementForm, setMovementForm] = useState(EMPTY_MOVEMENT_FORM)
   const [movementError, setMovementError] = useState('')
+  const [savedRetryAvailable, setSavedRetryAvailable] = useState(false)
+  const requestRef = useRef(null)
+
+  useEffect(() => {
+    if (!draftStorageKey) {
+      requestRef.current = null
+      setSavedRetryAvailable(false)
+      return
+    }
+    const draft = readStockMovementDraft(movementDraftStorage(), draftStorageKey)
+    requestRef.current = draft
+    setSavedRetryAvailable(Boolean(draft))
+  }, [draftStorageKey])
 
   // Query: Stock movements
   const { data, isLoading, isError } = useQuery({
@@ -125,52 +153,124 @@ export default function StockMovements() {
 
   const movements = rawItems
 
+  function buildMovementPayload() {
+    const parsedQty = Number(movementForm.quantity)
+    if (!movementForm.productId) {
+      throw new Error('Please select a product.')
+    }
+    if (!Number.isSafeInteger(parsedQty) || parsedQty <= 0) {
+      throw new Error('Quantity must be a positive integer.')
+    }
+    const delta = movementForm.kind === 'receive' ? parsedQty : -parsedQty
+    const reason = movementForm.reason
+    if (valuationConfigured) {
+      if (movementForm.kind === 'receive' && !movementForm.unitCost.trim()) {
+        throw new Error('Unit cost is required because this workspace values inventory. The selling price is never used as cost.')
+      }
+      if (movementForm.kind !== 'receive' && !reason) {
+        throw new Error('Select a reason so the cost posts to the right ledger account.')
+      }
+    }
+    return {
+      productId: movementForm.productId,
+      delta,
+      note: movementForm.note.trim() || null,
+      ...(valuationConfigured && {
+        reason,
+        ...(movementForm.kind === 'receive' && { unitCost: movementForm.unitCost.trim() }),
+      }),
+    }
+  }
+
   // Mutation: Record Stock Movement
   const recordMovementMutation = useMutation({
-    mutationFn: async () => {
-      const parsedQty = Number(movementForm.quantity)
-      if (!movementForm.productId) {
-        throw new Error('Please select a product.')
-      }
-      if (!Number.isSafeInteger(parsedQty) || parsedQty <= 0) {
-        throw new Error('Quantity must be a positive integer.')
-      }
-      const delta = movementForm.kind === 'receive' ? parsedQty : -parsedQty
-      const reason = movementForm.reason
-      if (valuationConfigured) {
-        if (movementForm.kind === 'receive' && !movementForm.unitCost.trim()) {
-          throw new Error('Unit cost is required because this workspace values inventory. The selling price is never used as cost.')
-        }
-        if (movementForm.kind !== 'receive' && !reason) {
-          throw new Error('Select a reason so the cost posts to the right ledger account.')
-        }
-      }
-      return inventoryApi.recordStockMovement({
-        productId: movementForm.productId,
-        delta,
-        note: movementForm.note.trim() || null,
-        ...(valuationConfigured && {
-          reason,
-          ...(movementForm.kind === 'receive' && { unitCost: movementForm.unitCost.trim() }),
-        }),
-      })
-    },
+    mutationFn: (payload) => inventoryApi.recordStockMovement(payload),
     onSuccess: () => {
+      clearStockMovementDraft(movementDraftStorage(), draftStorageKey)
+      requestRef.current = null
+      setSavedRetryAvailable(false)
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all() })
-      closeMovementDialog()
+      setMovementDialogOpen(false)
+      setMovementError('')
     },
     onError: (err) => {
+      setSavedRetryAvailable(Boolean(requestRef.current))
       setMovementError(err.message || 'Failed to record stock movement.')
     },
   })
 
-  function openMovementDialog() {
-    setMovementForm({ productId: '', kind: 'receive', quantity: '1', note: '', reason: 'PURCHASE_RECEIPT', unitCost: '' })
+  async function openMovementDialog() {
+    const draft = requestRef.current?.payload
+      ? requestRef.current
+      : readStockMovementDraft(movementDraftStorage(), draftStorageKey)
+    if (draft) {
+      requestRef.current = draft
+      const isReceive = draft.payload.delta > 0
+      setMovementForm({
+        productId: draft.payload.productId,
+        kind: isReceive ? 'receive' : 'issue',
+        quantity: String(Math.abs(draft.payload.delta)),
+        note: draft.payload.note ?? '',
+        reason: draft.payload.reason ?? (isReceive ? 'PURCHASE_RECEIPT' : 'SALE'),
+        unitCost: draft.payload.unitCost ?? '',
+      })
+      setSelectedProduct(null)
+      setProductSearchInput('')
+      setProductPage(1)
+      setMovementError('')
+      setSavedRetryAvailable(true)
+      setMovementDialogOpen(true)
+      try {
+        const product = await inventoryApi.getProduct(draft.payload.productId)
+        if (product) setSelectedProduct(product)
+      } catch {
+        setMovementError('The saved product selection could not be loaded. Choose the product again before retrying.')
+      }
+      return
+    }
+    requestRef.current = null
+    setMovementForm(EMPTY_MOVEMENT_FORM)
     setSelectedProduct(null)
     setProductSearchInput('')
     setProductPage(1)
     setMovementError('')
+    setSavedRetryAvailable(false)
     setMovementDialogOpen(true)
+  }
+
+  function discardSavedRetry() {
+    clearStockMovementDraft(movementDraftStorage(), draftStorageKey)
+    requestRef.current = null
+    setSavedRetryAvailable(false)
+    setMovementForm(EMPTY_MOVEMENT_FORM)
+    setSelectedProduct(null)
+    setProductSearchInput('')
+    setProductPage(1)
+    setMovementError('')
+  }
+
+  function submitMovement() {
+    if (recordMovementMutation.isPending) return
+    try {
+      const payload = buildMovementPayload()
+      const signature = JSON.stringify(payload)
+      if (requestRef.current?.signature !== signature) {
+        requestRef.current = { signature, requestKey: crypto.randomUUID(), payload }
+      } else {
+        requestRef.current.payload = payload
+      }
+      const persisted = saveStockMovementDraft(
+        movementDraftStorage(),
+        draftStorageKey,
+        payload,
+        requestRef.current.requestKey,
+      )
+      setSavedRetryAvailable(persisted)
+      setMovementError('')
+      recordMovementMutation.mutate({ ...payload, requestKey: requestRef.current.requestKey })
+    } catch (error) {
+      setMovementError(error.message || 'Failed to record stock movement.')
+    }
   }
 
   function closeMovementDialog() {
@@ -500,10 +600,27 @@ export default function StockMovements() {
         confirmLabel="Save Movement"
         busy={recordMovementMutation.isPending}
         error={movementError}
-        onConfirm={() => recordMovementMutation.mutate()}
+        onConfirm={submitMovement}
         width="max-w-md"
       >
         <div className="space-y-4">
+          {savedRetryAvailable && (
+            <div role="status" className="flex items-start justify-between gap-3 rounded-input border border-accent/30 bg-accent/5 p-3 text-xs text-body">
+              <span>
+                A previous request may have reached the server before its response was lost. Retry unchanged to
+                reuse its request key; changing details creates a new request.
+              </span>
+              <Button
+                variant="link"
+                size="sm"
+                type="button"
+                onClick={discardSavedRetry}
+                className="h-auto p-0 font-semibold text-accent hover:underline shrink-0"
+              >
+                Discard saved retry
+              </Button>
+            </div>
+          )}
           <div>
             <label className="block text-xs font-bold text-heading mb-1.5">Product</label>
             <Input

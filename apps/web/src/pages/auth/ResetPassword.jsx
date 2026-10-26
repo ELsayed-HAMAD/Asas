@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff, Loader2, CheckCircle2, AlertTriangle, ArrowRight, Check } from 'lucide-react'
 import { authClient } from '../../lib/authClient'
+import { authErrorMessage } from '../../lib/authErrorMessage'
+import { getSafeAuthCallbackPath } from '../../lib/authRedirect'
 import { validatePasswordPolicy, getPasswordStrength } from '../../lib/passwordPolicy'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -12,6 +14,13 @@ export default function ResetPassword() {
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token')
   const queryError = searchParams.get('error')
+  const rawReturnTo = searchParams.get('returnTo')
+  const safeReturnTo = rawReturnTo
+    ? getSafeAuthCallbackPath(rawReturnTo, window.location.origin, '')
+    : ''
+  // Only invitation returns are honoured here; other entry points still finish at sign-in.
+  const invitationReturnTo = safeReturnTo.startsWith('/accept-invitation') ? safeReturnTo : ''
+  const completionTarget = invitationReturnTo || '/login'
 
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -59,15 +68,15 @@ export default function ResetPassword() {
       })
 
       if (res?.error) {
-        throw new Error(res.error.message || 'Unable to reset password. The link may have expired.')
+        throw new Error(authErrorMessage(res.error, 'Unable to reset password. The link may have expired.'))
       }
 
       setSuccess(true)
       setTimeout(() => {
-        navigate('/login', { replace: true })
+        navigate(completionTarget, { replace: true })
       }, 2500)
     } catch (err) {
-      setError(err?.message || 'Failed to reset password. Please request a new link.')
+      setError(authErrorMessage(err, 'Failed to reset password. Please request a new link.'))
     } finally {
       setLoading(false)
     }
@@ -88,10 +97,15 @@ export default function ResetPassword() {
         </p>
 
         <Button asChild className="w-full h-10">
-          <Link to="/login" className="flex items-center justify-center gap-2">
-            Return to Sign In <ArrowRight size={16} />
+          <Link to={completionTarget} className="flex items-center justify-center gap-2">
+            {invitationReturnTo ? 'Return to Invitation' : 'Return to Sign In'} <ArrowRight size={16} />
           </Link>
         </Button>
+        {invitationReturnTo && (
+          <Link to="/login" className="mt-4 text-xs text-muted hover:text-heading">
+            Return to sign in instead
+          </Link>
+        )}
       </div>
     )
   }
@@ -104,11 +118,14 @@ export default function ResetPassword() {
         </div>
         <h1 className="text-2xl font-semibold text-heading mb-2">Password Reset Complete</h1>
         <p className="text-sm text-muted mb-6 leading-relaxed">
-          Your password has been securely updated. Redirecting you to sign in...
+          Your password has been securely updated.{' '}
+          {invitationReturnTo
+            ? 'Returning you to your workspace invitation...'
+            : 'Redirecting you to sign in...'}
         </p>
         <Button asChild className="w-full h-10">
-          <Link to="/login" className="flex items-center justify-center gap-2">
-            Sign In Now <ArrowRight size={16} />
+          <Link to={completionTarget} className="flex items-center justify-center gap-2">
+            {invitationReturnTo ? 'Continue to Invitation' : 'Sign In Now'} <ArrowRight size={16} />
           </Link>
         </Button>
       </div>
@@ -144,6 +161,8 @@ export default function ResetPassword() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter at least 12 characters"
+              autoComplete="new-password"
+              aria-describedby="password-requirements"
               required
               autoFocus
               className="pr-10"
@@ -152,7 +171,8 @@ export default function ResetPassword() {
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute end-3 top-1/2 -translate-y-1/2 text-caption hover:text-body transition-colors"
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-label={showPassword ? 'Hide new password' : 'Show new password'}
+              aria-controls="password"
             >
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
@@ -191,6 +211,8 @@ export default function ResetPassword() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Re-enter your new password"
+              autoComplete="new-password"
+              aria-describedby="password-requirements"
               required
               className="pr-10"
             />
@@ -198,7 +220,8 @@ export default function ResetPassword() {
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
               className="absolute end-3 top-1/2 -translate-y-1/2 text-caption hover:text-body transition-colors"
-              aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+              aria-label={showConfirmPassword ? 'Hide confirmed password' : 'Show confirmed password'}
+              aria-controls="confirmPassword"
             >
               {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
@@ -210,7 +233,7 @@ export default function ResetPassword() {
 
         {/* Requirements Checklist */}
         <div className="bg-surface-muted/50 border border-border-subtle rounded-card-sm p-3 space-y-1.5 text-xs">
-          <p className="font-medium text-body mb-1">Password Requirements:</p>
+          <p id="password-requirements" className="font-medium text-body mb-1">Password Requirements:</p>
           {rules.map((rule, idx) => (
             <div key={idx} className="flex items-center gap-2 text-caption">
               {rule.valid ? (
@@ -235,8 +258,8 @@ export default function ResetPassword() {
       </form>
 
       <div className="mt-6 text-center">
-        <Link to="/login" className="text-sm font-medium text-muted hover:text-heading transition-colors">
-          &larr; Back to sign in
+        <Link to={completionTarget} className="text-sm font-medium text-muted hover:text-heading transition-colors">
+          &larr; {invitationReturnTo ? 'Back to invitation' : 'Back to sign in'}
         </Link>
       </div>
     </div>

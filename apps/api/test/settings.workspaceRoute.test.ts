@@ -6,7 +6,7 @@ import type { Auth } from '../src/auth.js'
 import { errorHandler } from '../src/middlewares/errorHandler.js'
 import { settingsRoutes } from '../src/modules/settings/settings.routes.js'
 
-async function setup(options: { role?: string; unauthenticated?: boolean; stripeBilling?: unknown; activeStripeSubscription?: string } = {}) {
+async function setup(options: { role?: string; unauthenticated?: boolean; stripeBilling?: unknown; activeStripeSubscription?: string; quietHours?: { start: string; end: string } | null } = {}) {
   const app = Fastify()
   app.setValidatorCompiler(validatorCompiler)
   app.setSerializerCompiler(serializerCompiler)
@@ -44,7 +44,7 @@ async function setup(options: { role?: string; unauthenticated?: boolean; stripe
     },
     quietHours: {
       upsert: vi.fn().mockResolvedValue({}),
-      findFirst: vi.fn().mockResolvedValue(null),
+      findFirst: vi.fn().mockResolvedValue(options.quietHours ?? null),
     },
     auditLog: { create: vi.fn().mockResolvedValue({}) },
     integration: {
@@ -151,6 +151,70 @@ describe('settings reliability', () => {
     expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ tenantId: 'tenant_1', actorId: 'user_1', action: 'settings.notifications.update' }),
     }))
+    await app.close()
+  })
+
+  it('rejects a partial quiet-hours update that would collapse the stored window', async () => {
+    const { app, tx } = await setup({ role: 'ADMIN', quietHours: { start: '22:00', end: '07:00' } })
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/notifications',
+      payload: { quietHours: { end: '22:00' } },
+    })
+    expect(response.statusCode, response.body).toBe(400)
+    expect(response.json().error.message).toContain('Quiet hours start and end times must differ')
+    expect(tx.quietHours.upsert).not.toHaveBeenCalled()
+    expect(tx.auditLog.create).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('rejects an initial quiet-hours row whose partial update matches the default start', async () => {
+    const { app, tx } = await setup({ role: 'ADMIN' })
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/notifications',
+      payload: { quietHours: { end: '22:00' } },
+    })
+    expect(response.statusCode, response.body).toBe(400)
+    expect(response.json().error.message).toContain('Quiet hours start and end times must differ')
+    expect(tx.quietHours.upsert).not.toHaveBeenCalled()
+    await app.close()
+  })
+
+  it('still allows a non-collapsing partial quiet-hours update', async () => {
+    const { app, tx } = await setup({ role: 'ADMIN', quietHours: { start: '22:00', end: '07:00' } })
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/notifications',
+      payload: { quietHours: { end: '06:00' } },
+    })
+    expect(response.statusCode, response.body).toBe(200)
+    expect(tx.quietHours.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { tenantId: 'tenant_1' },
+      update: { end: '06:00' },
+    }))
+    expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ action: 'settings.notifications.update' }),
+    }))
+    await app.close()
+  })
+
+  it('maps the database quiet-hours guard to the validation error on a write race', async () => {
+    const { app, tx } = await setup({ role: 'ADMIN', quietHours: { start: '22:00', end: '07:00' } })
+    tx.quietHours.upsert.mockRejectedValueOnce(Object.assign(new Error('check constraint failed'), {
+      name: 'PrismaClientKnownRequestError',
+      code: 'P2004',
+      meta: { database_error: 'new row violates check constraint "QuietHours_start_end_distinct"' },
+    }))
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/notifications',
+      payload: { quietHours: { end: '06:00' } },
+    })
+    expect(response.statusCode, response.body).toBe(400)
+    expect(response.json().error.message).toContain('Quiet hours start and end times must differ')
+    expect(tx.auditLog.create).not.toHaveBeenCalled()
     await app.close()
   })
 

@@ -352,6 +352,7 @@ export default function ActiveSprints() {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised">
+        <h1 className="sr-only">Active Sprints</h1>
         <Loader2 className="animate-spin text-muted" size={24} />
       </div>
     );
@@ -360,6 +361,7 @@ export default function ActiveSprints() {
   if (isError || !sprintsData) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised text-danger">
+        <h1 className="sr-only">Active Sprints</h1>
         Failed to load active sprints.
       </div>
     );
@@ -496,6 +498,7 @@ export default function ActiveSprints() {
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto bg-surface-raised p-4 sm:p-6 space-y-4">
+      <h1 className="sr-only">Active Sprints</h1>
       {activeSprint ? (
         <>
           {/* ── 1. Top Sprint Command Header (Interactive & Scannable) ── */}
@@ -1237,9 +1240,9 @@ function IssueInspector({
           </div>
         </div>
 
-        <h1 className="text-xl font-bold tracking-tight text-slate-900 mt-1 leading-snug">
+        <h2 className="text-xl font-bold tracking-tight text-slate-900 mt-1 leading-snug">
           {selectedIssue.key ? `${selectedIssue.key}: ` : ''}{selectedIssue.title}
-        </h1>
+        </h2>
 
         {/* Status & Priority */}
         <div className="flex items-center gap-2 mt-2.5 flex-wrap">

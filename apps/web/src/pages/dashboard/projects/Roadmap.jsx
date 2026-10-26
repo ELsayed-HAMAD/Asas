@@ -563,6 +563,7 @@ export default function Roadmap() {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised">
+        <h1 className="sr-only">Roadmap</h1>
         <Loader2 className="animate-spin text-muted" size={24} />
       </div>
     );
@@ -571,6 +572,7 @@ export default function Roadmap() {
   if (isError || !responseData) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised text-danger">
+        <h1 className="sr-only">Roadmap</h1>
         Failed to load roadmap.
       </div>
     );
@@ -625,6 +627,7 @@ export default function Roadmap() {
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto bg-surface-raised p-4 sm:p-6 space-y-4">
+      <h1 className="sr-only">Roadmap</h1>
       {/* ── 1. Top Roadmap Command Bar (Apple-Glass Header Card) ── */}
       <div className="bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-2.5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-wrap items-center justify-between gap-3">
         {/* Left Cluster: KPI Metric Badges */}
@@ -794,7 +797,9 @@ export default function Roadmap() {
             <>
               {filteredPhases.length === 0 ? (
                 <div className="bg-white/90 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-12 text-center text-sm text-slate-400">
-                  No roadmap data found.
+                  {phases.length === 0
+                    ? 'No roadmap phases yet. Use New Phase to start the plan.'
+                    : 'No roadmap items match the current search or timeline filter.'}
                 </div>
               ) : (
                 filteredPhases.map(phase => {

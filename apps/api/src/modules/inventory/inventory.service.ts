@@ -12,6 +12,7 @@
  *    (`decimalStringSchema`), since a price is a single column rather than a `{ amount, currency }`
  *    wire pair.
  */
+import { createHash } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import type {
   Product as PrismaProduct,
@@ -170,12 +171,16 @@ export async function removeProductSupplier(
 
 export async function createPurchaseOrder(prisma: PrismaClient, tenantId: string, input: PurchaseOrderWriteInput, actorId: string): Promise<PurchaseOrder> {
   return prisma.$transaction(async tx => {
-    const [product, tenant] = await Promise.all([
+    const [product, tenant, vendor] = await Promise.all([
       tx.product.findFirst({ where: { id: input.productId, tenantId, archivedAt: null }, select: { id: true, currency: true } }),
       tx.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } }),
+      input.vendorId
+        ? tx.vendor.findFirst({ where: { id: input.vendorId, tenantId }, select: { id: true, name: true } })
+        : Promise.resolve(null),
     ])
     if (!product) throw new AppError(404, 'Product not found')
     if (!tenant) throw new AppError(404, 'Workspace not found')
+    if (input.vendorId && !vendor) throw new AppError(404, 'Finance vendor not found')
     const currency = product.currency ?? tenant.currency
     let unitCost: string | null = null
     if (input.unitCost != null) {
@@ -192,15 +197,19 @@ export async function createPurchaseOrder(prisma: PrismaClient, tenantId: string
       data: {
         tenantId,
         status: 'DRAFT',
+        ...(vendor && { vendorId: vendor.id }),
         lines: { create: { productId: product.id, quantity: input.quantity, unitCost, currency: unitCost == null ? null : currency } },
       },
-      include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+      include: {
+        vendor: { select: { id: true, name: true } },
+        lines: { include: { product: { select: { id: true, name: true, sku: true } } } },
+      },
     })
     const line = order.lines[0]
     if (!line) throw new AppError(500, 'Purchase order line was not created')
     await recordAuditLog(tx, {
       tenantId, actorId, action: 'inventory.purchase-order.create', targetType: 'PurchaseOrder', targetId: order.id,
-      metadata: { productId: line.product.id, quantity: line.quantity, unitCost: line.unitCost?.toString() ?? null, currency: line.currency },
+      metadata: { productId: line.product.id, quantity: line.quantity, unitCost: line.unitCost?.toString() ?? null, currency: line.currency, vendorId: order.vendorId ?? null },
     })
     return {
       id: order.id,
@@ -212,6 +221,7 @@ export async function createPurchaseOrder(prisma: PrismaClient, tenantId: string
       quantity: line.quantity,
       unitCost: line.unitCost?.toString() ?? null,
       currency: line.currency,
+      ...(order.vendorId && { vendorId: order.vendorId, vendorName: order.vendor?.name ?? null }),
     }
   })
 }
@@ -230,7 +240,10 @@ export async function listPurchaseOrders(
   const orders = await prisma.purchaseOrder.findMany({
     where,
     orderBy: { createdAt: 'desc' },
-    include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+    include: {
+      vendor: { select: { id: true, name: true } },
+      lines: { include: { product: { select: { id: true, name: true, sku: true } } } },
+    },
   })
 
   return orders.map(order => {
@@ -247,6 +260,7 @@ export async function listPurchaseOrders(
       quantity: line?.quantity ?? 0,
       unitCost: line?.unitCost?.toString() ?? null,
       currency: line?.currency ?? null,
+      ...(order.vendorId && { vendorId: order.vendorId, vendorName: order.vendor?.name ?? null }),
     }
   })
 }
@@ -259,7 +273,10 @@ export async function approvePurchaseOrder(
 ): Promise<PurchaseOrder> {
   const order = await prisma.purchaseOrder.findFirst({
     where: { id, tenantId },
-    include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+    include: {
+      vendor: { select: { id: true, name: true } },
+      lines: { include: { product: { select: { id: true, name: true, sku: true } } } },
+    },
   })
   if (!order) throw new AppError(404, 'Purchase order not found')
   if (order.status !== 'DRAFT') {
@@ -277,7 +294,10 @@ export async function approvePurchaseOrder(
 
     const updated = await tx.purchaseOrder.findUniqueOrThrow({
       where: { id },
-      include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+      include: {
+        vendor: { select: { id: true, name: true } },
+        lines: { include: { product: { select: { id: true, name: true, sku: true } } } },
+      },
     })
     const line = updated.lines[0]
     await recordAuditLog(tx, {
@@ -295,6 +315,7 @@ export async function approvePurchaseOrder(
       quantity: line?.quantity ?? 0,
       unitCost: line?.unitCost?.toString() ?? null,
       currency: line?.currency ?? null,
+      ...(updated.vendorId && { vendorId: updated.vendorId, vendorName: updated.vendor?.name ?? null }),
     }
   })
 }
@@ -307,7 +328,10 @@ export async function receivePurchaseOrder(
 ): Promise<PurchaseOrder> {
   const order = await prisma.purchaseOrder.findFirst({
     where: { id, tenantId },
-    include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+    include: {
+      vendor: { select: { id: true, name: true } },
+      lines: { include: { product: { select: { id: true, name: true, sku: true } } } },
+    },
   })
   if (!order) throw new AppError(404, 'Purchase order not found')
   if (order.status === 'DRAFT') {
@@ -345,7 +369,10 @@ export async function receivePurchaseOrder(
 
     const updatedOrder = await tx.purchaseOrder.findUniqueOrThrow({
       where: { id },
-      include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+      include: {
+        vendor: { select: { id: true, name: true } },
+        lines: { include: { product: { select: { id: true, name: true, sku: true } } } },
+      },
     })
 
     for (const line of updatedOrder.lines) {
@@ -367,6 +394,7 @@ export async function receivePurchaseOrder(
           reason: 'PURCHASE_RECEIPT',
           postedAt: movement.createdAt,
           actorId,
+          purchaseOrderId: updatedOrder.id,
         })
       }
     }
@@ -392,6 +420,7 @@ export async function receivePurchaseOrder(
       quantity: line?.quantity ?? 0,
       unitCost: line?.unitCost?.toString() ?? null,
       currency: line?.currency ?? null,
+      ...(updatedOrder.vendorId && { vendorId: updatedOrder.vendorId, vendorName: updatedOrder.vendor?.name ?? null }),
     }
   })
 }
@@ -404,7 +433,10 @@ export async function cancelPurchaseOrder(
 ): Promise<PurchaseOrder> {
   const order = await prisma.purchaseOrder.findFirst({
     where: { id, tenantId },
-    include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+    include: {
+      vendor: { select: { id: true, name: true } },
+      lines: { include: { product: { select: { id: true, name: true, sku: true } } } },
+    },
   })
   if (!order) throw new AppError(404, 'Purchase order not found')
   if (order.status === 'RECEIVED') {
@@ -425,7 +457,10 @@ export async function cancelPurchaseOrder(
 
     const updated = await tx.purchaseOrder.findUniqueOrThrow({
       where: { id },
-      include: { lines: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+      include: {
+        vendor: { select: { id: true, name: true } },
+        lines: { include: { product: { select: { id: true, name: true, sku: true } } } },
+      },
     })
     const line = updated.lines[0]
     await recordAuditLog(tx, {
@@ -443,6 +478,7 @@ export async function cancelPurchaseOrder(
       quantity: line?.quantity ?? 0,
       unitCost: line?.unitCost?.toString() ?? null,
       currency: line?.currency ?? null,
+      ...(updated.vendorId && { vendorId: updated.vendorId, vendorName: updated.vendor?.name ?? null }),
     }
   })
 }
@@ -613,6 +649,20 @@ export async function createProduct(
   let product: PrismaProduct
   try {
     product = await prisma.$transaction(async tx => {
+    // Starting stock establishes an opening position. Once Finance has posted its opening
+    // balance, adding more stock here would create a second opening position outside that
+    // journal. Operational receipts and adjustments remain available after the product exists.
+    if (initialStock > 0) {
+      const financeOpeningCount = await tx.journalEntry.count({
+        where: { tenantId, sourceType: 'OPENING_BALANCE' },
+      })
+      if (financeOpeningCount > 0) {
+        throw new AppError(
+          409,
+          'A Finance opening balance is already posted. Starting stock cannot establish a second opening position. Create the product with zero stock and add stock through operational receipts or adjustments instead; a coordinated Inventory/Finance opening is not implemented.',
+        )
+      }
+    }
     // Read the policy inside the transaction so a concurrent setup change cannot create initial
     // stock unvalued while valuation is already configured (or value it before configuration).
     const valuationConfig = initialStock > 0
@@ -933,6 +983,34 @@ export async function recordStockMovement(
   input: StockMovementWriteInput,
   actorId: string,
 ): Promise<StockMovementRecorded> {
+  if (!input.requestKey) {
+    throw new AppError(400, 'A request key is required so a manual stock movement cannot be recorded twice by a retry')
+  }
+
+  // Hash the logical payload, not the transport envelope. A retry must use both the same key and
+  // the same values; reusing a key for different quantities is a conflict, never a second posting.
+  const requestHash = createHash('sha256').update(JSON.stringify({
+    productId: input.productId,
+    delta: input.delta,
+    note: input.note ?? null,
+    reason: input.reason ?? null,
+    unitCost: input.unitCost ?? null,
+  })).digest('hex')
+
+  const findReplay = () => prisma.stockMovement.findFirst({
+    where: { tenantId, requestKey: input.requestKey },
+    include: { product: { select: { name: true, warehouse: true, stock: true } } },
+  })
+  const replayResult = (replay: NonNullable<Awaited<ReturnType<typeof findReplay>>>): StockMovementRecorded => {
+    if (replay.requestHash !== requestHash) {
+      throw new AppError(409, 'This request key was already used for a different stock movement')
+    }
+    return { ...mapMovement(replay), newStock: replay.product.stock, creationReplayed: true }
+  }
+
+  const existing = await findReplay()
+  if (existing) return replayResult(existing)
+
   const product = await prisma.product.findFirst({ where: { id: input.productId, tenantId, archivedAt: null } })
   if (!product) throw new AppError(404, 'Product not found')
 
@@ -974,50 +1052,66 @@ export async function recordStockMovement(
     )
   }
 
-  const result = await prisma.$transaction(async tx => {
-    const { movement, newStock } = await writeStockMovement(tx, {
-      tenantId, productId: product.id, delta: input.delta, note: input.note ?? null,
+  try {
+    const result = await prisma.$transaction(async tx => {
+      const { movement, newStock } = await writeStockMovement(tx, {
+        tenantId,
+        productId: product.id,
+        delta: input.delta,
+        note: input.note ?? null,
+        requestKey: input.requestKey,
+        requestHash,
+      })
+      if (!movement) throw new AppError(400, 'Stock movement cannot be zero')
+      const valuation = valuationConfig && reason
+        ? input.delta > 0
+          ? await postValuedReceipt(tx, {
+              tenantId,
+              productId: product.id,
+              stockMovementId: movement.id,
+              quantity: input.delta,
+              unitCost: input.unitCost!,
+              reason,
+              postedAt: movement.createdAt,
+              actorId,
+            })
+          : await postValuedIssue(tx, {
+              tenantId,
+              productId: product.id,
+              stockMovementId: movement.id,
+              quantity: -input.delta,
+              reason,
+              postedAt: movement.createdAt,
+              actorId,
+            })
+        : null
+      await recordAuditLog(tx, {
+        tenantId,
+        actorId,
+        action: 'inventory.stock.record',
+        targetType: 'StockMovement',
+        targetId: movement.id,
+        metadata: {
+          productId: movement.productId,
+          delta: movement.delta,
+          ...(valuation && { valuationEventId: valuation.eventId, costValue: valuation.value, journalEntryId: valuation.journalEntryId }),
+        },
+      })
+      return { movement, newStock }
     })
-    if (!movement) throw new AppError(400, 'Stock movement cannot be zero')
-    const valuation = valuationConfig && reason
-      ? input.delta > 0
-        ? await postValuedReceipt(tx, {
-            tenantId,
-            productId: product.id,
-            stockMovementId: movement.id,
-            quantity: input.delta,
-            unitCost: input.unitCost!,
-            reason,
-            postedAt: movement.createdAt,
-            actorId,
-          })
-        : await postValuedIssue(tx, {
-            tenantId,
-            productId: product.id,
-            stockMovementId: movement.id,
-            quantity: -input.delta,
-            reason,
-            postedAt: movement.createdAt,
-            actorId,
-          })
-      : null
-    await recordAuditLog(tx, {
-      tenantId,
-      actorId,
-      action: 'inventory.stock.record',
-      targetType: 'StockMovement',
-      targetId: movement.id,
-      metadata: {
-        productId: movement.productId,
-        delta: movement.delta,
-        ...(valuation && { valuationEventId: valuation.eventId, costValue: valuation.value, journalEntryId: valuation.journalEntryId }),
-      },
-    })
-    return { movement, newStock }
-  })
 
-  return {
-    ...mapMovement(result.movement),
-    newStock: result.newStock,
+    return {
+      ...mapMovement(result.movement),
+      newStock: result.newStock,
+      creationReplayed: false,
+    }
+  } catch (error) {
+    // Two concurrent retries can both miss the pre-check. The unique tenant/request-key index
+    // rolls the loser back (including its stock increment); return the winner's committed row.
+    if ((error as { code?: string }).code === 'P2002') {
+      const concurrent = await findReplay()
+      if (concurrent) return replayResult(concurrent)
+    }
+    throw error
   }
 }

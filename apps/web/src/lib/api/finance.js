@@ -24,6 +24,8 @@ export const financeApi = {
   /** GET /finance/payables — { items, pagination, summary } over the whole tenant set. */
   listPayables: (params) => http.get('/finance/payables', { query: params }),
   getPayable: (id) => http.get(`/finance/payables/${id}`),
+  /** GET /finance/payables/matchable-purchase-orders?vendorId=... — exact, valued receipts. */
+  listPayablePurchaseOrderCandidates: (vendorId) => http.get('/finance/payables/matchable-purchase-orders', { query: { vendorId } }),
 
   /** GET /finance/receivables — { items, pagination, summary } incl. the AR aging report. */
   listReceivables: (params) => http.get('/finance/receivables', { query: params }),
@@ -47,6 +49,7 @@ export const financeApi = {
   createReceivable: (body) => http.post('/finance/receivables', { body }),
   deleteReceivable: (id) => http.delete(`/finance/receivables/${id}`),
   createPayable: (body) => http.post('/finance/payables', { body }),
+  updatePayable: (id, body) => http.patch(`/finance/payables/${id}`, { body }),
   createExpense: (body) => http.post('/finance/expenses', { body }),
   createExpenseSelf: (body) => http.post('/finance/expenses/self', { body }),
 

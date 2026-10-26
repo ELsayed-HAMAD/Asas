@@ -6,7 +6,6 @@ import {
   Boxes,
   Check,
   CheckCircle2,
-  ChevronRight,
   Code2,
   DollarSign,
   ShieldCheck,
@@ -21,53 +20,53 @@ import MarketingNavbar from '../../components/marketing/MarketingNavbar'
 
 const PLATFORM_CAPABILITIES = [
   { name: 'Finance', domain: 'Payables · receivables · ledger' },
-  { name: 'People', domain: 'Employees · payroll · attendance' },
-  { name: 'Customer work', domain: 'Accounts · deals · forecasts' },
+  { name: 'HR', domain: 'Employees · payroll · attendance' },
+  { name: 'CRM', domain: 'Accounts · deals · forecasts' },
+  { name: 'Inventory', domain: 'Catalog · stock · movements' },
   { name: 'Projects', domain: 'Portfolios · sprints · roadmaps' },
-  { name: 'Operations', domain: 'Catalog · stock · movements' },
 ]
 
 const PERSONAS = [
   {
     id: 'cfo',
-    role: 'Chief Financial Officer',
+    role: 'Finance lead',
     title: 'Review cash, receivables, and ledger activity in one workspace.',
     focus: 'A finance workflow for tracking invoices, settlements, reconciliation, and journal balances.',
     metrics: [
-      { label: 'Payables and receivables', value: 'Track and review' },
+      { label: 'Payables and receivables', value: 'Review and reconcile' },
       { label: 'Bank reconciliation', value: 'Match ledger entries' },
       { label: 'Trial balance', value: 'Review account totals' },
     ],
   },
   {
     id: 'coo',
-    role: 'Chief Operating Officer',
+    role: 'Operations lead',
     title: 'Keep people, approvals, and operational work visible together.',
     focus: 'A workspace for managing team records, attendance, stock, and project activity.',
     metrics: [
-      { label: 'Team records', value: 'Employee directory' },
-      { label: 'Inventory', value: 'Stock and movements' },
-      { label: 'Projects', value: 'Roadmaps and sprints' },
+      { label: 'Team records', value: 'Maintain directory' },
+      { label: 'Inventory', value: 'Record movements' },
+      { label: 'Projects', value: 'Plan sprints' },
     ],
   },
   {
     id: 'vpe',
-    role: 'VP of Engineering',
+    role: 'Engineering lead',
     title: 'Give teams clear access boundaries and a shared view of work.',
     focus: 'Server-side sessions, workspace roles, tenant scoping, and an API for connected workflows.',
     metrics: [
-      { label: 'Workspace access', value: 'Role checked' },
-      { label: 'Data access', value: 'Tenant scoped' },
-      { label: 'API', value: 'Documented endpoints' },
+      { label: 'Workspace access', value: 'Assign roles' },
+      { label: 'Data access', value: 'Check permissions' },
+      { label: 'API', value: 'Review endpoints' },
     ],
   },
   {
     id: 'hr',
-    role: 'Chief People Officer',
+    role: 'People lead',
     title: 'Keep employee records and payroll workflows organized.',
     focus: 'A people operations view for employee data, attendance, leave, and payroll runs.',
     metrics: [
-      { label: 'Employee records', value: 'One directory' },
+      { label: 'Employee records', value: 'Maintain records' },
       { label: 'Attendance and leave', value: 'Review requests' },
       { label: 'Payroll', value: 'Prepare and approve runs' },
     ],
@@ -202,11 +201,18 @@ export default function Landing() {
 
   return (
     <div ref={pageRef} className="min-h-screen bg-surface text-body selection:bg-primary-light selection:text-primary">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-on-primary focus:shadow-card"
+      >
+        Skip to content
+      </a>
       {/* ── Floating Glass Navbar ── */}
       <div className="pt-4">
         <MarketingNavbar />
       </div>
 
+      <main id="main-content" tabIndex={-1} className="focus:outline-none">
       {/* ── Hero Section ── */}
       <section
         ref={heroRef}
@@ -220,11 +226,10 @@ export default function Landing() {
         <div ref={badgeRef} className="inline-block mb-6">
           <Badge
             variant="outline"
-            className="inline-flex items-center gap-2 glass border border-border-default/80 text-heading shadow-glass rounded-full px-4 py-1.5 text-xs font-medium hover:border-accent/40 transition-micro cursor-default"
+            className="inline-flex items-center gap-2 glass border border-border-default/80 text-heading shadow-glass rounded-full px-4 py-1.5 text-xs font-medium"
           >
-            <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-accent animate-pulse" aria-hidden="true" />
             <span>Finance, people, CRM, projects &amp; inventory in one workspace</span>
-            <ChevronRight className="w-3.5 h-3.5 text-caption" />
           </Badge>
         </div>
 
@@ -233,9 +238,9 @@ export default function Landing() {
           ref={headlineRef}
           className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-heading leading-[1.08] max-w-4xl mx-auto"
         >
-          The unified operating system for{' '}
+          The unified workspace for{' '}
           <span className="text-accent">
-            modern enterprise.
+            modern business.
           </span>
         </h1>
 
@@ -259,7 +264,7 @@ export default function Landing() {
               className="bg-primary hover:bg-primary-hover text-on-primary font-medium text-sm h-12 px-7 rounded-button shadow-card hover:shadow-glow hover-lift transition-micro flex items-center gap-2 cursor-pointer active:scale-[0.98]"
             >
               <Link to="/dashboard">
-                <span>Enter Enterprise Workspace</span>
+                <span>Open Workspace</span>
                 <ArrowRight className="w-4 h-4" />
               </Link>
             </Button>
@@ -285,7 +290,7 @@ export default function Landing() {
           )}
         </div>
 
-        {/* Interactive Executive Mockup */}
+        {/* Sample workspace preview */}
         <div
           ref={mockupRef}
           className="mt-14 max-w-5xl mx-auto rounded-card border border-border-default/80 glass-strong shadow-glass overflow-hidden text-left hover-lift transition-premium"
@@ -296,7 +301,7 @@ export default function Landing() {
               <div className="w-3 h-3 rounded-full bg-danger/80" />
               <div className="w-3 h-3 rounded-full bg-warning/80" />
               <div className="w-3 h-3 rounded-full bg-success/80" />
-              <span className="text-xs font-mono text-caption ml-2">app.asas.io/dashboard</span>
+              <span className="text-xs font-mono text-caption ml-2">workspace / dashboard</span>
             </div>
             <div className="flex items-center gap-2 text-[11px] text-muted">
               <span className="text-[10px] text-caption">Illustrative product preview · sample workspace and figures</span>
@@ -313,17 +318,17 @@ export default function Landing() {
                 </div>
                 <div className="min-w-0">
                   <p className="font-semibold text-heading truncate">Acme Global</p>
-                  <p className="text-[10px] text-caption truncate">Enterprise Tier</p>
+                  <p className="text-[10px] text-caption truncate">Sample workspace</p>
                 </div>
               </div>
 
               {[
-                { label: 'Executive Overview', icon: BarChart3, active: true },
-                { label: 'Treasury & Ledger', icon: DollarSign },
-                { label: 'Human Capital', icon: Users },
-                { label: 'Deal Pipeline', icon: TrendingUp },
-                { label: 'Engineering Sprints', icon: Code2 },
-                { label: 'Global Inventory', icon: Boxes },
+                { label: 'Dashboard', icon: BarChart3, active: true },
+                { label: 'HR', icon: Users },
+                { label: 'Finance', icon: DollarSign },
+                { label: 'CRM', icon: TrendingUp },
+                { label: 'Inventory', icon: Boxes },
+                { label: 'Projects', icon: Code2 },
               ].map((item) => {
                 const Icon = item.icon
                 return (
@@ -346,21 +351,21 @@ export default function Landing() {
             <div className="md:col-span-3 p-6 bg-surface-muted/30 flex flex-col justify-between">
               <div>
                 {/* Metric Strip */}
-                <div className="grid grid-cols-3 gap-3 mb-5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
                   <div className="bg-surface-raised p-3.5 rounded-card-sm border border-border-default shadow-card">
-                    <p className="text-[11px] font-medium text-caption">Consolidated Liquidity</p>
-                    <p className="text-xl font-bold text-heading mt-1">$2,840,500</p>
-                    <span className="text-[10px] font-medium text-success">↑ 14.8% vs last quarter</span>
+                    <p className="text-[11px] font-medium text-caption">Headcount</p>
+                    <p className="text-xl font-bold text-heading mt-1">428</p>
+                    <span className="text-[10px] font-medium text-caption">Sample directory</span>
                   </div>
                   <div className="bg-surface-raised p-3.5 rounded-card-sm border border-border-default shadow-card">
-                    <p className="text-[11px] font-medium text-caption">Active Enterprise Seats</p>
-                    <p className="text-xl font-bold text-heading mt-1">428 Members</p>
-                    <span className="text-[10px] font-medium text-accent">Across 6 Countries</span>
+                    <p className="text-[11px] font-medium text-caption">Open pipeline value</p>
+                    <p className="text-xl font-bold text-heading mt-1">$2.84M</p>
+                    <span className="text-[10px] font-medium text-caption">Sample pipeline</span>
                   </div>
                   <div className="bg-surface-raised p-3.5 rounded-card-sm border border-border-default shadow-card">
-                    <p className="text-[11px] font-medium text-caption">Sprint Delivery Velocity</p>
-                    <p className="text-xl font-bold text-heading mt-1">94.2%</p>
-                    <span className="text-[10px] font-medium text-caption">Illustrative sample figures</span>
+                    <p className="text-[11px] font-medium text-caption">Active sprints</p>
+                    <p className="text-xl font-bold text-heading mt-1">3</p>
+                    <span className="text-[10px] font-medium text-caption">Sample project data</span>
                   </div>
                 </div>
 
@@ -368,14 +373,14 @@ export default function Landing() {
                 <div className="bg-surface-raised p-4 rounded-card-sm border border-border-default shadow-card">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <p className="text-xs font-semibold text-heading">Revenue & Operating Cash Flow</p>
-                    <p className="text-[10px] text-caption">Illustrative dashboard preview · sample figures</p>
+                      <p className="text-xs font-semibold text-heading">Cash Flow Analysis</p>
+                      <p className="text-[10px] text-caption">Illustrative dashboard preview · sample figures</p>
                     </div>
                     <Badge variant="outline" className="text-[10px] bg-surface-muted text-muted border-border-default">
-                      Q1 - Q4 Continuous
+                      Sample data
                     </Badge>
                   </div>
-                  <svg viewBox="0 0 500 120" className="w-full h-24 overflow-visible">
+                  <svg viewBox="0 0 500 120" className="w-full h-24 overflow-visible" aria-hidden="true" focusable="false">
                     <defs>
                       <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.25" />
@@ -411,7 +416,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── Enterprise Social Proof ── */}
+      {/* ── Product area strip ── */}
       <section data-gsap-reveal className="border-y border-border-default bg-surface-raised py-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <p className="text-center text-xs font-semibold uppercase tracking-widest text-caption mb-8">
@@ -434,7 +439,7 @@ export default function Landing() {
       <section id="features" data-gsap-reveal className="max-w-6xl mx-auto px-4 sm:px-6 py-24 scroll-mt-20">
         <div className="text-center mb-16">
           <Badge variant="outline" className="mb-3 text-accent border-accent-muted bg-accent-light">
-            Engineered For Scale
+            Workspace areas
           </Badge>
           <h2 className="text-3xl sm:text-5xl font-extrabold text-heading tracking-tight">
             Clear workflows for the work your teams manage every day.
@@ -456,15 +461,16 @@ export default function Landing() {
                   <div className="p-2 rounded-button bg-accent-light text-accent shadow-xs">
                     <DollarSign className="w-5 h-5" />
                   </div>
-                  <h3 className="text-lg font-bold text-heading">Multi-Currency Treasury & FX</h3>
+                  <h3 className="text-lg font-bold text-heading">Multi-Currency Finance &amp; FX</h3>
                 </div>
                 {/* Currency Switcher */}
-                <div className="flex items-center gap-1 bg-surface-muted p-1 rounded-button border border-border-default/80 shadow-xs">
+                <div className="flex items-center gap-1 bg-surface-muted p-1 rounded-button border border-border-default/80 shadow-xs" role="group" aria-label="Sample currency">
                   {['USD', 'EUR', 'SAR'].map((curr) => (
                     <button
                       key={curr}
                       type="button"
                       onClick={() => setActiveCurrency(curr)}
+                      aria-pressed={activeCurrency === curr}
                       className={`px-2.5 py-1 rounded-button text-xs font-semibold transition-micro cursor-pointer active:scale-[0.98] ${
                         activeCurrency === curr
                           ? 'bg-surface-raised text-accent shadow-card'
@@ -485,7 +491,7 @@ export default function Landing() {
               {/* Dynamic Currency Display */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 my-6">
                 <div className="bg-surface-muted/70 p-4 rounded-card-sm border border-border-default/80 hover-lift transition-micro">
-                  <p className="text-xs text-caption font-medium">Consolidated Cash</p>
+                  <p className="text-xs text-caption font-medium">Cash balance</p>
                   <p className="text-2xl font-extrabold text-heading mt-1">
                     {currencyValues[activeCurrency].cash}
                   </p>
@@ -563,7 +569,7 @@ export default function Landing() {
               {/* Mini Sprint Board */}
               <div className="space-y-2 bg-surface-muted/70 p-3 rounded-card-sm border border-border-default/80 text-xs">
                 <div className="flex justify-between font-semibold text-heading pb-1 border-b border-border-subtle">
-                  <span>Sprint Alpha • Velocity 94%</span>
+                  <span>Sprint Alpha • 94% complete</span>
                   <span className="text-accent font-mono">18 Points</span>
                 </div>
                 <div className="bg-surface-raised p-2 rounded-button border border-border-default shadow-card flex justify-between items-center transition-micro hover:scale-[1.01]">
@@ -579,20 +585,20 @@ export default function Landing() {
 
             <div className="pt-6 border-t border-border-subtle mt-6">
               <Link to="/solutions?area=engineering" className="text-xs text-accent font-semibold hover:underline flex items-center gap-1 group">
-                <span>Explore Engineering Suite</span>
+                <span>Explore project workflows</span>
                 <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
               </Link>
             </div>
           </div>
 
-          {/* Card 4: Executive CRM & Deals (Spans 2 columns) */}
+          {/* Card 4: CRM & deals (spans 2 columns) */}
           <div className="md:col-span-2 bg-surface-raised rounded-card border border-border-default/80 p-6 sm:p-8 shadow-card hover:shadow-card-hover hover-lift transition-premium flex flex-col justify-between hover:border-accent/40">
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <div className="p-2 rounded-button bg-success-light text-success shadow-xs">
                   <TrendingUp className="w-5 h-5" />
                 </div>
-                <h3 className="text-lg font-bold text-heading">High-Value Deal Pipeline</h3>
+                <h3 className="text-lg font-bold text-heading">Deal Pipeline</h3>
               </div>
 
               <p className="text-sm text-body-light leading-relaxed mb-6">
@@ -602,8 +608,8 @@ export default function Landing() {
               {/* Deal Stages Pipeline */}
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs mb-4">
                 {[
-                  { stage: 'Prospecting', value: '$840K', count: '14 Deals' },
-                  { stage: 'Security Review', value: '$1.4M', count: '6 Deals' },
+                  { stage: 'Leads', value: '$840K', count: '14 Deals' },
+                  { stage: 'Proposal', value: '$1.4M', count: '6 Deals' },
                   { stage: 'Negotiation', value: '$2.1M', count: '4 Deals' },
                   { stage: 'Closed Won', value: '$4.8M', count: '28 Deals' },
                 ].map((s) => (
@@ -627,22 +633,22 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── Executive Persona Switcher ── */}
+      {/* ── Role-based workflow switcher ── */}
       <section data-gsap-reveal className="bg-surface-muted border-y border-border-default py-24">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
             <Badge variant="outline" className="mb-3 text-accent border-accent-muted bg-accent-light">
-              Executive Alignment
+              How teams use Asas
             </Badge>
             <h2 className="text-3xl sm:text-5xl font-extrabold text-heading tracking-tight">
-              Built for every seat in the boardroom.
+              Clear views for the people running the business.
             </h2>
             <p className="text-body-light text-base sm:text-lg max-w-2xl mx-auto mt-4">
-              Explore how Asas delivers tailored operational leverage to each C-suite leader.
+              Choose a team to see the workspace areas and actions that support its day-to-day work.
             </p>
 
             {/* Persona Tabs */}
-            <div className="flex flex-wrap items-center justify-center gap-2 mt-8">
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-8" role="group" aria-label="Choose a team view">
               {PERSONAS.map((p) => (
                 <button
                   key={p.id}
@@ -685,7 +691,7 @@ export default function Landing() {
                     className="bg-surface-muted/80 border border-border-default/80 p-4 rounded-card-sm flex items-center justify-between hover-lift transition-micro"
                   >
                     <span className="text-xs text-caption">{m.label}</span>
-                    <span className="text-lg font-bold text-success">{m.value}</span>
+                    <span className="text-right text-sm font-bold text-success sm:text-base">{m.value}</span>
                   </div>
                 ))}
               </div>
@@ -783,13 +789,13 @@ export default function Landing() {
       <section data-gsap-reveal className="bg-primary text-on-primary py-20 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto text-center">
           <Badge variant="outline" className="mb-4 text-on-primary border-primary-subtle bg-primary-hover">
-            Immediate Board-Ready Deployment
+            Start with a free workspace
           </Badge>
           <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight mb-4">
-            Ready to upgrade your enterprise infrastructure?
+            Ready to set up your workspace?
           </h2>
           <p className="text-primary-subtle text-base sm:text-lg max-w-xl mx-auto mb-8 leading-relaxed">
-            Join enterprise leaders orchestrating high-velocity operations with total clarity and zero downtime.
+            Start clean, or plan a company migration when you are ready. All current product areas are available on the Free plan.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-4">
@@ -797,7 +803,7 @@ export default function Landing() {
               asChild
               className="bg-accent hover:bg-accent-hover text-on-primary font-medium text-sm h-12 px-8 rounded-button shadow-card"
             >
-              <Link to="/register">Deploy Free Workspace</Link>
+              <Link to="/register">Start Free Workspace</Link>
             </Button>
             <Button
               asChild
@@ -810,7 +816,9 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── Enterprise Footer ── */}
+      </main>
+
+      {/* ── Footer ── */}
       <footer className="bg-primary text-on-primary border-t border-primary-hover py-12 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-5 gap-8">
           <div className="col-span-2">
@@ -818,10 +826,10 @@ export default function Landing() {
               <div className="w-7 h-7 rounded-card-sm bg-accent text-on-primary flex items-center justify-center font-bold text-xs shadow-card">
                 A
               </div>
-              <span className="text-base font-bold text-on-primary">Asas Enterprise</span>
+              <span className="text-base font-bold text-on-primary">Asas</span>
             </div>
             <p className="text-xs text-primary-subtle max-w-xs leading-relaxed mb-4">
-              The high-performance operating system designed for modern multi-currency enterprises.
+              Finance, people, customer relationships, projects, and inventory records in one workspace.
             </p>
             <p className="text-[11px] text-primary-subtle">
               © {new Date().getFullYear()} Asas Technologies Inc. All rights reserved.

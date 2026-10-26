@@ -29,7 +29,6 @@ import { useActiveMemberRole } from '../../../lib/authClient';
 import { getMemberRoleName } from '../../../lib/memberRole';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
-import { Badge } from '../../../components/ui/badge';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
 import { cn } from '../../../lib/utils';
 import {
@@ -71,23 +70,29 @@ const STATUS_TABS = [
   { key: 'REJECTED', label: 'Rejected' },
 ];
 
-function getStatusBadgeStyle(status) {
+function getStatusDotColor(status) {
   switch (status) {
     case 'PENDING':
-      return 'bg-amber-500/10 text-amber-600 border border-amber-500/20';
+      return 'bg-amber-500';
     case 'FLAGGED':
-      return 'bg-danger-light text-danger-hover border border-danger/20';
-    case 'APPROVED':
-      return 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20';
-    case 'REIMBURSED':
-      return 'bg-accent/10 text-accent border border-accent/20';
     case 'REJECTED':
-      return 'bg-danger-light text-danger border border-danger/20';
+      return 'bg-rose-500';
+    case 'APPROVED':
+    case 'REIMBURSED':
+      return 'bg-emerald-500';
+    case 'PROCESSING':
+      return 'bg-blue-500';
     case 'VOID':
-      return 'bg-surface-muted text-muted border border-border-default';
+      return 'bg-slate-400';
     default:
-      return 'bg-surface-active text-muted border-0';
+      return 'bg-slate-400';
   }
+}
+
+function formatStatus(status) {
+  if (!status) return '—';
+  const lower = String(status).toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
 export default function Expenses() {
@@ -279,6 +284,7 @@ export default function Expenses() {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised">
+        <h1 className="sr-only">Expenses</h1>
         <Loader2 className="animate-spin text-muted" size={24} />
       </div>
     );
@@ -287,6 +293,7 @@ export default function Expenses() {
   if (isError || !data) {
     return (
       <div className="flex h-full items-center justify-center bg-surface-raised text-danger">
+        <h1 className="sr-only">Expenses</h1>
         Failed to load expenses.
       </div>
     );
@@ -299,6 +306,7 @@ export default function Expenses() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-y-auto min-w-0 p-4 sm:p-6 space-y-4">
+      <h1 className="sr-only">Expenses</h1>
 
       {/* ── 1. Full-Width Single-Row Apple-Glass Command Toolbar ── */}
       <div className="relative z-30 bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-2.5 shadow-xs flex flex-wrap xl:flex-nowrap items-center justify-between gap-2.5 flex-shrink-0">
@@ -395,7 +403,7 @@ export default function Expenses() {
             >
               {formatCompactCurrency(pendingAmount)}
             </span>
-            <span className="bg-surface-muted text-muted text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0">
+            <span className="bg-slate-100 text-slate-600 text-[11px] font-medium px-2.5 py-0.5 rounded-full shrink-0 tabular-nums">
               {pendingCount} Reports
             </span>
           </div>
@@ -421,7 +429,7 @@ export default function Expenses() {
             >
               {formatCompactCurrency(approvedAmount)}
             </span>
-            <span className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0">
+            <span className="bg-slate-100 text-slate-600 text-[11px] font-medium px-2.5 py-0.5 rounded-full shrink-0 tabular-nums">
               {summary.approvedCount ?? 0} Reports
             </span>
           </div>
@@ -445,13 +453,13 @@ export default function Expenses() {
           </div>
           <div className="flex items-baseline justify-between gap-2 my-1">
             <span
-              className="text-2xl font-bold text-danger tracking-tight tabular-nums leading-none"
+              className="text-2xl font-bold text-slate-900 tracking-tight tabular-nums leading-none"
               title={formatMoney(violationAmount)}
             >
               {formatCompactCurrency(violationAmount)}
             </span>
-            <span className="inline-flex items-center gap-1 bg-rose-500/10 text-rose-600 border border-rose-500/20 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0">
-              <AlertTriangle size={11} strokeWidth={2.5} /> {summary.flaggedCount ?? 0} Reports
+            <span className="bg-slate-100 text-slate-600 text-[11px] font-medium px-2.5 py-0.5 rounded-full shrink-0 tabular-nums">
+              {summary.flaggedCount ?? 0} Reports
             </span>
           </div>
           <div className="pt-1.5 border-t border-border-subtle text-[11px] leading-snug text-muted">
@@ -514,7 +522,7 @@ export default function Expenses() {
                   <TableRow className="h-10 hover:bg-transparent border-0">
                     <TableHead className="pl-4 pr-3 py-0 text-left rtl:text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10">Employee</TableHead>
                     <TableHead className="w-[20%] min-w-[110px] px-2.5 py-0 text-left rtl:text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10">Merchant</TableHead>
-                    <TableHead className="w-[85px] lg:w-[90px] px-2.5 py-0 text-left rtl:text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10">Expense Date</TableHead>
+                    <TableHead className="w-[85px] lg:w-[90px] px-2.5 py-0 text-left rtl:text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10 whitespace-nowrap">Expense Date</TableHead>
                     <TableHead className="w-[100px] lg:w-[105px] px-2.5 py-0 text-center text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10">Status</TableHead>
                     <TableHead className="w-[110px] lg:w-[120px] px-2.5 pr-4 py-0 text-right rtl:text-left text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10">Amount</TableHead>
                   </TableRow>
@@ -523,7 +531,6 @@ export default function Expenses() {
                 <TableBody>
                   {filteredItems.map(item => {
                     const isSelected = selectedId === item.id;
-                    const badgeStyle = getStatusBadgeStyle(item.status);
                     const name = item.employee || 'Unassigned';
 
                     return (
@@ -533,15 +540,12 @@ export default function Expenses() {
                         className={cn(
                           'h-[48px] cursor-pointer transition-colors border-0',
                           isSelected
-                            ? 'bg-surface-row-selected hover:bg-surface-row-selected-hover'
-                            : 'bg-surface-raised hover:bg-surface-muted/60'
+                            ? 'border-l-[3px] border-l-indigo-600 bg-slate-50/80 hover:bg-slate-100/70'
+                            : 'border-l-[3px] border-l-transparent bg-surface-raised hover:bg-surface-muted/60'
                         )}
                       >
                         {/* Employee Column */}
-                        <TableCell className={cn(
-                          'pl-4 pr-3 py-0 align-middle border-b border-border-subtle min-w-0 transition-colors',
-                          isSelected ? 'border-l-2 border-l-accent' : 'border-l-2 border-l-transparent'
-                        )}>
+                        <TableCell className="pl-4 pr-3 py-0 align-middle border-b border-border-subtle min-w-0">
                           <div className="flex items-center gap-2.5 min-w-0">
                             <div className="w-8 h-8 rounded-xl bg-surface-muted border border-border-default flex items-center justify-center text-xs font-bold text-heading shrink-0 shadow-xs">
                               {name?.substring(0, 1).toUpperCase()}
@@ -567,9 +571,10 @@ export default function Expenses() {
 
                         {/* Status Column */}
                         <TableCell className="px-2.5 py-0 align-middle border-b border-border-subtle text-center whitespace-nowrap">
-                          <Badge variant="outline" className={`border text-[11px] font-semibold px-2 py-0.5 rounded-lg ${badgeStyle}`}>
-                            {item.status}
-                          </Badge>
+                          <span className="bg-slate-100/80 border border-slate-200/60 text-slate-700 px-2.5 py-0.5 rounded-full text-xs font-medium inline-flex items-center gap-1.5 capitalize">
+                            <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", getStatusDotColor(item.status))} aria-hidden="true" />
+                            {formatStatus(item.status)}
+                          </span>
                         </TableCell>
 
                         {/* Amount Column: Exact Currency with tabular-nums */}
@@ -583,7 +588,11 @@ export default function Expenses() {
                   {filteredItems.length === 0 && (
                     <TableRow className="hover:bg-transparent border-0">
                       <TableCell colSpan={5} className="px-6 py-8 text-center text-muted text-xs">
-                        No expenses found for the selected filter.
+                        {items.length === 0 && statusTab === 'ALL' && !search.trim() && !departmentId
+                          ? 'No expenses yet. Use New Expense to submit the first report.'
+                          : statusTab !== 'ALL'
+                          ? `No ${STATUS_TABS.find(tab => tab.key === statusTab)?.label.toLowerCase() ?? ''} expenses. Choose All to see every expense.`
+                          : 'No expenses match the current search or department filter. Clear the filters to see every report.'}
                       </TableCell>
                     </TableRow>
                   )}
@@ -628,26 +637,27 @@ export default function Expenses() {
                 </div>
               </div>
 
-              {/* 2. Single-Row Action Bar (Saves 48px of Height) */}
+              {/* 2. Action Bar: 2x2 Calm Structured Grid */}
               {isAdmin ? (
-                <div className="space-y-2 pt-0.5">
-                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <div className="pt-0.5">
+                  <div className="grid grid-cols-2 gap-2 pt-1">
                     <Button
                       type="button"
                       size="sm"
                       disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'PENDING'}
                       onClick={() => statusMutation.mutate('APPROVED')}
-                      className="h-9 flex-1 whitespace-nowrap text-xs font-semibold px-3 rounded-xl shadow-xs cursor-pointer"
+                      className="h-9 px-3 rounded-xl text-xs font-semibold bg-[#0f172a] text-white hover:bg-slate-800 shadow-xs whitespace-nowrap cursor-pointer disabled:opacity-50"
                     >
                       Approve
                     </Button>
                     <Button
                       type="button"
+                      variant="outline"
                       size="sm"
                       disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'APPROVED'}
                       onClick={() => statusMutation.mutate('REIMBURSED')}
                       title="Records reimbursement after it has been paid outside Asas."
-                      className="h-9 flex-1 whitespace-nowrap text-xs font-semibold px-3 rounded-xl shadow-xs cursor-pointer"
+                      className="h-9 px-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/80 text-slate-700 text-xs font-medium whitespace-nowrap cursor-pointer shadow-xs disabled:opacity-50"
                     >
                       Mark Reimbursed
                     </Button>
@@ -657,7 +667,7 @@ export default function Expenses() {
                       size="sm"
                       disabled={!selectedRecord || statusMutation.isPending || ['APPROVED', 'REIMBURSED', 'REJECTED', 'VOID'].includes(selectedRecord.status)}
                       onClick={() => statusMutation.mutate('REJECTED')}
-                      className="h-9 px-2.5 rounded-xl border border-border-default text-xs font-semibold whitespace-nowrap cursor-pointer hover:bg-surface-muted"
+                      className="h-9 px-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/80 text-slate-700 text-xs font-medium whitespace-nowrap cursor-pointer shadow-xs disabled:opacity-50"
                     >
                       Reject
                     </Button>
@@ -670,7 +680,7 @@ export default function Expenses() {
                         const reason = window.prompt('Reason for voiding this expense:')?.trim();
                         if (reason) voidMutation.mutate(reason);
                       }}
-                      className="h-9 px-2.5 rounded-xl border border-danger/40 text-xs font-semibold text-danger hover:bg-danger/5 whitespace-nowrap cursor-pointer"
+                      className="h-9 px-3 rounded-xl bg-white hover:bg-rose-50/50 border border-slate-200/80 text-slate-500 hover:text-rose-600 text-xs font-medium whitespace-nowrap cursor-pointer shadow-xs disabled:opacity-50"
                     >
                       {voidMutation.isPending ? 'Voiding…' : 'Void expense'}
                     </Button>
@@ -678,12 +688,10 @@ export default function Expenses() {
                 </div>
               ) : (
                 <div className="pt-1">
-                  <Badge
-                    variant="outline"
-                    className="inline-flex items-center justify-center h-8 px-3 w-full text-xs font-semibold uppercase tracking-wider rounded-xl border border-border-default bg-surface-muted"
-                  >
-                    {selectedRecord.status}
-                  </Badge>
+                  <span className="inline-flex items-center justify-center gap-1.5 h-8 px-3 w-full text-xs font-semibold capitalize rounded-xl border border-slate-200/80 bg-slate-100/80 text-slate-700">
+                    <span className={cn("w-2 h-2 rounded-full shrink-0", getStatusDotColor(selectedRecord.status))} aria-hidden="true" />
+                    {formatStatus(selectedRecord.status)}
+                  </span>
                 </div>
               )}
 
@@ -698,46 +706,46 @@ export default function Expenses() {
                 </Alert>
               )}
 
-              {/* 3. Compact EXPENSE DETAILS Recessed Bento Strip */}
-              <div className="space-y-2">
+              {/* 3. Compact EXPENSE DETAILS Recessed Well (Matching Payroll) */}
+              <div className="space-y-1.5">
                 <div className="flex items-center gap-1.5">
                   <Sparkles size={13} className="text-accent shrink-0" />
                   <h3 className="text-[10px] font-bold text-muted uppercase tracking-wider">Expense details</h3>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-surface-muted/60 border border-border-subtle rounded-xl p-2.5 min-w-0">
-                    <p className="text-[10px] font-bold text-muted uppercase tracking-wider leading-none">Merchant</p>
-                    <p className="text-xs font-bold text-heading truncate mt-1 leading-tight" title={selectedRecord.merchant || '—'}>
+                <div className="rounded-xl bg-slate-50/70 border border-slate-200/60 p-3.5 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">Merchant</span>
+                    <span className="font-semibold text-slate-900 truncate max-w-[180px]" title={selectedRecord.merchant || '—'}>
                       {selectedRecord.merchant || '—'}
-                    </p>
+                    </span>
                   </div>
 
-                  <div className="bg-surface-muted/60 border border-border-subtle rounded-xl p-2.5 min-w-0">
-                    <p className="text-[10px] font-bold text-muted uppercase tracking-wider leading-none">Category</p>
-                    <p className="text-xs font-bold text-heading truncate mt-1 leading-tight" title={formatCategory(selectedRecord.category)}>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">Category</span>
+                    <span className="font-semibold text-slate-900 truncate max-w-[180px]" title={formatCategory(selectedRecord.category)}>
                       {formatCategory(selectedRecord.category)}
-                    </p>
+                    </span>
                   </div>
 
-                  <div className="bg-surface-muted/60 border border-border-subtle rounded-xl p-2.5 min-w-0">
-                    <p className="text-[10px] font-bold text-muted uppercase tracking-wider leading-none">Tax</p>
-                    <p className="text-xs font-bold text-heading tabular-nums mt-1 leading-tight">
-                      {formatMoney(selectedRecord.tax)}
-                    </p>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">Tax</span>
+                    <span className={cn("tabular-nums", selectedRecord.tax?.amount != null && selectedRecord.tax.amount > 0 ? "font-semibold text-slate-900" : "text-slate-400")}>
+                      {selectedRecord.tax?.amount != null && selectedRecord.tax.amount > 0 ? formatMoney(selectedRecord.tax) : '—'}
+                    </span>
                   </div>
 
-                  <div className="bg-surface-muted/60 border border-border-subtle rounded-xl p-2.5 min-w-0">
-                    <p className="text-[10px] font-bold text-muted uppercase tracking-wider leading-none">Policy Match</p>
-                    <div className="text-xs font-bold mt-1 leading-tight flex items-center gap-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">Policy match</span>
+                    <div className="text-xs">
                       {selectedRecord.policyMatch === null ? (
-                        <span className="text-muted font-normal">—</span>
+                        <span className="text-slate-400">—</span>
                       ) : selectedRecord.policyMatch ? (
-                        <span className="text-accent flex items-center gap-1">
+                        <span className="text-emerald-600 font-medium inline-flex items-center gap-1">
                           <CheckCircle2 size={13} className="shrink-0" /> Yes
                         </span>
                       ) : (
-                        <span className="text-danger flex items-center gap-1">
+                        <span className="text-rose-600 font-medium inline-flex items-center gap-1">
                           <AlertTriangle size={13} className="shrink-0" /> No
                         </span>
                       )}
@@ -795,7 +803,7 @@ export default function Expenses() {
                 </div>
 
                 {receiptOpen && (
-                  <div className="bg-slate-100 dark:bg-slate-900/50 p-3 flex justify-center relative max-h-[340px] overflow-auto rounded-b-xl">
+                  <div className="bg-slate-50/80 border-t border-slate-200/60 p-4 flex justify-center relative max-h-[340px] overflow-auto rounded-b-xl">
                     {/* Collapse toggle button */}
                     <button
                       type="button"
@@ -809,7 +817,7 @@ export default function Expenses() {
                     {/* Receipt Visual */}
                     <div
                       style={{ zoom: `${receiptZoom}%` }}
-                      className="bg-surface-raised w-full max-w-[320px] shadow-card rounded-xl p-4 flex flex-col relative z-0 min-h-[260px] border border-border-subtle"
+                      className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-2xs w-full max-w-[320px] flex flex-col relative z-0 min-h-[260px]"
                     >
                       {/* Background watermark simulation */}
                       <div className="absolute top-3 right-3 opacity-15 pointer-events-none">

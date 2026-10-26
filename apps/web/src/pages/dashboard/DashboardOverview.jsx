@@ -115,27 +115,28 @@ export default function DashboardOverview() {
 
   const payablesChangeText = (() => {
     if (pastDuePayables?.amount > 0) {
-      return `${formatMoney(pastDuePayables)} past due${dueIn7DaysPayables?.amount > 0 ? ` · ${formatMoney(dueIn7DaysPayables)} due in 7d` : ''}`
+      return `${formatCompactCurrency(pastDuePayables)} past due${dueIn7DaysPayables?.amount > 0 ? ` · ${formatCompactCurrency(dueIn7DaysPayables)} due in 7d` : ''}`
     }
     if (dueIn7DaysPayables?.amount > 0) {
-      return `${formatMoney(dueIn7DaysPayables)} due in 7 days`
+      return `${formatCompactCurrency(dueIn7DaysPayables)} due in 7 days`
     }
     if (paidThisMonthTotal && paidThisMonthComparison?.previousTotal) {
-      return `${formatMoney(paidThisMonthTotal)} paid MTD (vs ${formatMoney(paidThisMonthComparison.previousTotal)})`
+      return `${formatCompactCurrency(paidThisMonthTotal)} paid MTD (vs ${formatCompactCurrency(paidThisMonthComparison.previousTotal)})`
     }
-    return 'All current'
+    return 'No past-due bills'
   })()
 
   const sprintItems = sprints.data?.items ?? []
   const activeSprintCount = countActiveSprints(sprintItems)
   const completedSprintCount = sprintItems.filter(s => s.status === 'COMPLETED').length
+  const reportDataLoading = [employees, crm, finance, payables, sprints, receivables, products, payroll, attendance].some(query => query.isLoading)
 
   const stats = [
     {
       label: 'Headcount',
       value: headcount.toString(),
       change: `${hiredThisMonth} hired MTD`,
-      subtitle: `${hiresDelta > 0 ? `+${hiresDelta}` : hiresDelta < 0 ? `${hiresDelta}` : '0'} vs last month${onLeaveCount > 0 ? ` · ${onLeaveCount} on leave` : ''}`,
+      subtitle: `${hiresDelta > 0 ? `+${hiresDelta}` : hiresDelta < 0 ? `${hiresDelta}` : '0'} vs same time last month${onLeaveCount > 0 ? ` · ${onLeaveCount} on leave` : ''}`,
       trend: hiresDelta > 0 ? 'up' : hiresDelta < 0 ? 'down' : 'neutral',
       icon: Users,
     },
@@ -194,6 +195,7 @@ export default function DashboardOverview() {
       subtitle: `Accounts receivable • ${overdueCount} ${overdueCount === 1 ? 'invoice' : 'invoices'} past due`,
       amount: formatCompactCurrency(overdueTotal),
       fullAmount: formatFullCurrency(overdueTotal),
+      actionLabel: 'Open',
       to: '/dashboard/finance/accounts-receivable',
     })
   }
@@ -203,6 +205,7 @@ export default function DashboardOverview() {
       title: 'Low-Stock Products',
       subtitle: `Inventory • ${lowStockProducts} ${lowStockProducts === 1 ? 'product' : 'products'} below threshold`,
       amount: `${lowStockProducts} item${lowStockProducts === 1 ? '' : 's'}`,
+      actionLabel: 'Open',
       to: '/dashboard/inventory',
     })
   }
@@ -210,8 +213,9 @@ export default function DashboardOverview() {
     attentionItems.push({
       id: 'pending-payroll',
       title: 'Pending Payroll Runs',
-      subtitle: `HR • ${pendingPayrollRuns} ${pendingPayrollRuns === 1 ? 'run' : 'runs'} awaiting approval`,
-      amount: 'Approve',
+      subtitle: 'HR • awaiting payroll approval',
+      amount: `${pendingPayrollRuns} ${pendingPayrollRuns === 1 ? 'run' : 'runs'}`,
+      actionLabel: 'Review',
       to: '/dashboard/hr/payroll',
     })
   }
@@ -219,8 +223,9 @@ export default function DashboardOverview() {
     attentionItems.push({
       id: 'attendance-exceptions',
       title: 'Attendance Exceptions',
-      subtitle: `HR • ${attendanceExceptions} ${attendanceExceptions === 1 ? 'exception' : 'exceptions'} this period`,
-      amount: 'Review',
+      subtitle: 'HR • recorded this period',
+      amount: `${attendanceExceptions} ${attendanceExceptions === 1 ? 'exception' : 'exceptions'}`,
+      actionLabel: 'Review',
       to: '/dashboard/hr/time-attendance',
     })
   }
@@ -243,11 +248,12 @@ export default function DashboardOverview() {
       ['Requires attention', 'Detail', 'Amount / action'],
       ...attentionItems.map(item => [item.title, item.subtitle, item.amount]),
     ]
-    downloadCsv(rows, `dashboard-${selectedYear}-${new Date().toISOString().slice(0, 10)}.csv`)
+    downloadCsv(rows, `dashboard-${new Date().toISOString().slice(0, 10)}.csv`)
   }
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
+      <h1 className="sr-only">Dashboard overview</h1>
 
       <TopBarActions>
         <div className="flex items-center gap-3">
@@ -256,7 +262,10 @@ export default function DashboardOverview() {
             variant="outline"
             size="sm"
             onClick={downloadReport}
-            className="h-9 px-3.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/80 text-xs sm:text-sm font-semibold text-slate-800 shadow-sm transition-all cursor-pointer"
+            disabled={reportDataLoading}
+            aria-busy={reportDataLoading}
+            title={reportDataLoading ? 'Wait for dashboard data to finish loading before generating a report.' : undefined}
+            className={`h-9 px-3.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/80 text-xs sm:text-sm font-semibold text-slate-800 shadow-sm transition-all ${reportDataLoading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
           >
             Generate Report
           </Button>
@@ -283,15 +292,18 @@ export default function DashboardOverview() {
               </div>
 
               {/* Tier 2: Middle Row */}
-              <div className="flex items-baseline justify-between gap-2 my-1.5 min-w-0">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 my-1.5 min-w-0">
                 <span
-                  className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums truncate cursor-help"
+                  className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums whitespace-nowrap cursor-help"
                   title={stat.fullValue || stat.value}
                 >
                   {stat.value}
                 </span>
                 {stat.change && (
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200/60 shrink-0 whitespace-nowrap">
+                  <span
+                    className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-full border border-slate-200/60 bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 shrink-0"
+                    title={stat.change}
+                  >
                     {stat.change}
                   </span>
                 )}
@@ -446,9 +458,10 @@ export default function DashboardOverview() {
                       </p>
                       <Link
                         to={item.to}
+                        aria-label={`${item.actionLabel} ${item.title.toLowerCase()}`}
                         className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-[11px] font-semibold shrink-0 transition-colors"
                       >
-                        Action
+                        {item.actionLabel}
                       </Link>
                     </div>
                   </div>
@@ -562,7 +575,7 @@ export default function DashboardOverview() {
               <div className="py-6 flex flex-col items-center justify-center text-center">
                 <Clock size={20} className="text-slate-300 mb-1.5" />
                 <p className="text-xs font-semibold text-slate-600">No recent activity</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">New audits will display here in real time</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Recorded audits will appear here after the page refreshes</p>
               </div>
             )}
           </div>

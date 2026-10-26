@@ -107,6 +107,10 @@ async function setup(status: string, failAuditAt = 0, role = 'ADMIN', withSettle
         return { id: `journal_${staged.journals.length}` }
       }), findMany: vi.fn(async () => []) },
       journalLine: { createMany: vi.fn(async ({ data }: { data: Record<string, unknown>[] }) => { staged.journalLines.push(...data); return { count: data.length } }) },
+      purchaseOrderInvoiceMatch: {
+        findFirst: vi.fn(async () => null),
+        update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'match_1', ...data })),
+      },
       auditLog: { create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         if (staged.audits.length + 1 === failAuditAt) throw new Error('Audit unavailable')
         staged.audits.push(data)

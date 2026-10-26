@@ -60,6 +60,7 @@ describe('Auth providers and dev social login', () => {
       GOOGLE_CLIENT_SECRET: 'google-secret-456',
       APPLE_CLIENT_ID: 'apple-client-id-789',
       APPLE_CLIENT_SECRET: 'apple-secret-012',
+      AUTH_SECRET: '01234567890123456789012345678901',
       DEV_SOCIAL_AUTH_ENABLED: 'true',
     })
 
@@ -108,6 +109,7 @@ describe('Auth providers and dev social login', () => {
       NODE_ENV: 'production',
       DATABASE_URL: 'postgresql://mock:mock@localhost:5432/db',
       AUTH_SECRET: '01234567890123456789012345678901',
+      BETTER_AUTH_URL: 'https://api.asas.local',
       FRONTEND_ORIGIN: 'https://app.asas.local',
     })
 

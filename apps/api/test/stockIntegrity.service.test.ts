@@ -3,6 +3,8 @@ import { PGlite } from '@electric-sql/pglite'
 import { describe, expect, it, vi } from 'vitest'
 import { listStockMovements, recordStockMovement } from '../src/modules/inventory/inventory.service.js'
 
+const REQUEST_KEY = 'cc35b4e1-07ec-4656-a3d3-8b4e71c67251'
+
 function movementSetup(count = 1) {
   const tx = {
     product: {
@@ -18,15 +20,50 @@ function movementSetup(count = 1) {
   const prisma = {
     product: { findFirst: vi.fn().mockResolvedValue({ id: 'product_1', stock: 10 }) },
     inventoryValuationConfig: { findUnique: vi.fn().mockResolvedValue(null) },
+    stockMovement: { findFirst: vi.fn().mockResolvedValue(null) },
     $transaction: vi.fn(async (work: (client: unknown) => unknown) => work(tx)),
   } as unknown as PrismaClient
   return { prisma, tx }
 }
 
+function replaySetup() {
+  let stored: Record<string, unknown> | null = null
+  const tx = {
+    product: {
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      findUniqueOrThrow: vi.fn().mockResolvedValue({ stock: 7 }),
+    },
+    stockMovement: {
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+        stored = {
+          id: 'move_1',
+          ...data,
+          createdAt: new Date(),
+          product: { name: 'Product', warehouse: null },
+        }
+        return stored
+      }),
+    },
+    auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit_1' }) },
+  }
+  const findFirst = vi.fn(async () => stored && {
+    ...stored,
+    product: { name: 'Product', warehouse: null, stock: 7 },
+  })
+  const transaction = vi.fn(async (work: (client: unknown) => unknown) => work(tx))
+  const prisma = {
+    product: { findFirst: vi.fn().mockResolvedValue({ id: 'product_1', stock: 10 }) },
+    inventoryValuationConfig: { findUnique: vi.fn().mockResolvedValue(null) },
+    stockMovement: { findFirst },
+    $transaction: transaction,
+  } as unknown as PrismaClient
+  return { prisma, tx, findFirst, transaction }
+}
+
 describe('stock integrity', () => {
   it('enforces stock availability in the write and returns the updated stock, not the stale read', async () => {
     const { prisma, tx } = movementSetup()
-    const result = await recordStockMovement(prisma, 'tenant_1', { productId: 'product_1', delta: -3 }, 'user_1')
+    const result = await recordStockMovement(prisma, 'tenant_1', { productId: 'product_1', delta: -3, requestKey: REQUEST_KEY }, 'user_1')
     expect(tx.product.updateMany).toHaveBeenCalledWith({
       where: { id: 'product_1', tenantId: 'tenant_1', archivedAt: null, stock: { gte: 3 } },
       data: { stock: { increment: -3 } },
@@ -39,12 +76,12 @@ describe('stock integrity', () => {
   })
   it('does not create a movement when an atomic decrement loses the stock race', async () => {
     const { prisma, tx } = movementSetup(0)
-    await expect(recordStockMovement(prisma, 'tenant_1', { productId: 'product_1', delta: -3 }, 'user_1')).rejects.toMatchObject({ statusCode: 409 })
+    await expect(recordStockMovement(prisma, 'tenant_1', { productId: 'product_1', delta: -3, requestKey: REQUEST_KEY }, 'user_1')).rejects.toMatchObject({ statusCode: 409 })
     expect(tx.stockMovement.create).not.toHaveBeenCalled()
   })
   it('blocks a positive movement that would overflow the stored Int quantity', async () => {
     const { prisma, tx } = movementSetup(0)
-    await expect(recordStockMovement(prisma, 'tenant_1', { productId: 'product_1', delta: 1 }, 'user_1'))
+    await expect(recordStockMovement(prisma, 'tenant_1', { productId: 'product_1', delta: 1, requestKey: REQUEST_KEY }, 'user_1'))
       .rejects.toMatchObject({ statusCode: 409, message: 'Stock quantity exceeds the supported maximum or product is no longer available' })
     expect(tx.product.updateMany).toHaveBeenCalledWith({
       where: { id: 'product_1', tenantId: 'tenant_1', archivedAt: null, stock: { lte: 2_147_483_646 } },
@@ -56,11 +93,77 @@ describe('stock integrity', () => {
     const { prisma, tx } = movementSetup()
     tx.auditLog.create.mockRejectedValueOnce(new Error('audit unavailable'))
 
-    await expect(recordStockMovement(prisma, 'tenant_1', { productId: 'product_1', delta: -3 }, 'user_1'))
+    await expect(recordStockMovement(prisma, 'tenant_1', { productId: 'product_1', delta: -3, requestKey: REQUEST_KEY }, 'user_1'))
       .rejects.toThrow('audit unavailable')
     expect(tx.stockMovement.create).toHaveBeenCalledTimes(1)
     expect(tx.auditLog.create).toHaveBeenCalledTimes(1)
   })
+  it('replays an unchanged retry without advancing stock or writing a second audit entry', async () => {
+    const { prisma, tx, transaction } = replaySetup()
+    const first = await recordStockMovement(prisma, 'tenant_1', {
+      productId: 'product_1', delta: 3, note: 'PO-2026-081', requestKey: REQUEST_KEY,
+    }, 'user_1')
+    const retry = await recordStockMovement(prisma, 'tenant_1', {
+      productId: 'product_1', delta: 3, note: 'PO-2026-081', requestKey: REQUEST_KEY,
+    }, 'user_1')
+
+    expect(first.creationReplayed).toBe(false)
+    expect(retry).toMatchObject({ id: 'move_1', creationReplayed: true, newStock: 7 })
+    expect(transaction).toHaveBeenCalledTimes(1)
+    expect(tx.product.updateMany).toHaveBeenCalledTimes(1)
+    expect(tx.stockMovement.create).toHaveBeenCalledTimes(1)
+    expect(tx.auditLog.create).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects reuse of a request key for a different movement payload', async () => {
+    const { prisma, tx, transaction } = replaySetup()
+    await recordStockMovement(prisma, 'tenant_1', {
+      productId: 'product_1', delta: 3, note: 'PO-2026-081', requestKey: REQUEST_KEY,
+    }, 'user_1')
+
+    await expect(recordStockMovement(prisma, 'tenant_1', {
+      productId: 'product_1', delta: 4, note: 'PO-2026-081', requestKey: REQUEST_KEY,
+    }, 'user_1')).rejects.toMatchObject({
+      statusCode: 409,
+      message: 'This request key was already used for a different stock movement',
+    })
+    expect(transaction).toHaveBeenCalledTimes(1)
+    expect(tx.stockMovement.create).toHaveBeenCalledTimes(1)
+    expect(tx.auditLog.create).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns the winning movement when concurrent retries lose the unique-key race', async () => {
+    const { prisma, tx, findFirst } = replaySetup()
+    let stored: Record<string, unknown> | null = null
+    tx.stockMovement.create.mockImplementationOnce(async ({ data }: { data: Record<string, unknown> }) => {
+      stored = { id: 'move_race', ...data, createdAt: new Date(), product: { name: 'Product', warehouse: null } }
+      throw Object.assign(new Error('Unique constraint failed'), { code: 'P2002' })
+    })
+    findFirst
+      .mockResolvedValueOnce(null)
+      .mockImplementationOnce(async () => stored && {
+        ...stored,
+        product: { name: 'Product', warehouse: null, stock: 7 },
+      })
+
+    const result = await recordStockMovement(prisma, 'tenant_1', {
+      productId: 'product_1', delta: 3, note: null, requestKey: REQUEST_KEY,
+    }, 'user_1')
+
+    expect(result).toMatchObject({ id: 'move_race', creationReplayed: true, newStock: 7 })
+    expect(tx.auditLog.create).not.toHaveBeenCalled()
+  })
+
+  it('requires a request key even when the service is called outside the route schema', async () => {
+    const { prisma } = movementSetup()
+    await expect(recordStockMovement(prisma, 'tenant_1', {
+      productId: 'product_1', delta: 1,
+    } as never, 'user_1')).rejects.toMatchObject({
+      statusCode: 400,
+      message: 'A request key is required so a manual stock movement cannot be recorded twice by a retry',
+    })
+  })
+
   it('returns positive OUT totals and applies filters to counts and aggregates', async () => {
     const stockMovement = {
       findMany: vi.fn().mockResolvedValue([]), count: vi.fn().mockResolvedValue(2),

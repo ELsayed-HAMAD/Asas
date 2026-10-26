@@ -339,6 +339,7 @@ model Tenant {
   inventoryValuationEvents          InventoryValuationEvent[]
   inventoryCostAllocations          InventoryCostAllocation[]
   receivableInventoryLines          ReceivableInventoryLine[]
+  purchaseOrderInvoiceMatches       PurchaseOrderInvoiceMatch[]
   dataMigrationProjects             DataMigrationProject[]
   dataMigrationImportJobs           DataMigrationImportJob[]
   dataMigrationRecordLinks          DataMigrationRecordLink[]
@@ -990,9 +991,11 @@ model Vendor {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  invoices PayableInvoice[]
+  tenant         Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoices       PayableInvoice[]
+  purchaseOrders PurchaseOrder[]
 
+  @@unique([id, tenantId])
   @@index([tenantId])
 }
 
@@ -1000,6 +1003,7 @@ model PayableInvoice {
   id                   String        @id @default(cuid())
   tenantId             String
   projectId            String?
+  purchaseOrderId      String?
   currency             String?
   vendorId             String
   invoiceNumber        String?
@@ -1017,18 +1021,21 @@ model PayableInvoice {
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
-  tenant              Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  project             Project?          @relation(fields: [projectId, tenantId], references: [id, tenantId], onDelete: NoAction)
-  vendor              Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  lineItems           PayableLineItem[]
-  settlementJournals  JournalEntry[]
-  recognitionJournals JournalEntry[]    @relation("PayableRecognition")
+  tenant               Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project              Project?                    @relation(fields: [projectId, tenantId], references: [id, tenantId], onDelete: NoAction)
+  purchaseOrder        PurchaseOrder?              @relation(fields: [purchaseOrderId, tenantId], references: [id, tenantId], onDelete: NoAction)
+  vendor               Vendor                      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  lineItems            PayableLineItem[]
+  settlementJournals   JournalEntry[]
+  recognitionJournals  JournalEntry[]              @relation("PayableRecognition")
+  purchaseOrderMatches PurchaseOrderInvoiceMatch[]
 
   @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([tenantId, dueDate])
   @@index([tenantId, projectId])
+  @@index([tenantId, purchaseOrderId])
 }
 
 model PayableLineItem {
@@ -1250,22 +1257,23 @@ model JournalEntry {
   postedAt                      DateTime
   createdAt                     DateTime @default(now())
 
-  tenant                           Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  exchangeRate                     ExchangeRate?             @relation(fields: [exchangeRateId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  payable                          PayableInvoice?           @relation(fields: [payableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  receivable                       ReceivableInvoice?        @relation(fields: [receivableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  payrollRun                       PayrollRun?               @relation(fields: [payrollRunId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  expense                          Expense?                  @relation(fields: [expenseId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  recognizedPayable                PayableInvoice?           @relation("PayableRecognition", fields: [recognizesPayableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  recognizedReceivable             ReceivableInvoice?        @relation("ReceivableRecognition", fields: [recognizesReceivableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  recognizedPayrollRun             PayrollRun?               @relation("PayrollRecognition", fields: [recognizesPayrollRunId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  recognizedExpense                Expense?                  @relation("ExpenseRecognition", fields: [recognizesExpenseId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  reverses                         JournalEntry?             @relation("JournalReversal", fields: [reversesJournalEntryId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  reversedBy                       JournalEntry?             @relation("JournalReversal")
+  tenant                           Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  exchangeRate                     ExchangeRate?               @relation(fields: [exchangeRateId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  payable                          PayableInvoice?             @relation(fields: [payableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  receivable                       ReceivableInvoice?          @relation(fields: [receivableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  payrollRun                       PayrollRun?                 @relation(fields: [payrollRunId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  expense                          Expense?                    @relation(fields: [expenseId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  recognizedPayable                PayableInvoice?             @relation("PayableRecognition", fields: [recognizesPayableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  recognizedReceivable             ReceivableInvoice?          @relation("ReceivableRecognition", fields: [recognizesReceivableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  recognizedPayrollRun             PayrollRun?                 @relation("PayrollRecognition", fields: [recognizesPayrollRunId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  recognizedExpense                Expense?                    @relation("ExpenseRecognition", fields: [recognizesExpenseId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  reverses                         JournalEntry?               @relation("JournalReversal", fields: [reversesJournalEntryId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  reversedBy                       JournalEntry?               @relation("JournalReversal")
   lines                            JournalLine[]
   inventoryValuationEvent          InventoryValuationEvent?
-  receivableInventoryIssueLines    ReceivableInventoryLine[] @relation("ReceivableInventoryIssueJournal")
-  receivableInventoryReversalLines ReceivableInventoryLine[] @relation("ReceivableInventoryReversalJournal")
+  purchaseOrderInvoiceMatches      PurchaseOrderInvoiceMatch[]
+  receivableInventoryIssueLines    ReceivableInventoryLine[]   @relation("ReceivableInventoryIssueJournal")
+  receivableInventoryReversalLines ReceivableInventoryLine[]   @relation("ReceivableInventoryReversalJournal")
 
   @@unique([id, tenantId])
   @@unique([tenantId, payableInvoiceId])
@@ -1553,12 +1561,17 @@ model Product {
 }
 
 model StockMovement {
-  id        String   @id @default(cuid())
-  tenantId  String
-  productId String
-  delta     Int
-  note      String?
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  tenantId    String
+  productId   String
+  delta       Int
+  note        String?
+  /// Stable client-generated UUID for a manual movement. State-guarded system movements leave
+  /// both request fields NULL; a repeated manual request returns the original movement instead
+  /// of advancing stock twice.
+  requestKey  String?
+  requestHash String?
+  createdAt   DateTime @default(now())
 
   product                 Product                   @relation(fields: [productId, tenantId], references: [id, tenantId], onDelete: Cascade)
   valuationEvent          InventoryValuationEvent?
@@ -1567,6 +1580,7 @@ model StockMovement {
   receivableReversalLines ReceivableInventoryLine[] @relation("ReceivableInventoryReversalMovement")
 
   @@unique([id, tenantId])
+  @@unique([tenantId, requestKey])
   @@index([tenantId])
 }
 
@@ -1654,6 +1668,9 @@ model InventoryValuationEvent {
   id              String                 @id @default(cuid())
   tenantId        String
   productId       String
+  /// Set only for a purchase-order receipt. This link lets Finance match an AP bill to the
+  /// exact valued receipt that established the goods-received-not-invoiced balance.
+  purchaseOrderId String?
   /// Absent for an opening valuation of existing quantity (no new movement occurred).
   stockMovementId String?
   journalEntryId  String?
@@ -1665,18 +1682,21 @@ model InventoryValuationEvent {
   postedAt        DateTime
   createdAt       DateTime               @default(now())
 
-  tenant                  Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  product                 Product                   @relation(fields: [productId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  stockMovement           StockMovement?            @relation(fields: [stockMovementId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  journalEntry            JournalEntry?             @relation(fields: [journalEntryId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  tenant                  Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product                 Product                     @relation(fields: [productId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  purchaseOrder           PurchaseOrder?              @relation(fields: [purchaseOrderId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  stockMovement           StockMovement?              @relation(fields: [stockMovementId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  journalEntry            JournalEntry?               @relation(fields: [journalEntryId, tenantId], references: [id, tenantId], onDelete: Restrict)
   allocations             InventoryCostAllocation[]
-  receivableIssueLines    ReceivableInventoryLine[] @relation("ReceivableInventoryIssueValuation")
-  receivableReversalLines ReceivableInventoryLine[] @relation("ReceivableInventoryReversalValuation")
+  receivableIssueLines    ReceivableInventoryLine[]   @relation("ReceivableInventoryIssueValuation")
+  receivableReversalLines ReceivableInventoryLine[]   @relation("ReceivableInventoryReversalValuation")
+  invoiceMatches          PurchaseOrderInvoiceMatch[]
 
   @@unique([stockMovementId, tenantId])
   @@unique([journalEntryId, tenantId])
   @@unique([id, tenantId])
   @@index([tenantId, productId, postedAt, id])
+  @@index([tenantId, purchaseOrderId])
 }
 
 /// Append-only cost allocation from an outgoing issue to the receipt layer(s) it consumed.
@@ -1723,16 +1743,25 @@ model ProductSupplier {
 model PurchaseOrder {
   id         String    @id @default(cuid())
   tenantId   String
+  /// Finance vendor selected for this order. Nullable so historical orders remain valid; a
+  /// purchase order without a vendor can be received but cannot be matched to a supplier bill.
+  vendorId   String?
   status     String    @default("DRAFT")
   approvedAt DateTime?
   receivedAt DateTime?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
-  tenant Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  lines  PurchaseOrderLine[]
+  tenant          Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vendor          Vendor?                     @relation(fields: [vendorId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  lines           PurchaseOrderLine[]
+  payables        PayableInvoice[]
+  valuationEvents InventoryValuationEvent[]
+  invoiceMatches  PurchaseOrderInvoiceMatch[]
 
+  @@unique([id, tenantId])
   @@index([tenantId])
+  @@index([tenantId, vendorId])
 }
 
 model PurchaseOrderLine {
@@ -1749,6 +1778,40 @@ model PurchaseOrderLine {
 
   purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   product       Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+/// One exact match between a received, valued purchase-order line and the supplier bill that
+/// clears its goods-received-not-invoiced balance. `activePurchaseOrderId` is unique while a
+/// match is ACTIVE and becomes NULL when the match is reversed, so a replacement bill can match
+/// the same receipt without deleting the historical match.
+model PurchaseOrderInvoiceMatch {
+  id                    String    @id @default(cuid())
+  tenantId              String
+  purchaseOrderId       String
+  payableInvoiceId      String
+  valuationEventId      String
+  journalEntryId        String
+  /// Mirrors `purchaseOrderId` while ACTIVE and is NULL after reversal.
+  activePurchaseOrderId String?
+  amount                Decimal   @db.Decimal(19, 4)
+  currency              String
+  status                String    @default("ACTIVE")
+  reversedAt            DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  tenant         Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchaseOrder  PurchaseOrder           @relation(fields: [purchaseOrderId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  payableInvoice PayableInvoice          @relation(fields: [payableInvoiceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  valuationEvent InventoryValuationEvent @relation(fields: [valuationEventId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  journalEntry   JournalEntry            @relation(fields: [journalEntryId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, activePurchaseOrderId])
+  @@index([tenantId, payableInvoiceId])
+  @@index([tenantId, purchaseOrderId])
+  @@index([tenantId, valuationEventId])
+  @@index([tenantId, journalEntryId])
 }
 
 // ─── Projects ────────────────────────────────────────────────────────────────

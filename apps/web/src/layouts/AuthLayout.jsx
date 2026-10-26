@@ -16,7 +16,7 @@ export default function AuthLayout() {
           </div>
           <div>
             <p className="text-lg font-semibold text-heading leading-tight group-hover:text-accent transition-colors">Asas</p>
-            <p className="text-xs text-caption">Enterprise ERP</p>
+            <p className="text-xs text-caption">Business workspace</p>
           </div>
         </Link>
 
@@ -27,7 +27,7 @@ export default function AuthLayout() {
 
         {/* Footer */}
         <p className="text-center text-xs text-caption mt-6">
-          © {new Date().getFullYear()} Asas Enterprise ERP. All rights reserved.
+          © {new Date().getFullYear()} Asas. All rights reserved.
         </p>
 
       </div>

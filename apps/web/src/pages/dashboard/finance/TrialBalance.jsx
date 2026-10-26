@@ -327,6 +327,9 @@ export default function TrialBalance() {
               <p className="text-xs text-muted">
                 Use one line per account. Choose the account’s normal balance side and enter positive amounts. Add an equity line to balance the opening position. This posting is append-only; errors must be corrected with a future reversal workflow.
               </p>
+              <p className="text-xs text-warning-text">
+                Do not post the mapped inventory asset control account or INVENTORY_OPENING_EQUITY here; use Inventory Valuation to establish opening inventory.
+              </p>
               <div className="space-y-3">
                 {openingLines.map((line, index) => (
                   <div key={index} className="grid grid-cols-1 items-end gap-2 rounded-lg border border-border-default p-3 sm:grid-cols-[1fr_1.4fr_1fr_1fr_1fr_auto]">

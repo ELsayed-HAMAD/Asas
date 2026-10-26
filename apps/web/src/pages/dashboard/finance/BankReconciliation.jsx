@@ -138,7 +138,7 @@ export default function BankReconciliation() {
                 FINANCE
               </div>
               <h1 className="text-xl font-bold tracking-tight text-slate-900">
-                Bank reconciliation
+                Bank Reconciliation
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-3xl leading-relaxed">
                 Import a normalized CSV statement and review exact matches against recorded cash settlements. Imports never create or change ledger entries; every match is confirmed manually.

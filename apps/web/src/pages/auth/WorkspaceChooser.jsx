@@ -14,17 +14,23 @@ import {
   useActiveOrganization,
   signOut
 } from '../../lib/authClient'
+import { authErrorMessage } from '../../lib/authErrorMessage'
 import { Button } from '../../components/ui/button'
-import { Badge } from '../../components/ui/badge'
 import { Alert, AlertDescription } from '../../components/ui/alert'
 
 export default function WorkspaceChooser() {
   const navigate = useNavigate()
   const { data: session, isPending: sessionPending } = useSession()
-  const { data: organizations, isPending: orgsPending } = useListOrganizations()
+  const {
+    data: organizations,
+    isPending: orgsPending,
+    error: orgsError,
+    refetch: refetchOrganizations,
+  } = useListOrganizations()
   const { data: activeOrg } = useActiveOrganization()
 
   const [activatingId, setActivatingId] = useState(null)
+  const [retryingWorkspaces, setRetryingWorkspaces] = useState(false)
   const [error, setError] = useState('')
   const [signingOut, setSigningOut] = useState(false)
   const autoActivationAttempted = useRef(false)
@@ -43,27 +49,47 @@ export default function WorkspaceChooser() {
     setActivatingId(organizationId)
     setError('')
     try {
-      localStorage.setItem('asas.lastActiveOrgId', organizationId)
+      try {
+        localStorage.setItem('asas.lastActiveOrgId', organizationId)
+      } catch {
+        // The cache is optional; activation below is the source of truth.
+      }
       const res = await authClient.organization.setActive({ organizationId })
       if (res?.error) {
-        throw new Error(res.error.message || 'Failed to switch workspace.')
+        throw new Error(authErrorMessage(res.error, 'Failed to switch workspace.'))
       }
       navigate('/dashboard', { replace: true })
     } catch (err) {
-      setError(err?.message || 'Failed to activate selected workspace.')
+      setError(authErrorMessage(err, 'Failed to activate selected workspace.'))
       setActivatingId(null)
     }
   }
 
   const handleSignOut = async () => {
     setSigningOut(true)
+    setError('')
     try {
-      await signOut()
+      const res = await signOut()
+      if (res?.error) {
+        throw new Error(authErrorMessage(res.error, 'Failed to sign out.'))
+      }
       navigate('/login', { replace: true })
     } catch (err) {
-      setError(err?.message || 'Failed to sign out.')
+      setError(authErrorMessage(err, 'Failed to sign out.'))
     } finally {
       setSigningOut(false)
+    }
+  }
+
+  const retryWorkspaceList = async () => {
+    setRetryingWorkspaces(true)
+    setError('')
+    try {
+      await refetchOrganizations?.()
+    } catch (err) {
+      setError(authErrorMessage(err, 'Could not reload your workspaces. Check your connection and try again.'))
+    } finally {
+      setRetryingWorkspaces(false)
     }
   }
 
@@ -87,16 +113,16 @@ export default function WorkspaceChooser() {
           </div>
           <div>
             <p className="text-xl font-semibold text-heading leading-tight">Asas</p>
-            <p className="text-xs text-caption">Enterprise ERP</p>
+            <p className="text-xs text-caption">Business workspace</p>
           </div>
         </div>
 
         {/* Card */}
         <div className="bg-surface-raised rounded-card border border-border-subtle shadow-card p-6 sm:p-8">
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-semibold text-heading mb-1.5">Select a Workspace</h1>
-              <p className="text-sm text-muted">
+          <div className="flex items-start justify-between gap-3 mb-6">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold text-heading mb-1.5">Select a workspace</h1>
+              <p className="text-sm text-muted break-words">
                 Signed in as <strong className="text-heading font-medium">{session?.user?.email}</strong>
               </p>
             </div>
@@ -106,7 +132,7 @@ export default function WorkspaceChooser() {
               size="sm"
               disabled={signingOut}
               onClick={handleSignOut}
-              className="text-xs text-muted hover:text-heading flex items-center gap-1.5"
+              className="text-xs text-muted hover:text-heading flex shrink-0 items-center gap-1.5"
             >
               {signingOut ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />}
               Sign out
@@ -121,7 +147,24 @@ export default function WorkspaceChooser() {
 
           {/* Workspaces List */}
           <div className="space-y-3 mb-6">
-            {orgList.length === 0 ? (
+            {orgsError ? (
+              <div className="rounded-card-sm border border-danger-border bg-danger-light px-4 py-6 text-center">
+                <p role="alert" className="text-sm font-medium text-danger-text">
+                  We could not load your workspaces. Check your connection and try again.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={retryWorkspaceList}
+                  disabled={retryingWorkspaces}
+                  className="mt-3 border-danger-border bg-surface-raised text-heading hover:bg-surface-muted"
+                >
+                  {retryingWorkspaces ? <Loader2 size={14} className="animate-spin" /> : null}
+                  {retryingWorkspaces ? 'Retrying…' : 'Retry workspace list'}
+                </Button>
+              </div>
+            ) : orgList.length === 0 ? (
               <div className="text-center py-8 border border-dashed border-border-subtle rounded-card-sm">
                 <Building2 className="w-8 h-8 text-muted mx-auto mb-2" />
                 <p className="text-sm font-medium text-heading">No workspaces found</p>
@@ -129,7 +172,7 @@ export default function WorkspaceChooser() {
                   You are not currently a member of any workspace.
                 </p>
                 <Button asChild className="h-9">
-                  <Link to="/onboarding?new=1">Create Your First Workspace</Link>
+                  <Link to="/onboarding?new=1">Create your first workspace</Link>
                 </Button>
               </div>
             ) : (
@@ -139,59 +182,60 @@ export default function WorkspaceChooser() {
                 const initials = (org.name || 'W').slice(0, 2).toUpperCase()
 
                 return (
-                  <div
+                  <button
                     key={org.id}
-                    onClick={() => !isActivating && handleSelectWorkspace(org.id)}
-                    className={`group relative flex items-center justify-between p-4 rounded-card-sm border transition-all cursor-pointer ${
+                    type="button"
+                    onClick={() => handleSelectWorkspace(org.id)}
+                    disabled={Boolean(activatingId)}
+                    aria-label={`Open ${org.name}${isCurrentActive ? ' (active workspace)' : ''}`}
+                    aria-current={isCurrentActive ? 'true' : undefined}
+                    aria-busy={isActivating || undefined}
+                    className={`group relative flex w-full items-center justify-between p-4 rounded-card-sm border text-left transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:cursor-wait ${activatingId && !isActivating ? 'opacity-60' : ''} ${
                       isCurrentActive
                         ? 'bg-primary/5 border-primary/40 hover:border-primary'
                         : 'bg-surface border-border-subtle hover:border-accent hover:bg-surface-muted/50'
                     }`}
                   >
-                    <div className="flex items-center gap-3.5 min-w-0">
+                    <span className="flex items-center gap-3.5 min-w-0">
                       {org.logo ? (
                         <img
                           src={org.logo}
-                          alt={org.name}
+                          alt=""
                           className="w-10 h-10 rounded-lg object-cover border border-border-subtle flex-shrink-0"
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary font-bold flex items-center justify-center flex-shrink-0 text-sm">
+                        <span className="w-10 h-10 rounded-lg bg-primary/10 text-primary font-bold flex items-center justify-center flex-shrink-0 text-sm">
                           {initials}
-                        </div>
+                        </span>
                       )}
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-heading truncate group-hover:text-primary transition-colors">
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-heading truncate group-hover:text-primary transition-colors">
                             {org.name}
-                          </p>
+                          </span>
                           {isCurrentActive && (
-                            <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/20">
+                            <span className="inline-flex items-center rounded-badge border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold text-primary">
                               Active
-                            </Badge>
+                            </span>
                           )}
-                        </div>
-                        <p className="text-xs text-muted truncate mt-0.5">
+                        </span>
+                        <span className="block text-xs text-muted truncate mt-0.5">
                           {org.slug || 'Workspace'}
                           {org.currency ? ` • ${org.currency}` : ''}
-                        </p>
-                      </div>
-                    </div>
+                        </span>
+                      </span>
+                    </span>
 
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="flex items-center gap-2 flex-shrink-0">
                       {isActivating ? (
                         <Loader2 size={16} className="animate-spin text-primary" />
                       ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-xs group-hover:translate-x-0.5 transition-transform"
-                        >
-                          Launch <ChevronRight size={14} className="ml-1" />
-                        </Button>
+                        <span className="inline-flex min-h-8 items-center rounded-button px-2 text-xs font-medium text-body group-hover:translate-x-0.5 transition-transform">
+                          Open <ChevronRight size={14} className="ml-1" />
+                        </span>
                       )}
-                    </div>
-                  </div>
+                    </span>
+                  </button>
                 )
               })
             )}
@@ -214,7 +258,7 @@ export default function WorkspaceChooser() {
 
         {/* Footer */}
         <p className="text-center text-xs text-caption mt-6">
-          © {new Date().getFullYear()} Asas Enterprise ERP. All rights reserved.
+          © {new Date().getFullYear()} Asas. All rights reserved.
         </p>
 
       </div>

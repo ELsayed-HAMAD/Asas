@@ -46,6 +46,7 @@ describe('inventory purchasing', () => {
         findUniqueOrThrow: vi.fn().mockResolvedValue({ stock: 8 }),
       },
       stockMovement: { create: vi.fn().mockResolvedValue({ id: 'opening_1', product: { name: 'Widget', warehouse: null } }) },
+      journalEntry: { count: vi.fn().mockResolvedValue(0) },
       inventoryValuationConfig: { findUnique: vi.fn().mockResolvedValue(null) },
       auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit_1' }) },
     }
@@ -67,6 +68,45 @@ describe('inventory purchasing', () => {
       tenantId: 'tenant_1', actorId: 'user_1', action: 'inventory.product.create',
       targetType: 'Product', targetId: 'product_1', metadata: null,
     } })
+  })
+
+  it('blocks positive starting stock after a Finance opening balance', async () => {
+    const tx = {
+      journalEntry: { count: vi.fn().mockResolvedValue(1) },
+    }
+    const prisma = {
+      product: { findFirst: vi.fn().mockResolvedValue(null) },
+      $transaction: vi.fn(async (callback: (client: unknown) => unknown) => callback(tx)),
+    } as unknown as PrismaClient
+
+    await expect(createProduct(prisma, 'tenant_1', { name: 'Widget', sku: 'W-1', stock: 8 }, 'user_1'))
+      .rejects.toMatchObject({
+        statusCode: 409,
+        message: expect.stringMatching(/Finance opening balance is already posted/),
+      })
+    expect(tx.journalEntry.count).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant_1', sourceType: 'OPENING_BALANCE' },
+    })
+  })
+
+  it('allows a zero-stock product after a Finance opening balance', async () => {
+    const product = {
+      id: 'product_1', name: 'Widget', sku: 'W-1', price: { toString: () => '2.5' }, stock: 0,
+      warehouse: null, aisle: null, bin: null, avgMonthlyUsage: null, leadTimeDays: null,
+      minThreshold: 10, archivedAt: null, createdAt: new Date(), updatedAt: new Date(),
+    }
+    const tx = {
+      product: { create: vi.fn().mockResolvedValue(product) },
+      auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit_1' }) },
+    }
+    const prisma = {
+      product: { findFirst: vi.fn().mockResolvedValue(null) },
+      $transaction: vi.fn(async (callback: (client: unknown) => unknown) => callback(tx)),
+    } as unknown as PrismaClient
+
+    await expect(createProduct(prisma, 'tenant_1', { name: 'Widget', sku: 'W-1' }, 'user_1'))
+      .resolves.toMatchObject({ id: 'product_1', stock: 0 })
+    expect(tx.product.create).toHaveBeenCalledWith({ data: expect.objectContaining({ stock: 0 }) })
   })
 
   it('lists only supplier links belonging to a tenant-owned product', async () => {
@@ -150,7 +190,7 @@ describe('inventory purchasing', () => {
     expect(tx.auditLog.create).toHaveBeenCalledWith({ data: {
       tenantId: 'tenant_1', actorId: 'user_1', action: 'inventory.purchase-order.create',
       targetType: 'PurchaseOrder', targetId: expect.any(String),
-      metadata: JSON.stringify({ productId: 'product_1', quantity: 12, unitCost: null, currency: null }),
+      metadata: JSON.stringify({ productId: 'product_1', quantity: 12, unitCost: null, currency: null, vendorId: null }),
     } })
   })
 
@@ -175,6 +215,32 @@ describe('inventory purchasing', () => {
         lines: { create: expect.objectContaining({ unitCost: '12.50', currency: 'EUR' }) },
       }),
     }))
+  })
+
+  it('links an optional tenant Finance vendor and rejects a foreign vendor', async () => {
+    const tx = {
+      product: { findFirst: vi.fn().mockResolvedValue({ id: 'product_1', currency: null }) },
+      tenant: { findUnique: vi.fn().mockResolvedValue({ currency: 'USD' }) },
+      vendor: { findFirst: vi.fn().mockResolvedValue({ id: 'vendor_1', name: 'Supplier One' }) },
+      auditLog: { create: vi.fn().mockResolvedValue({ id: 'audit_1' }) },
+      purchaseOrder: { create: vi.fn().mockResolvedValue({
+        id: 'po_1', vendorId: 'vendor_1', vendor: { id: 'vendor_1', name: 'Supplier One' },
+        status: 'DRAFT', createdAt: new Date('2026-10-05T10:00:00.000Z'),
+        lines: [{ quantity: 12, unitCost: null, currency: null, product: { id: 'product_1', name: 'Widget', sku: 'W-1' } }],
+      }) },
+    }
+    const prisma = { $transaction: vi.fn(async (callback: (client: unknown) => unknown) => callback(tx)) } as unknown as PrismaClient
+
+    await expect(createPurchaseOrder(prisma, 'tenant_1', { productId: 'product_1', quantity: 12, vendorId: 'vendor_1' }, 'user_1'))
+      .resolves.toMatchObject({ id: 'po_1', vendorId: 'vendor_1', vendorName: 'Supplier One' })
+    expect(tx.vendor.findFirst).toHaveBeenCalledWith({ where: { id: 'vendor_1', tenantId: 'tenant_1' }, select: { id: true, name: true } })
+    expect(tx.purchaseOrder.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ vendorId: 'vendor_1' }),
+    }))
+
+    tx.vendor.findFirst.mockResolvedValueOnce(null)
+    await expect(createPurchaseOrder(prisma, 'tenant_1', { productId: 'product_1', quantity: 1, vendorId: 'foreign_vendor' }, 'user_1'))
+      .rejects.toMatchObject({ statusCode: 404, message: 'Finance vendor not found' })
   })
 
   it('rejects a purchase-order cost that is not exact in the valuation currency', async () => {

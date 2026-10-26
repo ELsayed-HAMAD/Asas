@@ -5,6 +5,7 @@ import { financeApOpenItemRowSchema, financeArOpenItemRowSchema, financeOpeningB
 import { postOpeningBalance, recordMigrationInvoiceOpeningRecognition, migrationInvoiceBaseAmount } from '../finance/ledger.service.js'
 import { recordAuditLog } from '../../services/auditLog.js'
 import { AppError } from '../../utils/errors.js'
+import { reservedFinanceOpeningCodes, reservedOpeningMessage } from '../../services/openingBalanceAccounts.js'
 
 type StageEntity = 'FINANCE_AP_OPEN_ITEMS' | 'FINANCE_AR_OPEN_ITEMS' | 'FINANCE_OPENING_BALANCE'
 type StageMetadata = { asOf?: string; accountsReceivableControlTotal?: string; accountsPayableControlTotal?: string }
@@ -124,8 +125,9 @@ export async function cutoverFinanceMigration(prisma: PrismaClient, tenantId: st
       let debit = new Prisma.Decimal(0)
       let credit = new Prisma.Decimal(0)
       const codes = new Set<string>()
+      const reservedCodes = await reservedFinanceOpeningCodes(tx, tenantId, tenant.currency)
       for (const { row } of trialRows) {
-        if (['ACCOUNTS_PAYABLE', 'ACCOUNTS_RECEIVABLE', 'MIGRATION_OPENING_EQUITY'].includes(row.code)) fail(`Account ${row.code} is reserved for the migration cutover and cannot be imported as a residual trial-balance line`)
+        if (reservedCodes.has(row.code)) fail(reservedOpeningMessage(reservedCodes))
         if (codes.has(row.code)) fail(`Trial-balance account ${row.code} appears more than once`)
         codes.add(row.code)
         const amount = Money.fromDecimal(row.amount, tenant.currency)

@@ -96,6 +96,7 @@ export default function SettingsNotifications() {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-surface flex-1">
+        <h1 className="sr-only">Notifications</h1>
         <Loader2 className="animate-spin text-muted" size={24} />
       </div>
     );
@@ -104,6 +105,7 @@ export default function SettingsNotifications() {
   if (isError || !data) {
     return (
       <div className="flex h-full items-center justify-center bg-surface text-danger flex-1">
+        <h1 className="sr-only">Notifications</h1>
         Failed to load notification settings.
       </div>
     );
@@ -151,6 +153,7 @@ export default function SettingsNotifications() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-surface overflow-hidden min-w-0 relative">
+      <h1 className="sr-only">Notifications</h1>
 
       <TopBarActions>
         <div className="flex flex-wrap items-center gap-3">
