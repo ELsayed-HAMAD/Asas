@@ -418,12 +418,14 @@ scratchpads/
 analysis/
 
 # Explicit named files
+internal notes
 UI_UX_security review
 AUDIT.md
 security review
 migration notes
 migration notes
 migration log
+internal notes
 REMEDIATION-PLAN-*.md
 REVIEW-*.md
 
@@ -626,8 +628,6 @@ REVIEW-*.md
 !**/SECURITY.md
 !CODE_OF_CONDUCT.md
 !**/CODE_OF_CONDUCT.md
-!internal notes
-!internal notes
 
 # Explicitly protect project source code from documentation patterns
 !*.js
