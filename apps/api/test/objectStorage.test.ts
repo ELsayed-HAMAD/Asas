@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { rmSync } from 'node:fs'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import {
   assertSafeObjectKey,
@@ -34,6 +35,10 @@ describe('object storage keys', () => {
 describe('local object storage', () => {
   const root = `storage-test-${process.pid}`
   const storage = new LocalObjectStorage(root)
+
+  afterAll(() => {
+    rmSync(root, { recursive: true, force: true })
+  })
 
   afterEach(async () => {
     await storage.delete('resumes/tenant1/candidate1.pdf')

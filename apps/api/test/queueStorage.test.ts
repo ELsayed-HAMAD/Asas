@@ -1,9 +1,14 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { rmSync } from 'node:fs'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { createExportQueue } from '../src/services/queue.js'
 import { exportObjectKey, LocalObjectStorage } from '../src/services/objectStorage.js'
 
 const root = `queue-storage-test-${process.pid}`
 const storage = new LocalObjectStorage(root)
+
+afterAll(() => {
+  rmSync(root, { recursive: true, force: true })
+})
 
 afterEach(async () => {
   await storage.delete(exportObjectKey('tenant1', 'job1', 'xlsx'))
