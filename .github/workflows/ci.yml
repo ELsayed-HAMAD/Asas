@@ -76,7 +76,7 @@ jobs:
         run: pnpm --filter @asas/api run prisma:generate
 
       - name: Deploy Prisma migrations and triggers to live PostgreSQL 17
-        run: pnpm --filter @asas/api prisma migrate deploy
+        run: pnpm --filter @asas/api run prisma:deploy
 
       - name: Lint
         run: pnpm run lint
