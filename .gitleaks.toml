@@ -3,12 +3,16 @@
 # The default rule set is intentionally kept: it covers provider tokens, private
 # keys, generic high-entropy credentials, and common credential files. Add
 # narrow allowlists only for generated files and documented placeholders.
+#
+# The singular [allowlist] table is used because the CI action pins Gitleaks
+# 8.24.3, which ignores the newer [[allowlists]] array form.
 
 [extend]
 useDefault = true
 
-[[allowlists]]
-description = "Generated lockfiles and documented placeholder values only"
+[allowlist]
+description = "Generated lockfiles, documented placeholders, and exact synthetic test values"
+
 paths = [
   '''(^|/)pnpm-lock\.yaml$''',
   '''(^|/)\.env\.example$''',
@@ -17,11 +21,6 @@ paths = [
 regexes = [
   '''(?i)(example\.com|example\.test|localhost|127\.0\.0\.1)''',
   '''(?i)(synthetic|placeholder|changeme|not-a-real|redacted)''',
-]
-
-[[allowlists]]
-description = "Idempotency request keys in test fixtures are UUIDs, not credentials"
-regexTarget = "line"
-regexes = [
-  '''(?i)request[_-]?key\s*[:=]\s*['"][0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}['"]''',
+  '''abcdefghijklmnopqrstuvwxyz012345''',
+  '''cc35b4e1-07ec-4656-a3d3-8b4e71c67251''',
 ]
