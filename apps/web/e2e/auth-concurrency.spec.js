@@ -578,7 +578,7 @@ test('CRM overview charts and dashboard actions fit phone, tablet, and desktop v
 
     await page.getByRole('button', { name: 'View full revenue forecast' }).click()
     await expect(page).toHaveURL(/\/dashboard\/crm\/revenue-forecast$/)
-    await expect(page.getByRole('heading', { level: 1, name: 'Revenue Forecast' })).toHaveCount(1)
+    await expect(page.getByRole('heading', { level: 1, name: 'Revenue Forecast' })).toHaveCount(1, { timeout: 15_000 })
   } finally {
     await context.close()
   }

@@ -5,13 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.0] - 2026-10-27
 
 ### Added
 
-- Repository security policy, contribution guidance, code of conduct,
-  changelog, issue and pull request templates, and code ownership.
-- Automated secret scanning in CI and weekly dependency update configuration.
+- Initial baseline of the Asas multi-tenant operations platform: HR and payroll,
+  finance, CRM, projects, inventory, notifications, exports, billing, and
+  workspace administration.
+- React web application, Fastify API, shared Zod contracts, and TypeScript
+  domain package.
+- PostgreSQL schema, migrations, and row-level security policies.
+- Unit, integration, browser, and migration test suites.
+- Repository security policy, contribution guidance, code of conduct, code
+  ownership, issue and pull request templates, and changelog.
+- Automated secret scanning and a production dependency audit in CI.
 - Application-level Prisma tenant guard with request-scoped tenant context and
   cross-tenant rejection tests.
 - PostgreSQL RLS migration test coverage.
@@ -33,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   critical advisories and resolve peer dependency conflicts.
 - README and API documentation now describe the current security model and no
   longer claim unverified production deployments.
+- Dependabot automation is disabled; the CI production audit and manual
+  `pnpm audit` remain the dependency update signal.
 
 ### Removed
 
@@ -40,15 +49,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   personal fixture data from the repository history.
 - Broad documentation ignore rules that could hide legitimate security and
   contribution files.
-
-## [0.1.0] - 2026-10-26
-
-### Added
-
-- Initial public baseline of the Asas multi-tenant operations platform:
-  HR and payroll, finance, CRM, projects, inventory, notifications, exports,
-  billing, and workspace administration.
-- React web application, Fastify API, shared Zod contracts, and TypeScript
-  domain package.
-- PostgreSQL schema, migrations, and row-level security policies.
-- Unit, integration, browser, and migration test suites.
