@@ -29,7 +29,7 @@
     "@fastify/swagger": "^9.9.2",
     "@fastify/swagger-ui": "^6.1.2",
     "@prisma/client": "6.19.3",
-    "@sentry/node": "^9.12.0",
+    "@sentry/node": "^11.9.0",
     "better-auth": "^1.7.2",
     "dotenv": "16.4.7",
     "exceljs": "4.4.0",
