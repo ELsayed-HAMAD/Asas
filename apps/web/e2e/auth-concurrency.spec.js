@@ -527,7 +527,7 @@ test('CRM overview charts and dashboard actions fit phone, tablet, and desktop v
       stageConversions: [{ fromStage: 'LEADS', toStage: 'PROPOSAL', enteredCount: 96, convertedCount: 54, rate: 56 }, { fromStage: 'PROPOSAL', toStage: 'NEGOTIATION', enteredCount: 54, convertedCount: 28, rate: 52 }, { fromStage: 'NEGOTIATION', toStage: 'CLOSED_WON', enteredCount: 28, convertedCount: 12, rate: 43 }],
     } })
     if (path.endsWith('/crm/forecast')) return json(route, { data: {
-      year: String(year), availableYears: [String(year)], forecastByRep: [], quotas: [],
+      year: String(year), availableYears: [String(year)], forecastByRep: [], liveForecastByRep: [], quotas: [],
       monthlyPipeline: months.map((month, index) => ({ month, value: money((12 - index) * 850000) })),
       monthlyCommit: months.map((month, index) => ({ month, value: money((12 - index) * 420000) })),
       monthlyWeightedPipeline: months.map((month, index) => ({ month, value: money((12 - index) * 310000) })),
