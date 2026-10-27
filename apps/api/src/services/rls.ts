@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from '@prisma/client'
+import { runWithTenantId } from './tenantContext.js'
 
 /**
  * PostgreSQL Row-Level Security (RLS) Service
@@ -30,8 +31,8 @@ export async function withTenantContext<T>(
   tenantId: string,
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
-  return prisma.$transaction(async (tx) => {
+  return runWithTenantId(tenantId, () => prisma.$transaction(async (tx) => {
     await setTenantSessionContext(tx, tenantId)
     return fn(tx)
-  })
+  }))
 }

@@ -24,13 +24,25 @@ const TAG_LENGTH_BYTES = 16
 /** Cache derived 32-byte keys by source secret to avoid repeated HKDF calculation per record. */
 const keyCache = new Map<string, Buffer>()
 
+/**
+ * Resolve the master secret without ever falling back to a hard-coded value.
+ *
+ * Production must configure `ENCRYPTION_KEY`; development may borrow `AUTH_SECRET` so a
+ * fresh checkout can run without a second secret, but that fallback is explicit and logged
+ * nowhere. Tests pass an explicit secret and never touch the process environment.
+ */
+function resolveMasterSecret(explicit: string | undefined, variable: string): string {
+  const configured = explicit?.trim() || process.env.ENCRYPTION_KEY?.trim()
+  if (configured) return configured
+  if (process.env.NODE_ENV !== 'production') {
+    const devFallback = process.env.AUTH_SECRET?.trim() || process.env.BETTER_AUTH_SECRET?.trim()
+    if (devFallback) return devFallback
+  }
+  throw new Error(`${variable} is required for AES-256-GCM encryption; configure a stable 32+ character secret`)
+}
+
 function getDerivedKey(secret?: string, salt = KEY_SALT, info = KEY_INFO): Buffer {
-  const masterSecret =
-    secret ||
-    process.env.ENCRYPTION_KEY ||
-    process.env.AUTH_SECRET ||
-    process.env.BETTER_AUTH_SECRET ||
-    'default-insecure-dev-master-secret-32-chars-long!'
+  const masterSecret = resolveMasterSecret(secret, 'ENCRYPTION_KEY')
 
   const cacheKey = `${salt}:${info}:${masterSecret}`
   let key = keyCache.get(cacheKey)
@@ -43,13 +55,13 @@ function getDerivedKey(secret?: string, salt = KEY_SALT, info = KEY_INFO): Buffe
 }
 
 function getBankDataMasterSecret(secret?: string): string {
-  if (secret) return secret
-  const configured = process.env.BANK_DATA_ENCRYPTION_KEY
+  if (secret?.trim()) return secret.trim()
+  const configured = process.env.BANK_DATA_ENCRYPTION_KEY?.trim()
   if (configured) return configured
   if (process.env.NODE_ENV === 'production') {
     throw new Error('BANK_DATA_ENCRYPTION_KEY is required to read or write employee bank details in production')
   }
-  return process.env.AUTH_SECRET || process.env.BETTER_AUTH_SECRET || 'default-insecure-dev-master-secret-32-chars-long!'
+  return resolveMasterSecret(undefined, 'BANK_DATA_ENCRYPTION_KEY')
 }
 
 export function isBankEncrypted(value: unknown): boolean {
@@ -116,7 +128,7 @@ export function isEncrypted(value: unknown): boolean {
  *
  * @param plaintext The secret to encrypt
  * @param aad Optional Additional Authenticated Data (e.g. tenantId) to cryptographically bind ciphertext to its tenant
- * @param secret Optional master secret override (defaults to environment auth secret)
+ * @param secret Optional master secret override (defaults to ENCRYPTION_KEY)
  */
 export function encryptCredential(plaintext: string, aad?: string, secret?: string): string {
   if (!plaintext) return plaintext

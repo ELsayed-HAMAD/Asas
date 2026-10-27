@@ -12,7 +12,9 @@
 
 import { scopeServerPrefix } from './queryKeys'
 
-const SSE_URL = `${import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:4000'}/api/v1/events`
+const SSE_ORIGIN = import.meta.env.VITE_API_URL?.trim()
+  || (import.meta.env.DEV ? 'http://127.0.0.1:4000' : '')
+const SSE_URL = `${SSE_ORIGIN}/api/v1/events`
 
 /** No frame (data or keepalive comment) for this long → treat an "open" socket as dead. */
 const STALE_AFTER_MS = 30_000

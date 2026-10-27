@@ -2,6 +2,7 @@ import type { PrismaClient, UserRole } from '@prisma/client'
 import { fromNodeHeaders } from 'better-auth/node'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Auth } from '../auth.js'
+import { setActiveTenant } from '../services/tenantContext.js'
 
 export interface AuthContext {
   userId: string
@@ -25,7 +26,7 @@ const ROLE_RANK: Record<UserRole, number> = {
 /**
  * Short-lived cache of resolved auth contexts, keyed by raw session token. Every guarded
  * request otherwise pays for `getSession()` plus one or two `Member` lookups (security review
- * finding F4); a 30 s TTL cuts that to one resolution per token per half-minute.
+ * finding F4); a 5 s TTL cuts that to one resolution per token per five seconds.
  *
  * Only successful resolutions are cached: a `null` (no session, no membership) is cheap to
  * produce and must never stick around, so sign-out takes effect immediately. The accepted
@@ -167,5 +168,6 @@ export function requireRole(minimum: UserRole) {
       return
     }
     request.authContext = context
+    setActiveTenant(context.tenantId)
   }
 }

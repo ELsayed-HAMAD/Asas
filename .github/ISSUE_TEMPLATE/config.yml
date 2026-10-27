@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/ELsayed-HAMAD/Asas/security/advisories/new
+    about: Report vulnerabilities privately. Never open a public issue for a security problem.
+  - name: Questions and ideas
+    url: https://github.com/ELsayed-HAMAD/Asas/discussions
+    about: Ask usage questions and discuss ideas that are not bug reports or feature requests.

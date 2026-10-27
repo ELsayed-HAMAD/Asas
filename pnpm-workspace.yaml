@@ -11,3 +11,17 @@ allowBuilds:
   prisma: true
 minimumReleaseAgeExclude:
   - zod@4.5.2
+  - zod@4.6.7
+
+# Patched transitive versions for known high-severity advisories. Major-scoped keys keep
+# brace-expansion 1.x/2.x/5.x API-compatible with the minimatch versions that request them.
+overrides:
+  brace-expansion@1: 1.1.21
+  brace-expansion@2: 2.1.7
+  brace-expansion@4: 5.0.12
+  brace-expansion@5: 5.0.12
+  fast-uri@3: 3.1.9
+  fast-uri@4: 4.2.3
+  source-map-js: 1.2.2
+  ip-address: 10.7.4
+  deepmerge-ts: 8.0.2

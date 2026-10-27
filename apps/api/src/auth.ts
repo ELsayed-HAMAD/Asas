@@ -41,7 +41,20 @@ function maskEmail(email: string): string {
   return `${visible}@${domain}`
 }
 
-export function createAuth(prisma: PrismaClient, env: AsasEnv) {
+/** Minimal logger surface so auth hooks never write to stdout directly. */
+export interface AuthLogger {
+  info: (context: Record<string, unknown>, message: string) => void
+  warn: (context: Record<string, unknown>, message: string) => void
+  error: (context: Record<string, unknown>, message: string) => void
+}
+
+const noopLogger: AuthLogger = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+}
+
+export function createAuth(prisma: PrismaClient, env: AsasEnv, logger: AuthLogger = noopLogger) {
   const ac = createAccessControl({
     organization: ['update', 'delete'],
     member: ['create', 'update', 'delete'],
@@ -82,9 +95,9 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
             text: `Reset your password by visiting: ${data.url}`,
             html: passwordResetHtml(data.user.name, data.url),
           })
-          console.log(`[Auth] Password reset email sent for ${maskEmail(data.user.email)}`)
+          logger.info({ email: maskEmail(data.user.email) }, 'Password reset email sent')
         } catch (mailError) {
-          console.error(`[Auth] Failed to send password reset email for ${maskEmail(data.user.email)}:`, mailError)
+          logger.error({ email: maskEmail(data.user.email), err: mailError }, 'Failed to send password reset email')
           throw mailError
         }
       },
@@ -112,9 +125,9 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
             text: `Verify your email by visiting: ${verificationUrl}`,
             html: emailVerificationHtml(data.user.name, verificationUrl),
           })
-          console.log(`[Auth] Verification email sent for ${maskEmail(data.user.email)}`)
+          logger.info({ email: maskEmail(data.user.email) }, 'Verification email sent')
         } catch (mailError) {
-          console.error(`[Auth] Failed to send verification email for ${maskEmail(data.user.email)}:`, mailError)
+          logger.error({ email: maskEmail(data.user.email), err: mailError }, 'Failed to send verification email')
           throw mailError
         }
       },
@@ -200,7 +213,7 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv) {
           } catch {
             // Better Auth has already created the invitation at this point. Keep its direct link
             // available to the inviter instead of returning a failed request for a saved invite.
-            console.warn(`[Auth] Invitation email could not be queued for ${maskEmail(data.email)}; share the direct invitation link instead.`)
+            logger.warn({ email: maskEmail(data.email) }, 'Invitation email could not be queued; share the direct invitation link instead')
           }
         },
         schema: {

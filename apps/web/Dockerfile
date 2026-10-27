@@ -37,8 +37,9 @@ FROM nginx:alpine AS runner
 # Copy built SPA artifacts
 COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
 
-# Copy Nginx SPA configuration
+# Copy Nginx SPA configuration and shared security headers
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY apps/web/security-headers.conf /etc/nginx/security-headers.conf
 
 EXPOSE 80
 

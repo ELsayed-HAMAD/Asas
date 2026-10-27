@@ -13,9 +13,36 @@ pnpm --filter @asas/api run prisma:migrate
 pnpm --filter @asas/api run dev
 ```
 
-Copy `.env.example` to `.env` first and set `DATABASE_URL` and `AUTH_SECRET`.
+Copy `.env.example` to `.env` first and set `DATABASE_URL`, a random `AUTH_SECRET`, and independent random `ENCRYPTION_KEY` and `BANK_DATA_ENCRYPTION_KEY` values.
+
+### Production environment checklist
+
+The API refuses to boot in production unless the following are configured:
+
+- `AUTH_SECRET` with at least 32 characters and not reused as an encryption key.
+- `ENCRYPTION_KEY` with at least 32 characters, independent of `AUTH_SECRET`, for integration credentials.
+- `BANK_DATA_ENCRYPTION_KEY` with at least 32 characters, independent of the other keys, for employee bank details.
+- `BETTER_AUTH_URL` and every `FRONTEND_ORIGIN` entry using HTTPS.
+- `TRUSTED_PROXY_CIDRS` listing the exact reverse-proxy IPs or CIDRs. Trust-all values (`*`, `0.0.0.0/0`, `::/0`, `true`) are rejected.
+- `RLS_ENFORCEMENT=enforce`; disabling the application-level tenant guard is rejected in production.
+- `OBJECT_STORAGE_DRIVER=s3` with `S3_BUCKET` and the required region or endpoint credentials.
+- Stripe keys and webhook secret configured together, with an allow-list of recurring Price IDs when billing is enabled.
+
+Generate each secret independently with a cryptographically secure random source, store it in the deployment secret manager, and never commit it. Rotating an encryption key requires a planned decrypt-and-re-encrypt migration.
+
+### Tenant isolation
+
+Tenant-owned PostgreSQL tables have row-level security policies as defence-in-depth. The API also applies a Prisma client extension that reads a request-scoped tenant context after authentication and injects the active `tenantId` into reads, writes, counts, aggregates, and upserts on every model that has a `tenantId` column. An operation that explicitly references a different tenant is rejected before it reaches PostgreSQL.
+
+Operations that genuinely span tenants, such as maintenance sweeps and platform billing reconciliation, must use the explicit `withCrossTenantAccess` helper and require a test proving the scope is intentional. Raw SQL bypasses the Prisma extension; it must include a tenant predicate or run inside `withTenantContext`. `pnpm --filter @asas/api run lint` includes the tenant-filter tripwire for raw query call sites.
+
+Application code must still scope its own queries. The guard is a safety net, not a replacement for authorization or correct data modeling. The `RLS_ENFORCEMENT=off` setting exists only for local diagnostics and is rejected in production.
 
 For email delivery, configure `RESEND_API_KEY` and a verified `MAIL_FROM` address. When `QUEUE_URL` is set, email is dispatched through the pg-boss `emails` queue with retries; otherwise it is delivered inline. Without a Resend key, email sends fail explicitly rather than being recorded as successful. Keep provider credentials in the deployment secret store, not in source control.
+
+### Integration credential encryption
+
+Third-party API keys and webhook tokens stored through the integrations module are encrypted with AES-256-GCM, bound to their tenant with additional authenticated data, and decrypted only inside authorized server-side handlers. Production requires a dedicated `ENCRYPTION_KEY` of at least 32 characters that is different from `AUTH_SECRET`; there is no hard-coded fallback. Keep the key stable in the deployment secret manager and plan a decrypt-and-re-encrypt migration before rotation.
 
 ### Employee bank-data encryption
 
@@ -39,7 +66,7 @@ Stripe billing is disabled unless `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, 
 
 Create a Stripe webhook endpoint at `/api/v1/billing/stripe/webhook` and subscribe it to `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `customer.updated`, `payment_method.attached`, `payment_method.detached`, `invoice.paid`, and `invoice.payment_failed`. Set the endpoint signing secret as `STRIPE_WEBHOOK_SECRET`. Signature verification uses the original request bytes; subscription, saved card, and invoice state changes and the event de-duplication record commit together. Saved card data is limited to brand, last four digits, and expiration; Stripe remains responsible for sensitive card details. Configure the Customer Portal in Stripe before exposing its manage-billing link.
 
-Use Stripe test-mode keys and prices in staging first, then verify checkout, cancellation/update through the portal, invoice history, duplicate webhook delivery, saved card updates/removal, and failed-payment state. Migrations `20261012020000_stripe_billing` and `20261012030000_stripe_payment_method_sync` are confirmed deployed by the user. No live Stripe credentials are stored in the repository.
+Use Stripe test-mode keys and prices in staging first, then verify checkout, cancellation/update through the portal, invoice history, duplicate webhook delivery, saved card updates/removal, and failed-payment state. Apply migrations `20261012020000_stripe_billing` and `20261012030000_stripe_payment_method_sync` before starting the matching API version, and verify the full flow in an isolated staging environment. No live Stripe credentials are stored in the repository.
 
 ### Bank statement reconciliation
 
@@ -47,7 +74,7 @@ The Finance > Bank Reconciliation screen accepts CSV files with `Date`, `Descrip
 
 Suggestions only consider recorded, unreversed AP payments, AR collections, payroll payments, and expense reimbursements on the `CASH_CLEARING` account. A candidate must match the signed amount and currency exactly and fall within three calendar days. A user must confirm each match; matching does not create or edit ledger entries. Duplicate normalized imports are deduplicated per tenant. Import and match actions are audit logged, and matches can be undone.
 
-Migration `20261012040000_bank_statement_reconciliation` adds statement import/line tables and tenant-composite constraints; the user confirmed it deployed successfully on 2026-10-12. Test the workflow in staging against that database before production use. Bank feed connections, NACHA/SEPA/ABA payment files, and automatic reconciliation are not included.
+Migration `20261012040000_bank_statement_reconciliation` adds statement import/line tables and tenant-composite constraints. Apply it with the rest of the pending migrations, then test the workflow in staging against PostgreSQL 17 before production use. Bank feed connections, NACHA/SEPA/ABA payment files, and automatic reconciliation are not included.
 
 ### S3-compatible object storage
 

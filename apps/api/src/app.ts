@@ -46,6 +46,7 @@ import { mailer } from './services/mailer.js'
 import { ResendTransport } from './services/resendTransport.js'
 import { createObjectStorage, type ObjectStorage } from './services/objectStorage.js'
 import { createStripeBillingProvider, type StripeBillingProvider } from './services/stripeBilling.js'
+import { createTenantScope, runWithTenantScope } from './services/tenantContext.js'
 import { stripeBillingRoutes } from './modules/billing/stripe.routes.js'
 
 /**
@@ -211,9 +212,17 @@ export async function buildApp(
     // a client can log "request X" and match it against the server's `reqId` field.
     requestIdHeader: false,
     genReqId: req => resolveRequestId(req.headers['x-request-id']),
-    // Trust loopback and private container subnets behind reverse proxy to prevent rate-limit collapse (Finding 1)
-    trustProxy: environment.isProduction ? true : ['127.0.0.1', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'],
+    // Trust only explicit reverse-proxy IPs/CIDRs. Trusting every peer (the old production
+    // default) lets any client forge X-Forwarded-For and defeat IP rate limits.
+    trustProxy: environment.trustedProxyCidrs.length > 0 ? environment.trustedProxyCidrs : false,
   }).withTypeProvider<ZodTypeProvider>()
+
+  // Each request gets its own mutable tenant scope. The RBAC preHandler records the
+  // authenticated tenant; the Prisma guard reads it for every subsequent query. `done()` is
+  // invoked inside `run` so Fastify's preHandler → handler continuation stays in this context.
+  app.addHook('onRequest', (_request, _reply, done) => {
+    runWithTenantScope(createTenantScope(), done)
+  })
 
   const objectStorage = options.objectStorage ?? createObjectStorage({
     driver: environment.objectStorageDriver,
@@ -320,8 +329,8 @@ export async function buildApp(
   )
 
   if (options.prisma) {
-    await prismaPlugin(app, options.prisma)
-    const auth = options.auth ?? createAuth(options.prisma, environment)
+    await prismaPlugin(app, options.prisma, environment.tenantGuardEnabled)
+    const auth = options.auth ?? createAuth(app.prisma, environment, app.log)
     await betterAuthPlugin(app, auth)
     // The CV upload route mints/verifies an HMAC signature against the same secret better-auth
     // uses for its cookies; decorate it once so that route reads it from one place.

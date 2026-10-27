@@ -1,16 +1,21 @@
+import { isIP } from 'node:net'
+
 /**
  * Environment configuration.
  *
  * `loadEnv` is a pure function so tests can inject values without process-global mutation.
  * `assertEnv` guards the process-level invariants required to actually boot (a database
- * connection string, and — once auth ships — a secret). Everything short of booting, including
- * building the Fastify app and running handler tests, is intentionally free of these.
+ * connection string, real secrets, and an explicit proxy trust boundary). Everything short
+ * of booting, including building the Fastify app and running handler tests, is intentionally
+ * free of these.
  */
 
 export interface AsasEnv {
   databaseUrl: string
-  /** Signs and encrypts Better Auth's session cookies. Not JWT-related — auth has shipped. */
+  /** Signs and encrypts Better Auth's session cookies. */
   authSecret: string
+  /** Dedicated master key for AES-256-GCM credential encryption. */
+  encryptionKey: string
   /** Dedicated key for encrypting employee bank details at rest. */
   bankDataEncryptionKey: string
   port: number
@@ -25,8 +30,19 @@ export interface AsasEnv {
   nodeEnv: string
   isProduction: boolean
   /**
+   * Explicit reverse-proxy IPs/CIDRs whose `X-Forwarded-*` headers are trusted. An empty list
+   * means no proxy is trusted, which is the safe default. Trust-all ranges are rejected.
+   */
+  trustedProxyCidrs: string[]
+  /**
+   * Application-level tenant guard. `enforce` injects the active tenant into every
+   * request-scoped Prisma operation on a tenant-owned model and rejects mismatches; `off`
+   * is allowed only outside production for diagnostics. RLS remains defence-in-depth.
+   */
+  tenantGuardEnabled: boolean
+  /**
    * When set, the export queue runs on pg-boss (this Postgres connection string); when empty
-   * it runs inline in-process. Default empty — local dev, tests, and CI never need a broker.
+   * it runs inline in-process. Default empty: local dev, tests, and CI never need a broker.
    */
   queueUrl: string
   /**
@@ -66,6 +82,50 @@ export interface AsasEnv {
   devSocialAuthEnabled: boolean
 }
 
+/** Proxy values that disable the trust boundary entirely. They are never accepted. */
+const TRUST_ALL_PROXIES = new Set(['*', '0.0.0.0/0', '::/0', 'true'])
+
+function isValidCidr(value: string): boolean {
+  const [address, prefix, ...rest] = value.split('/')
+  if (!address || prefix === undefined || rest.length > 0) return false
+  const family = isIP(address)
+  if (family === 0 || !/^\d{1,3}$/.test(prefix)) return false
+  const bits = Number(prefix)
+  return family === 4 ? bits >= 0 && bits <= 32 : bits >= 0 && bits <= 128
+}
+
+/**
+ * Parse the explicit proxy trust boundary.
+ *
+ * `TRUSTED_PROXY_CIDRS` is the preferred name. `TRUST_PROXY` is accepted for compatibility,
+ * but `true` and trust-all CIDRs are rejected: trusting every peer lets any client forge
+ * `X-Forwarded-For`, defeating IP rate limits and audit attribution.
+ */
+export function resolveTrustedProxyCidrs(source: NodeJS.ProcessEnv = process.env): string[] {
+  const raw = (source.TRUSTED_PROXY_CIDRS ?? source.TRUST_PROXY ?? '').trim()
+  if (!raw || raw.toLowerCase() === 'false') return []
+  if (TRUST_ALL_PROXIES.has(raw.toLowerCase())) {
+    throw new Error('Trusting every reverse proxy is unsafe; list explicit TRUSTED_PROXY_CIDRS values instead')
+  }
+
+  const values = raw.split(',').map(value => value.trim()).filter(Boolean)
+  for (const value of values) {
+    if (TRUST_ALL_PROXIES.has(value.toLowerCase())) {
+      throw new Error('Trusting every reverse proxy is unsafe; list explicit TRUSTED_PROXY_CIDRS values instead')
+    }
+    if (value.includes('/')) {
+      if (!isValidCidr(value)) {
+        throw new Error(`TRUSTED_PROXY_CIDRS contains an invalid CIDR range: ${value}`)
+      }
+      continue
+    }
+    if (isIP(value) === 0) {
+      throw new Error(`TRUSTED_PROXY_CIDRS contains an invalid IP address: ${value}`)
+    }
+  }
+  return values
+}
+
 function resolveBetterAuthUrl(value: string | undefined, nodeEnv: string, port: number): string {
   const configured = value?.trim()
   const raw = configured || (nodeEnv === 'production' ? '' : `http://127.0.0.1:${port}`)
@@ -93,6 +153,10 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
   if (devSocialAuthRequested && !authSecret.trim()) {
     throw new Error('AUTH_SECRET is required when DEV_SOCIAL_AUTH_ENABLED=true')
   }
+  const rlsEnforcement = (source.RLS_ENFORCEMENT ?? 'enforce').trim().toLowerCase()
+  if (rlsEnforcement !== 'enforce' && rlsEnforcement !== 'off') {
+    throw new Error('RLS_ENFORCEMENT must be either "enforce" or "off"')
+  }
   const frontendOrigin = source.FRONTEND_ORIGIN || (nodeEnv === 'production' ? 'https://app.asas.local' : 'http://localhost:5173,http://127.0.0.1:5173')
   const objectStorageDriver = source.OBJECT_STORAGE_DRIVER ?? 'local'
   if (objectStorageDriver !== 'local' && objectStorageDriver !== 's3') {
@@ -106,6 +170,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
   return {
     databaseUrl: source.DATABASE_URL ?? '',
     authSecret,
+    encryptionKey: source.ENCRYPTION_KEY?.trim() ?? '',
     bankDataEncryptionKey: source.BANK_DATA_ENCRYPTION_KEY?.trim() ?? '',
     port: rawPort,
     host: source.HOST || '127.0.0.1',
@@ -113,6 +178,8 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
     betterAuthUrl,
     nodeEnv,
     isProduction: nodeEnv === 'production',
+    trustedProxyCidrs: resolveTrustedProxyCidrs(source),
+    tenantGuardEnabled: rlsEnforcement === 'enforce',
     queueUrl: source.QUEUE_URL ?? '',
     enableApiDocs: source.ENABLE_API_DOCS === 'true',
     redisUrl: source.REDIS_URL ?? '',
@@ -145,6 +212,15 @@ export function assertEnv(environment: AsasEnv = loadEnv()): AsasEnv {
   }
   if (environment.isProduction && environment.authSecret.length < 32) {
     throw new Error('AUTH_SECRET must contain at least 32 characters in production')
+  }
+  if (environment.isProduction && environment.encryptionKey.length < 32) {
+    throw new Error('ENCRYPTION_KEY must contain at least 32 characters in production')
+  }
+  if (environment.isProduction && environment.encryptionKey === environment.authSecret) {
+    throw new Error('ENCRYPTION_KEY must be different from AUTH_SECRET so credential encryption is independently keyed')
+  }
+  if (environment.isProduction && !environment.tenantGuardEnabled) {
+    throw new Error('RLS_ENFORCEMENT=off is not allowed in production')
   }
   if (environment.isProduction && !environment.betterAuthUrl) {
     throw new Error('Missing required environment variable: BETTER_AUTH_URL (required in production)')

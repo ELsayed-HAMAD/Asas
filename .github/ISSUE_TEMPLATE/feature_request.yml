@@ -1,0 +1,59 @@
+name: Feature request
+description: Propose a focused improvement or new capability.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include real employee, customer, payroll, bank, or tenant data.
+        Report security vulnerabilities through the private advisory link
+        instead of this form.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or operational problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the expected behavior and any alternatives considered.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Authentication or workspace access
+        - HR, attendance, or payroll
+        - Finance or billing
+        - CRM
+        - Projects
+        - Inventory
+        - Notifications or exports
+        - Web UI or accessibility
+        - API, database, or migrations
+        - CI, build, or deployment
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security and tenant-isolation considerations
+      description: Note any new permissions, tenant boundaries, sensitive data, or provider integrations.
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      options:
+        - label: I searched existing issues and discussions for a duplicate.
+          required: true
+        - label: This request does not contain secrets or personal data.
+          required: true

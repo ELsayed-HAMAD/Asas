@@ -13,13 +13,18 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE_URL = `${import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:4000'}/api/v1`
+const CONFIGURED_API_ORIGIN = import.meta.env.VITE_API_URL?.trim()
+const DEFAULT_API_ORIGIN = import.meta.env.DEV ? 'http://127.0.0.1:4000' : ''
+const API_BASE_URL = `${CONFIGURED_API_ORIGIN ?? DEFAULT_API_ORIGIN}/api/v1`
 
-/** The API origin without the `/api/v1` suffix — for URLs the API hands back as absolute paths. */
-export const API_ORIGIN_URL = (import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:4000').replace(/\/+$/, '')
+/** The API origin without the `/api/v1` suffix — empty in production so URLs stay same-origin. */
+export const API_ORIGIN_URL = (CONFIGURED_API_ORIGIN ?? DEFAULT_API_ORIGIN).replace(/\/+$/, '')
 
 function buildUrl(path, query) {
-  const url = new URL(`${API_BASE_URL}${path}`)
+  // Production serves the SPA and proxies `/api` through the same nginx origin. A relative
+  // API base therefore needs an absolute base only for URL construction.
+  const appOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:4000'
+  const url = new URL(`${API_BASE_URL}${path}`, appOrigin)
   // `query` is either a plain object of key/value params, or a pre-built query string
   // (e.g. the signed CV grant's `?h=..&exp=..`) forwarded as-is. Object.entries over a
   // string would index it by character and emit `?0=h&1=%3D&...` — a signature the server

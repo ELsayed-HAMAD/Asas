@@ -1,6 +1,7 @@
 import type { UserRole } from '@prisma/client'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { hasRequiredRole, resolveAuthContext } from './rbac.js'
+import { setActiveTenant } from '../services/tenantContext.js'
 
 /**
  * The declarative permission map (the plan's Phase 1 §5 choice, over a full CASL setup).
@@ -149,5 +150,6 @@ export function requirePermission(permission: Permission) {
       return
     }
     request.authContext = context
+    setActiveTenant(context.tenantId)
   }
 }

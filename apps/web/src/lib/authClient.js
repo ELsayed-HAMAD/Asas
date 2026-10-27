@@ -10,7 +10,10 @@ import { organizationClient, twoFactorClient } from 'better-auth/client/plugins'
  * (API on :4000, this app on :5173 in dev).
  */
 export const authClient = createAuthClient({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:4000',
+  // Production builds use the same nginx origin and proxy `/api` to the API service. The
+  // development default keeps the API on :4000.
+  baseURL: import.meta.env.VITE_API_URL?.trim()
+    || (import.meta.env.DEV ? 'http://127.0.0.1:4000' : window.location.origin),
   fetchOptions: {
     credentials: 'include',
   },

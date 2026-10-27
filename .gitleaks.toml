@@ -1,0 +1,27 @@
+# Gitleaks configuration for Asas.
+#
+# The default rule set is intentionally kept: it covers provider tokens, private
+# keys, generic high-entropy credentials, and common credential files. Add
+# narrow allowlists only for generated files and documented placeholders.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Generated lockfiles and documented placeholder values only"
+paths = [
+  '''(^|/)pnpm-lock\.yaml$''',
+  '''(^|/)\.env\.example$''',
+]
+
+regexes = [
+  '''(?i)(example\.com|example\.test|localhost|127\.0\.0\.1)''',
+  '''(?i)(synthetic|placeholder|changeme|not-a-real|redacted)''',
+]
+
+[[allowlists]]
+description = "Idempotency request keys in test fixtures are UUIDs, not credentials"
+regexTarget = "line"
+regexes = [
+  '''(?i)request[_-]?key\s*[:=]\s*['"][0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}['"]''',
+]

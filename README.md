@@ -9,6 +9,8 @@
 
 Asas is a multi-tenant business operations platform for HR, payroll, finance, CRM, projects, and inventory. It is a pnpm monorepo with a React web app, a Fastify API, shared contracts, and a domain package.
 
+The source is proprietary and all rights are reserved. See [LICENSE](LICENSE) for the terms that apply to this repository.
+
 ## Features
 
 - **HR and payroll:** Employee directory, payroll runs and payslips, attendance punches, overtime thresholds, leave requests and balances, recruitment stages, interviews, and candidate exports.
@@ -47,7 +49,7 @@ Install dependencies from the repository root:
 pnpm install
 ```
 
-Copy the environment templates, then set a local PostgreSQL connection string and a strong `AUTH_SECRET` in `apps/api/.env`. Set `VITE_API_URL` in `apps/web/.env` if the API is not at its default address.
+Copy the environment templates, then set a local PostgreSQL connection string and independent random secrets in `apps/api/.env`: `AUTH_SECRET`, `ENCRYPTION_KEY`, and `BANK_DATA_ENCRYPTION_KEY`. Set `VITE_API_URL` in `apps/web/.env` only if the API is not at its default address. See [apps/api/.env.example](apps/api/.env.example) for the full list.
 
 PowerShell:
 
@@ -88,6 +90,17 @@ The web app is served at `http://localhost:5173` and the API at `http://127.0.0.
 - **Redis:** Local Compose starts Redis. The API can fall back to in-process behavior when Redis is not configured; multi-instance rate limiting and SSE fan-out require Redis.
 
 Keep real credentials in local environment files or deployment secret stores. Never commit `.env` files, private keys, certificates, database dumps, or provider credentials. Only sanitized `.env.example` templates belong in Git.
+
+## Security model
+
+- PostgreSQL row-level security is enabled for tenant-owned tables as defence-in-depth.
+- The API applies a Prisma tenant guard: once a request is authenticated, every operation on a tenant-owned model is constrained to the active tenant, and an explicit reference to another tenant is rejected. Cross-tenant maintenance code must use the reviewed `withCrossTenantAccess` escape hatch.
+- Authentication is handled by Better Auth with server-side session validation, RBAC pre-handlers, rate limiting, audit logging, and secure cookie settings in production.
+- Sensitive credentials and employee bank details use AES-256-GCM with independent, mandatory production keys. The API refuses to start in production without strong `AUTH_SECRET`, `ENCRYPTION_KEY`, and `BANK_DATA_ENCRYPTION_KEY` values.
+- Production requires an explicit `TRUSTED_PROXY_CIDRS` boundary, HTTPS origins, S3-compatible object storage, and `RLS_ENFORCEMENT=enforce`.
+- The web container serves the SPA and proxies `/api` through the same origin, with CSP, HSTS, frame denial, Permissions-Policy, COOP, and CORP headers.
+
+Report vulnerabilities privately through [GitHub Security Advisories](https://github.com/ELsayed-HAMAD/Asas/security/advisories/new), not in a public issue. See [SECURITY.md](SECURITY.md) for scope and expectations.
 
 ## Development commands
 
@@ -137,11 +150,15 @@ packages/
 
 ## Deployment notes
 
-Production database changes must be applied with `pnpm --filter @asas/api run prisma:deploy` before starting the API version that depends on them. Review migration contents and back up production data according to your deployment process. Then run the staging acceptance checks documented in [apps/api/README.md](apps/api/README.md) for configured email, billing, and storage providers.
+Production database changes must be applied with `pnpm --filter @asas/api run prisma:deploy` before starting the API version that depends on them. Review migration contents and back up production data according to your deployment process. Then run the staging acceptance checks documented in [apps/api/README.md](apps/api/README.md) for configured email, billing, and storage providers. The repository does not assert that any environment has already been deployed; verify every environment independently.
 
 The repository includes API and web Dockerfiles, an Nginx configuration, and a local Compose stack. The Compose stack is for development and is not a production security configuration.
 
 ## Documentation
 
-- [API configuration, email, billing, reconciliation, and storage](apps/api/README.md)
+- [API configuration, email, billing, reconciliation, storage, and tenant isolation](apps/api/README.md)
+- [Security policy](SECURITY.md)
+- [Contributing](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
 - [CI workflow](.github/workflows/ci.yml)
+- [Security workflow](.github/workflows/security.yml)

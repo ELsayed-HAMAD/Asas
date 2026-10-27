@@ -1,0 +1,17 @@
+# Default owners for everything in the repository. Review requests are routed to
+# the maintainer; adjust per-directory entries when additional maintainers join.
+* @ELsayed-HAMAD
+
+# Security-sensitive areas require explicit owner review.
+/.github/ @ELsayed-HAMAD
+/apps/api/prisma/ @ELsayed-HAMAD
+/apps/api/src/auth.ts @ELsayed-HAMAD
+/apps/api/src/config/ @ELsayed-HAMAD
+/apps/api/src/middlewares/ @ELsayed-HAMAD
+/apps/api/src/services/crypto.ts @ELsayed-HAMAD
+/apps/api/src/services/tenantContext.ts @ELsayed-HAMAD
+/apps/api/src/services/tenantGuard.ts @ELsayed-HAMAD
+/apps/web/nginx.conf @ELsayed-HAMAD
+/apps/web/security-headers.conf @ELsayed-HAMAD
+/SECURITY.md @ELsayed-HAMAD
+/LICENSE @ELsayed-HAMAD

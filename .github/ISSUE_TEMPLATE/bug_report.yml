@@ -1,0 +1,81 @@
+name: Bug report
+description: Report a reproducible defect using synthetic data.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not report security vulnerabilities here.** Use the private
+        security advisory link shown on the new-issue page.
+
+        Remove all personal, employee, customer, payroll, bank, and tenant data
+        from logs, screenshots, and reproduction steps. Use synthetic records.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest sequence that reliably reproduces the issue.
+      placeholder: |
+        1. Start from a clean local database.
+        2. Sign in with a synthetic account.
+        3. Open...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Authentication or workspace access
+        - HR, attendance, or payroll
+        - Finance or billing
+        - CRM
+        - Projects
+        - Inventory
+        - Notifications or exports
+        - Web UI or accessibility
+        - API, database, or migrations
+        - CI, build, or deployment
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The commit SHA, tag, or branch where the issue occurs.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, Node.js, pnpm, PostgreSQL, browser, and deployment method.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs or screenshots
+      description: Remove secrets, tokens, cookies, email addresses, and personal data before pasting.
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      options:
+        - label: I removed secrets and personal data from this report.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true
+        - label: I searched existing issues for a duplicate.
+          required: true

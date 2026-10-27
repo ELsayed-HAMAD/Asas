@@ -23,24 +23,24 @@
     "@asas/domain": "workspace:*",
     "@aws-sdk/client-s3": "^3.1149.0",
     "@aws-sdk/s3-request-presigner": "^3.1149.0",
-    "@fastify/cors": "^11.0.0",
-    "@fastify/helmet": "^13.1.1",
-    "@fastify/rate-limit": "^11.2.0",
-    "@fastify/swagger": "^9.8.1",
-    "@fastify/swagger-ui": "^6.1.1",
+    "@fastify/cors": "^11.3.1",
+    "@fastify/helmet": "^13.2.0",
+    "@fastify/rate-limit": "^11.2.1",
+    "@fastify/swagger": "^9.9.2",
+    "@fastify/swagger-ui": "^6.1.2",
     "@prisma/client": "6.19.3",
     "@sentry/node": "^9.12.0",
     "better-auth": "^1.7.2",
     "dotenv": "16.4.7",
     "exceljs": "4.4.0",
-    "fastify": "^5.2.1",
+    "fastify": "^5.12.7",
     "fastify-type-provider-zod": "^7.0.0",
     "ioredis": "^6.0.0",
     "pdfkit": "0.17.1",
     "pg-boss": "10.1.5",
     "pino": "^10.0.0",
     "stripe": "^23.0.0",
-    "zod": "^4.5.2"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.14",
@@ -50,6 +50,7 @@
     "prisma": "6.19.3",
     "tsx": "4.19.3",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
+    "vite": "^6.4.5",
+    "vitest": "^4.1.12"
   }
 }

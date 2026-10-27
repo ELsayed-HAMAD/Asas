@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { assertEnv, loadEnv } from '../src/config/env.js'
+import { assertEnv, loadEnv, resolveTrustedProxyCidrs } from '../src/config/env.js'
 
 const productionAuthSecret = '01234567890123456789012345678901'
+const productionEncryptionKey = 'abcdefghijklmnopqrstuvwxyz012345'
 const productionUrl = 'https://api.asas.test'
 const bankKey = 'bank-data-encryption-key-that-is-at-least-32-chars'
 
@@ -10,6 +11,7 @@ function productionEnv(overrides: NodeJS.ProcessEnv = {}) {
     NODE_ENV: 'production',
     DATABASE_URL: 'postgres://db',
     AUTH_SECRET: productionAuthSecret,
+    ENCRYPTION_KEY: productionEncryptionKey,
     BETTER_AUTH_URL: productionUrl,
     ...overrides,
   })
@@ -112,15 +114,15 @@ describe('object storage environment', () => {
 
 describe('Stripe billing environment', () => {
   it('loads configured monthly price IDs without logging or exposing keys', () => {
-    const env = loadEnv({ DATABASE_URL: 'postgres://db', STRIPE_SECRET_KEY: 'sk_test_private', STRIPE_WEBHOOK_SECRET: 'whsec_private', STRIPE_PRICE_IDS: 'price_basic, price_pro' })
+    const env = loadEnv({ DATABASE_URL: 'postgres://db', STRIPE_SECRET_KEY: 'synthetic-stripe-secret', STRIPE_WEBHOOK_SECRET: 'synthetic-webhook-secret', STRIPE_PRICE_IDS: 'price_basic, price_pro' })
     expect(env.stripePriceIds).toEqual(['price_basic', 'price_pro'])
     expect(() => assertEnv(env)).not.toThrow()
   })
 
   it('requires paired API and webhook secrets and validates price IDs', () => {
-    expect(() => assertEnv(loadEnv({ DATABASE_URL: 'postgres://db', STRIPE_SECRET_KEY: 'sk_test_private' }))).toThrow('must be configured together')
+    expect(() => assertEnv(loadEnv({ DATABASE_URL: 'postgres://db', STRIPE_SECRET_KEY: 'synthetic-stripe-secret' }))).toThrow('must be configured together')
     expect(() => assertEnv(loadEnv({ DATABASE_URL: 'postgres://db', STRIPE_WEBHOOK_SECRET: 'whsec_private' }))).toThrow('must be configured together')
-    expect(() => assertEnv(loadEnv({ DATABASE_URL: 'postgres://db', STRIPE_SECRET_KEY: 'sk_test_private', STRIPE_WEBHOOK_SECRET: 'whsec_private', STRIPE_PRICE_IDS: 'monthly' }))).toThrow('Stripe Price IDs')
+    expect(() => assertEnv(loadEnv({ DATABASE_URL: 'postgres://db', STRIPE_SECRET_KEY: 'synthetic-stripe-secret', STRIPE_WEBHOOK_SECRET: 'synthetic-webhook-secret', STRIPE_PRICE_IDS: 'monthly' }))).toThrow('Stripe Price IDs')
     expect(() => assertEnv(loadEnv({ DATABASE_URL: 'postgres://db', STRIPE_PRICE_IDS: 'price_basic' }))).toThrow('STRIPE_SECRET_KEY is required')
   })
 })
@@ -167,5 +169,61 @@ describe('employee bank-data encryption environment', () => {
     expect(() => assertEnv(productionEnv({
       BANK_DATA_ENCRYPTION_KEY: 'short', OBJECT_STORAGE_DRIVER: 's3', S3_BUCKET: 'asas-files',
     }))).toThrow('BANK_DATA_ENCRYPTION_KEY must contain at least 32 characters in production')
+  })
+})
+
+describe('credential encryption environment', () => {
+  it('requires an independent 32-character ENCRYPTION_KEY in production', () => {
+    expect(() => assertEnv(productionEnv({
+      ENCRYPTION_KEY: '',
+      BANK_DATA_ENCRYPTION_KEY: bankKey,
+      OBJECT_STORAGE_DRIVER: 's3',
+      S3_BUCKET: 'asas-files',
+    }))).toThrow('ENCRYPTION_KEY must contain at least 32 characters in production')
+    expect(() => assertEnv(productionEnv({
+      ENCRYPTION_KEY: 'short',
+      BANK_DATA_ENCRYPTION_KEY: bankKey,
+      OBJECT_STORAGE_DRIVER: 's3',
+      S3_BUCKET: 'asas-files',
+    }))).toThrow('ENCRYPTION_KEY must contain at least 32 characters in production')
+    expect(() => assertEnv(productionEnv({
+      ENCRYPTION_KEY: productionAuthSecret,
+      BANK_DATA_ENCRYPTION_KEY: bankKey,
+      OBJECT_STORAGE_DRIVER: 's3',
+      S3_BUCKET: 'asas-files',
+    }))).toThrow('ENCRYPTION_KEY must be different from AUTH_SECRET')
+  })
+})
+
+describe('tenant guard environment', () => {
+  it('enforces the guard by default and permits an explicit non-production opt-out', () => {
+    expect(loadEnv({}).tenantGuardEnabled).toBe(true)
+    expect(loadEnv({ RLS_ENFORCEMENT: 'enforce' }).tenantGuardEnabled).toBe(true)
+    expect(loadEnv({ NODE_ENV: 'development', RLS_ENFORCEMENT: 'off' }).tenantGuardEnabled).toBe(false)
+    expect(() => loadEnv({ RLS_ENFORCEMENT: 'sometimes' })).toThrow('RLS_ENFORCEMENT must be either "enforce" or "off"')
+    expect(() => assertEnv(productionEnv({
+      RLS_ENFORCEMENT: 'off',
+      BANK_DATA_ENCRYPTION_KEY: bankKey,
+      OBJECT_STORAGE_DRIVER: 's3',
+      S3_BUCKET: 'asas-files',
+    }))).toThrow('RLS_ENFORCEMENT=off is not allowed in production')
+  })
+})
+
+describe('reverse-proxy trust boundary', () => {
+  it('accepts explicit IPs and CIDR ranges only', () => {
+    expect(resolveTrustedProxyCidrs({})).toEqual([])
+    expect(resolveTrustedProxyCidrs({ TRUSTED_PROXY_CIDRS: '127.0.0.1, 10.0.0.0/8, 2001:db8::/32, ::1' }))
+      .toEqual(['127.0.0.1', '10.0.0.0/8', '2001:db8::/32', '::1'])
+    expect(resolveTrustedProxyCidrs({ TRUST_PROXY: 'false' })).toEqual([])
+  })
+
+  it('rejects trust-all values and malformed entries', () => {
+    for (const value of ['*', 'true', '0.0.0.0/0', '::/0', '0.0.0.0/0, 10.0.0.0/8']) {
+      expect(() => resolveTrustedProxyCidrs({ TRUSTED_PROXY_CIDRS: value })).toThrow('Trusting every reverse proxy is unsafe')
+    }
+    expect(() => resolveTrustedProxyCidrs({ TRUSTED_PROXY_CIDRS: 'proxy.internal' })).toThrow('invalid IP address')
+    expect(() => resolveTrustedProxyCidrs({ TRUSTED_PROXY_CIDRS: '10.0.0.0/99' })).toThrow('invalid CIDR range')
+    expect(() => resolveTrustedProxyCidrs({ TRUSTED_PROXY_CIDRS: '10.0.0.0/8/extra' })).toThrow('invalid CIDR range')
   })
 })

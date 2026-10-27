@@ -94,5 +94,35 @@ describe('Finding 5: Enterprise Credential Encryption Service (AES-256-GCM)', ()
     expect(() => decryptBankDetail(encrypted, tenantId, 'accountNumber', key)).toThrow()
     expect(decryptBankDetail('legacy-plaintext-account', tenantId, 'accountNumber', key)).toBe('legacy-plaintext-account')
   })
+
+  it('fails closed when production has no dedicated encryption key', () => {
+    const saved = {
+      NODE_ENV: process.env.NODE_ENV,
+      ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
+      BANK_DATA_ENCRYPTION_KEY: process.env.BANK_DATA_ENCRYPTION_KEY,
+      AUTH_SECRET: process.env.AUTH_SECRET,
+      BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
+    }
+    const restore = () => {
+      for (const [key, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[key]
+        else process.env[key] = value
+      }
+    }
+
+    try {
+      process.env.NODE_ENV = 'production'
+      delete process.env.ENCRYPTION_KEY
+      process.env.AUTH_SECRET = 'auth-secret-that-must-not-be-reused-for-credentials'
+      expect(() => encryptCredential('secret-value')).toThrow('ENCRYPTION_KEY is required')
+
+      process.env.ENCRYPTION_KEY = 'dedicated-encryption-key-for-production-123'
+      delete process.env.BANK_DATA_ENCRYPTION_KEY
+      expect(() => encryptBankDetail('021000021', tenantId, 'routingNumber'))
+        .toThrow('BANK_DATA_ENCRYPTION_KEY is required')
+    } finally {
+      restore()
+    }
+  })
 })
 

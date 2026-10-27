@@ -57,6 +57,10 @@ services:
       HOST: 0.0.0.0
       NODE_ENV: ${NODE_ENV:-development}
       FRONTEND_ORIGIN: http://localhost:80,http://localhost:5173,http://localhost
+      # Only the Docker bridge proxy may set X-Forwarded-For. Adjust if your deployment uses
+      # a different private subnet; never use a trust-all value.
+      TRUSTED_PROXY_CIDRS: 172.16.0.0/12
+      RLS_ENFORCEMENT: enforce
     ports:
       - "4000:4000"
     volumes:
@@ -73,8 +77,6 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
-      args:
-        VITE_API_URL: http://localhost:4000
     container_name: asas-web
     restart: unless-stopped
     ports:

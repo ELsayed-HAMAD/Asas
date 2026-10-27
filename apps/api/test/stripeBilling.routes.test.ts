@@ -33,7 +33,7 @@ async function makeApp(role: 'ADMIN' | 'MEMBER', provider: StripeBillingProvider
   app.decorate('prisma', prisma as unknown as PrismaClient)
   app.decorate('auth', auth as never)
   app.decorate('stripeBilling', provider)
-  app.decorate('environment', loadEnv({ STRIPE_SECRET_KEY: 'sk_test_key', STRIPE_WEBHOOK_SECRET: 'whsec_test', FRONTEND_ORIGIN: 'https://app.example.test' }))
+  app.decorate('environment', loadEnv({ STRIPE_SECRET_KEY: 'synthetic-stripe-secret', STRIPE_WEBHOOK_SECRET: 'synthetic-webhook-secret', FRONTEND_ORIGIN: 'https://app.example.test' }))
   app.decorate('ssePublish', vi.fn())
   await app.register(stripeBillingRoutes, { prefix: '/api/v1/billing' })
   await app.ready()
@@ -136,6 +136,6 @@ describe('Stripe billing routes', () => {
       payload: '{"amount":1}',
     })
     expect(response.statusCode).toBe(400)
-    expect(stripe.verifyWebhook).toHaveBeenCalledWith(Buffer.from('{"amount":1}'), 'invalid', 'whsec_test')
+    expect(stripe.verifyWebhook).toHaveBeenCalledWith(Buffer.from('{"amount":1}'), 'invalid', 'synthetic-webhook-secret')
   })
 })
