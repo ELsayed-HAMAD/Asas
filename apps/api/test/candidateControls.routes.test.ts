@@ -41,6 +41,7 @@ async function setup(role: 'ADMIN' | 'MEMBER' = 'ADMIN', objectStorage: ObjectSt
   }
   const tx = {
     $queryRaw: vi.fn(async () => []),
+    $executeRaw: vi.fn(async () => 1),
     $executeRawUnsafe: vi.fn(async () => 1),
     subscription: { findMany: vi.fn(async () => []) },
     candidate: {

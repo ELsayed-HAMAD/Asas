@@ -65,12 +65,12 @@ export function parsePrismaEnums(schemaSource: string): PrismaEnum[] {
     }
 
     if (values.length === 0) {
-      throw new Error(`Prisma enum ${name} parsed to zero values — the parser is wrong`)
+      throw new Error(`Prisma enum ${name} parsed to zero values. The parser is wrong.`)
     }
     enums.push({ name, values })
   }
 
-  if (enums.length === 0) throw new Error('No enums found in schema.prisma — the parser is wrong')
+  if (enums.length === 0) throw new Error('No enums found in schema.prisma. The parser is wrong.')
 
   return enums.sort((a, b) => a.name.localeCompare(b.name))
 }

@@ -271,7 +271,9 @@ test('onboarding retries on the same workspace after a setup failure', async ({ 
     emptyCalls += 1
     return json(route, { data: { onboardingStatus: 'EMPTY' } })
   })
-  await context.route('**/api/v1/onboarding/status', route => json(route, { data: { onboardingStatus: 'PENDING' } }))
+  await context.route('**/api/v1/onboarding/status', route => json(route, {
+    data: { onboardingStatus: emptyCalls > 0 ? 'EMPTY' : 'PENDING' },
+  }))
 
   try {
     const page = await context.newPage()
@@ -294,6 +296,110 @@ test('onboarding retries on the same workspace after a setup failure', async ({ 
     expect(createCalls).toBe(1)
     expect(settingsPatchCalls).toBe(2)
     expect(emptyCalls).toBe(1)
+  } finally {
+    await context.close()
+  }
+})
+
+test('onboarding resumes the current step and choices after a reload', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' })
+  const workspace = {
+    id: 'workspace_resume', name: 'Resume Workspace', slug: 'resume-workspace', logo: null,
+    currency: 'USD', onboardingStatus: 'PENDING', createdAt: new Date().toISOString(),
+  }
+  const user = { id: 'owner_resume', name: 'Resume Owner', email: 'resume@example.test', emailVerified: true }
+  const json = (route, body, status = 200) => route.fulfill({
+    status, contentType: 'application/json', body: JSON.stringify(body),
+  })
+
+  await context.route('**/api/auth/**', async route => {
+    const path = new URL(route.request().url()).pathname
+    let body = {}
+    if (path.endsWith('/get-session')) body = { session: { id: 'session_resume', token: 'token', userId: user.id, activeOrganizationId: workspace.id }, user }
+    else if (path.endsWith('/organization/list')) body = [workspace]
+    else if (path.endsWith('/organization/get-full-organization')) body = workspace
+    else if (path.endsWith('/organization/get-active-member-role')) body = { role: 'OWNER' }
+    return json(route, body)
+  })
+
+  try {
+    const page = await context.newPage()
+    await page.goto('/onboarding')
+
+    await page.getByPlaceholder('e.g. Acme Global Holdings Inc.').fill('Draft Workspace')
+    await page.getByRole('button', { name: 'Review workspace areas' }).click()
+    await page.getByRole('button', { name: 'Choose how to start' }).click()
+    await page.getByRole('button', { name: /Load sample data/ }).click()
+    await expect(page.getByRole('button', { name: /Load sample data/ })).toHaveAttribute('aria-pressed', 'true')
+
+    await page.waitForFunction(() => {
+      try {
+        const draft = JSON.parse(sessionStorage.getItem('asas.onboarding.draft.v1'))
+        return draft?.step === 3 && draft?.dataMode === 'sample'
+      } catch {
+        return false
+      }
+    })
+
+    await page.reload()
+
+    // The reload must land on step 3 with the sample mode still selected, not restart at step 1.
+    await expect(page.getByRole('heading', { name: 'Choose how to start', level: 1 })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Load sample data/ })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByTestId('onboarding-summary')).toContainText('Draft Workspace')
+
+    await page.getByRole('button', { name: /^Profile Company and locale$/ }).click()
+    await expect(page.getByLabel(/Company \/ Organization Name/)).toHaveValue('Draft Workspace')
+  } finally {
+    await context.close()
+  }
+})
+
+test('onboarding verifies the committed workspace status before opening the dashboard', async ({ browser }) => {
+  const context = await browser.newContext({ reducedMotion: 'reduce' })
+  const workspace = {
+    id: 'workspace_status_check', name: 'Status Workspace', slug: 'status-workspace', logo: null,
+    currency: 'USD', onboardingStatus: 'PENDING', createdAt: new Date().toISOString(),
+  }
+  const user = { id: 'owner_status_check', name: 'Status Owner', email: 'status@example.test', emailVerified: true }
+  let applyCalls = 0
+  const json = (route, body, status = 200) => route.fulfill({
+    status, contentType: 'application/json', body: JSON.stringify(body),
+  })
+
+  await context.route('**/api/auth/**', async route => {
+    const path = new URL(route.request().url()).pathname
+    let body = {}
+    if (path.endsWith('/get-session')) body = { session: { id: 'session_status_check', token: 'token', userId: user.id, activeOrganizationId: workspace.id }, user }
+    else if (path.endsWith('/organization/list')) body = [workspace]
+    else if (path.endsWith('/organization/get-full-organization')) body = workspace
+    else if (path.endsWith('/organization/get-active-member-role')) body = { role: 'OWNER' }
+    return json(route, body)
+  })
+  await context.route('**/api/v1/settings/general', route => json(route, { data: {} }))
+  await context.route('**/api/v1/billing/switch-plan', route => json(route, { data: {} }))
+  await context.route('**/api/v1/onboarding/empty', route => {
+    applyCalls += 1
+    return json(route, { data: { onboardingStatus: 'EMPTY' } })
+  })
+  // The initializer claims success, but the persisted status never leaves PENDING.
+  await context.route('**/api/v1/onboarding/status', route => json(route, { data: { onboardingStatus: 'PENDING' } }))
+
+  try {
+    const page = await context.newPage()
+    await page.goto('/onboarding')
+    await page.getByRole('button', { name: 'Review workspace areas' }).click()
+    await page.getByRole('button', { name: 'Choose how to start' }).click()
+    await page.getByRole('button', { name: 'Launch workspace' }).click()
+
+    await expect(page.getByRole('alert')).toContainText('still finishing setup')
+    await expect(page).toHaveURL(/\/onboarding$/)
+    expect(applyCalls).toBe(1)
+
+    // A failed launch keeps the draft so retrying resumes the same step.
+    const draft = await page.evaluate(() => JSON.parse(sessionStorage.getItem('asas.onboarding.draft.v1')))
+    expect(draft.step).toBe(3)
+    expect(draft.dataMode).toBe('empty')
   } finally {
     await context.close()
   }
@@ -322,8 +428,26 @@ test('onboarding labels its fields, moves focus between steps, and fits a mobile
 
     await expect(page.getByRole('heading', { name: 'Set up your workspace', level: 1 })).toBeVisible()
     await expect(page.getByLabel(/Company \/ Organization Name/)).toHaveValue('Pending Workspace')
-    await expect(page.getByLabel('Base Reporting Currency')).toHaveValue('USD')
+    await expect(page.getByLabel('Base Reporting Currency')).toHaveAttribute('data-value', 'USD')
     await expect(page.getByLabel('Headquarters Timezone')).toBeVisible()
+
+    await page.getByRole('combobox', { name: 'Base Reporting Currency' }).click()
+    await expect(page.getByTestId('onboarding-currency-popover')).toBeVisible()
+    const currencyTriggerBox = await page.getByRole('combobox', { name: 'Base Reporting Currency' }).boundingBox()
+    const currencyPanelBox = await page.getByTestId('onboarding-currency-popover').boundingBox()
+    expect(currencyPanelBox.y).toBeGreaterThanOrEqual(currencyTriggerBox.y + currencyTriggerBox.height - 1)
+    await page.getByPlaceholder('Search code, currency, or symbol').fill('EGP')
+    await page.getByRole('option', { name: /EGP/ }).click()
+    await expect(page.getByRole('combobox', { name: 'Base Reporting Currency' })).toHaveAttribute('data-value', 'EGP')
+
+    await page.getByRole('combobox', { name: 'Headquarters Timezone' }).click()
+    await expect(page.getByTestId('onboarding-timezone-popover')).toBeVisible()
+    const timezoneTriggerBox = await page.getByRole('combobox', { name: 'Headquarters Timezone' }).boundingBox()
+    const timezonePanelBox = await page.getByTestId('onboarding-timezone-popover').boundingBox()
+    expect(timezonePanelBox.y).toBeGreaterThanOrEqual(timezoneTriggerBox.y + timezoneTriggerBox.height - 1)
+    await page.getByPlaceholder('Search city, region, or UTC offset').fill('Cairo')
+    await page.getByRole('option', { name: /Cairo/ }).click()
+    await expect(page.getByRole('combobox', { name: 'Headquarters Timezone' })).toHaveAttribute('data-value', 'Africa/Cairo')
 
     await page.getByRole('button', { name: 'Review workspace areas' }).click()
     await expect(page.getByRole('heading', { name: 'Workspace areas', level: 1 })).toBeFocused()
@@ -340,6 +464,93 @@ test('onboarding labels its fields, moves focus between steps, and fits a mobile
       expect(box.x + box.width).toBeLessThanOrEqual(390.5)
     }
   } finally {
+    await context.close()
+  }
+})
+
+test('desktop progress rail summarizes setup and the launch panel shows staged progress', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' })
+  const workspace = {
+    id: 'workspace_rail_setup', name: 'Rail Workspace', slug: 'rail-workspace', logo: null,
+    currency: 'USD', onboardingStatus: 'PENDING', createdAt: new Date().toISOString(),
+  }
+  const user = { id: 'owner_rail_setup', name: 'Rail Owner', email: 'owner@example.test', emailVerified: true }
+  let finishSample
+  const sampleGate = new Promise(resolve => { finishSample = resolve })
+  const json = (route, body, status = 200) => route.fulfill({
+    status, contentType: 'application/json', body: JSON.stringify(body),
+  })
+
+  await context.route('**/api/auth/**', async route => {
+    const path = new URL(route.request().url()).pathname
+    let body = {}
+    if (path.endsWith('/get-session')) body = { session: { id: 'session_rail_setup', token: 'token', userId: user.id, activeOrganizationId: workspace.id }, user }
+    else if (path.endsWith('/organization/list')) body = [workspace]
+    else if (path.endsWith('/organization/get-full-organization')) body = workspace
+    else if (path.endsWith('/organization/get-active-member-role')) body = { role: 'OWNER' }
+    return json(route, body)
+  })
+  await context.route('**/api/v1/settings/general', route => json(route, { data: {} }))
+  await context.route('**/api/v1/billing/switch-plan', route => json(route, { data: {} }))
+  await context.route('**/api/v1/onboarding/sample', async route => {
+    await sampleGate
+    await json(route, { data: { onboardingStatus: 'SAMPLE_LOADED' } }).catch(() => {})
+  })
+
+  try {
+    const page = await context.newPage()
+    await page.goto('/onboarding')
+
+    const summary = page.getByTestId('onboarding-summary')
+    await expect(summary).toBeVisible()
+    await expect(summary).toContainText('Rail Workspace')
+    await expect(summary).toContainText('All 5 included')
+    await expect(summary).toContainText('Clean workspace')
+    await expect(page.getByTestId('onboarding-mobile-progress')).toBeHidden()
+
+    // Desktop setup has to fit the viewport so no step needs scrolling to continue.
+    const pageScroll = () => page.evaluate(() => {
+      const root = document.documentElement
+      return root.scrollHeight - root.clientHeight
+    })
+    const railScroll = () => page.evaluate(() => {
+      const rail = document.querySelector('aside .glass-strong')
+      return rail ? rail.scrollHeight - rail.clientHeight : null
+    })
+    const actionInViewport = name => page.evaluate(name => {
+      const button = [...document.querySelectorAll('button')].find(el => el.textContent.trim().startsWith(name))
+      if (!button) return null
+      const box = button.getBoundingClientRect()
+      return box.y >= 0 && box.bottom <= window.innerHeight
+    }, name)
+    await expect.poll(pageScroll).toBe(0)
+    await expect.poll(railScroll).toBe(0)
+    await expect.poll(() => actionInViewport('Review workspace areas')).toBe(true)
+
+    await page.getByRole('button', { name: 'Review workspace areas' }).click()
+    await page.getByRole('button', { name: 'Choose how to start' }).click()
+    await page.getByRole('button', { name: /Load sample data/ }).click()
+    await expect(summary).toContainText('Sample data')
+
+    await page.getByRole('button', { name: /^Profile Company and locale$/ }).click()
+    await expect(page.getByRole('heading', { name: 'Set up your workspace', level: 1 })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Review workspace areas' }).click()
+    await page.getByRole('button', { name: 'Choose how to start' }).click()
+    await expect.poll(pageScroll).toBe(0)
+    await expect.poll(railScroll).toBe(0)
+    await expect.poll(() => actionInViewport('Launch workspace')).toBe(true)
+    await page.getByRole('button', { name: 'Launch workspace' }).click()
+
+    const launch = page.getByTestId('onboarding-launch-progress')
+    await expect(launch).toBeVisible()
+    for (const stage of ['Workspace', 'Settings', 'Data', 'Ready']) {
+      await expect(launch.getByText(stage, { exact: true })).toBeVisible()
+    }
+    await expect(launch.getByText(/can take a few minutes/)).toBeVisible()
+  } finally {
+    finishSample?.()
+    await new Promise(resolve => setTimeout(resolve, 300))
     await context.close()
   }
 })
@@ -419,6 +630,11 @@ test('onboarding saves a resumable company migration project before launching a 
     workspaceInitialized = true
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { onboardingStatus: 'EMPTY' } }) })
   })
+  await context.route('**/api/v1/onboarding/status', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ data: { onboardingStatus: workspaceInitialized ? 'EMPTY' : 'PENDING' } }),
+  }))
 
   try {
     const page = await context.newPage()
@@ -435,9 +651,9 @@ test('onboarding saves a resumable company migration project before launching a 
     await page.getByRole('button', { name: /People & payroll/ }).click()
     await page.getByRole('button', { name: /CRM & pipeline/ }).click()
     await page.getByRole('button', { name: /Finance & accounting/ }).click()
-    await expect(page.getByText('Start mode:')).toBeVisible()
-    await expect(page.getByText('Company migration plan', { exact: true })).toBeVisible()
-    await expect(page.getByText('Finance & accounting, People & payroll, CRM & pipeline', { exact: true })).toBeVisible()
+    const summary = page.getByTestId('onboarding-summary')
+    await expect(summary).toContainText('Company migration plan')
+    await expect(summary).toContainText('Finance & accounting, People & payroll, CRM & pipeline')
     await page.getByRole('button', { name: /Save migration plan & launch/ }).click()
     await expect.poll(() => migrationPlan).not.toBeNull()
     await expect.poll(() => workspaceInitialized).toBe(true)

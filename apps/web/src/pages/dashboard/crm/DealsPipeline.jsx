@@ -781,7 +781,7 @@ export default function DealsPipeline() {
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <div className="flex-1 min-w-0 flex flex-col p-6 pt-4 gap-4">
           {/* 4) STAGE CARDS ROW (Switcher) - All 5 in one row */}
-          <div className="grid grid-cols-[repeat(5,minmax(170px,1fr))] min-[1100px]:grid-cols-[repeat(5,minmax(0,1fr))] gap-3 sm:gap-3.5 shrink-0 overflow-x-auto min-[1100px]:overflow-visible [scrollbar-width:thin]">
+          <div data-testid="deal-stage-switcher" className="grid grid-cols-[repeat(5,minmax(170px,1fr))] min-[1100px]:grid-cols-[repeat(5,minmax(0,1fr))] gap-3 sm:gap-3.5 shrink-0 overflow-x-auto min-[1100px]:overflow-visible [scrollbar-width:thin]">
             {groups.map(group => (
               <StageSwitcherCard
                 key={group.stage}

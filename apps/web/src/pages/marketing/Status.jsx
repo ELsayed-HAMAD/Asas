@@ -15,11 +15,11 @@ function serviceState(value, { healthy = [], disabled = [] } = {}) {
 
 function StatusPill({ state }) {
   const styles = {
-    success: 'bg-success-light text-success-text border-success-border',
-    danger: 'bg-danger-light text-danger-text border-danger-border',
-    muted: 'bg-surface-muted text-muted border-border-default',
+    success: 'border-emerald-200/80 bg-emerald-50/80 text-emerald-700',
+    danger: 'border-red-200/80 bg-red-50/80 text-red-700',
+    muted: 'border-black/[0.07] bg-black/[0.035] text-[#737378]',
   }
-  return <Badge variant="outline" className={styles[state.tone]}>{state.label}</Badge>
+  return <Badge variant="outline" className={`${styles[state.tone]} rounded-full px-3 py-1 text-[10px] font-medium shadow-none`}>{state.label}</Badge>
 }
 
 export default function Status() {
@@ -78,20 +78,20 @@ export default function Status() {
       title="Platform status"
       description="This page displays the live readiness fields exposed by the current Asas API deployment. It does not show uptime history or provider checks the API does not perform."
     >
-      <section aria-labelledby="readiness-title" className="glass-strong mb-8 rounded-card border border-border-default/80 p-6 shadow-glass sm:p-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <span className={`flex h-10 w-10 items-center justify-center rounded-full ${apiState.tone === 'success' ? 'bg-success-light text-success' : apiState.tone === 'danger' ? 'bg-danger-light text-danger' : 'bg-surface-muted text-muted'}`}>
-              <CheckCircle2 className="h-6 w-6" />
+      <section aria-labelledby="readiness-title" className="rounded-[28px] border border-white/80 bg-white/60 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl sm:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-5">
+          <div className="flex items-center gap-4">
+            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${apiState.tone === 'success' ? 'bg-emerald-50 text-emerald-600' : apiState.tone === 'danger' ? 'bg-red-50 text-red-600' : 'bg-black/[0.04] text-[#737378]'}`}>
+              <CheckCircle2 className="h-5 w-5" />
             </span>
             <div>
-              <h2 id="readiness-title" className="text-xl font-bold text-heading">{overall}</h2>
-              <p className="mt-1 text-xs text-caption">Refreshes automatically every 30 seconds.</p>
+              <h2 id="readiness-title" className="text-xl font-semibold tracking-[-0.025em] text-[#1d1d1f] sm:text-2xl">{overall}</h2>
+              <p className="mt-1.5 text-xs text-[#929297]">Refreshes automatically every 30 seconds.</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <StatusPill state={apiState} />
-            <Button variant="outline" size="sm" onClick={() => readyQuery.refetch()} disabled={readyQuery.isFetching} className="gap-1.5 text-xs">
+            <Button variant="outline" size="sm" onClick={() => readyQuery.refetch()} disabled={readyQuery.isFetching} className="h-9 gap-1.5 rounded-full border-black/10 bg-white/60 px-4 text-xs text-[#1d1d1f] shadow-none hover:bg-white">
               <RefreshCw className={`h-3.5 w-3.5 ${readyQuery.isFetching ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
@@ -99,18 +99,24 @@ export default function Status() {
         </div>
       </section>
 
-      <section aria-labelledby="services-title" className="mb-10">
-        <h3 id="services-title" className="mb-4 text-lg font-bold text-heading">Reported service configuration</h3>
-        <div className="glass-strong divide-y divide-border-subtle/80 overflow-hidden rounded-card border border-border-default/80 shadow-glass">
+      <section aria-labelledby="services-title" className="mt-12">
+        <div className="mb-5 flex items-end justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-[#0071e3]">Current deployment</p>
+            <h3 id="services-title" className="mt-2 text-xl font-semibold tracking-[-0.025em] text-[#1d1d1f]">Reported service configuration</h3>
+          </div>
+          <span className="hidden text-[10px] text-[#929297] sm:inline">Live API fields only</span>
+        </div>
+        <div className="divide-y divide-black/[0.06] overflow-hidden rounded-[24px] border border-black/[0.06] bg-white/55 shadow-[0_16px_50px_rgba(0,0,0,0.04)] backdrop-blur-xl">
           {rows.map((row) => {
             const Icon = row.icon
             return (
-              <div key={row.name} className="flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5">
-                <div className="flex items-center gap-3.5">
-                  <span className="rounded-button bg-surface-muted p-2 text-body"><Icon className="h-5 w-5" /></span>
+              <div key={row.name} className="flex flex-wrap items-center justify-between gap-4 p-5 sm:px-6">
+                <div className="flex items-center gap-4">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-black/[0.05] bg-white/75 text-[#626267] shadow-sm"><Icon className="h-4.5 w-4.5" /></span>
                   <div>
-                    <h4 className="text-sm font-bold text-heading">{row.name}</h4>
-                    <p className="mt-0.5 text-xs text-caption">{row.detail}</p>
+                    <h4 className="text-sm font-semibold text-[#1d1d1f]">{row.name}</h4>
+                    <p className="mt-1 max-w-xl text-xs leading-5 text-[#86868b]">{row.detail}</p>
                   </div>
                 </div>
                 <StatusPill state={row.state} />
@@ -120,15 +126,13 @@ export default function Status() {
         </div>
       </section>
 
-      {readyQuery.isError && (
-        <p role="alert" className="mb-8 text-sm text-danger-text">Could not load live readiness information. Check the API connection and try again.</p>
-      )}
+      {readyQuery.isError && <p role="alert" className="mt-6 rounded-2xl border border-red-200/70 bg-red-50/70 p-4 text-sm text-red-700">Could not load live readiness information. Check the API connection and try again.</p>}
 
-      <div className="flex items-center gap-2 text-sm text-body-light">
-        <HardDrive className="h-4 w-4 text-accent" />
+      <div className="mt-10 flex items-start gap-3 border-t border-black/[0.07] pt-6 text-xs leading-5 text-[#737378]">
+        <HardDrive className="mt-0.5 h-4 w-4 shrink-0 text-[#0071e3]" />
         <span>For security and accuracy, historical uptime and incident records are shown only when backed by a monitoring service.</span>
       </div>
-      <p className="mt-6 text-xs text-caption">Need help? Read the <Link to="/documentation" className="font-semibold text-accent hover:underline">platform documentation</Link>.</p>
+      <p className="mt-5 text-xs text-[#86868b]">Need help? Read the <Link to="/documentation" className="font-semibold text-[#0071e3] hover:underline">platform documentation</Link>.</p>
     </MarketingPageFrame>
   )
 }

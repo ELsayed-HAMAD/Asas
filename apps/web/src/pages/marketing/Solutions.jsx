@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
+  ArrowDown,
   ArrowRight,
   Boxes,
   CheckCircle2,
@@ -150,7 +151,7 @@ export default function Solutions() {
   const requestedArea = searchParams.get('area')
   const initialArea = SOLUTIONS.some(solution => solution.id === requestedArea) ? requestedArea : SOLUTIONS[0].id
   const [activeSolutionId, setActiveSolutionId] = useState(initialArea)
-  const currentSolution = SOLUTIONS.find((s) => s.id === activeSolutionId) || SOLUTIONS[0]
+  const currentSolution = SOLUTIONS.find((solution) => solution.id === activeSolutionId) || SOLUTIONS[0]
   const Icon = currentSolution.icon
 
   useEffect(() => {
@@ -168,145 +169,91 @@ export default function Solutions() {
     })
   }
 
+  const workflowSteps = [
+    { label: 'Input', value: currentSolution.architecture.input },
+    { label: 'Workspace workflow', value: currentSolution.architecture.process },
+    { label: 'Saved records and views', value: currentSolution.architecture.output },
+  ]
+
   return (
     <MarketingPageFrame
       eyebrow="Workspace solutions"
       title="Business workflows in one workspace"
       description="Explore the current Asas product areas, the records they manage, and the practical limits to confirm before using them in production."
     >
-      {/* Solution Vertical Selector Tabs */}
-      <div className="flex flex-wrap gap-2 mb-10 pb-2 border-b border-border-default/80">
-        {SOLUTIONS.map((s) => {
-          const TabIcon = s.icon
-          const active = s.id === activeSolutionId
-          return (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => selectSolution(s.id)}
-              aria-pressed={active}
-              aria-controls="solution-detail"
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-button text-xs font-semibold hover-lift transition-micro cursor-pointer active:scale-[0.98] ${
-                active
-                  ? 'bg-primary text-on-primary shadow-card hover:shadow-glow'
-                  : 'glass text-body hover:bg-surface-raised hover:text-heading border border-border-default/80'
-              }`}
-            >
-              <TabIcon className="w-4 h-4" />
-              <span>{s.badge}</span>
-            </button>
-          )
-        })}
-      </div>
+      <div className="grid gap-8 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <aside className="h-fit rounded-[24px] border border-white/80 bg-white/50 p-2.5 shadow-[0_16px_50px_rgba(0,0,0,0.05)] backdrop-blur-xl lg:sticky lg:top-28">
+          <p className="px-3 pb-2 pt-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#929297]">Product areas</p>
+          <nav aria-label="Solution areas" className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
+            {SOLUTIONS.map((solution) => {
+              const TabIcon = solution.icon
+              const active = solution.id === activeSolutionId
+              return (
+                <button
+                  key={solution.id}
+                  type="button"
+                  onClick={() => selectSolution(solution.id)}
+                  aria-pressed={active}
+                  aria-controls="solution-detail"
+                  className={`flex min-w-max items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-xs font-medium transition-colors lg:w-full ${active ? 'bg-white text-[#1d1d1f] shadow-[0_4px_16px_rgba(0,0,0,0.07)]' : 'text-[#737378] hover:bg-white/50 hover:text-[#1d1d1f]'}`}
+                >
+                  <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${active ? 'bg-[#e8f1fd] text-[#0071e3]' : 'bg-black/[0.035] text-[#86868b]'}`}><TabIcon className="h-4 w-4" /></span>
+                  <span>{solution.badge}</span>
+                </button>
+              )
+            })}
+          </nav>
+        </aside>
 
-      {/* Featured Architecture Canvas */}
-      <div id="solution-detail" className="glass-strong scroll-mt-28 rounded-card border border-border-default/80 p-6 sm:p-10 shadow-glass mb-16 hover-lift transition-premium">
-        <p className="sr-only" role="status">Showing {currentSolution.title}. {currentSolution.subtitle}</p>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
-          <div className="lg:col-span-2 space-y-5">
-            <div className="flex items-center gap-2">
-              <div className="p-2.5 rounded-button bg-accent-light text-accent shadow-xs">
-                <Icon className="w-6 h-6" />
-              </div>
+        <section id="solution-detail" className="scroll-mt-28 overflow-hidden rounded-[28px] border border-white/80 bg-white/60 shadow-[0_24px_70px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl">
+          <p className="sr-only" role="status">Showing {currentSolution.title}. {currentSolution.subtitle}</p>
+          <div key={currentSolution.id} className="animate-fade-in p-6 sm:p-9 lg:p-11">
+            <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-start">
               <div>
-                <Badge variant="outline" className="text-xs text-accent border-accent-muted bg-accent-light shadow-xs">
-                  {currentSolution.badge}
-                </Badge>
-                <h2 className="text-2xl sm:text-3xl font-extrabold text-heading mt-1">
-                  {currentSolution.title}
-                </h2>
+                <Badge variant="outline" className="border-[#cfe1f8] bg-[#e8f1fd] text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0071e3] shadow-none">{currentSolution.badge}</Badge>
+                <h2 className="mt-5 text-3xl font-semibold tracking-[-0.04em] text-[#1d1d1f] sm:text-4xl">{currentSolution.title}</h2>
+                <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[#4b4b50]">{currentSolution.subtitle}</p>
               </div>
+              <span className="hidden h-13 w-13 shrink-0 items-center justify-center rounded-2xl border border-black/[0.05] bg-white text-[#0071e3] shadow-[0_10px_30px_rgba(0,0,0,0.06)] sm:flex"><Icon className="h-6 w-6" /></span>
             </div>
+            <p className="mt-5 max-w-3xl text-sm leading-7 text-[#737378]">{currentSolution.description}</p>
 
-            <p className="text-base font-medium text-body">{currentSolution.subtitle}</p>
-            <p className="text-sm text-body-light leading-relaxed">{currentSolution.description}</p>
-
-            {/* Core Capabilities Checklist */}
-            <div className="pt-2 space-y-2.5">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-caption">Key Capabilities</h3>
-              {currentSolution.capabilities.map((cap) => (
-                <div key={cap} className="flex items-start gap-2.5 text-xs text-body">
-                  <CheckCircle2 className="w-4 h-4 text-success mt-0.5 flex-shrink-0" />
-                  <span>{cap}</span>
+            <div className="mt-10 grid gap-9 border-t border-black/[0.07] pt-9 lg:grid-cols-[1fr_0.82fr]">
+              <div>
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.17em] text-[#929297]">Key capabilities</h3>
+                <div className="mt-5 space-y-4">
+                  {currentSolution.capabilities.map((capability) => (
+                    <div key={capability} className="flex items-start gap-3 text-sm leading-6 text-[#4b4b50]">
+                      <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-[#0071e3]" />
+                      <span>{capability}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              <div className="rounded-[22px] border border-black/[0.05] bg-[#f5f5f7]/85 p-5 sm:p-6">
+                <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#929297]">
+                  <Cpu className="h-4 w-4 text-[#0071e3]" />
+                  <span>Example workflow</span>
+                </div>
+                <div className="mt-5">
+                  {workflowSteps.map((step, index) => (
+                    <div key={step.label}>
+                      <div className="rounded-2xl border border-black/[0.05] bg-white/80 p-4 shadow-[0_4px_16px_rgba(0,0,0,0.035)]">
+                        <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">{step.label}</span>
+                        <p className="mt-1.5 text-xs font-semibold leading-5 text-[#3a3a3c]">{step.value}</p>
+                      </div>
+                      {index < workflowSteps.length - 1 && <div className="flex justify-center py-2 text-[#a1a1a6]"><ArrowDown className="h-3.5 w-3.5" /></div>}
+                    </div>
+                  ))}
+                </div>
+                <Button asChild className="mt-6 h-10 w-full rounded-full bg-[#0071e3] text-xs font-medium text-white shadow-[0_8px_24px_rgba(0,113,227,0.2)] hover:bg-[#0077ed]">
+                  <Link to="/register">Start Free Workspace <ArrowRight className="h-3.5 w-3.5" /></Link>
+                </Button>
+              </div>
             </div>
           </div>
-
-          {/* Architecture Flow Box */}
-          <div className="bg-primary text-on-primary p-6 rounded-card border border-primary-hover shadow-glass hover:shadow-glow transition-premium space-y-4">
-            <div className="flex items-center gap-2 text-primary-subtle text-xs font-bold uppercase tracking-wider">
-              <Cpu className="w-4 h-4" />
-              <span>Example workflow</span>
-            </div>
-
-            <div className="space-y-3 pt-2">
-              <div className="p-3 rounded-button bg-primary-hover border border-primary-subtle/30 shadow-xs">
-                <span className="text-[10px] font-semibold text-primary-subtle uppercase">Input</span>
-                <p className="text-xs font-semibold text-on-primary mt-0.5">{currentSolution.architecture.input}</p>
-              </div>
-
-              <div className="flex justify-center text-primary-subtle">
-                <span>↓</span>
-              </div>
-
-              <div className="p-3 rounded-button bg-primary-hover border border-accent shadow-xs">
-                <span className="text-[10px] font-semibold text-accent-muted uppercase">Workspace workflow</span>
-                <p className="text-xs font-semibold text-on-primary mt-0.5">{currentSolution.architecture.process}</p>
-              </div>
-
-              <div className="flex justify-center text-primary-subtle">
-                <span>↓</span>
-              </div>
-
-              <div className="p-3 rounded-button bg-primary-hover border border-success-border shadow-xs">
-                <span className="text-[10px] font-semibold text-success-bright uppercase">Saved records and views</span>
-                <p className="text-xs font-semibold text-on-primary mt-0.5">{currentSolution.architecture.output}</p>
-              </div>
-            </div>
-
-            <Button asChild className="w-full mt-4 bg-accent hover:bg-accent-hover text-on-primary text-xs h-10 rounded-button shadow-card hover-lift transition-micro active:scale-[0.98]">
-              <Link to="/register">Start Free Workspace</Link>
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Grid of All Solutions */}
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-heading">Available product areas</h2>
-        <p className="text-xs text-caption mt-1">Explore the current product areas included in Asas.</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {SOLUTIONS.map((item) => {
-          const CardIcon = item.icon
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => selectSolution(item.id)}
-              aria-pressed={activeSolutionId === item.id}
-              aria-controls="solution-detail"
-              className="w-full text-left bg-surface-raised rounded-card border border-border-default/80 p-6 flex flex-col justify-between hover:border-accent/40 shadow-card hover:shadow-card-hover hover-lift transition-premium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
-            >
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="p-2 rounded-button bg-accent-light text-accent">
-                    <CardIcon className="w-5 h-5" />
-                  </div>
-                  <h3 className="font-bold text-heading text-sm">{item.title}</h3>
-                </div>
-                <p className="text-xs text-body-light leading-relaxed mb-4">{item.subtitle}</p>
-              </div>
-
-              <div className="pt-3 border-t border-border-subtle flex items-center justify-between text-xs text-accent font-semibold">
-                <span>View workflow</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </div>
-            </button>
-          )
-        })}
+        </section>
       </div>
     </MarketingPageFrame>
   )

@@ -32,6 +32,7 @@ import {
 } from '../../services/export.js'
 import type { EmployeeDirectoryRow, LedgerRow, ProjectExportRow } from '../../services/export.js'
 import { AppError } from '../../utils/errors.js'
+import { getPlatformFlags } from '../platform/platformSettings.js'
 
 /**
  * The export surface — job-based bulk exports (employee directory, general ledger) that run
@@ -445,6 +446,10 @@ export async function exportRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const { tenantId, role, userId } = requireAuthContext(request)
+      const flags = await getPlatformFlags(request.server.prisma)
+      if (!flags.exportsEnabled) {
+        throw new AppError(503, 'Exports are temporarily paused by the platform administrator.', { code: 'EXPORTS_DISABLED' })
+      }
       const prisma = request.server.prisma
       const canReadSalary = role === 'ADMIN' || role === 'OWNER'
       const format: ExportFormat = request.body.format ?? (request.body.kind === 'workspace' ? 'json' : 'xlsx')

@@ -37,7 +37,7 @@ test('compact formatting understands money wire objects rather than returning fa
   assert.equal(formatCompactTableMoney('1250000'), '$1.3M');
   assert.equal(formatCompactTableMoney('-1250000'), '-$1.3M');
   assert.equal(formatCompactTableMoney('1250.50', { currency: 'EUR' }), '€1.3K');
-  assert.equal(formatCompactTableMoney(null), '—');
+  assert.equal(formatCompactTableMoney(null), 'No amount');
 });
 
 test('wire currency takes precedence over the workspace display default', () => {
@@ -49,8 +49,8 @@ test('wire currency takes precedence over the workspace display default', () => 
 
 test('does not guess currency scales or display nonfinite/unsafe amounts', () => {
   for (const value of [null, undefined, NaN, Infinity, -Infinity, { amount: 1, currency: 'ZZZ' }, { amount: 1.5, currency: 'USD' }, { amount: Number.MAX_SAFE_INTEGER + 1, currency: 'USD' }]) {
-    assert.equal(formatMoney(value), '—');
-    assert.equal(formatCompactMoney(value), '—');
+    assert.equal(formatMoney(value), 'No amount');
+    assert.equal(formatCompactMoney(value), 'No amount');
   }
   assert.ok(Number.isNaN(moneyToMajor({ amount: 1, currency: 'ZZZ' })));
 });
@@ -60,7 +60,7 @@ test('uses workspace date format and timezone while preserving calendar-only dat
   try {
     assert.equal(formatDate('2026-01-01T02:00:00.000Z'), '2025-12-31');
     assert.equal(formatDate('2026-01-01'), '2026-01-01');
-    assert.equal(formatDate('2026-02-31'), '—');
+    assert.equal(formatDate('2026-02-31'), 'Not recorded');
     assert.equal(getFormatDefaults().timeZone, 'America/Los_Angeles');
   } finally {
     setFormatDefaults({ timezone: 'UTC', dateFormat: 'MMM d, yyyy' });
@@ -85,7 +85,7 @@ test('formatCompactCurrency formats executive KPI summary cards and dashboard wi
   assert.equal(formatCompactCurrency({ amount: 953620100, currency: 'USD' }), '$9.54M');
   assert.equal(formatCompactCurrency(850), '$850');
   assert.equal(formatCompactCurrency(0), '$0');
-  assert.equal(formatCompactCurrency(null), '—');
+  assert.equal(formatCompactCurrency(null), 'No amount');
 
   assert.equal(formatFullCurrency({ amount: 426807900, currency: 'USD' }), '$4,268,079.00');
   assert.equal(formatFullCurrency({ amount: 52712700, currency: 'USD' }), '$527,127.00');

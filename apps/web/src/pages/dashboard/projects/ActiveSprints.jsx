@@ -213,7 +213,7 @@ function KanbanCard({ issue, isSelected, onClick }) {
               title="Unassigned"
               className="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[9px] text-slate-400 font-medium shrink-0"
             >
-              —
+              ?
             </div>
           )}
         </div>
@@ -487,7 +487,7 @@ export default function ActiveSprints() {
                 title="Unassigned"
                 className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[9px] text-slate-400 font-medium shrink-0"
               >
-                —
+                ?
               </div>
             )}
           </div>

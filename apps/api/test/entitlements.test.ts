@@ -77,17 +77,54 @@ describe('plan entitlements', () => {
     })
   })
 
+  it('honors an active local comp plan without a Stripe subscription', () => {
+    const compPlan = {
+      status: 'ACTIVE',
+      stripeSubscriptionId: null,
+      planName: 'Standard Growth',
+      seatLimit: 15,
+      storageLimitGb: 25,
+    } as unknown as Subscription
+
+    expect(resolveEffectivePlanLimits([compPlan])).toMatchObject({
+      planName: 'Standard Growth',
+      seatLimit: 15,
+      storageLimitGb: 25,
+      source: 'subscription',
+    })
+  })
+
+  it('does not grant capacity from a canceled local comp plan', () => {
+    const canceledComp = {
+      status: 'CANCELED',
+      stripeSubscriptionId: null,
+      planName: 'Professional Scale',
+      seatLimit: 50,
+      storageLimitGb: 100,
+    } as unknown as Subscription
+
+    expect(resolveEffectivePlanLimits([canceledComp])).toMatchObject({
+      planName: freePlan.name,
+      seatLimit: freePlan.seatLimit,
+      storageLimitGb: freePlan.storageLimitGb,
+      source: 'free-fallback',
+    })
+  })
+
   it('serializes concurrent reservations so only the last available seat can be claimed once', async () => {
     let lockTail = Promise.resolve()
     const reservations: Array<{ id: string; tenantId: string; invitationId: string | null; purpose: string; expiresAt: Date }> = []
     const tx = {
       $executeRawUnsafe: async () => 1,
-      $queryRaw: async () => {
+      $executeRaw: async () => {
         const previous = lockTail
         let release = () => undefined
         lockTail = new Promise<void>(resolve => { release = resolve })
         await previous
         return release
+      },
+      $queryRaw: async () => {
+        throw new Error('the advisory lock returns void and cannot use $queryRaw')
       },
       subscription: { findMany: async () => [] },
       member: {
@@ -118,9 +155,9 @@ describe('plan entitlements', () => {
         let releaseLock: (() => void) | undefined
         const transaction = {
           ...tx,
-          $queryRaw: async () => {
-            releaseLock = await tx.$queryRaw()
-            return []
+          $executeRaw: async () => {
+            releaseLock = (await tx.$executeRaw()) as unknown as () => void
+            return 1
           },
         }
         try {
@@ -145,7 +182,7 @@ describe('plan entitlements', () => {
     let linkedReservationId: string | null = null
     const tx = {
       $executeRawUnsafe: async () => 1,
-      $queryRaw: async () => [],
+      $executeRaw: async () => 1,
       subscription: { findMany: async () => [] },
       member: { count: async () => 4, updateMany: async () => ({ count: 0 }) },
       invitation: {

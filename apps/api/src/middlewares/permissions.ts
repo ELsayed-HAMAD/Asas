@@ -149,6 +149,15 @@ export function requirePermission(permission: Permission) {
       await reply.code(403).send({ error: { message: `Requires the '${minimum}' role or higher` } })
       return
     }
+    if (context.tenantStatus && context.tenantStatus !== 'ACTIVE') {
+      await reply.code(403).send({
+        error: {
+          message: 'This workspace is suspended. Contact the platform administrator to restore access.',
+          details: { code: 'WORKSPACE_SUSPENDED' },
+        },
+      })
+      return
+    }
     request.authContext = context
     setActiveTenant(context.tenantId)
   }

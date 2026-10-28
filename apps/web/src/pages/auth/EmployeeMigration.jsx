@@ -4,6 +4,7 @@ import { Alert, AlertDescription } from '../../components/ui/alert'
 import { Button } from '../../components/ui/button'
 import { downloadCsv, parseCsvImport } from '../../lib/csv'
 import { http } from '../../lib/api/http'
+import { EMPTY } from '../../lib/emptyText'
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024
 const MAX_ROWS = 500
@@ -160,7 +161,7 @@ export default function EmployeeMigration({ onRowsChange, disabled = false }) {
             <span className={issues.length || serverValidation.status === 'error' ? 'text-danger' : serverValidation.status === 'ready' && serverValidation.fingerprint === fingerprint ? 'text-success-text' : 'text-caption'}>{issues.length ? `${issues.length} issue${issues.length === 1 ? '' : 's'} to fix` : serverValidation.status === 'checking' ? 'Validating with Asas…' : serverValidation.status === 'error' ? 'Server validation needs attention' : serverValidation.status === 'ready' && serverValidation.fingerprint === fingerprint ? `${employees.length} records validated` : `${employees.length} records to review`}</span>
           </div>
           {(issues.length > 0 || serverValidation.status === 'error') && <ul className="mt-2 max-h-24 space-y-1 overflow-auto text-xs text-danger" aria-live="polite">{issues.slice(0, 8).map((issue, index) => <li key={`${index}-${issue}`}>{issue}</li>)}{issues.length > 8 && <li>And {issues.length - 8} more issues.</li>}{serverValidation.status === 'error' && <li>{serverValidation.error}</li>}</ul>}
-          {employees.length > 0 && <div className="mt-3 max-h-64 overflow-auto"><table className="w-full min-w-max text-left text-xs"><thead className="sticky top-0 bg-surface"><tr className="text-caption">{FIELDS.filter(field => mapping[field.key] !== '').map(field => <th key={field.key} className="pb-2 pr-3 font-medium">{field.label.replace(/ \(.+\)$/, '')}</th>)}</tr></thead><tbody>{employees.map((employee, index) => <tr key={index} className="border-t border-border-subtle text-body">{FIELDS.filter(field => mapping[field.key] !== '').map(field => <td key={field.key} className="py-2 pr-3">{employee[field.key] || '—'}</td>)}</tr>)}</tbody></table></div>}
+          {employees.length > 0 && <div className="mt-3 max-h-64 overflow-auto"><table className="w-full min-w-max text-left text-xs"><thead className="sticky top-0 bg-surface"><tr className="text-caption">{FIELDS.filter(field => mapping[field.key] !== '').map(field => <th key={field.key} className="pb-2 pr-3 font-medium">{field.label.replace(/ \(.+\)$/, '')}</th>)}</tr></thead><tbody>{employees.map((employee, index) => <tr key={index} className="border-t border-border-subtle text-body">{FIELDS.filter(field => mapping[field.key] !== '').map(field => <td key={field.key} className="py-2 pr-3">{employee[field.key] || EMPTY.provided}</td>)}</tr>)}</tbody></table></div>}
         </div>
       </>}
 

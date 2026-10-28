@@ -3,7 +3,6 @@ import { Check } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import MarketingPageFrame from '../../components/marketing/MarketingPageFrame'
 import { Button } from '../../components/ui/button'
-import { Badge } from '../../components/ui/badge'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../../components/ui/accordion'
 import { PLATFORM_PLANS } from '../../../../../packages/contracts/src/billing/catalog.ts'
 import { http } from '../../lib/api/http'
@@ -60,129 +59,72 @@ export default function Pricing() {
       description="Compare the current workspace seat and storage limits. Product areas are shared across plans; paid checkout is available only when billing is configured for this deployment."
     >
       {plansQuery.isError && (
-        <div role="status" className="mb-8 rounded-card border border-warning-border bg-warning-light px-4 py-3 text-sm text-warning-text">
+        <div role="status" className="mb-8 rounded-2xl border border-amber-200/70 bg-amber-50/70 px-5 py-4 text-sm leading-6 text-amber-800">
           Could not confirm the paid-checkout configuration. You can still create a workspace on the Free plan; paid checkout may be unavailable.
         </div>
       )}
       {plansQuery.isSuccess && plansQuery.data?.stripeConfigured !== true && (
-        <div role="status" className="mb-8 rounded-card border border-warning-border bg-warning-light px-4 py-3 text-sm text-warning-text">
+        <div role="status" className="mb-8 rounded-2xl border border-amber-200/70 bg-amber-50/70 px-5 py-4 text-sm leading-6 text-amber-800">
           Paid checkout is not configured in this environment. You can create a workspace on the Free plan.
         </div>
       )}
 
-      <p className="mb-12 text-center text-sm text-body-light">Prices shown are monthly. Annual checkout is not currently available.</p>
+      <div className="mb-6 flex items-center justify-between gap-4 text-xs text-[#86868b]">
+        <span>Prices shown are monthly.</span>
+        <span>Annual checkout is not currently available.</span>
+      </div>
 
-      {/* 4 Plans Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-20">
+      <div className="grid gap-px overflow-hidden rounded-[26px] border border-black/[0.07] bg-black/[0.06] shadow-[0_20px_60px_rgba(0,0,0,0.05)] md:grid-cols-2 xl:grid-cols-4">
         {tiers.map((plan) => {
           const price = plan.monthlyPrice === 0 ? '$0' : `$${plan.monthlyPrice}`
-
-          const isHighlighted = plan.highlight
-
           return (
-            <div
-              key={plan.tier}
-              className={`rounded-card p-6 flex flex-col justify-between hover-lift transition-premium ${
-                isHighlighted
-                  ? 'bg-primary text-on-primary border-2 border-accent shadow-glass hover:shadow-glow relative'
-                  : 'bg-surface-raised text-body border border-border-default/80 shadow-card hover:shadow-card-hover hover:border-border-strong'
-              }`}
-            >
-              {isHighlighted && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-accent text-on-primary text-[10px] font-bold uppercase tracking-wider px-3 py-0.5 rounded-full shadow-card">
-                  Most Popular
-                </div>
-              )}
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                    <h3 className={`font-bold text-lg ${isHighlighted ? 'text-on-primary' : 'text-heading'}`}>
-                    {plan.name}
-                  </h3>
-                  {plan.tier === 'free' && (
-                    <Badge variant="outline" className="bg-surface-muted text-body text-[10px] border-border-default shadow-xs">
-                      Default
-                    </Badge>
-                  )}
-                </div>
-
-                <p className={`text-xs mb-6 ${isHighlighted ? 'text-primary-subtle' : 'text-caption'}`}>
-                  {plan.description}
-                </p>
-
-                <div className="mb-6">
-                  <span className={`text-4xl font-extrabold ${isHighlighted ? 'text-on-primary' : 'text-heading'}`}>
-                    {price}
-                  </span>
-                  {plan.monthlyPrice != null && (
-                    <span className={`text-xs ml-1 ${isHighlighted ? 'text-primary-subtle' : 'text-caption'}`}>
-                      {plan.monthlyPrice === 0 ? '/ month forever' : '/ month'}
-                    </span>
-                  )}
-                </div>
-
-                <ul className="space-y-3 text-xs">
-                  {plan.features?.map((f) => (
-                    <li key={f} className="flex items-start gap-2">
-                      <Check className={`w-4 h-4 flex-shrink-0 mt-0.5 ${isHighlighted ? 'text-success-bright' : 'text-success'}`} />
-                      <span className={isHighlighted ? 'text-primary-light' : 'text-body-light'}>{f}</span>
-                    </li>
-                  ))}
-                </ul>
+            <article key={plan.tier} className={`flex flex-col p-6 sm:p-7 ${plan.highlight ? 'bg-[#f0f6ff]' : 'bg-white/85'}`}>
+              <div className="flex min-h-6 items-center justify-between gap-3">
+                <h2 className="text-sm font-semibold text-[#1d1d1f]">{plan.name}</h2>
+                {plan.highlight && <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">Most popular</span>}
+                {plan.tier === 'free' && <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#929297]">Default</span>}
               </div>
-
-              <Button
-                asChild
-                className={`w-full mt-8 text-xs font-semibold h-10 rounded-button cursor-pointer hover-lift transition-micro active:scale-[0.98] ${
-                  isHighlighted
-                    ? 'bg-accent hover:bg-accent-hover text-on-primary shadow-card hover:shadow-glow'
-                    : plan.tier === 'free'
-                    ? 'bg-primary hover:bg-primary-hover text-on-primary shadow-card'
-                    : 'border border-border-default/80 bg-surface-raised hover:bg-surface-muted text-heading shadow-card'
-                }`}
-              >
-                <Link to="/register">
-                  {plan.cta || 'Get Started'}
-                </Link>
+              <p className="mt-3 min-h-10 text-xs leading-5 text-[#86868b]">{plan.description}</p>
+              <div className="mt-8 flex items-end gap-2">
+                <span className="text-4xl font-semibold tracking-[-0.045em] text-[#1d1d1f]">{price}</span>
+                <span className="pb-1 text-[10px] text-[#86868b]">{plan.monthlyPrice === 0 ? '/ month forever' : '/ month'}</span>
+              </div>
+              <ul className="mt-8 space-y-3.5 text-xs leading-5 text-[#626267]">
+                {plan.features?.map((feature) => (
+                  <li key={feature} className="flex items-start gap-2.5">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#0071e3]" />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+              <Button asChild variant={plan.tier === 'free' || plan.highlight ? 'default' : 'outline'} className={`mt-9 h-10 w-full rounded-full text-xs font-medium ${plan.tier === 'free' || plan.highlight ? 'bg-[#0071e3] text-white shadow-[0_8px_22px_rgba(0,113,227,0.18)] hover:bg-[#0077ed]' : 'border-black/10 bg-transparent text-[#1d1d1f] shadow-none hover:bg-white'}`}>
+                <Link to="/register">{plan.cta || 'Get Started'}</Link>
               </Button>
-            </div>
+            </article>
           )
         })}
       </div>
 
-      {/* Feature Comparison Table */}
-      <section className="mb-20">
-        <div className="text-center mb-8">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-heading">
-            Compare plan limits across tiers
-          </h2>
-          <p className="text-sm text-body-light mt-2">
-            Product modules are shared across tiers; plans currently differ by seat and storage allowances.
-          </p>
+      <section className="mt-24">
+        <div className="max-w-2xl">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.17em] text-[#0071e3]">Plan comparison</p>
+          <h2 className="mt-4 text-3xl font-semibold tracking-[-0.035em] text-[#1d1d1f] sm:text-4xl">Compare plan limits across tiers</h2>
+          <p className="mt-4 text-sm leading-6 text-[#737378]">Product modules are shared across tiers; plans currently differ by seat and storage allowances.</p>
         </div>
-
-        <div className="bg-surface-raised rounded-card border border-border-default overflow-hidden shadow-card">
+        <div className="mt-8 overflow-hidden rounded-[24px] border border-black/[0.07] bg-white/65 shadow-[0_16px_50px_rgba(0,0,0,0.04)] backdrop-blur-xl">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-surface-muted border-b border-border-default text-heading font-bold uppercase tracking-wider text-[10px]">
+            <table className="w-full min-w-[640px] text-left text-xs">
+              <thead className="border-b border-black/[0.07] text-[10px] font-semibold uppercase tracking-[0.12em] text-[#86868b]">
                 <tr>
-                  <th className="py-3.5 px-4">Plan limit</th>
-                  {tiers.map(plan => (
-                    <th key={plan.tier} className={`py-3.5 px-4 text-center ${plan.highlight ? 'bg-primary-light text-primary' : ''}`}>
-                      {plan.name}
-                    </th>
-                  ))}
+                  <th className="px-5 py-4">Plan limit</th>
+                  {tiers.map(plan => <th key={plan.tier} className={`px-5 py-4 text-center ${plan.highlight ? 'bg-[#f0f6ff] text-[#0071e3]' : ''}`}>{plan.name}</th>)}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border-subtle text-body-light">
+              <tbody className="divide-y divide-black/[0.06] text-[#626267]">
                 {COMPARISON_ROWS.map((row) => (
-                  <tr key={row.feature} className="hover:bg-surface-muted/50">
-                    <td className="py-3.5 px-4 font-medium text-heading">{row.feature}</td>
-                    {tiers.map(plan => (
-                      <td key={plan.tier} className={`py-3.5 px-4 text-center ${plan.highlight ? 'bg-primary-light/30' : ''}`}>
-                        {row.value(plan)}
-                      </td>
-                    ))}
+                  <tr key={row.feature}>
+                    <td className="px-5 py-4 font-medium text-[#1d1d1f]">{row.feature}</td>
+                    {tiers.map(plan => <td key={plan.tier} className={`px-5 py-4 text-center ${plan.highlight ? 'bg-[#f0f6ff]/60' : ''}`}>{row.value(plan)}</td>)}
                   </tr>
                 ))}
               </tbody>
@@ -191,26 +133,17 @@ export default function Pricing() {
         </div>
       </section>
 
-      {/* Frequently Asked Questions */}
-      <section className="max-w-3xl mx-auto">
-        <div className="text-center mb-8">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-heading">
-            Frequently Asked Questions
-          </h2>
-          <p className="text-sm text-body-light mt-2">
-            Billing, limits, and provider configuration.
-          </p>
+      <section className="mx-auto mt-24 max-w-3xl">
+        <div className="text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.17em] text-[#0071e3]">Questions, answered</p>
+          <h2 className="mt-4 text-3xl font-semibold tracking-[-0.035em] text-[#1d1d1f] sm:text-4xl">Frequently Asked Questions</h2>
+          <p className="mt-4 text-sm text-[#737378]">Billing, limits, and provider configuration.</p>
         </div>
-
-        <Accordion type="single" collapsible className="space-y-3">
-          {FAQS.map((faq, i) => (
-            <AccordionItem key={faq.q} value={`faq-${i}`} className="bg-surface-raised rounded-card-sm border border-border-default px-4">
-              <AccordionTrigger className="text-sm font-semibold text-heading py-3.5 hover:no-underline">
-                {faq.q}
-              </AccordionTrigger>
-              <AccordionContent className="text-xs text-body-light leading-relaxed pb-4">
-                {faq.a}
-              </AccordionContent>
+        <Accordion type="single" collapsible className="mt-8 border-y border-black/10">
+          {FAQS.map((faq, index) => (
+            <AccordionItem key={faq.q} value={`faq-${index}`} className="border-black/10 px-1">
+              <AccordionTrigger className="py-5 text-left text-sm font-semibold text-[#1d1d1f] hover:no-underline">{faq.q}</AccordionTrigger>
+              <AccordionContent className="pb-5 pr-8 text-sm leading-6 text-[#737378]">{faq.a}</AccordionContent>
             </AccordionItem>
           ))}
         </Accordion>

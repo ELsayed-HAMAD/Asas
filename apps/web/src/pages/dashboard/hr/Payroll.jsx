@@ -23,6 +23,7 @@ import SearchInput from '../../../components/common/SearchInput'
 import { hrApi } from '../../../lib/api/hr'
 import { queryKeys } from '../../../lib/queryKeys'
 import { formatMoney, formatCompactCurrency, formatCompactTableMoney, formatDate } from '../../../lib/format'
+import { EMPTY } from '../../../lib/emptyText'
 import { cn } from '../../../lib/utils'
 import { downloadCsv } from '../../../lib/csv'
 import { payrollPaymentSummaryFilename, payrollPaymentSummaryRows } from '../../../lib/payrollExport'
@@ -520,7 +521,7 @@ export default function Payroll() {
             </div>
             <div className="border border-border-default rounded-card-sm p-5 bg-surface-raised shadow-card">
               <p className="text-[11px] font-semibold text-muted tracking-wide mb-2">Latest Pay Date</p>
-              <p className="text-3xl font-bold text-heading">{latestPayDate ? formatDate(latestPayDate) : '—'}</p>
+              <p className="text-3xl font-bold text-heading">{latestPayDate ? formatDate(latestPayDate) : <span className="text-base font-medium text-muted">No payroll yet</span>}</p>
               <p className="mt-2 text-xs text-muted">Most recent statement processed</p>
             </div>
             <div className="border border-border-default rounded-card-sm p-5 bg-surface-raised shadow-card">
@@ -551,7 +552,7 @@ export default function Payroll() {
                 {payslipsList.map(item => (
                   <TableRow key={item.id} className="hover:bg-surface-muted transition-colors border-0">
                     <TableCell className="px-6 py-4 font-semibold text-sm text-heading">{item.runLabel}</TableCell>
-                    <TableCell className="px-6 py-4 text-sm text-body">{item.payDate ? formatDate(item.payDate) : (item.periodEnd ? formatDate(item.periodEnd) : '—')}</TableCell>
+                    <TableCell className="px-6 py-4 text-sm text-body">{item.payDate ? formatDate(item.payDate) : (item.periodEnd ? formatDate(item.periodEnd) : EMPTY.recorded)}</TableCell>
                     <TableCell className="px-6 py-4 text-sm text-heading text-right rtl:text-left tabular-nums" title={formatMoney(item.baseSalary, { currency: item.currency })}>{formatCompactTableMoney(item.baseSalary, { currency: item.currency })}</TableCell>
                     <TableCell className="px-6 py-4 text-sm text-heading text-right rtl:text-left tabular-nums" title={formatMoney(item.gross, { currency: item.currency })}>{formatCompactTableMoney(item.gross, { currency: item.currency })}</TableCell>
                     <TableCell className="px-6 py-4 text-sm text-body text-right rtl:text-left tabular-nums" title={`-${formatMoney(item.deductions, { currency: item.currency })}`}>-{formatCompactTableMoney(item.deductions, { currency: item.currency })}</TableCell>
@@ -913,7 +914,7 @@ export default function Payroll() {
         {/* Row 2 — Unified Telemetry & Status Bar (With Auto-priced on creation on Right) */}
         <div className="px-3.5 py-1.5 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs bg-surface-muted/60 border border-border-subtle text-muted">
           <div className="flex items-center gap-1.5 truncate min-w-0">
-            <span className="shrink-0 font-medium text-heading">Pay date {activeRun?.payDate ? formatDate(activeRun.payDate) : '—'}</span>
+            <span className="shrink-0 font-medium text-heading">Pay date {activeRun?.payDate ? formatDate(activeRun.payDate) : 'not scheduled'}</span>
             <span>·</span>
             <span className="truncate">Earning period {run?.periodStart && run?.periodEnd ? `${run.periodStart} – ${run.periodEnd}` : 'not recorded (legacy run)'}</span>
             {run?.createdById && (
@@ -1180,7 +1181,7 @@ export default function Payroll() {
                             </div>
                             <div className="min-w-0">
                               <p className="text-xs sm:text-sm font-semibold text-heading whitespace-nowrap">{record.employee?.name}</p>
-                              <p className="text-[11px] text-muted truncate">{record.employee?.title || record.employee?.departmentName || '—'}</p>
+                              <p className="text-[11px] text-muted truncate">{record.employee?.title || record.employee?.departmentName || EMPTY.provided}</p>
                             </div>
                           </div>
                         </TableCell>
@@ -1552,7 +1553,7 @@ export default function Payroll() {
               ) : isEmployeeError ? (
                 <p className="px-3 py-3 text-xs text-danger">{employeeError?.message || 'Unable to load employees.'}</p>
               ) : employees.length === 0 ? (
-                <p className="px-3 py-3 text-xs text-muted">No employees to pay — add employees first.</p>
+                <p className="px-3 py-3 text-xs text-muted">No employees to pay. Add employees first.</p>
               ) : (
                 employees.map(emp => (
                   <label

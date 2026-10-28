@@ -40,9 +40,9 @@ export function getPastDueGraceEndsOn(subscription: Subscription): Date {
 
 /**
  * Resolve the plan that currently grants capacity. A still-active or grace-period Stripe plan
- * takes precedence over the Free row left behind by checkout. Once that paid plan is canceled
- * or its grace period expires, the workspace falls back to its active Free row or the canonical
- * platform Free limits. A stale canceled paid row must never continue granting paid quotas.
+ * takes precedence over local rows. An active local comp plan is honored next, then the active
+ * Free row left behind by checkout. Once a paid plan is canceled or its grace period expires,
+ * the workspace falls back to Free. A stale canceled paid row must never grant paid quotas.
  */
 export function resolveEffectivePlanLimits(
   subscriptions: readonly Subscription[],
@@ -79,6 +79,13 @@ export function resolveEffectivePlanSubscription(
     row.status === 'PAST_DUE' && row.stripeSubscriptionId !== null && isWithinPastDueGrace(row, now),
   )
   if (gracePaid) return gracePaid
+
+  // Platform comp plans are local subscriptions without a Stripe id. They are active grants,
+  // not checkout leftovers, so they must outrank the Free row for both billing and entitlements.
+  const activeComp = subscriptions.find(row =>
+    row.status === 'ACTIVE' && row.stripeSubscriptionId === null && row.planName !== FREE_PLAN.name,
+  )
+  if (activeComp) return activeComp
 
   const activeFree = subscriptions.find(row =>
     row.status === 'ACTIVE' && row.stripeSubscriptionId === null && row.planName === FREE_PLAN.name,
@@ -145,7 +152,7 @@ export async function reserveWorkspaceSeat(
 ): Promise<string | null> {
   return withTenantContext(prisma, tenantId, async tx => {
     const lockKey = `seat-capacity:${tenantId}`
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))` // tenant-filter: tenantId is included in lockKey
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))` // tenant-filter: tenantId is included in lockKey
     const now = new Date()
 
     const expired = await tx.seatReservation.findMany({
@@ -235,7 +242,7 @@ export async function reserveWorkspaceSeat(
 export async function releaseWorkspaceSeat(prisma: PrismaClient, tenantId: string, reservationId: string): Promise<void> {
   await withTenantContext(prisma, tenantId, async tx => {
     const lockKey = `seat-capacity:${tenantId}`
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))` // tenant-filter: tenantId is included in lockKey
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))` // tenant-filter: tenantId is included in lockKey
     await Promise.all([
       tx.invitation.updateMany({ where: { tenantId, seatReservationId: reservationId }, data: { seatReservationId: null } }),
       tx.member.updateMany({ where: { tenantId, seatReservationId: reservationId }, data: { seatReservationId: null } }),
@@ -282,7 +289,7 @@ export async function withStorageCapacity<T>(
   reclaimedBytes: number | (() => Promise<number>) = 0,
 ): Promise<T> {
   return withTenantContext(prisma, tenantId, async tx => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${tenantId}, 0))`
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${tenantId}, 0))`
     const reclaim = typeof reclaimedBytes === 'function' ? await reclaimedBytes() : reclaimedBytes
     const check = await checkStorageEntitlement(tx, storage, tenantId, additionalBytes, reclaim)
     if (!check.allowed) {

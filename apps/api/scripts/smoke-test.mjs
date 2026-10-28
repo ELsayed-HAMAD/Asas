@@ -49,7 +49,7 @@ async function main() {
   const activeOrgId = session2Json?.session?.activeOrganizationId
   console.log('   activeOrganizationId:', activeOrgId ?? 'NOT SET')
 
-  console.log('5. GET /api/v1/hr/employees (should succeed \u2014 creator should be OWNER)')
+  console.log('5. GET /api/v1/hr/employees (should succeed; creator should be OWNER)')
   const employeesList = await app.inject({ method: 'GET', url: '/api/v1/hr/employees', headers: { cookie } })
   console.log('   status:', employeesList.statusCode, employeesList.body.slice(0, 400))
 

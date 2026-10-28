@@ -42,6 +42,7 @@ async function setup() {
       const stagedTenant = { ...tenant }
       const stagedAudits = [...audits]
       const tx = {
+        $executeRaw: vi.fn(async () => 1),
         $executeRawUnsafe: vi.fn(async () => undefined),
         $queryRaw: vi.fn(async () => [{ id: 'tenant_1' }]),
         subscription: { findMany: vi.fn(async () => []) },

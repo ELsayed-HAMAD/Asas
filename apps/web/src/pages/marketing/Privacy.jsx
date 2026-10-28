@@ -1,4 +1,5 @@
 import MarketingPageFrame from '../../components/marketing/MarketingPageFrame'
+import CookieSettingsButton from '../../components/common/CookieSettingsButton'
 
 export default function Privacy() {
   return (
@@ -47,7 +48,19 @@ export default function Privacy() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-bold text-heading">5. Contact</h2>
+          <h2 className="text-lg font-bold text-heading">6. Cookies and privacy choices</h2>
+          <p>
+            Essential cookies keep you signed in, protect your account, and remember your cookie choice. Optional
+            analytics and diagnostics are off until you allow them, and they are limited to error and performance
+            reports used to improve reliability. Your choice is stored in this browser and can be changed at any time.
+          </p>
+          <CookieSettingsButton className="text-sm font-semibold text-primary underline decoration-primary/30 underline-offset-2 hover:decoration-primary">
+            Manage cookie preferences
+          </CookieSettingsButton>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold text-heading">7. Contact</h2>
           <p>For privacy inquiries or requests, contact the organization that operates your Asas deployment.</p>
         </section>
       </div>

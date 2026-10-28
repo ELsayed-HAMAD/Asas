@@ -65,6 +65,27 @@ describe('health probe', () => {
     expect(response.body).not.toContain('test-secret')
   })
 
+  it('allows credentialed cross-origin writes from the configured frontend', async () => {
+    const app = await buildApp(loadEnv({ FRONTEND_ORIGIN: 'http://localhost:5173' }), { logger: false })
+    apps.push(app)
+
+    const response = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/v1/settings/general',
+      headers: {
+        origin: 'http://localhost:5173',
+        'access-control-request-method': 'PATCH',
+        'access-control-request-headers': 'content-type',
+      },
+    })
+
+    expect(response.statusCode).toBe(204)
+    expect(response.headers['access-control-allow-origin']).toBe('http://localhost:5173')
+    expect(response.headers['access-control-allow-credentials']).toBe('true')
+    const allowedMethods = String(response.headers['access-control-allow-methods']).split(',').map(method => method.trim())
+    expect(allowedMethods).toEqual(expect.arrayContaining(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']))
+  })
+
   it('checks database connectivity on /ready when prisma is supplied', async () => {
     const mockPrisma = {
       $queryRaw: async () => [{ '?column?': 1 }],

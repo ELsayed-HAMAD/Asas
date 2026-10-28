@@ -329,6 +329,147 @@ test('workspace members see Settings write controls disabled across notification
   }
 })
 
+test('settings glass surfaces apply to every Settings destination in light and dark mode', async ({ browser }) => {
+  test.setTimeout(120_000)
+  const account = { id: 'settings_glass_admin', name: 'Settings Glass Admin', email: 'settings.glass@example.test', emailVerified: true, role: 'ADMIN' }
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' })
+  await mockAuth(context, account, async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/settings/general')) {
+      return json(route, { data: {
+        name: 'Glass Workspace', supportEmail: 'hello@example.test', logoUrl: null,
+        timezone: 'UTC', currency: 'USD', dateFormat: 'MMM d, yyyy', overtimeThresholdHours: 8, currencyLockedAt: null,
+      } })
+    }
+    if (path.endsWith('/settings/notifications')) {
+      return json(route, { data: { modules: {}, quietHours: { start: '22:00', end: '07:00' }, quietHoursDefaulted: true } })
+    }
+    if (path.endsWith('/settings/integrations')) return json(route, { data: { items: [] } })
+    if (path.endsWith('/settings/billing')) {
+      return json(route, { data: {
+        stripePortalAvailable: false,
+        effectivePlan: { planName: 'Free Starter', priceMonthly: '0', currency: 'USD', billingStatus: 'FREE', source: 'free-fallback', renewsOn: null, graceEndsOn: null, seatsUsed: 1, seatLimit: 5, storageUsedGb: 0, storageLimitGb: 5 },
+        subscriptions: [], paymentMethods: [], invoices: [],
+      } })
+    }
+    if (path.endsWith('/billing/plans')) {
+      return json(route, { data: {
+        enabled: false, stripeConfigured: false, defaultPlanId: 'free',
+        tiers: [{ id: 'free', name: 'Free Starter', tagline: 'Free', priceMonthly: 0, priceAnnual: 0, currency: 'USD', seatLimit: 5, storageLimitGb: 5 }],
+        items: [],
+      } })
+    }
+    if (path.endsWith('/settings/exchange-rates')) return json(route, { data: { items: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } } })
+    if (path.endsWith('/settings/data-migrations')) return json(route, { data: { projects: [] } })
+    if (path.endsWith('/exports/jobs')) return json(route, { data: { items: [], pagination: { page: 1, limit: 100, total: 0, pages: 0 }, summary: null } })
+    return json(route, { data: {} })
+  })
+
+  const page = await context.newPage()
+  const runtimeErrors = []
+  page.on('pageerror', error => runtimeErrors.push(error.message))
+  try {
+    await signIn(page, account)
+    const destinations = [
+      ['/dashboard/settings', 'General'],
+      ['/dashboard/settings/members', 'Members & Roles'],
+      ['/dashboard/settings/billing', 'Billing & Plans'],
+      ['/dashboard/settings/integrations', 'Integrations'],
+      ['/dashboard/settings/notifications', 'Notifications'],
+      ['/dashboard/settings/data-export', 'Data Export'],
+      ['/dashboard/settings/data-migration', 'Data Migration'],
+    ]
+
+    for (const [path, tabName] of destinations) {
+      await page.goto(path)
+      const activeTab = page.getByRole('tab', { name: tabName, exact: true })
+      await expect(activeTab).toBeVisible({ timeout: 15_000 })
+      await expect(activeTab).toHaveAttribute('data-state', 'active')
+      await expect(page.locator('.settings-glass-shell')).toBeVisible()
+      await expect(page.locator('nav[aria-label="Settings navigation"]')).toBeVisible()
+    }
+
+    await page.goto('/dashboard/settings')
+    const settingsMain = page.locator('#dashboard-main-content')
+    const settingsTabs = page.locator('[role="tablist"]')
+    await expect(settingsTabs).toBeVisible({ timeout: 15_000 })
+    const saveChanges = page.getByRole('button', { name: 'Save Changes' })
+    await expect(saveChanges).toBeVisible()
+    await expect(saveChanges).toHaveCSS('background-color', 'rgb(30, 27, 75)')
+    const mainBox = await settingsMain.boundingBox()
+    const expandedTabsBox = await settingsTabs.boundingBox()
+    expect(mainBox).not.toBeNull()
+    expect(expandedTabsBox).not.toBeNull()
+    const leftTabGap = expandedTabsBox.x - mainBox.x
+    const rightTabGap = (mainBox.x + mainBox.width) - (expandedTabsBox.x + expandedTabsBox.width)
+    expect(Math.abs(leftTabGap - rightTabGap)).toBeLessThanOrEqual(1)
+
+    await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Expand sidebar', exact: true })).toBeVisible()
+    await expect.poll(async () => (await settingsTabs.boundingBox()).width).toBeGreaterThan(expandedTabsBox.width)
+    await page.getByRole('button', { name: 'Expand sidebar', exact: true }).click()
+
+    const inspector = page.getByRole('heading', { name: 'Subscription inspector' })
+      .locator('xpath=ancestor::div[contains(@class, "xl:w-[360px]")][1]')
+    await expect(inspector).toBeVisible()
+    const inspectorBox = await inspector.boundingBox()
+    const inspectorStyles = await inspector.evaluate(element => {
+      const styles = window.getComputedStyle(element)
+      return { borderRadius: styles.borderRadius }
+    })
+    expect(inspectorBox).not.toBeNull()
+    expect(inspectorBox.x + inspectorBox.width).toBeLessThanOrEqual(1420)
+    expect(parseFloat(inspectorStyles.borderRadius)).toBeGreaterThanOrEqual(20)
+
+    const scrollState = await page.evaluate(() => {
+      const scroller = [...document.querySelectorAll('.settings-glass-shell *')]
+        .find(element => {
+          const styles = window.getComputedStyle(element)
+          return /(auto|scroll)/.test(styles.overflowY) && element.scrollHeight > element.clientHeight
+        })
+      if (!scroller) return null
+      const before = scroller.scrollTop
+      scroller.scrollTop = before + 80
+      return {
+        scrollbarWidth: window.getComputedStyle(scroller).scrollbarWidth,
+        didScroll: scroller.scrollTop > before,
+      }
+    })
+    expect(scrollState).not.toBeNull()
+    expect(scrollState.scrollbarWidth).toBe('none')
+    expect(scrollState.didScroll).toBe(true)
+
+    await page.goto('/dashboard/settings/notifications')
+    const banner = page.getByRole('banner')
+    await expect(banner.getByRole('button', { name: 'Search or jump to...' })).toBeVisible()
+    await expect(banner.getByPlaceholder('Search events...')).toHaveCount(0)
+    await expect(page.getByPlaceholder('Search events...')).toBeVisible()
+
+    const glassCard = page.getByRole('heading', { name: 'Delivery Schedule' })
+      .locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " bg-surface-raised ")][1]')
+    await expect(glassCard).toBeVisible()
+    const lightStyles = await glassCard.evaluate(element => {
+      const styles = window.getComputedStyle(element)
+      return { backdropFilter: styles.backdropFilter, backgroundColor: styles.backgroundColor }
+    })
+    expect(lightStyles.backdropFilter).not.toBe('none')
+    expect(lightStyles.backgroundColor).toContain('rgba')
+
+    await page.evaluate(() => document.documentElement.classList.add('dark'))
+    await expect.poll(() => glassCard.evaluate(element => window.getComputedStyle(element).backgroundColor))
+      .not.toBe(lightStyles.backgroundColor)
+    const darkStyles = await glassCard.evaluate(element => {
+      const styles = window.getComputedStyle(element)
+      return { backdropFilter: styles.backdropFilter, backgroundColor: styles.backgroundColor }
+    })
+    expect(darkStyles.backdropFilter).not.toBe('none')
+    expect(darkStyles.backgroundColor).not.toBe(lightStyles.backgroundColor)
+    expect(runtimeErrors).toEqual([])
+  } finally {
+    await context.close()
+  }
+})
+
 test('export format and date controls submit the selected scope to the export job', async ({ browser }) => {
   const account = { id: 'export_admin', name: 'Export Admin', email: 'export.admin@example.test', emailVerified: true, role: 'ADMIN' }
   const context = await browser.newContext()
@@ -1063,17 +1204,18 @@ test('clean workspace Payroll, Deals Pipeline, Roadmap, and Settings pages keep 
     return json(route, { data: { items: [] } })
   })
   const page = await context.newPage()
+  page.setDefaultTimeout(15_000)
 
   try {
     await signIn(page, account)
 
     await page.goto('/dashboard/hr/payroll')
-    await expect(page.getByRole('heading', { level: 1, name: 'Payroll' })).toHaveCount(1)
+    await expect(page.getByRole('heading', { level: 1, name: 'Payroll' })).toHaveCount(1, { timeout: 15_000 })
     await expect(page.getByText('No payroll lines')).toBeVisible()
     await expect(page.getByRole('button', { name: 'New Payroll Run' })).toBeVisible()
 
     await page.goto('/dashboard/crm/deals')
-    await expect(page.getByRole('heading', { level: 1, name: 'Deals Pipeline' })).toHaveCount(1)
+    await expect(page.getByRole('heading', { level: 1, name: 'Deals Pipeline' })).toHaveCount(1, { timeout: 15_000 })
     await expect(page.getByText('No deals in this stage. Use New Deal to add the first one.')).toBeVisible()
     await expect(page.getByRole('button', { name: 'New Deal' })).toBeVisible()
     await page.getByRole('button', { name: 'View archived' }).click()
@@ -1081,29 +1223,28 @@ test('clean workspace Payroll, Deals Pipeline, Roadmap, and Settings pages keep 
     await expect(page.getByText('No archived deals in this stage.')).toBeVisible()
 
     await page.goto('/dashboard/projects/roadmap')
-    await expect(page.getByRole('heading', { level: 1, name: 'Roadmap' })).toHaveCount(1)
+    await expect(page.getByRole('heading', { level: 1, name: 'Roadmap' })).toHaveCount(1, { timeout: 15_000 })
     await expect(page.getByText('No roadmap phases yet. Use New Phase to start the plan.')).toBeVisible()
     await expect(page.getByRole('button', { name: 'New Phase' })).toBeVisible()
 
     await page.goto('/dashboard/settings')
-    // The Settings route is a lazy chunk; allow it to mount after a full-suite run has
-    // already loaded several other route chunks.
+    // Lazy route chunks can take longer to hydrate after several other modules loaded.
     await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toHaveCount(1, { timeout: 15_000 })
     await expect(page.getByRole('heading', { name: 'Organization Profile' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Save Changes' })).toBeVisible()
 
     await page.goto('/dashboard/settings/members')
-    await expect(page.getByRole('heading', { level: 1, name: 'Members & Roles' })).toHaveCount(1)
+    await expect(page.getByRole('heading', { level: 1, name: 'Members & Roles' })).toHaveCount(1, { timeout: 15_000 })
     await expect(page.getByText('No members found')).toBeVisible()
 
     await page.goto('/dashboard/settings/integrations')
-    await expect(page.getByRole('heading', { level: 1, name: 'Integrations' })).toHaveCount(1)
+    await expect(page.getByRole('heading', { level: 1, name: 'Integrations' })).toHaveCount(1, { timeout: 15_000 })
     await page.goto('/dashboard/settings/notifications')
-    await expect(page.getByRole('heading', { level: 1, name: 'Notifications' })).toHaveCount(1)
+    await expect(page.getByRole('heading', { level: 1, name: 'Notifications' })).toHaveCount(1, { timeout: 15_000 })
     await page.goto('/dashboard/settings/data-export')
-    await expect(page.getByRole('heading', { level: 1, name: 'Data Export' })).toHaveCount(1)
+    await expect(page.getByRole('heading', { level: 1, name: 'Data Export' })).toHaveCount(1, { timeout: 15_000 })
     await page.goto('/dashboard/exports')
-    await expect(page.getByRole('heading', { level: 1, name: 'Exports' })).toHaveCount(1)
+    await expect(page.getByRole('heading', { level: 1, name: 'Exports' })).toHaveCount(1, { timeout: 15_000 })
   } finally {
     await context.close()
   }
@@ -1712,7 +1853,7 @@ test('stock movement entry searches and pages the full product catalog while ret
     const productSelect = page.getByRole('combobox', { name: 'Product' })
     await page.getByRole('button', { name: 'Next product page' }).click()
     await expect.poll(() => requested.some(item => item.page === 2 && item.limit === 25)).toBe(true)
-    await selectRadixOption(page, productSelect, 'Product 26 (SKU-26) — 20 on hand')
+    await selectRadixOption(page, productSelect, 'Product 26 (SKU-26): 20 on hand')
     await page.getByRole('searchbox', { name: 'Search products' }).fill('special')
     await expect.poll(() => requested.some(item => item.search === 'special' && item.page === 1 && item.limit === 25)).toBe(true)
     await expect(productSelect).toContainText('Product 26 (SKU-26)')
@@ -1759,6 +1900,52 @@ test('product movement history pages all rows and exposes load errors', async ({
     await page.getByRole('button', { name: 'Next movement page' }).click()
     await expect.poll(() => requested.some(item => item.page === 2 && item.limit === 25 && item.productId === 'product_1')).toBe(true)
     await expect(page.getByText('Movement 26', { exact: true })).toBeVisible()
+  } finally {
+    await context.close()
+  }
+})
+
+test('integration dialogs follow the shared form dialog design', async ({ browser }) => {
+  const account = { id: 'integrations_admin', name: 'Integrations Admin', email: 'integrations.admin@example.test', emailVerified: true, role: 'ADMIN' }
+  const context = await browser.newContext()
+  await mockAuth(context, account, async route => {
+    const url = new URL(route.request().url())
+    if (url.pathname.endsWith('/settings/integrations') && route.request().method() === 'GET') {
+      return json(route, { data: { items: [{
+        id: 'endpoint_1', name: 'Operations endpoint', description: '', status: 'CONFIGURE',
+        syncPullRequests: false, syncCiCdStatus: false,
+        credential: { configured: true, masked: 'https://hooks…/test' }, createdAt: '2026-10-01T00:00:00.000Z',
+      }] } })
+    }
+    if (url.pathname.endsWith('/settings/integrations/endpoint_1/webhook-logs')) {
+      return json(route, { data: { items: [] } })
+    }
+    return json(route, { data: {} })
+  })
+  const page = await context.newPage()
+
+  try {
+    await signIn(page, account)
+    await page.goto('/dashboard/settings/integrations')
+
+    await page.getByRole('button', { name: 'Custom Endpoint' }).click()
+    const createDialog = page.getByRole('dialog')
+    await expect(createDialog.getByRole('heading', { name: 'Add endpoint check' })).toBeVisible()
+    await expect(createDialog.getByText('Track a public HTTPS endpoint and confirm it responds to test pings.')).toBeVisible()
+    await expect(createDialog.getByLabel('Name')).toBeVisible()
+    await expect(createDialog.getByLabel('Description')).toBeVisible()
+    await expect(createDialog.getByLabel('Public HTTPS endpoint (optional)')).toBeVisible()
+    await expect(createDialog.getByRole('button', { name: 'Cancel' })).toBeVisible()
+    await expect(createDialog.getByRole('button', { name: 'Add integration' })).toHaveCSS('background-color', 'rgb(30, 27, 75)')
+    await createDialog.getByRole('button', { name: 'Cancel' }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Update Endpoint' }).click()
+    const endpointDialog = page.getByRole('dialog')
+    await expect(endpointDialog.getByRole('heading', { name: 'Configure endpoint' })).toBeVisible()
+    await expect(endpointDialog.getByText(/Enter the public HTTPS URL for Operations endpoint/)).toBeVisible()
+    await expect(endpointDialog.getByLabel('Public HTTPS endpoint')).toBeVisible()
+    await expect(endpointDialog.getByRole('button', { name: 'Save endpoint' })).toBeDisabled()
   } finally {
     await context.close()
   }

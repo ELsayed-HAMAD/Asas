@@ -15,8 +15,10 @@ import {
   signOut
 } from '../../lib/authClient'
 import { authErrorMessage } from '../../lib/authErrorMessage'
+import { clearOnboardingDraft, onboardingDraftStorage } from '../../lib/onboardingDraft'
 import { Button } from '../../components/ui/button'
 import { Alert, AlertDescription } from '../../components/ui/alert'
+import { AsasLogo } from '../../components/common/AsasLogo'
 
 export default function WorkspaceChooser() {
   const navigate = useNavigate()
@@ -95,7 +97,7 @@ export default function WorkspaceChooser() {
 
   if (sessionPending || orgsPending) {
     return (
-      <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-4">
+      <div className="auth-deep-blue min-h-screen bg-surface flex flex-col items-center justify-center p-4">
         <Loader2 className="w-8 h-8 animate-spin text-primary mb-3" />
         <p className="text-sm text-muted">Loading your workspaces...</p>
       </div>
@@ -103,13 +105,13 @@ export default function WorkspaceChooser() {
   }
 
   return (
-    <div className="min-h-screen bg-surface flex items-center justify-center p-4 sm:p-6">
+    <div className="auth-deep-blue min-h-screen bg-surface flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-xl">
 
         {/* Brand Header */}
         <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-card-sm bg-primary text-on-primary flex items-center justify-center text-xl font-bold">
-            A
+          <div className="w-10 h-10 rounded-card-sm bg-primary text-on-primary flex items-center justify-center shadow-card">
+            <AsasLogo className="w-5 h-5 text-on-primary" />
           </div>
           <div>
             <p className="text-xl font-semibold text-heading leading-tight">Asas</p>
@@ -172,7 +174,7 @@ export default function WorkspaceChooser() {
                   You are not currently a member of any workspace.
                 </p>
                 <Button asChild className="h-9">
-                  <Link to="/onboarding?new=1">Create your first workspace</Link>
+                  <Link to="/onboarding?new=1" onClick={() => clearOnboardingDraft(onboardingDraftStorage())}>Create your first workspace</Link>
                 </Button>
               </div>
             ) : (
@@ -248,7 +250,7 @@ export default function WorkspaceChooser() {
               variant="outline"
               className="w-full h-11 border-dashed hover:border-primary hover:bg-primary/5 flex items-center justify-center gap-2 text-sm font-medium"
             >
-              <Link to="/onboarding?new=1">
+              <Link to="/onboarding?new=1" onClick={() => clearOnboardingDraft(onboardingDraftStorage())}>
                 <Plus size={16} />
                 Create New Workspace
               </Link>

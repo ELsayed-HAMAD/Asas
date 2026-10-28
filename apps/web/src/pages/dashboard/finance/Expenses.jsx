@@ -20,6 +20,7 @@ import { financeApi } from '../../../lib/api/finance';
 import { hrApi } from '../../../lib/api/hr';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatMoney, formatCompactCurrency } from '../../../lib/format';
+import { EMPTY } from '../../../lib/emptyText';
 import { downloadCsv } from '../../../lib/csv';
 import { useDebouncedValue } from '../../../lib/useDebouncedValue';
 import FormDialog from '../../../components/common/FormDialog';
@@ -54,7 +55,7 @@ import {
 } from '../../../components/ui/dropdown-menu';
 
 function formatCategory(category) {
-  if (!category) return '—';
+  if (!category) return EMPTY.category;
   return String(category)
     .toLowerCase()
     .split('_')
@@ -90,7 +91,7 @@ function getStatusDotColor(status) {
 }
 
 function formatStatus(status) {
-  if (!status) return '—';
+  if (!status) return EMPTY.status;
   const lower = String(status).toLowerCase();
   return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
@@ -560,8 +561,8 @@ export default function Expenses() {
                         </TableCell>
 
                         {/* Merchant Column */}
-                        <TableCell className="px-2.5 py-0 align-middle border-b border-border-subtle text-xs font-medium text-body truncate" title={item.merchant || '—'}>
-                          {item.merchant || '—'}
+                        <TableCell className="px-2.5 py-0 align-middle border-b border-border-subtle text-xs font-medium text-body truncate" title={item.merchant || EMPTY.provided}>
+                          {item.merchant || EMPTY.provided}
                         </TableCell>
 
                         {/* Expense Date Column */}
@@ -716,8 +717,8 @@ export default function Expenses() {
                 <div className="rounded-xl bg-slate-50/70 border border-slate-200/60 p-3.5 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-500">Merchant</span>
-                    <span className="font-semibold text-slate-900 truncate max-w-[180px]" title={selectedRecord.merchant || '—'}>
-                      {selectedRecord.merchant || '—'}
+                    <span className="font-semibold text-slate-900 truncate max-w-[180px]" title={selectedRecord.merchant || EMPTY.provided}>
+                      {selectedRecord.merchant || EMPTY.provided}
                     </span>
                   </div>
 
@@ -731,7 +732,7 @@ export default function Expenses() {
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-500">Tax</span>
                     <span className={cn("tabular-nums", selectedRecord.tax?.amount != null && selectedRecord.tax.amount > 0 ? "font-semibold text-slate-900" : "text-slate-400")}>
-                      {selectedRecord.tax?.amount != null && selectedRecord.tax.amount > 0 ? formatMoney(selectedRecord.tax) : '—'}
+                      {selectedRecord.tax?.amount != null && selectedRecord.tax.amount > 0 ? formatMoney(selectedRecord.tax) : EMPTY.tax}
                     </span>
                   </div>
 
@@ -739,7 +740,7 @@ export default function Expenses() {
                     <span className="text-slate-500">Policy match</span>
                     <div className="text-xs">
                       {selectedRecord.policyMatch === null ? (
-                        <span className="text-slate-400">—</span>
+                        <span className="text-slate-400">Not evaluated</span>
                       ) : selectedRecord.policyMatch ? (
                         <span className="text-emerald-600 font-medium inline-flex items-center gap-1">
                           <CheckCircle2 size={13} className="shrink-0" /> Yes
@@ -845,7 +846,7 @@ export default function Expenses() {
 
                       <div className="flex justify-between items-start mb-auto gap-2">
                         <p className="text-xs text-heading leading-relaxed">
-                          {formatCategory(selectedRecord.category)} expense at {selectedRecord.merchant || '—'}
+                          {formatCategory(selectedRecord.category)} expense at {selectedRecord.merchant || EMPTY.provided}
                         </p>
                         <span className="text-xs font-bold text-heading tabular-nums shrink-0 pt-0.5">{formatMoney(selectedRecord.amount)}</span>
                       </div>

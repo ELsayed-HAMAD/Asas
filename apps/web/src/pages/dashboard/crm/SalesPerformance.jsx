@@ -17,6 +17,7 @@ import { useQuery } from '@tanstack/react-query';
 import { crmApi } from '../../../lib/api/crm';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatCompactTableMoney, formatMoney, formatPercent, moneyToMajor } from '../../../lib/format';
+import { EMPTY } from '../../../lib/emptyText';
 import { downloadCsv } from '../../../lib/csv';
 import { Button } from '../../../components/ui/button';
 import SearchInput from '../../../components/common/SearchInput';
@@ -318,7 +319,7 @@ export default function SalesPerformance() {
               </div>
               <div className="my-1 flex items-baseline justify-between gap-2">
                 <p className="min-w-0 text-2xl font-bold tracking-tight text-slate-900 tabular-nums truncate">
-                  {summary.averageSalesCycleDays == null ? '—' : `${Math.round(summary.averageSalesCycleDays)} Days`}
+                  {summary.averageSalesCycleDays == null ? EMPTY.data : `${Math.round(summary.averageSalesCycleDays)} Days`}
                 </p>
                 <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200/60 px-2 py-0.5 text-[10px] font-bold tracking-wider leading-none shrink-0 whitespace-nowrap">
                   Closed won

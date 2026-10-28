@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Routes, Route, Link } from 'react-router-dom'
 import { Button } from './components/ui/button'
+import CookieConsent from './components/common/CookieConsent'
 
 // ── Layouts ────────────────────────────────────────────────
 import MarketingLayout  from './layouts/MarketingLayout'
@@ -10,6 +11,7 @@ import DashboardLayout  from './layouts/DashboardLayout'
 // ── Guards ─────────────────────────────────────────────────
 import RequireAuth  from './guards/RequireAuth'
 import GuestGuard   from './guards/GuestGuard'
+import RequirePlatformAdmin from './guards/RequirePlatformAdmin'
 
 // ── Marketing ──────────────────────────────────────────────
 import Landing from './pages/marketing/Landing'
@@ -61,6 +63,17 @@ const Notifications = lazy(() => import('./pages/dashboard/settings/Notification
 const DataExport = lazy(() => import('./pages/dashboard/settings/DataExport'))
 const DataMigration = lazy(() => import('./pages/dashboard/settings/DataMigration'))
 const HelpCenter = lazy(() => import('./pages/dashboard/support/HelpCenter'))
+
+// ── Platform console ────────────────────────────────────────
+const PlatformLayout = lazy(() => import('./layouts/PlatformLayout'))
+const AdminOverview = lazy(() => import('./pages/admin/AdminOverview'))
+const AdminWorkspaces = lazy(() => import('./pages/admin/AdminWorkspaces'))
+const AdminWorkspaceDetail = lazy(() => import('./pages/admin/AdminWorkspaceDetail'))
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'))
+const AdminBilling = lazy(() => import('./pages/admin/AdminBilling'))
+const AdminHealth = lazy(() => import('./pages/admin/AdminHealth'))
+const AdminAudit = lazy(() => import('./pages/admin/AdminAudit'))
+const AdminControls = lazy(() => import('./pages/admin/AdminControls'))
 
 // ── 404 ────────────────────────────────────────────────────
 function NotFound() {
@@ -123,7 +136,8 @@ const REAL_PAGES = {
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <Routes>
 
       {/* ── Marketing ── */}
       <Route element={<Suspense fallback={<div className="flex h-screen items-center justify-center text-muted">Loading…</div>}><MarketingLayout /></Suspense>}>
@@ -167,9 +181,25 @@ export default function App() {
         </Route>
       </Route>
 
+      {/* ── Platform owner console (separate from tenant dashboards) ── */}
+      <Route element={<RequirePlatformAdmin />}>
+        <Route element={<Suspense fallback={<div className="flex h-screen items-center justify-center bg-[#f5f5f7] text-sm text-muted">Loading platform console...</div>}><PlatformLayout /></Suspense>}>
+          <Route path="/admin" element={<AdminOverview />} />
+          <Route path="/admin/workspaces" element={<AdminWorkspaces />} />
+          <Route path="/admin/workspaces/:id" element={<AdminWorkspaceDetail />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/admin/billing" element={<AdminBilling />} />
+          <Route path="/admin/health" element={<AdminHealth />} />
+          <Route path="/admin/audit" element={<AdminAudit />} />
+          <Route path="/admin/controls" element={<AdminControls />} />
+        </Route>
+      </Route>
+
       {/* ── Fallback ── */}
       <Route path="*" element={<NotFound />} />
 
-    </Routes>
+      </Routes>
+      <CookieConsent />
+    </>
   )
 }

@@ -94,88 +94,88 @@ export default function Documentation() {
       title="Get started with Asas"
       description="A practical guide to every dashboard area: what each page shows, the actions available there, and the boundaries to understand before relying on business data or external services."
     >
-      <div className="grid gap-8 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="h-fit rounded-card border border-border-default/80 glass-strong p-5 shadow-glass lg:sticky lg:top-24">
-          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border-subtle/80">
-            <BookOpenCheck className="w-5 h-5 text-accent" />
-            <h2 className="text-sm font-bold text-heading">Guide index</h2>
+      <div className="grid gap-10 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className="h-fit rounded-[24px] border border-white/80 bg-white/55 p-4 shadow-[0_16px_50px_rgba(0,0,0,0.05)] backdrop-blur-xl lg:sticky lg:top-28">
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-black/[0.06]">
+            <BookOpenCheck className="w-5 h-5 text-[#0071e3]" />
+            <h2 className="text-sm font-bold text-[#1d1d1f]">Guide index</h2>
           </div>
           <nav aria-label="Documentation sections" className="flex flex-col gap-1">
             {SECTIONS.map(section => (
-              <a key={section.id} href={`#${section.id}`} className="px-3 py-2 rounded-button text-xs font-medium text-body hover:text-heading hover:bg-surface-muted/80 transition-colors">
+              <a key={section.id} href={`#${section.id}`} className="rounded-xl px-3 py-2.5 text-xs font-medium text-[#626267] transition-colors hover:bg-black/[0.04] hover:text-[#1d1d1f]">
                 {section.label}
               </a>
             ))}
           </nav>
-          <div className="mt-6 pt-4 border-t border-border-subtle/80">
-            <p className="text-[11px] text-caption mb-2">Compare workspace plans</p>
-            <Button asChild variant="outline" size="sm" className="w-full text-xs">
+          <div className="mt-6 pt-4 border-t border-black/[0.06]">
+            <p className="text-[11px] text-[#929297] mb-2">Compare workspace plans</p>
+            <Button asChild variant="outline" size="sm" className="h-9 w-full rounded-full border-black/10 bg-white/60 text-xs text-[#1d1d1f] shadow-none hover:bg-white">
               <Link to="/pricing">View pricing</Link>
             </Button>
           </div>
         </aside>
 
-        <div className="space-y-6">
-          <section id="getting-started" className="scroll-mt-28 rounded-card border border-border-default/80 bg-surface-raised p-6 sm:p-8 shadow-card">
+        <div className="space-y-10">
+          <section id="getting-started" className="scroll-mt-28 border-b border-black/10 pb-10">
             <div className="flex items-center gap-2 mb-3">
-              <Badge variant="outline" className="text-xs text-accent border-accent-muted bg-accent-light">Setup</Badge>
-              <h2 className="text-xl font-bold text-heading">Create a workspace</h2>
+              <Badge variant="outline" className="text-xs text-[#0071e3] border-[#cfe1f8] bg-[#e8f1fd]">Setup</Badge>
+              <h2 className="text-xl font-bold text-[#1d1d1f]">Create a workspace</h2>
             </div>
-            <p className="text-sm text-body-light leading-relaxed mb-5">
+            <p className="text-sm text-[#737378] leading-relaxed mb-5">
               Create an account, complete the workspace setup prompts, and invite teammates from settings when you are ready.
               The available setup fields and member roles are shown in the application for your deployment.
             </p>
-            <div className="rounded-card-sm bg-surface-muted border border-border-default p-4 text-sm text-body-light">
+            <div className="rounded-2xl border border-black/[0.06] bg-white/55 p-4 text-sm text-[#737378]">
               Review billing, notifications, integrations, and data export settings before relying on an external provider or scheduled operation.
               A setting being visible does not mean the related provider or background service is configured.
             </div>
-            <Button asChild size="sm" className="mt-5"><Link to="/register">Create an account</Link></Button>
+            <Button asChild size="sm" className="mt-5 h-9 rounded-full bg-[#0071e3] px-4 text-xs text-white hover:bg-[#0077ed]"><Link to="/register">Create an account</Link></Button>
           </section>
 
           {DASHBOARD_GUIDE.map(group => (
-            <section key={group.id} id={group.id} className="scroll-mt-28 rounded-card border border-border-default/80 bg-surface-raised p-6 shadow-card sm:p-8">
+            <section key={group.id} id={group.id} className="scroll-mt-28 border-b border-black/10 pb-10">
               <div className="mb-3 flex items-center gap-2">
-                <Badge variant="outline" className="border-accent-muted bg-accent-light text-xs text-accent">Workspace guide</Badge>
-                <h2 className="text-xl font-bold text-heading">{group.title}</h2>
+                <Badge variant="outline" className="border-[#cfe1f8] bg-[#e8f1fd] text-xs text-[#0071e3]">Workspace guide</Badge>
+                <h2 className="text-xl font-bold text-[#1d1d1f]">{group.title}</h2>
               </div>
-              <p className="mb-5 text-sm leading-relaxed text-body-light">{group.intro}</p>
-              <div className="grid gap-3 md:grid-cols-2">
+              <p className="mb-5 text-sm leading-relaxed text-[#737378]">{group.intro}</p>
+              <div className="grid gap-x-8 gap-y-7 md:grid-cols-2">
                 {group.pages.map(([title, description]) => (
-                  <article key={title} className="rounded-card-sm border border-border-default/80 bg-surface/70 p-4">
-                    <h3 className="text-sm font-semibold text-heading">{title}</h3>
-                    <p className="mt-1.5 text-xs leading-5 text-body-light">{description}</p>
+                  <article key={title} className="border-t border-black/[0.08] pt-4">
+                    <h3 className="text-sm font-semibold text-[#1d1d1f]">{title}</h3>
+                    <p className="mt-1.5 text-xs leading-5 text-[#737378]">{description}</p>
                   </article>
                 ))}
               </div>
-              {group.id === 'finance' && <Button asChild variant="outline" size="sm" className="mt-5"><Link to="/solutions?area=finance">Explore Finance workflows</Link></Button>}
+              {group.id === 'finance' && <Button asChild variant="outline" size="sm" className="mt-5 h-9 rounded-full border-black/10 bg-white/60 px-4 text-xs text-[#1d1d1f] shadow-none hover:bg-white"><Link to="/solutions?area=finance">Explore Finance workflows</Link></Button>}
               {group.id === 'inventory' && <p className="mt-4 rounded-card-sm border border-warning-border bg-warning-light p-3 text-xs leading-5 text-warning-text">Inventory valuation is available only after a workspace explicitly configures a FIFO or weighted-average policy and its ledger accounts. New receivables can then issue valued stock and post cost of goods sold; the Accounts Receivable action menu exposes the API's exact-reversal void and unpaid-only delete paths. Accounts Payable can match one bill to one fully received, valued, single-line purchase order from the same Finance vendor when the amount and currency are exact; partial, multi-line, tax/freight, and price-variance matching remain unsupported. A coordinated Inventory/Finance cutover remains in development. Never treat stock quantity or selling price as a financial inventory balance.</p>}
             </section>
           ))}
 
-          <section id="api-reference" className="scroll-mt-28 rounded-card border border-border-default bg-surface-raised p-6 sm:p-8 shadow-card">
+          <section id="api-reference" className="scroll-mt-28 border-b border-black/10 pb-10">
             <div className="flex items-center gap-2 mb-3">
-              <Badge variant="outline" className="text-xs text-accent border-accent-muted bg-accent-light">Developers</Badge>
-              <h2 className="text-xl font-bold text-heading">API reference</h2>
+              <Badge variant="outline" className="text-xs text-[#0071e3] border-[#cfe1f8] bg-[#e8f1fd]">Developers</Badge>
+              <h2 className="text-xl font-bold text-[#1d1d1f]">API reference</h2>
             </div>
-            <p className="text-sm text-body-light leading-relaxed">
+            <p className="text-sm text-[#737378] leading-relaxed">
               The API reference is generated from the running API and is available at <code>/docs</code> on the API deployment
               when API documentation is enabled. It describes the actual routes, request schemas, and authentication available
               in that deployment. This site does not publish a separate API token or webhook guide.
             </p>
           </section>
 
-          <section id="security" className="scroll-mt-28 rounded-card border border-border-default bg-surface-raised p-6 sm:p-8 shadow-card">
+          <section id="security" className="scroll-mt-28 border-b border-black/10 pb-10">
             <div className="flex items-center gap-2 mb-3">
               <Badge variant="outline" className="text-xs text-success-text border-success-border bg-success-light">Workspace</Badge>
-              <h2 className="text-xl font-bold text-heading">Access & data handling</h2>
+              <h2 className="text-xl font-bold text-[#1d1d1f]">Access & data handling</h2>
             </div>
-            <p className="text-sm text-body-light leading-relaxed mb-4">
+            <p className="text-sm text-[#737378] leading-relaxed mb-4">
               The application uses authenticated sessions and workspace-scoped access checks. Some administrative and business
               actions are recorded in activity or audit logs; these records are not described as tamper-proof. Retention cleanup
               and backups depend on the deployment configuration, so confirm backup arrangements with its operator.
             </p>
-            <div className="flex items-start gap-3 rounded-card-sm bg-surface-muted border border-border-default p-4 text-xs text-body-light">
-              <ShieldCheck className="w-4 h-4 text-accent mt-0.5 shrink-0" />
+            <div className="flex items-start gap-3 rounded-2xl border border-black/[0.06] bg-white/55 p-4 text-xs text-[#737378]">
+              <ShieldCheck className="w-4 h-4 text-[#0071e3] mt-0.5 shrink-0" />
               <span>Use the application’s settings and the API reference served by your deployment to check which controls are available and active.</span>
             </div>
           </section>

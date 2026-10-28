@@ -79,6 +79,17 @@ test('user account & workspace popover menu satisfies compact Apple-Glass polish
   expect(box.width).toBeLessThanOrEqual(255)
   expect(box.width).toBeGreaterThanOrEqual(235)
 
+  // Restored sidebar-footer placement: trigger at bottom-left, panel opening upward from it.
+  const triggerBox = await userMenuBtn.boundingBox()
+  expect(triggerBox).not.toBeNull()
+  expect(triggerBox.x).toBeLessThan(80)
+  expect(triggerBox.y).toBeGreaterThan(700)
+  expect(box.x - triggerBox.x).toBeGreaterThanOrEqual(8)
+  // Allow one pixel of subpixel rounding: CI font metrics land at 16.96 for a 12px alignOffset.
+  expect(box.x - triggerBox.x).toBeLessThanOrEqual(17)
+  expect(box.y + box.height).toBeLessThanOrEqual(triggerBox.y)
+  expect(box.y).toBeGreaterThanOrEqual(0)
+
   // 3. User Identity Recessed Well
   await expect(popover.getByText('QA User', { exact: true })).toBeVisible()
   // Full email must be displayed without cutting off at gmail....

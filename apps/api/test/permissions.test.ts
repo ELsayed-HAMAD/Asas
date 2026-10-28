@@ -108,6 +108,7 @@ describe('requirePermission', () => {
       tenantId: 'tenant_1',
       role: 'ADMIN',
       employeeId: 'emp_1',
+      tenantStatus: 'ACTIVE',
     })
   })
 })

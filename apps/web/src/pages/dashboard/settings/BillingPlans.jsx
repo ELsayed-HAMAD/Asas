@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from '../../../components/ui/alert'
 import { PLATFORM_PLANS } from '../../../../../../packages/contracts/src/billing/catalog.ts'
 import { useActiveMemberRole } from '../../../lib/authClient'
 import { getMemberRoleName } from '../../../lib/memberRole'
+import { EMPTY } from '../../../lib/emptyText'
 
 function money(amount, currency = 'USD') {
   const numericAmount = Number(amount)
@@ -150,12 +151,12 @@ export default function SettingsBilling() {
                   <p className="mt-1 text-sm text-body-light">
                     {effectivePlan
                       ? `${money(effectivePlan.priceMonthly, effectivePlan.currency || 'USD')} / month`
-                      : billingLoaded ? '$0 / month' : '— / month'}
+                      : billingLoaded ? '$0 / month' : 'Loading… / month'}
                     {' · '}
-                    <span className="font-semibold text-heading">{effectivePlan?.seatsUsed ?? '—'}</span> of{' '}
-                    <span>{effectivePlan?.seatLimit ?? (billingLoaded ? freePlan?.seatLimit ?? '—' : '—')}</span> seats allocated
+                    <span className="font-semibold text-heading">{effectivePlan?.seatsUsed ?? (billingLoaded ? EMPTY.value : 'Loading…')}</span> of{' '}
+                    <span>{effectivePlan?.seatLimit ?? (billingLoaded ? freePlan?.seatLimit ?? EMPTY.value : 'Loading…')}</span> seats allocated
                     {' · '}
-                    <span>{storageLabel(effectivePlan?.storageUsedGb)} of {effectivePlan?.storageLimitGb ?? (billingLoaded ? freePlan?.storageLimitGb ?? '—' : '—')} GB</span>
+                    <span>{storageLabel(effectivePlan?.storageUsedGb)} of {effectivePlan?.storageLimitGb ?? (billingLoaded ? freePlan?.storageLimitGb ?? EMPTY.value : 'Loading…')} GB</span>
                   </p>
 
                   {(effectivePlan?.renewsOn || effectivePlan?.graceEndsOn) && (

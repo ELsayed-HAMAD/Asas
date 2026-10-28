@@ -759,7 +759,7 @@ export async function adjustPayrollLine(
   const run = await prisma.payrollRun.findFirst({ where: { id: runId, tenantId } })
   if (!run) throw new AppError(404, 'Payroll run not found')
   if (run.status === 'APPROVED' || run.status === 'PAID') {
-    throw new AppError(409, 'An approved or paid run cannot be adjusted — make a correction run')
+    throw new AppError(409, 'An approved or paid run cannot be adjusted. Make a correction run.')
   }
 
   const line = await prisma.payrollLine.findFirst({
@@ -810,7 +810,7 @@ export async function adjustPayrollLine(
     data: { updatedAt: new Date() },
   })
   if (count === 0) {
-    throw new AppError(409, 'An approved or paid run cannot be adjusted — make a correction run')
+    throw new AppError(409, 'An approved or paid run cannot be adjusted. Make a correction run.')
   }
   await prisma.payrollLine.update({
     where: { id: line.id },

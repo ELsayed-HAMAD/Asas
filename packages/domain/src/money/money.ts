@@ -388,7 +388,7 @@ export class CurrencyMismatchError extends Error {
   ) {
     super(
       `Cannot combine ${received} with ${expected}. Convert one side explicitly with a dated ` +
-        'FX rate — implicit coercion would produce a plausible-looking wrong number.',
+        'FX rate: implicit coercion would produce a plausible-looking wrong number.',
     )
     this.name = 'CurrencyMismatchError'
   }

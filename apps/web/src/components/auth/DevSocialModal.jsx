@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { GoogleIcon, AppleIcon } from '../common/BrandIcons'
+import { GoogleIcon } from '../common/BrandIcons'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { authApi } from '../../lib/api/auth'
@@ -10,23 +10,15 @@ const PRESET_PROFILES = [
     name: 'Dev User',
     email: 'dev@example.com',
     role: 'Founder & CEO',
-    provider: 'google',
   },
   {
     name: 'Alex Morgan',
     email: 'alex.morgan@techcorp.io',
     role: 'Finance Director',
-    provider: 'google',
-  },
-  {
-    name: 'Sarah Jenkins',
-    email: 'sarah.jenkins@apple-id.io',
-    role: 'Operations Lead',
-    provider: 'apple',
   },
 ]
 
-export default function DevSocialModal({ isOpen, onClose, provider = 'google', onSuccess }) {
+export default function DevSocialModal({ isOpen, onClose, onSuccess }) {
   const [selectedPreset, setSelectedPreset] = useState(0)
   const [useCustom, setUseCustom] = useState(false)
   const [customName, setCustomName] = useState('')
@@ -37,8 +29,7 @@ export default function DevSocialModal({ isOpen, onClose, provider = 'google', o
 
   if (!isOpen) return null
 
-  const relevantPresets = PRESET_PROFILES.filter(p => p.provider === provider)
-  const activePreset = relevantPresets[selectedPreset] || relevantPresets[0]
+  const activePreset = PRESET_PROFILES[selectedPreset] || PRESET_PROFILES[0]
 
   const handleAuthenticate = async () => {
     setError('')
@@ -54,7 +45,7 @@ export default function DevSocialModal({ isOpen, onClose, provider = 'google', o
       }
 
       const res = await authApi.devSocialLogin({
-        provider,
+        provider: 'google',
         email,
         name: name || undefined,
       })
@@ -75,8 +66,6 @@ export default function DevSocialModal({ isOpen, onClose, provider = 'google', o
       setLoading(false)
     }
   }
-
-  const isApple = provider === 'apple'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50 backdrop-blur-xs">
@@ -100,11 +89,11 @@ export default function DevSocialModal({ isOpen, onClose, provider = 'google', o
         {/* Dialog Header */}
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-xl bg-surface-muted border border-border-default flex items-center justify-center shrink-0">
-            {isApple ? <AppleIcon className="w-5 h-5 text-heading" /> : <GoogleIcon className="w-5 h-5" />}
+            <GoogleIcon className="w-5 h-5" />
           </div>
           <div>
             <h2 id="dev-social-title" className="text-lg font-bold text-heading flex items-center gap-2">
-              <span>{isApple ? 'Apple Sign In' : 'Google Sign In'}</span>
+              <span>Google Sign In</span>
               <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-accent-light text-accent">
                 Dev Sandbox
               </span>
@@ -117,7 +106,7 @@ export default function DevSocialModal({ isOpen, onClose, provider = 'google', o
         <div className="mb-4 p-3 rounded-card-sm bg-warning-light border border-warning-border text-warning-text text-xs leading-relaxed flex items-start gap-2">
           <Info size={16} className="shrink-0 mt-0.5" />
           <span>
-            Live {isApple ? 'Apple' : 'Google'} OAuth client credentials are not configured in <code className="font-mono font-semibold">apps/api/.env</code>.
+            Live Google OAuth client credentials are not configured in <code className="font-mono font-semibold">apps/api/.env</code>.
             Choose or enter a profile below to authenticate and test the full onboarding and dashboard workflow.
           </span>
         </div>
@@ -132,7 +121,7 @@ export default function DevSocialModal({ isOpen, onClose, provider = 'google', o
         <div className="space-y-2 mb-4">
           <p className="text-xs font-semibold text-heading">Select an enterprise testing profile:</p>
 
-          {relevantPresets.map((profile, idx) => {
+          {PRESET_PROFILES.map((profile, idx) => {
             const isSelected = !useCustom && selectedPreset === idx
             return (
               <button
@@ -231,28 +220,17 @@ export default function DevSocialModal({ isOpen, onClose, provider = 'google', o
             onClick={() => setShowConfigGuide(!showConfigGuide)}
             className="w-full flex items-center justify-between text-left text-[11px] font-medium text-accent hover:underline cursor-pointer"
           >
-            <span>How to connect live {isApple ? 'Apple' : 'Google'} credentials for production</span>
+            <span>How to connect live Google credentials for production</span>
             {showConfigGuide ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
 
           {showConfigGuide && (
             <div className="mt-2 p-3 rounded-card-sm bg-terminal text-terminal-text text-[11px] font-mono leading-relaxed space-y-2">
               <p className="text-terminal-muted"># In apps/api/.env, add:</p>
-              {isApple ? (
-                <>
-                  <p className="text-terminal-success">APPLE_CLIENT_ID="com.yourcompany.service"</p>
-                  <p className="text-terminal-success">APPLE_CLIENT_SECRET="your-private-key-jwt"</p>
-                  <p className="text-terminal-muted mt-2"># Authorized Redirect URI:</p>
-                  <p>http://localhost:4000/api/auth/callback/apple</p>
-                </>
-              ) : (
-                <>
-                  <p className="text-terminal-success">GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"</p>
-                  <p className="text-terminal-success">GOOGLE_CLIENT_SECRET="GOCSPX-your-secret"</p>
-                  <p className="text-terminal-muted mt-2"># Authorized Redirect URI:</p>
-                  <p>http://localhost:4000/api/auth/callback/google</p>
-                </>
-              )}
+              <p className="text-terminal-success">GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"</p>
+              <p className="text-terminal-success">GOOGLE_CLIENT_SECRET="GOCSPX-your-secret"</p>
+              <p className="text-terminal-muted mt-2"># Authorized Redirect URI:</p>
+              <p>http://127.0.0.1:4000/api/auth/callback/google</p>
             </div>
           )}
         </div>

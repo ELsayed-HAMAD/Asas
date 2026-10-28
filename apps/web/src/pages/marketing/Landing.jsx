@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   ArrowRight,
-  BarChart3,
+  ArrowUpRight,
   Boxes,
   Check,
   CheckCircle2,
   Code2,
   DollarSign,
+  Layers3,
   ShieldCheck,
   TrendingUp,
   Users,
@@ -15,21 +16,93 @@ import {
 import { useSession } from '../../lib/authClient'
 import { PLATFORM_PLANS } from '../../../../../packages/contracts/src/billing/catalog.ts'
 import { Button } from '../../components/ui/button'
-import { Badge } from '../../components/ui/badge'
+import { AsasLogo } from '../../components/common/AsasLogo'
+import CookieSettingsButton from '../../components/common/CookieSettingsButton'
 import MarketingNavbar from '../../components/marketing/MarketingNavbar'
 
+const GLASS_PANEL = 'border border-white/80 bg-white/55 shadow-[0_24px_80px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl'
+
 const PLATFORM_CAPABILITIES = [
-  { name: 'Finance', domain: 'Payables · receivables · ledger' },
-  { name: 'HR', domain: 'Employees · payroll · attendance' },
-  { name: 'CRM', domain: 'Accounts · deals · forecasts' },
-  { name: 'Inventory', domain: 'Catalog · stock · movements' },
-  { name: 'Projects', domain: 'Portfolios · sprints · roadmaps' },
+  { id: 'finance', name: 'Finance', icon: DollarSign },
+  { id: 'hr', name: 'People', icon: Users },
+  { id: 'crm', name: 'CRM', icon: TrendingUp },
+  { id: 'inventory', name: 'Inventory', icon: Boxes },
+  { id: 'engineering', name: 'Projects', icon: Code2 },
+]
+
+const WORKFLOWS = [
+  {
+    id: 'finance',
+    label: 'Finance',
+    icon: DollarSign,
+    eyebrow: 'Finance workflow',
+    title: 'From invoice to reconciliation.',
+    description: 'Customer balances, recorded payments, and balanced journal entries stay connected.',
+    steps: [
+      { label: 'Customer invoice', detail: 'Receivable recorded' },
+      { label: 'Payment received', detail: 'Ready to reconcile' },
+      { label: 'Journal entry', detail: 'Debit and credit balanced' },
+    ],
+  },
+  {
+    id: 'hr',
+    label: 'People',
+    icon: Users,
+    eyebrow: 'People workflow',
+    title: 'People operations, clearly organized.',
+    description: 'Employee records, attendance, leave, and payroll review in one calm workflow.',
+    steps: [
+      { label: 'Employee record', detail: 'Workspace directory' },
+      { label: 'Attendance & leave', detail: 'Requests ready for review' },
+      { label: 'Payroll run', detail: 'Prepare and approve' },
+    ],
+  },
+  {
+    id: 'crm',
+    label: 'CRM',
+    icon: TrendingUp,
+    eyebrow: 'Customer workflow',
+    title: 'Every relationship has a next step.',
+    description: 'Accounts and deals move through a pipeline your whole team can understand.',
+    steps: [
+      { label: 'Qualified account', detail: 'Shared customer context' },
+      { label: 'Proposal', detail: 'Deal activity in one place' },
+      { label: 'Closed won', detail: 'Ready for delivery' },
+    ],
+  },
+  {
+    id: 'inventory',
+    label: 'Inventory',
+    icon: Boxes,
+    eyebrow: 'Inventory workflow',
+    title: 'Stock movements without the mystery.',
+    description: 'Catalog records, quantities, and stock movements stay visible to the teams that need them.',
+    steps: [
+      { label: 'Product catalog', detail: 'Shared item records' },
+      { label: 'Stock movement', detail: 'Incoming and outgoing activity' },
+      { label: 'Available stock', detail: 'Current workspace view' },
+    ],
+  },
+  {
+    id: 'engineering',
+    label: 'Projects',
+    icon: Code2,
+    eyebrow: 'Project workflow',
+    title: 'Delivery connected to the business.',
+    description: 'Portfolios, roadmaps, sprint issues, and delivery progress share the wider business context.',
+    steps: [
+      { label: 'Roadmap', detail: 'Priorities aligned' },
+      { label: 'Sprint', detail: 'Work clearly assigned' },
+      { label: 'Delivery', detail: 'Progress ready to review' },
+    ],
+  },
 ]
 
 const PERSONAS = [
   {
     id: 'cfo',
     role: 'Finance lead',
+    icon: DollarSign,
     title: 'Review cash, receivables, and ledger activity in one workspace.',
     focus: 'A finance workflow for tracking invoices, settlements, reconciliation, and journal balances.',
     metrics: [
@@ -41,6 +114,7 @@ const PERSONAS = [
   {
     id: 'coo',
     role: 'Operations lead',
+    icon: Layers3,
     title: 'Keep people, approvals, and operational work visible together.',
     focus: 'A workspace for managing team records, attendance, stock, and project activity.',
     metrics: [
@@ -52,6 +126,7 @@ const PERSONAS = [
   {
     id: 'vpe',
     role: 'Engineering lead',
+    icon: Code2,
     title: 'Give teams clear access boundaries and a shared view of work.',
     focus: 'Server-side sessions, workspace roles, tenant scoping, and an API for connected workflows.',
     metrics: [
@@ -63,6 +138,7 @@ const PERSONAS = [
   {
     id: 'hr',
     role: 'People lead',
+    icon: Users,
     title: 'Keep employee records and payroll workflows organized.',
     focus: 'A people operations view for employee data, attendance, leave, and payroll runs.',
     metrics: [
@@ -73,25 +149,28 @@ const PERSONAS = [
   },
 ]
 
+function SectionLabel({ children }) {
+  return (
+    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0071e3]">{children}</p>
+  )
+}
+
 export default function Landing() {
   const { data: session } = useSession()
   const location = useLocation()
-
-  // Animation Refs
   const pageRef = useRef(null)
   const heroRef = useRef(null)
-  const badgeRef = useRef(null)
-  const headlineRef = useRef(null)
-  const subtitleRef = useRef(null)
-  const ctaRef = useRef(null)
-  const mockupRef = useRef(null)
+  const previewRef = useRef(null)
+  const previewTiltRef = useRef(null)
+  const workflowPanelRef = useRef(null)
   const personaPanelRef = useRef(null)
-  // Interactive States
-  const [activeCurrency, setActiveCurrency] = useState('USD')
+  const [activeWorkflowIndex, setActiveWorkflowIndex] = useState(0)
   const [activePersona, setActivePersona] = useState(PERSONAS[0])
+  const activeWorkflow = WORKFLOWS[activeWorkflowIndex]
+  const ActiveWorkflowIcon = activeWorkflow.icon
+  const ActivePersonaIcon = activePersona.icon
 
   useEffect(() => {
-    // Keep marketing pages in light clean theme for universal brand presentation
     const hadDarkTheme = document.documentElement.classList.contains('dark')
     document.documentElement.classList.remove('dark')
     const restoreTheme = () => {
@@ -102,6 +181,7 @@ export default function Landing() {
 
     let cancelled = false
     let animationContext
+    let magneticCleanup = []
     const loadAnimations = async () => {
       const [{ gsap }, { ScrollTrigger }] = await Promise.all([
         import('gsap'),
@@ -110,38 +190,100 @@ export default function Landing() {
       if (cancelled) return
       gsap.registerPlugin(ScrollTrigger)
       animationContext = gsap.context(() => {
-        const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
+        gsap.set('[data-hero-line] > span', { transformOrigin: '0% 100%' })
+        const intro = gsap.timeline({ defaults: { ease: 'power3.out' } })
+        intro
+          .fromTo('[data-hero-eyebrow]', { autoAlpha: 0, y: 14, scale: 0.94 }, {
+            autoAlpha: 1, y: 0, scale: 1, duration: 0.65, ease: 'expo.out',
+          })
+          .fromTo('[data-hero-line] > span', { yPercent: 118, rotate: 2.2 }, {
+            yPercent: 0, rotate: 0, duration: 1.15, stagger: 0.12, ease: 'expo.out',
+          }, '-=0.32')
+          .fromTo('[data-hero-copy]', { autoAlpha: 0, y: 22 }, {
+            autoAlpha: 1, y: 0, duration: 0.8,
+          }, '-=0.62')
+          .fromTo('[data-hero-actions]', { autoAlpha: 0, y: 16 }, {
+            autoAlpha: 1, y: 0, duration: 0.7,
+          }, '-=0.5')
+          .fromTo(previewRef.current, {
+            autoAlpha: 0, y: 60, scale: 0.955, rotationX: 9, transformPerspective: 1400,
+          }, {
+            autoAlpha: 1, y: 0, scale: 1, rotationX: 0, duration: 1.35, ease: 'expo.out',
+          }, '-=0.55')
+          .fromTo('[data-preview-shine]', { xPercent: -220, autoAlpha: 0 }, {
+            xPercent: 220, autoAlpha: 0.55, duration: 1.2, ease: 'power2.inOut',
+          }, '-=0.7')
+          .to('[data-preview-shine]', { autoAlpha: 0, duration: 0.35 }, '-=0.12')
 
-        tl.fromTo(badgeRef.current, { opacity: 0, y: -20 }, { opacity: 1, y: 0, duration: 0.6 })
-          .fromTo(headlineRef.current, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.8 }, '-=0.3')
-          .fromTo(subtitleRef.current, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.7 }, '-=0.5')
-          .fromTo(ctaRef.current, { opacity: 0, scale: 0.95 }, { opacity: 1, scale: 1, duration: 0.6 }, '-=0.4')
-          .fromTo(mockupRef.current, { opacity: 0, y: 40, rotateX: 6 }, { opacity: 1, y: 0, rotateX: 0, duration: 1 }, '-=0.4')
-
-        gsap.utils.toArray('[data-gsap-reveal]', pageRef.current).forEach((element) => {
-          gsap.fromTo(element,
-            { autoAlpha: 0, y: 20 },
-            {
-              autoAlpha: 1,
-              y: 0,
-              duration: 0.65,
-              ease: 'power2.out',
-              scrollTrigger: { trigger: element, start: 'top 88%', once: true },
-            },
-          )
+        gsap.utils.toArray('[data-reveal]', pageRef.current).forEach((element) => {
+          gsap.fromTo(element, { autoAlpha: 0, y: 38, scale: 0.985, filter: 'blur(9px)' }, {
+            autoAlpha: 1,
+            y: 0,
+            scale: 1,
+            filter: 'blur(0px)',
+            duration: 0.95,
+            ease: 'power3.out',
+            scrollTrigger: { trigger: element, start: 'top 88%', once: true },
+            onComplete: () => gsap.set(element, { clearProps: 'filter,transform' }),
+          })
         })
 
-        gsap.utils.toArray('[data-gsap-parallax]', heroRef.current).forEach((element, index) => {
-          gsap.to(element, {
-            yPercent: index === 0 ? 18 : -12,
-            ease: 'none',
-            scrollTrigger: {
-              trigger: heroRef.current,
-              start: 'top top',
-              end: 'bottom top',
-              scrub: 0.7,
-            },
+        gsap.utils.toArray('[data-reveal-group]', pageRef.current).forEach((group) => {
+          gsap.fromTo(group.children, { autoAlpha: 0, y: 28, filter: 'blur(6px)' }, {
+            autoAlpha: 1,
+            y: 0,
+            filter: 'blur(0px)',
+            duration: 0.7,
+            stagger: 0.09,
+            ease: 'power3.out',
+            scrollTrigger: { trigger: group, start: 'top 88%', once: true },
+            onComplete: () => gsap.set(group.children, { clearProps: 'filter,transform' }),
           })
+        })
+
+        gsap.to('[data-ambient]', {
+          yPercent: 20,
+          scale: 1.08,
+          rotation: 5,
+          ease: 'none',
+          scrollTrigger: { trigger: heroRef.current, start: 'top top', end: 'bottom top', scrub: 1.2 },
+        })
+
+        gsap.to('[data-ambient-secondary]', {
+          xPercent: -8,
+          yPercent: -14,
+          rotation: -6,
+          ease: 'none',
+          scrollTrigger: { trigger: heroRef.current, start: 'top top', end: 'bottom top', scrub: 1.4 },
+        })
+
+        gsap.to('[data-preview-motion]', {
+          y: -44,
+          ease: 'none',
+          scrollTrigger: { trigger: heroRef.current, start: 'top top', end: 'bottom top', scrub: 1.1 },
+        })
+
+        magneticCleanup = gsap.utils.toArray('[data-magnetic]', pageRef.current).map((element) => {
+          const strength = Number(element.dataset.magnetic) || 0.12
+          const moveX = gsap.quickTo(element, 'x', { duration: 0.45, ease: 'power3.out' })
+          const moveY = gsap.quickTo(element, 'y', { duration: 0.45, ease: 'power3.out' })
+          const handleMove = (event) => {
+            if (event.pointerType !== 'mouse') return
+            const rect = element.getBoundingClientRect()
+            moveX((event.clientX - rect.left - rect.width / 2) * strength)
+            moveY((event.clientY - rect.top - rect.height / 2) * strength)
+          }
+          const handleLeave = () => {
+            moveX(0)
+            moveY(0)
+          }
+          element.addEventListener('pointermove', handleMove, { passive: true })
+          element.addEventListener('pointerleave', handleLeave)
+          return () => {
+            element.removeEventListener('pointermove', handleMove)
+            element.removeEventListener('pointerleave', handleLeave)
+            gsap.set(element, { clearProps: 'transform' })
+          }
         })
       }, pageRef)
     }
@@ -149,10 +291,97 @@ export default function Landing() {
 
     return () => {
       cancelled = true
+      magneticCleanup.forEach(cleanup => cleanup())
       animationContext?.revert()
       restoreTheme()
     }
   }, [])
+
+  useEffect(() => {
+    const surface = previewTiltRef.current
+    const anchor = previewRef.current
+    if (!surface || !anchor) return undefined
+    if (
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      !window.matchMedia('(hover: hover) and (pointer: fine)').matches
+    ) {
+      return undefined
+    }
+
+    const glare = surface.querySelector('[data-preview-glare]')
+    let frame = 0
+    let targetX = 0
+    let targetY = 0
+    let currentX = 0
+    let currentY = 0
+
+    const animate = () => {
+      frame = 0
+      currentX += (targetX - currentX) * 0.12
+      currentY += (targetY - currentY) * 0.12
+      surface.style.transform = `rotateX(${currentX.toFixed(3)}deg) rotateY(${currentY.toFixed(3)}deg)`
+      if (Math.abs(targetX - currentX) > 0.01 || Math.abs(targetY - currentY) > 0.01) {
+        frame = window.requestAnimationFrame(animate)
+      }
+    }
+
+    const schedule = () => {
+      if (!frame) frame = window.requestAnimationFrame(animate)
+    }
+
+    const handleMove = (event) => {
+      if (event.pointerType !== 'mouse') return
+      const rect = anchor.getBoundingClientRect()
+      const relativeX = (event.clientX - rect.left) / rect.width - 0.5
+      const relativeY = (event.clientY - rect.top) / rect.height - 0.5
+      targetX = relativeY * -8
+      targetY = relativeX * 8
+      if (glare) {
+        glare.style.setProperty('--glare-x', `${(relativeX + 0.5) * 100}%`)
+        glare.style.setProperty('--glare-y', `${(relativeY + 0.5) * 100}%`)
+        glare.style.opacity = '1'
+      }
+      schedule()
+    }
+
+    const handleLeave = () => {
+      targetX = 0
+      targetY = 0
+      if (glare) glare.style.opacity = '0'
+      schedule()
+    }
+
+    surface.addEventListener('pointermove', handleMove, { passive: true })
+    surface.addEventListener('pointerleave', handleLeave)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      surface.removeEventListener('pointermove', handleMove)
+      surface.removeEventListener('pointerleave', handleLeave)
+      surface.style.transform = ''
+      if (glare) glare.style.opacity = '0'
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!workflowPanelRef.current || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
+    let cancelled = false
+    let transitionContext
+    void import('gsap').then(({ gsap }) => {
+      if (cancelled || !workflowPanelRef.current) return
+      transitionContext = gsap.context(() => {
+        gsap.fromTo('[data-workflow-content]', { autoAlpha: 0, y: 14, filter: 'blur(6px)' }, {
+          autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.45, ease: 'power2.out', clearProps: 'filter,transform',
+        })
+        gsap.fromTo('[data-workflow-step]', { autoAlpha: 0, y: 16, filter: 'blur(5px)' }, {
+          autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.5, stagger: 0.07, ease: 'power2.out', clearProps: 'filter,transform',
+        })
+      }, workflowPanelRef)
+    })
+    return () => {
+      cancelled = true
+      transitionContext?.revert()
+    }
+  }, [activeWorkflowIndex])
 
   useEffect(() => {
     if (!personaPanelRef.current || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
@@ -161,10 +390,9 @@ export default function Landing() {
     void import('gsap').then(({ gsap }) => {
       if (cancelled || !personaPanelRef.current) return
       transitionContext = gsap.context(() => {
-        gsap.fromTo(personaPanelRef.current,
-          { autoAlpha: 0.76, y: 8 },
-          { autoAlpha: 1, y: 0, duration: 0.28, ease: 'power2.out', clearProps: 'transform,opacity,visibility' },
-        )
+        gsap.fromTo(personaPanelRef.current, { autoAlpha: 0.8, y: 12, scale: 0.992, filter: 'blur(5px)' }, {
+          autoAlpha: 1, y: 0, scale: 1, filter: 'blur(0px)', duration: 0.4, ease: 'power2.out', clearProps: 'transform,opacity,visibility,filter',
+        })
       }, personaPanelRef)
     })
     return () => {
@@ -192,675 +420,294 @@ export default function Landing() {
     return () => window.cancelAnimationFrame(frame)
   }, [location.pathname, location.hash])
 
-  // Currency calculations for interactive treasury card
-  const currencyValues = {
-    USD: { cash: '$2,840,500', inflow: '+$420,000', rate: 'USD Base' },
-    EUR: { cash: '€2,612,400', inflow: '+€386,400', rate: '1 USD = 0.92 EUR' },
-    SAR: { cash: '﷼10,651,800', inflow: '+﷼1,575,000', rate: '1 USD = 3.75 SAR' },
-  }
-
   return (
-    <div ref={pageRef} className="min-h-screen bg-surface text-body selection:bg-primary-light selection:text-primary">
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-on-primary focus:shadow-card"
-      >
+    <div ref={pageRef} className="min-h-screen overflow-clip bg-[#f5f5f7] font-sans text-[#1d1d1f] selection:bg-[#dbeafe] selection:text-[#0b3b70]">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-70 focus:rounded-full focus:bg-white focus:px-5 focus:py-3 focus:text-sm focus:font-semibold focus:text-slate-950 focus:shadow-lg">
         Skip to content
       </a>
-      {/* ── Floating Glass Navbar ── */}
-      <div className="pt-4">
-        <MarketingNavbar />
-      </div>
+
+      <MarketingNavbar />
+      <div className="h-20" aria-hidden="true" />
 
       <main id="main-content" tabIndex={-1} className="focus:outline-none">
-      {/* ── Hero Section ── */}
-      <section
-        ref={heroRef}
-        className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-20 text-center overflow-hidden"
-      >
-        {/* Subtle Ambient Background Orbs */}
-        <div data-gsap-parallax className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-accent/5 rounded-full blur-3xl pointer-events-none -z-10 animate-float" />
-        <div data-gsap-parallax className="absolute top-1/3 left-1/4 w-[300px] h-[300px] bg-primary/5 rounded-full blur-3xl pointer-events-none -z-10" />
+        <section ref={heroRef} className="relative isolate px-4 pb-24 pt-16 sm:px-6 sm:pt-24 lg:pb-32">
+          <div data-ambient className="absolute left-1/2 top-[-420px] -z-10 h-[820px] w-[1100px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(174,210,255,0.55),rgba(221,214,254,0.28)_42%,transparent_72%)] blur-2xl" aria-hidden="true" />
+          <div data-ambient-secondary className="absolute right-[-8%] top-[18%] -z-10 h-[420px] w-[420px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(221,214,254,0.42),transparent_70%)] blur-3xl" aria-hidden="true" />
 
-        {/* Release Pill */}
-        <div ref={badgeRef} className="inline-block mb-6">
-          <Badge
-            variant="outline"
-            className="inline-flex items-center gap-2 glass border border-border-default/80 text-heading shadow-glass rounded-full px-4 py-1.5 text-xs font-medium"
-          >
-            <span className="w-2 h-2 rounded-full bg-accent animate-pulse" aria-hidden="true" />
-            <span>Finance, people, CRM, projects &amp; inventory in one workspace</span>
-          </Badge>
-        </div>
+          <div className="mx-auto max-w-6xl text-center">
+            <div data-hero-eyebrow className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/50 px-4 py-2 text-xs font-medium text-[#4b4b50] shadow-[0_8px_30px_rgba(0,0,0,0.04)] backdrop-blur-xl">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#0071e3]" aria-hidden="true" />
+              One connected business workspace
+            </div>
 
-        {/* Hero Title */}
-        <h1
-          ref={headlineRef}
-          className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-heading leading-[1.08] max-w-4xl mx-auto"
-        >
-          The unified workspace for{' '}
-          <span className="text-accent">
-            modern business.
-          </span>
-        </h1>
+            <h1 data-hero-title className="mx-auto mt-8 max-w-6xl text-[clamp(3rem,7.6vw,7rem)] font-semibold leading-[0.96] tracking-[-0.065em]">
+              <span data-hero-line className="block overflow-hidden pb-[0.08em]"><span className="inline-block">Everything connected.</span></span>
+              <span data-hero-line className="block overflow-hidden pb-[0.1em] text-[#86868b]"><span className="inline-block">Nothing complicated.</span></span>
+            </h1>
 
-        {/* Subtitle */}
-        <p
-          ref={subtitleRef}
-          className="text-base sm:text-xl text-body-light max-w-2xl mx-auto mt-6 leading-relaxed"
-        >
-          Bring finance, workforce records, customer relationships, projects, and inventory into a shared
-          workspace with clear controls for your team.
-        </p>
+            <p data-hero-copy className="mx-auto mt-7 max-w-2xl text-lg leading-8 text-[#626267] sm:text-xl sm:leading-9">
+              Finance, people, customers, projects, and inventory in one thoughtful workspace, so your team always knows what matters next.
+            </p>
 
-        {/* CTA Actions */}
-        <div
-          ref={ctaRef}
-          className="mt-8 flex flex-wrap items-center justify-center gap-4"
-        >
-          {session?.user ? (
-            <Button
-              asChild
-              className="bg-primary hover:bg-primary-hover text-on-primary font-medium text-sm h-12 px-7 rounded-button shadow-card hover:shadow-glow hover-lift transition-micro flex items-center gap-2 cursor-pointer active:scale-[0.98]"
-            >
-              <Link to="/dashboard">
-                <span>Open Workspace</span>
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </Button>
-          ) : (
-            <>
-              <Button
-                asChild
-                className="bg-primary hover:bg-primary-hover text-on-primary font-medium text-sm h-12 px-7 rounded-button shadow-card hover:shadow-glow hover-lift transition-micro flex items-center gap-2 cursor-pointer active:scale-[0.98]"
-              >
-                <Link to="/register">
-                  <span>Start Free Workspace</span>
-                  <ArrowRight className="w-4 h-4" />
+            <div data-hero-actions className="mt-9 flex flex-col items-center justify-center gap-4 sm:flex-row">
+              <Button asChild className="h-12 rounded-full bg-[#0071e3] px-7 text-sm font-medium text-white shadow-[0_10px_30px_rgba(0,113,227,0.22)] transition-all hover:bg-[#0077ed] hover:shadow-[0_14px_36px_rgba(0,113,227,0.28)]">
+                <Link to={session?.user ? '/dashboard' : '/register'} data-magnetic="0.16">
+                  {session?.user ? 'Open your workspace' : 'Get started free'}
+                  <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
-              <Button
-                asChild
-                variant="outline"
-                className="glass hover:bg-surface-muted/80 border-border-default/80 text-heading font-medium text-sm h-12 px-6 rounded-button shadow-card hover-lift transition-micro cursor-pointer active:scale-[0.98]"
-              >
-                <Link to="/solutions">Explore Solutions</Link>
-              </Button>
-            </>
-          )}
-        </div>
-
-        {/* Sample workspace preview */}
-        <div
-          ref={mockupRef}
-          className="mt-14 max-w-5xl mx-auto rounded-card border border-border-default/80 glass-strong shadow-glass overflow-hidden text-left hover-lift transition-premium"
-        >
-          {/* Browser Chrome Header */}
-          <div className="glass-subtle border-b border-border-subtle/80 px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-danger/80" />
-              <div className="w-3 h-3 rounded-full bg-warning/80" />
-              <div className="w-3 h-3 rounded-full bg-success/80" />
-              <span className="text-xs font-mono text-caption ml-2">workspace / dashboard</span>
+              <Link to="/#features" data-magnetic="0.08" className="group inline-flex h-12 items-center gap-2 rounded-full px-5 text-sm font-medium text-[#0071e3] transition-colors hover:bg-white/60">
+                Explore the platform
+                <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </Link>
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-muted">
-              <span className="text-[10px] text-caption">Illustrative product preview · sample workspace and figures</span>
-            </div>
+            <p className="mt-5 text-xs text-[#86868b]">Free workspace · All current product areas</p>
           </div>
 
-          {/* Mockup Dashboard Body */}
-          <div className="grid grid-cols-1 md:grid-cols-4 min-h-[380px]">
-            {/* Sidebar nav preview */}
-            <div className="hidden md:block border-r border-border-subtle bg-surface-muted/70 p-4 space-y-1 text-xs">
-              <div className="flex items-center gap-2 px-2 py-2 mb-3 bg-surface-raised border border-border-default rounded-button shadow-card">
-                <div className="w-6 h-6 rounded-card-sm bg-primary text-on-primary flex items-center justify-center font-bold text-xs">
-                  A
+          <div data-preview-motion className="mx-auto mt-16 max-w-6xl sm:mt-20" style={{ perspective: '1400px' }}>
+            <div ref={previewTiltRef} data-preview-tilt className="[transform-style:preserve-3d] will-change-transform">
+              <div ref={previewRef} data-preview className={`${GLASS_PANEL} relative overflow-hidden rounded-[32px] p-2`}>
+                <span data-preview-shine aria-hidden="true" className="pointer-events-none absolute inset-y-0 -left-1/2 z-20 w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-white/55 to-transparent opacity-0 mix-blend-soft-light" />
+                <span
+                  data-preview-glare
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 z-10 rounded-[32px] opacity-0 mix-blend-soft-light transition-opacity duration-300"
+                  style={{ background: 'radial-gradient(420px circle at var(--glare-x, 50%) var(--glare-y, 50%), rgba(255,255,255,0.42), transparent 62%)' }}
+                />
+                <div className="overflow-hidden rounded-[26px] border border-black/[0.04] bg-white/65">
+              <div className="flex h-14 items-center justify-between border-b border-black/[0.06] px-5 sm:px-6">
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-1.5" aria-hidden="true">
+                    <span className="h-2 w-2 rounded-full bg-[#d8d8dc]" />
+                    <span className="h-2 w-2 rounded-full bg-[#d8d8dc]" />
+                    <span className="h-2 w-2 rounded-full bg-[#d8d8dc]" />
+                  </div>
+                  <span className="ml-1 text-xs font-medium text-[#626267]">Asas workspace</span>
                 </div>
-                <div className="min-w-0">
-                  <p className="font-semibold text-heading truncate">Acme Global</p>
-                  <p className="text-[10px] text-caption truncate">Sample workspace</p>
-                </div>
+                <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#86868b]">Interactive preview</span>
               </div>
 
-              {[
-                { label: 'Dashboard', icon: BarChart3, active: true },
-                { label: 'HR', icon: Users },
-                { label: 'Finance', icon: DollarSign },
-                { label: 'CRM', icon: TrendingUp },
-                { label: 'Inventory', icon: Boxes },
-                { label: 'Projects', icon: Code2 },
-              ].map((item) => {
-                const Icon = item.icon
-                return (
-                  <div
-                    key={item.label}
-                    className={`flex items-center gap-2.5 px-3 py-2 rounded-button font-medium transition-colors ${
-                      item.active
-                        ? 'bg-primary-light text-primary font-semibold'
-                        : 'text-body hover:bg-surface-active'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4 text-muted" />
-                    <span>{item.label}</span>
+              <div className="p-5 sm:p-8 lg:p-10">
+                <div className="flex justify-center overflow-x-auto pb-1" role="group" aria-label="Choose a product workflow">
+                  <div className="inline-flex min-w-max rounded-full border border-black/[0.05] bg-[#f0f0f2]/80 p-1">
+                    {WORKFLOWS.map((workflow, index) => {
+                      const active = index === activeWorkflowIndex
+                      return (
+                        <button
+                          key={workflow.id}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => setActiveWorkflowIndex(index)}
+                          className={`rounded-full px-4 py-2 text-xs font-medium transition-all sm:px-5 ${active ? 'bg-white text-[#1d1d1f] shadow-[0_2px_10px_rgba(0,0,0,0.08)]' : 'text-[#737378] hover:text-[#1d1d1f]'}`}
+                        >
+                          {workflow.label}
+                        </button>
+                      )
+                    })}
                   </div>
+                </div>
+
+                <div ref={workflowPanelRef} data-testid="workflow-panel" className="mt-9 sm:mt-11">
+                  <div data-workflow-content className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-[#0071e3]">{activeWorkflow.eyebrow}</p>
+                      <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#1d1d1f] sm:text-3xl">{activeWorkflow.title}</h2>
+                      <p className="mt-3 max-w-2xl text-sm leading-6 text-[#737378]">{activeWorkflow.description}</p>
+                    </div>
+                    <span className="hidden h-12 w-12 items-center justify-center rounded-2xl border border-black/[0.05] bg-white text-[#0071e3] shadow-[0_8px_24px_rgba(0,0,0,0.05)] lg:flex">
+                      <ActiveWorkflowIcon className="h-5 w-5" />
+                    </span>
+                  </div>
+
+                  <div className="mt-8 grid gap-3 md:grid-cols-3">
+                    {activeWorkflow.steps.map((step, index) => (
+                      <div data-workflow-step key={step.label} className="rounded-2xl border border-black/[0.04] bg-[#f5f5f7]/80 p-5 transition-transform duration-300 hover:-translate-y-0.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-[10px] text-[#9a9aa0]">0{index + 1}</span>
+                          <CheckCircle2 className="h-4 w-4 text-[#0071e3]" />
+                        </div>
+                        <p className="mt-6 text-sm font-semibold text-[#2c2c2f]">{step.label}</p>
+                        <p className="mt-1.5 text-xs leading-5 text-[#86868b]">{step.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-5 text-[10px] text-[#9a9aa0]">Illustrative workflow · no live business figures</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+          <nav aria-label="Product areas" className="mx-auto mt-10 flex max-w-4xl flex-wrap items-center justify-center gap-x-7 gap-y-4 sm:gap-x-10">
+            {PLATFORM_CAPABILITIES.map((capability) => (
+              <Link key={capability.id} to={`/solutions?area=${capability.id}`} className="text-sm font-medium text-[#737378] transition-colors hover:text-[#0071e3]">
+                {capability.name}
+              </Link>
+            ))}
+          </nav>
+        </section>
+
+        <section id="features" className="scroll-mt-24 border-y border-black/[0.06] bg-white px-4 py-24 sm:px-6 sm:py-32">
+          <div className="mx-auto max-w-6xl">
+            <div data-reveal className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
+              <div>
+                <SectionLabel>Why Asas</SectionLabel>
+                <h2 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.04] tracking-[-0.045em] sm:text-6xl">Complex operations.<br />Made to feel simple.</h2>
+              </div>
+              <p className="max-w-lg text-base leading-7 text-[#737378] lg:justify-self-end">A focused workspace for the work your team already does, without extra layers of noise.</p>
+            </div>
+
+            <div data-reveal-group className="mt-16 grid gap-10 md:grid-cols-3 md:gap-8">
+              {[
+                { number: '01', title: 'One shared context', copy: 'Finance, people, customer, project, and inventory records stay connected inside the same workspace.' },
+                { number: '02', title: 'Clear team workflows', copy: 'Each area has a purpose and a clear next step, so handoffs feel natural instead of fragmented.' },
+                { number: '03', title: 'Control without clutter', copy: 'Workspace roles, tenant-scoped access, and audit history protect your data behind the scenes.' },
+              ].map((item) => (
+                <article key={item.number} className="border-t border-black/10 pt-6 transition-[transform,border-color] duration-500 ease-out hover:-translate-y-1 hover:border-[#0071e3]/30">
+                  <span className="font-mono text-[10px] text-[#0071e3]">{item.number}</span>
+                  <h3 className="mt-8 text-xl font-semibold tracking-[-0.02em]">{item.title}</h3>
+                  <p className="mt-3 text-sm leading-6 text-[#737378]">{item.copy}</p>
+                </article>
+              ))}
+            </div>
+
+            <div data-reveal className="mt-14 flex items-center gap-3 border-t border-black/[0.06] pt-6 text-xs text-[#737378]">
+              <ShieldCheck className="h-4 w-4 text-[#0071e3]" />
+              <span>Server-side access controls and tenant-scoped data access.</span>
+              <Link to="/documentation#security" className="ml-auto shrink-0 font-medium text-[#0071e3] hover:underline">Security details</Link>
+            </div>
+          </div>
+        </section>
+
+        <section className="px-4 py-24 sm:px-6 sm:py-32">
+          <div className="mx-auto max-w-6xl">
+            <div data-reveal className="mx-auto max-w-3xl text-center">
+              <SectionLabel>Built around your team</SectionLabel>
+              <h2 className="mt-5 text-4xl font-semibold leading-[1.05] tracking-[-0.045em] sm:text-6xl">A clearer view<br />for every team.</h2>
+              <p className="mx-auto mt-6 max-w-xl text-base leading-7 text-[#737378]">Different responsibilities, with the same shared context.</p>
+            </div>
+
+            <div data-reveal className="mt-12 flex flex-wrap justify-center gap-2" role="group" aria-label="Choose a team view">
+              {PERSONAS.map((persona) => {
+                const active = activePersona.id === persona.id
+                return (
+                  <button key={persona.id} type="button" aria-pressed={active} onClick={() => setActivePersona(persona)} className={`rounded-full px-4 py-2.5 text-xs font-medium transition-all sm:px-5 ${active ? 'bg-[#1d1d1f] text-white shadow-[0_8px_24px_rgba(0,0,0,0.14)]' : 'border border-black/[0.06] bg-white/50 text-[#737378] hover:bg-white hover:text-[#1d1d1f]'}`}>
+                    {persona.role}
+                  </button>
                 )
               })}
             </div>
 
-            {/* Dashboard Workspace Canvas */}
-            <div className="md:col-span-3 p-6 bg-surface-muted/30 flex flex-col justify-between">
-              <div>
-                {/* Metric Strip */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-                  <div className="bg-surface-raised p-3.5 rounded-card-sm border border-border-default shadow-card">
-                    <p className="text-[11px] font-medium text-caption">Headcount</p>
-                    <p className="text-xl font-bold text-heading mt-1">428</p>
-                    <span className="text-[10px] font-medium text-caption">Sample directory</span>
-                  </div>
-                  <div className="bg-surface-raised p-3.5 rounded-card-sm border border-border-default shadow-card">
-                    <p className="text-[11px] font-medium text-caption">Open pipeline value</p>
-                    <p className="text-xl font-bold text-heading mt-1">$2.84M</p>
-                    <span className="text-[10px] font-medium text-caption">Sample pipeline</span>
-                  </div>
-                  <div className="bg-surface-raised p-3.5 rounded-card-sm border border-border-default shadow-card">
-                    <p className="text-[11px] font-medium text-caption">Active sprints</p>
-                    <p className="text-xl font-bold text-heading mt-1">3</p>
-                    <span className="text-[10px] font-medium text-caption">Sample project data</span>
-                  </div>
-                </div>
-
-                {/* Live Animated Cash Wave SVG */}
-                <div className="bg-surface-raised p-4 rounded-card-sm border border-border-default shadow-card">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="text-xs font-semibold text-heading">Cash Flow Analysis</p>
-                      <p className="text-[10px] text-caption">Illustrative dashboard preview · sample figures</p>
-                    </div>
-                    <Badge variant="outline" className="text-[10px] bg-surface-muted text-muted border-border-default">
-                      Sample data
-                    </Badge>
-                  </div>
-                  <svg viewBox="0 0 500 120" className="w-full h-24 overflow-visible" aria-hidden="true" focusable="false">
-                    <defs>
-                      <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.25" />
-                        <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0.0" />
-                      </linearGradient>
-                    </defs>
-                    <path
-                      d="M0 90 Q60 50 120 70 T240 40 T360 65 T480 20 L500 25"
-                      fill="none"
-                      stroke="var(--color-primary)"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                    />
-                    <path
-                      d="M0 90 Q60 50 120 70 T240 40 T360 65 T480 20 L500 25 L500 120 L0 120 Z"
-                      fill="url(#chartGradient)"
-                    />
-                    <circle cx="480" cy="20" r="4" fill="var(--color-primary)" />
-                  </svg>
-                </div>
-              </div>
-
-              {/* Bottom live event ticker */}
-              <div className="mt-4 pt-3 border-t border-border-subtle flex items-center justify-between text-[11px] text-caption">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-success animate-ping" />
-                  <span>Sample activity: journal entry approved</span>
-                </div>
-                <span className="font-mono text-caption">Illustrative preview</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Product area strip ── */}
-      <section data-gsap-reveal className="border-y border-border-default bg-surface-raised py-12">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <p className="text-center text-xs font-semibold uppercase tracking-widest text-caption mb-8">
-            Product areas available in one workspace
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-14">
-            {PLATFORM_CAPABILITIES.map((client) => (
-              <div key={client.name} className="flex flex-col items-center">
-                <span className="text-base sm:text-lg font-bold text-body tracking-tight hover:text-heading transition-colors">
-                  {client.name}
-                </span>
-                <span className="text-[10px] text-caption">{client.domain}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Interactive Bento Grid Section ── */}
-      <section id="features" data-gsap-reveal className="max-w-6xl mx-auto px-4 sm:px-6 py-24 scroll-mt-20">
-        <div className="text-center mb-16">
-          <Badge variant="outline" className="mb-3 text-accent border-accent-muted bg-accent-light">
-            Workspace areas
-          </Badge>
-          <h2 className="text-3xl sm:text-5xl font-extrabold text-heading tracking-tight">
-            Clear workflows for the work your teams manage every day.
-          </h2>
-          <p className="text-body-light text-base sm:text-lg max-w-2xl mx-auto mt-4 leading-relaxed">
-            Review finance, people, customer, project, and inventory records in one workspace, with each
-            area keeping its own workflows and data relationships clear.
-          </p>
-          <p className="mt-3 text-xs text-caption">Screens and figures below are illustrative sample data.</p>
-        </div>
-
-        {/* Bento Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Card 1: Multi-Currency Treasury (Spans 2 columns) */}
-          <div className="md:col-span-2 bg-surface-raised rounded-card border border-border-default/80 p-6 sm:p-8 shadow-card hover:shadow-card-hover hover-lift transition-premium flex flex-col justify-between hover:border-accent/40">
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-button bg-accent-light text-accent shadow-xs">
-                    <DollarSign className="w-5 h-5" />
-                  </div>
-                  <h3 className="text-lg font-bold text-heading">Multi-Currency Finance &amp; FX</h3>
-                </div>
-                {/* Currency Switcher */}
-                <div className="flex items-center gap-1 bg-surface-muted p-1 rounded-button border border-border-default/80 shadow-xs" role="group" aria-label="Sample currency">
-                  {['USD', 'EUR', 'SAR'].map((curr) => (
-                    <button
-                      key={curr}
-                      type="button"
-                      onClick={() => setActiveCurrency(curr)}
-                      aria-pressed={activeCurrency === curr}
-                      className={`px-2.5 py-1 rounded-button text-xs font-semibold transition-micro cursor-pointer active:scale-[0.98] ${
-                        activeCurrency === curr
-                          ? 'bg-surface-raised text-accent shadow-card'
-                          : 'text-body hover:text-heading hover:bg-surface-active/60'
-                      }`}
-                    >
-                      {curr}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <p className="text-sm text-body-light leading-relaxed">
-                Manage invoices, recorded payments, reconciliation, ledger balances, and workspace FX rates together.
-              </p>
-              <p className="mt-2 text-[11px] text-caption">Illustrative sample figures and rates; the currency selector does not fetch live exchange rates.</p>
-
-              {/* Dynamic Currency Display */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 my-6">
-                <div className="bg-surface-muted/70 p-4 rounded-card-sm border border-border-default/80 hover-lift transition-micro">
-                  <p className="text-xs text-caption font-medium">Cash balance</p>
-                  <p className="text-2xl font-extrabold text-heading mt-1">
-                    {currencyValues[activeCurrency].cash}
-                  </p>
-                  <p className="text-[11px] text-caption mt-1">{currencyValues[activeCurrency].rate}</p>
-                </div>
-                <div className="bg-surface-muted/70 p-4 rounded-card-sm border border-border-default/80 hover-lift transition-micro">
-                  <p className="text-xs text-caption font-medium">Monthly Inflow</p>
-                  <p className="text-2xl font-extrabold text-success mt-1">
-                    {currencyValues[activeCurrency].inflow}
-                  </p>
-                  <p className="text-[11px] text-caption mt-1">Illustrative sample figure</p>
-                </div>
-                <div className="hidden sm:block bg-surface-muted/70 p-4 rounded-card-sm border border-border-default/80 hover-lift transition-micro">
-                  <p className="text-xs text-caption font-medium">Next Payroll Cycle</p>
-                  <p className="text-2xl font-extrabold text-accent mt-1">Ready</p>
-                  <p className="text-[11px] text-caption mt-1">Payroll run status preview</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-2 flex items-center justify-between text-xs text-caption border-t border-border-subtle">
-              <span>Workspace-maintained exchange rates</span>
-              <Link to="/solutions?area=finance" className="text-accent font-semibold hover:underline flex items-center gap-1 group">
-                <span>Explore Finance Workflows</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-            </div>
-          </div>
-
-          {/* Card 2: Security & Tenant Isolation */}
-          <div className="bg-surface-raised rounded-card border border-border-default/80 p-6 sm:p-8 shadow-card hover:shadow-card-hover hover-lift transition-premium flex flex-col justify-between hover:border-accent/40">
-            <div>
-              <div className="p-2 w-fit rounded-button bg-primary-light text-primary mb-4 shadow-xs">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <h3 className="text-lg font-bold text-heading mb-2">Workspace security and access</h3>
-              <p className="text-sm text-body-light leading-relaxed mb-6">
-                Sign-in, workspace membership, server-side role checks, and tenant-scoped database access protect business data.
-              </p>
-
-              <div className="space-y-2.5">
-                {[
-                  { label: 'Google and Apple sign-in when configured', ok: true },
-                  { label: 'Workspace roles and permissions', ok: true },
-                  { label: 'Audit history for supported actions', ok: true },
-                  { label: 'Tenant-scoped data access', ok: true },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-center gap-2 text-xs text-body">
-                    <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
-                    <span>{item.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="pt-6 border-t border-border-subtle mt-6">
-              <Link to="/documentation#security" className="text-xs text-accent font-semibold hover:underline flex items-center gap-1 group">
-                <span>Review Access &amp; Data Handling</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-            </div>
-          </div>
-
-          {/* Card 3: Agile Engineering Sprints */}
-          <div className="bg-surface-raised rounded-card border border-border-default/80 p-6 sm:p-8 shadow-card hover:shadow-card-hover hover-lift transition-premium flex flex-col justify-between hover:border-accent/40">
-            <div>
-              <div className="p-2 w-fit rounded-button bg-accent-light text-accent mb-4 shadow-xs">
-                <Code2 className="w-5 h-5" />
-              </div>
-              <h3 className="text-lg font-bold text-heading mb-2">Projects & Delivery</h3>
-              <p className="text-sm text-body-light leading-relaxed mb-4">
-                Organize project portfolios, roadmaps, sprint issues, and delivery progress.
-              </p>
-
-              {/* Mini Sprint Board */}
-              <div className="space-y-2 bg-surface-muted/70 p-3 rounded-card-sm border border-border-default/80 text-xs">
-                <div className="flex justify-between font-semibold text-heading pb-1 border-b border-border-subtle">
-                  <span>Sprint Alpha • 94% complete</span>
-                  <span className="text-accent font-mono">18 Points</span>
-                </div>
-                <div className="bg-surface-raised p-2 rounded-button border border-border-default shadow-card flex justify-between items-center transition-micro hover:scale-[1.01]">
-                  <span className="truncate text-body">Postgres connection pooling</span>
-                  <Badge variant="outline" className="text-[10px] bg-success-light text-success-text border-success-border">Done</Badge>
-                </div>
-                <div className="bg-surface-raised p-2 rounded-button border border-border-default shadow-card flex justify-between items-center transition-micro hover:scale-[1.01]">
-                  <span className="truncate text-body">Review team permissions</span>
-                  <Badge variant="outline" className="text-[10px] bg-accent-light text-accent border-accent-muted">In Review</Badge>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-6 border-t border-border-subtle mt-6">
-              <Link to="/solutions?area=engineering" className="text-xs text-accent font-semibold hover:underline flex items-center gap-1 group">
-                <span>Explore project workflows</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-            </div>
-          </div>
-
-          {/* Card 4: CRM & deals (spans 2 columns) */}
-          <div className="md:col-span-2 bg-surface-raised rounded-card border border-border-default/80 p-6 sm:p-8 shadow-card hover:shadow-card-hover hover-lift transition-premium flex flex-col justify-between hover:border-accent/40">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="p-2 rounded-button bg-success-light text-success shadow-xs">
-                  <TrendingUp className="w-5 h-5" />
-                </div>
-                <h3 className="text-lg font-bold text-heading">Deal Pipeline</h3>
-              </div>
-
-              <p className="text-sm text-body-light leading-relaxed mb-6">
-                Track customer relationships and deal stages alongside finance and project workflows.
-              </p>
-
-              {/* Deal Stages Pipeline */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs mb-4">
-                {[
-                  { stage: 'Leads', value: '$840K', count: '14 Deals' },
-                  { stage: 'Proposal', value: '$1.4M', count: '6 Deals' },
-                  { stage: 'Negotiation', value: '$2.1M', count: '4 Deals' },
-                  { stage: 'Closed Won', value: '$4.8M', count: '28 Deals' },
-                ].map((s) => (
-                  <div key={s.stage} className="p-3 rounded-card-sm border border-border-default/80 bg-surface-muted/70 hover-lift transition-micro">
-                    <p className="font-semibold text-heading">{s.stage}</p>
-                    <p className="text-base font-bold text-heading mt-1">{s.value}</p>
-                    <p className="text-[10px] text-caption mt-0.5">{s.count}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-border-subtle flex items-center justify-between text-xs text-caption">
-              <span>Illustrative deal pipeline · sample figures</span>
-              <Link to="/solutions?area=crm" className="text-accent font-semibold hover:underline flex items-center gap-1 group">
-                <span>Explore CRM Workflows</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Role-based workflow switcher ── */}
-      <section data-gsap-reveal className="bg-surface-muted border-y border-border-default py-24">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <Badge variant="outline" className="mb-3 text-accent border-accent-muted bg-accent-light">
-              How teams use Asas
-            </Badge>
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-heading tracking-tight">
-              Clear views for the people running the business.
-            </h2>
-            <p className="text-body-light text-base sm:text-lg max-w-2xl mx-auto mt-4">
-              Choose a team to see the workspace areas and actions that support its day-to-day work.
-            </p>
-
-            {/* Persona Tabs */}
-            <div className="flex flex-wrap items-center justify-center gap-2 mt-8" role="group" aria-label="Choose a team view">
-              {PERSONAS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setActivePersona(p)}
-                  aria-pressed={activePersona.id === p.id}
-                  className={`px-4 py-2 rounded-full text-xs font-semibold transition-micro cursor-pointer active:scale-[0.98] ${
-                    activePersona.id === p.id
-                      ? 'bg-primary text-on-primary shadow-card hover:shadow-glow'
-                      : 'glass text-body hover:bg-surface-raised hover:text-heading border border-border-default/80 hover-lift'
-                  }`}
-                >
-                  {p.role}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Active Persona Showcase */}
-          <div ref={personaPanelRef} aria-live="polite" className="glass-strong border border-border-default/80 rounded-card p-6 sm:p-10 shadow-glass transition-premium">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
-              <div className="lg:col-span-2 space-y-4">
-                <span className="text-xs font-semibold uppercase tracking-wider text-accent">
-                  {activePersona.role}
-                </span>
-                <h3 className="text-2xl sm:text-3xl font-bold text-heading leading-tight">
-                  "{activePersona.title}"
-                </h3>
-                <p className="text-body-light text-base leading-relaxed pt-2">
-                  {activePersona.focus}
-                </p>
-                <div className="pt-2 text-xs text-caption">Illustrative workflow description</div>
-                </div>
-
-              {/* Metric Pillars */}
-              <div className="space-y-3">
-                {activePersona.metrics.map((m) => (
-                  <div
-                    key={m.label}
-                    className="bg-surface-muted/80 border border-border-default/80 p-4 rounded-card-sm flex items-center justify-between hover-lift transition-micro"
-                  >
-                    <span className="text-xs text-caption">{m.label}</span>
-                    <span className="text-right text-sm font-bold text-success sm:text-base">{m.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Interactive Pricing Matrix & Calculator ── */}
-      <section id="pricing" data-gsap-reveal className="max-w-6xl mx-auto px-4 sm:px-6 py-24 scroll-mt-20">
-        <div className="text-center mb-16">
-          <Badge variant="outline" className="mb-3 text-accent border-accent-muted bg-accent-light">
-            Transparent Pricing
-          </Badge>
-          <h2 className="text-3xl sm:text-5xl font-extrabold text-heading tracking-tight">
-            Plans that scale with your team and storage.
-          </h2>
-          <p className="text-body-light text-base sm:text-lg max-w-2xl mx-auto mt-4">
-            Every workspace starts with the <strong className="text-heading font-semibold">Free plan</strong>.
-            Prices below are monthly; paid checkout depends on Stripe being configured.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-          {PLATFORM_PLANS.map((plan) => {
-            const highlighted = Boolean(plan.popular)
-            const isFree = plan.id === 'free'
-            const price = new Intl.NumberFormat('en-US', {
-              style: 'currency',
-              currency: plan.currency,
-              maximumFractionDigits: 0,
-            }).format(plan.priceMonthly)
-
-            return (
-              <div
-                key={plan.id}
-                className={`rounded-card p-6 flex flex-col justify-between hover-lift transition-premium relative ${
-                  highlighted
-                    ? 'bg-primary text-on-primary border-2 border-accent shadow-glass hover:shadow-glow'
-                    : 'bg-surface-raised border border-border-default/80 hover:border-border-strong shadow-card hover:shadow-card-hover'
-                }`}
-              >
-                {highlighted && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-accent text-on-primary text-[10px] font-bold uppercase tracking-wider px-3 py-0.5 rounded-full shadow-card">
-                    Most Popular
-                  </span>
-                )}
+            <div ref={personaPanelRef} data-testid="persona-panel" aria-live="polite" data-reveal className={`${GLASS_PANEL} mx-auto mt-8 max-w-5xl rounded-[28px] p-6 sm:p-10`}>
+              <div className="flex items-start justify-between gap-5">
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className={`font-bold text-lg ${highlighted ? 'text-on-primary' : 'text-heading'}`}>{plan.name}</h3>
-                    {isFree && (
-                      <Badge variant="outline" className="bg-surface-muted text-body text-[10px] border-border-default shadow-xs">
-                        Default
-                      </Badge>
-                    )}
-                  </div>
-                  <p className={`text-xs mb-6 ${highlighted ? 'text-primary-subtle' : 'text-caption'}`}>{plan.tagline}</p>
-                  <div className="mb-6">
-                    <span className={`text-4xl font-extrabold ${highlighted ? 'text-on-primary' : 'text-heading'}`}>{price}</span>
-                    <span className={`text-xs ml-1 ${highlighted ? 'text-primary-subtle' : 'text-caption'}`}>
-                      {isFree ? '/ month forever' : '/ month'}
-                    </span>
-                  </div>
-                  <ul className={`space-y-3 text-xs ${highlighted ? 'text-primary-light' : 'text-body-light'}`}>
-                    <li className="flex items-center gap-2">
-                      <Check className={`w-4 h-4 flex-shrink-0 ${highlighted ? 'text-success-bright' : 'text-success'}`} />
-                      <span>Up to {plan.seatLimit.toLocaleString()} team members</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <Check className={`w-4 h-4 flex-shrink-0 ${highlighted ? 'text-success-bright' : 'text-success'}`} />
-                      <span>{plan.storageLimitGb.toLocaleString()} GB storage allowance</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <Check className={`w-4 h-4 flex-shrink-0 ${highlighted ? 'text-success-bright' : 'text-success'}`} />
-                      <span>Access to current product modules</span>
-                    </li>
-                  </ul>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-[#0071e3]">{activePersona.role}</p>
+                  <h3 className="mt-5 max-w-3xl text-2xl font-semibold leading-tight tracking-[-0.03em] sm:text-4xl">{activePersona.title}</h3>
+                  <p className="mt-5 max-w-2xl text-sm leading-7 text-[#737378]">{activePersona.focus}</p>
                 </div>
-                <Button
-                  asChild
-                  variant={highlighted ? 'default' : isFree ? 'default' : 'outline'}
-                  className={`w-full mt-8 text-xs h-10 rounded-button shadow-card hover-lift transition-micro active:scale-[0.98] ${
-                    highlighted || isFree ? 'bg-accent hover:bg-accent-hover text-on-primary' : 'border-border-default/80 bg-surface-raised hover:bg-surface-muted text-heading'
-                  }`}
-                >
-                  <Link to="/register">{isFree ? 'Start Free Now' : 'Start on Free'}</Link>
-                </Button>
+                <span className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white bg-white/70 text-[#0071e3] sm:flex"><ActivePersonaIcon className="h-5 w-5" /></span>
               </div>
-            )
-          })}
-        </div>
-      </section>
+              <div className="mt-9 grid border-t border-black/[0.07] pt-6 sm:grid-cols-3">
+                {activePersona.metrics.map((metric) => (
+                  <div key={metric.label} className="border-b border-black/[0.06] py-4 last:border-b-0 sm:border-b-0 sm:border-r sm:px-5 sm:first:pl-0 sm:last:border-r-0">
+                    <p className="text-[10px] uppercase tracking-[0.12em] text-[#929297]">{metric.label}</p>
+                    <p className="mt-2 text-xs font-semibold text-[#3a3a3c]">{metric.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
 
-      {/* ── Call to Action Banner ── */}
-      <section data-gsap-reveal className="bg-primary text-on-primary py-20 px-4 sm:px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          <Badge variant="outline" className="mb-4 text-on-primary border-primary-subtle bg-primary-hover">
-            Start with a free workspace
-          </Badge>
-          <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight mb-4">
-            Ready to set up your workspace?
-          </h2>
-          <p className="text-primary-subtle text-base sm:text-lg max-w-xl mx-auto mb-8 leading-relaxed">
-            Start clean, or plan a company migration when you are ready. All current product areas are available on the Free plan.
-          </p>
+        <section id="pricing" className="scroll-mt-24 border-y border-black/[0.06] bg-white px-4 py-24 sm:px-6 sm:py-32">
+          <div className="mx-auto max-w-6xl">
+            <div data-reveal className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
+              <div>
+                <SectionLabel>Simple pricing</SectionLabel>
+                <h2 className="mt-5 text-4xl font-semibold tracking-[-0.045em] sm:text-6xl">Start free.<br />Grow when ready.</h2>
+              </div>
+              <p className="max-w-md text-sm leading-6 text-[#737378]">Every workspace starts on Free. Paid checkout depends on Stripe being configured for your deployment.</p>
+            </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            <Button
-              asChild
-              className="bg-accent hover:bg-accent-hover text-on-primary font-medium text-sm h-12 px-8 rounded-button shadow-card"
-            >
-              <Link to="/register">Start Free Workspace</Link>
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              className="border-primary-subtle text-on-primary hover:bg-primary-hover text-sm h-12 px-6 rounded-button"
-            >
-              <Link to="/solutions">Explore product workflows</Link>
+            <div data-reveal className="mt-14 overflow-hidden rounded-[28px] border border-black/[0.07] bg-[#f7f7f8]">
+              <div className="grid md:grid-cols-2 xl:grid-cols-4">
+                {PLATFORM_PLANS.map((plan) => {
+                  const isFree = plan.id === 'free'
+                  const price = new Intl.NumberFormat('en-US', { style: 'currency', currency: plan.currency, maximumFractionDigits: 0 }).format(plan.priceMonthly)
+                  return (
+                    <article key={plan.id} className="flex flex-col border-b border-black/[0.07] p-6 transition-colors duration-300 last:border-b-0 hover:bg-white/55 md:border-r md:[&:nth-child(2n)]:border-r-0 xl:border-b-0 xl:[&:nth-child(2n)]:border-r xl:last:border-r-0">
+                      <div className="flex min-h-6 items-center justify-between gap-2">
+                        <h3 className="text-sm font-semibold">{plan.name}</h3>
+                        {plan.popular && <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#0071e3]">Most popular</span>}
+                      </div>
+                      <p className="mt-2 min-h-10 text-xs leading-5 text-[#86868b]">{plan.tagline}</p>
+                      <div className="mt-7 flex items-end gap-2">
+                        <span className="text-4xl font-semibold tracking-[-0.04em]">{price}</span>
+                        <span className="pb-1 text-[10px] text-[#86868b]">/ month</span>
+                      </div>
+                      <ul className="mt-7 space-y-3 text-xs text-[#6e6e73]">
+                        <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-[#0071e3]" />Up to {plan.seatLimit.toLocaleString()} members</li>
+                        <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-[#0071e3]" />{plan.storageLimitGb.toLocaleString()} GB storage</li>
+                        <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-[#0071e3]" />Current product modules</li>
+                      </ul>
+                      <Button asChild variant={isFree ? 'default' : 'outline'} className={`mt-8 h-10 w-full rounded-full text-xs font-medium ${isFree ? 'bg-[#0071e3] text-white hover:bg-[#0077ed]' : 'border-black/10 bg-transparent text-[#1d1d1f] shadow-none hover:bg-white'}`}>
+                        <Link to="/register">{isFree ? 'Start free' : 'Start on Free'}</Link>
+                      </Button>
+                    </article>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="relative isolate overflow-hidden px-4 py-24 sm:px-6 sm:py-32">
+          <div className="absolute left-1/2 top-1/2 -z-10 h-[500px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(174,210,255,0.4),transparent_68%)] blur-2xl" aria-hidden="true" />
+          <div data-reveal className={`${GLASS_PANEL} mx-auto max-w-5xl rounded-[32px] px-6 py-16 text-center sm:px-12 sm:py-20`}>
+            <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl border border-white bg-white/65 text-[#1d1d1f] shadow-sm"><AsasLogo className="h-4.5 w-4.5" /></span>
+            <h2 className="mx-auto mt-7 max-w-3xl text-4xl font-semibold leading-[1.04] tracking-[-0.045em] sm:text-6xl">Bring your business<br />into focus.</h2>
+            <p className="mx-auto mt-6 max-w-xl text-base leading-7 text-[#737378]">Set up your workspace and give every team a clearer next step. All current product areas are available on Free.</p>
+            <Button asChild className="mt-8 h-12 rounded-full bg-[#0071e3] px-7 text-sm font-medium text-white shadow-[0_10px_30px_rgba(0,113,227,0.22)] transition-all hover:bg-[#0077ed]">
+              <Link to={session?.user ? '/dashboard' : '/register'} data-magnetic="0.12">{session?.user ? 'Open your workspace' : 'Create your free workspace'}<ArrowRight className="h-4 w-4" /></Link>
             </Button>
           </div>
-        </div>
-      </section>
-
+        </section>
       </main>
 
-      {/* ── Footer ── */}
-      <footer className="bg-primary text-on-primary border-t border-primary-hover py-12 px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-5 gap-8">
+      <footer className="border-t border-black/[0.07] px-4 py-12 sm:px-6">
+        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-10 md:grid-cols-5">
           <div className="col-span-2">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-card-sm bg-accent text-on-primary flex items-center justify-center font-bold text-xs shadow-card">
-                A
-              </div>
-              <span className="text-base font-bold text-on-primary">Asas</span>
-            </div>
-            <p className="text-xs text-primary-subtle max-w-xs leading-relaxed mb-4">
-              Finance, people, customer relationships, projects, and inventory records in one workspace.
-            </p>
-            <p className="text-[11px] text-primary-subtle">
-              © {new Date().getFullYear()} Asas Technologies Inc. All rights reserved.
-            </p>
+            <Link to="/" className="flex w-fit items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#1d1d1f] text-white"><AsasLogo className="h-4 w-4" /></span>
+              <span className="text-base font-semibold tracking-tight">Asas</span>
+            </Link>
+            <p className="mt-4 max-w-xs text-xs leading-6 text-[#86868b]">One thoughtful workspace for finance, people, customers, projects, and inventory.</p>
+            <p className="mt-6 text-[10px] text-[#9a9aa0]">© {new Date().getFullYear()} Asas Technologies Inc. All rights reserved.</p>
           </div>
-
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-on-primary mb-3">Product</h4>
-            <ul className="space-y-2 text-xs">
-              <li><Link to="/#features" className="text-primary-subtle hover:text-on-primary transition-colors">Features</Link></li>
-              <li><Link to="/solutions" className="text-primary-subtle hover:text-on-primary transition-colors">Solutions</Link></li>
-              <li><Link to="/pricing" className="text-primary-subtle hover:text-on-primary transition-colors">Pricing</Link></li>
-              <li><Link to="/status" className="text-primary-subtle hover:text-on-primary transition-colors">System Status</Link></li>
+            <h3 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#626267]">Product</h3>
+            <ul className="space-y-3 text-xs text-[#86868b]">
+              <li><Link to="/#features" className="transition-colors hover:text-[#0071e3]">Features</Link></li>
+              <li><Link to="/solutions" className="transition-colors hover:text-[#0071e3]">Solutions</Link></li>
+              <li><Link to="/pricing" className="transition-colors hover:text-[#0071e3]">Pricing</Link></li>
             </ul>
           </div>
-
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-on-primary mb-3">Resources</h4>
-            <ul className="space-y-2 text-xs">
-              <li><Link to="/documentation" className="text-primary-subtle hover:text-on-primary transition-colors">Documentation</Link></li>
-              <li><Link to="/documentation#api-reference" className="text-primary-subtle hover:text-on-primary transition-colors">API Reference</Link></li>
-              <li><Link to="/documentation#security" className="text-primary-subtle hover:text-on-primary transition-colors">Access & data handling</Link></li>
+            <h3 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#626267]">Resources</h3>
+            <ul className="space-y-3 text-xs text-[#86868b]">
+              <li><Link to="/documentation" className="transition-colors hover:text-[#0071e3]">Documentation</Link></li>
+              <li><Link to="/documentation#api-reference" className="transition-colors hover:text-[#0071e3]">API reference</Link></li>
+              <li><Link to="/documentation#security" className="transition-colors hover:text-[#0071e3]">Access & data handling</Link></li>
             </ul>
           </div>
-
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-on-primary mb-3">Legal & Trust</h4>
-            <ul className="space-y-2 text-xs">
-              <li><Link to="/privacy" className="text-primary-subtle hover:text-on-primary transition-colors">Privacy Policy</Link></li>
-              <li><Link to="/terms" className="text-primary-subtle hover:text-on-primary transition-colors">Terms of Service</Link></li>
-              <li><Link to="/documentation#security" className="text-primary-subtle hover:text-on-primary transition-colors">Security practices</Link></li>
+            <h3 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#626267]">Legal & trust</h3>
+            <ul className="space-y-3 text-xs text-[#86868b]">
+              <li><Link to="/privacy" className="transition-colors hover:text-[#0071e3]">Privacy policy</Link></li>
+              <li><CookieSettingsButton className="transition-colors hover:text-[#0071e3]" /></li>
+              <li><Link to="/terms" className="transition-colors hover:text-[#0071e3]">Terms of service</Link></li>
+              <li><Link to="/documentation#security" className="transition-colors hover:text-[#0071e3]">Security practices</Link></li>
             </ul>
           </div>
         </div>

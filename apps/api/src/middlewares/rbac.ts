@@ -9,6 +9,8 @@ export interface AuthContext {
   tenantId: string
   role: UserRole
   employeeId: string | null
+  /** Tenant status resolved with the membership; suspended workspaces are blocked by guards. */
+  tenantStatus?: string
 }
 
 declare module 'fastify' {
@@ -118,6 +120,7 @@ export async function resolveAuthContext(
 
   const member = await prisma.member.findUnique({
     where: { tenantId_userId: { tenantId, userId: sessionData.user.id } },
+    include: { tenant: { select: { status: true } } },
   })
   if (!member) return null
 
@@ -126,6 +129,7 @@ export async function resolveAuthContext(
     tenantId,
     role: member.role,
     employeeId: member.employeeId,
+    tenantStatus: member.tenant?.status ?? 'ACTIVE',
   }
   if (sessionToken) {
     // A hard size cap with a full clear keeps the map bounded without an LRU dependency;
@@ -165,6 +169,15 @@ export function requireRole(minimum: UserRole) {
     }
     if (!hasRequiredRole(context.role, minimum)) {
       await reply.code(403).send({ error: { message: 'Insufficient role for this action' } })
+      return
+    }
+    if (context.tenantStatus && context.tenantStatus !== 'ACTIVE') {
+      await reply.code(403).send({
+        error: {
+          message: 'This workspace is suspended. Contact the platform administrator to restore access.',
+          details: { code: 'WORKSPACE_SUSPENDED' },
+        },
+      })
       return
     }
     request.authContext = context

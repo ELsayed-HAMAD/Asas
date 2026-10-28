@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { AppError } from '../../utils/errors.js'
 
 const devSocialLoginBodySchema = z.object({
-  provider: z.enum(['google', 'apple']),
+  provider: z.enum(['google']),
   email: z.string().email(),
   name: z.string().min(1).max(100).optional(),
 })
@@ -18,15 +18,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     return {
       data: {
         google: Boolean(env.googleClientId && env.googleClientSecret),
-        apple: Boolean(env.appleClientId && env.appleClientSecret),
         email: Boolean(env.resendApiKey),
         devAuthAllowed: env.devSocialAuthEnabled,
       },
     }
   })
 
-  // Development sandbox social sign-in: enables end-to-end testing of Google and Apple flows
-  // without requiring external Google Cloud Console or Apple Developer accounts.
+  // Development sandbox social sign-in: enables end-to-end testing of the Google flow
+  // without requiring external Google Cloud Console credentials.
   // Disabled by default and only available as an explicit local-development opt-in.
   app.post('/dev-social-login', async (request, reply) => {
     if (!env.devSocialAuthEnabled) {
@@ -43,7 +42,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     const { provider, email: rawEmail, name: rawName } = parseResult.data
     const email = rawEmail.trim().toLowerCase()
-    const name = rawName?.trim() || (provider === 'apple' ? 'Apple Enterprise User' : 'Google Enterprise User')
+    const name = rawName?.trim() || 'Google Enterprise User'
 
     // Find or create the user in the database
     let user = await app.prisma.user.findUnique({ where: { email } })

@@ -575,7 +575,7 @@ export default function AccountsPayable() {
               className="text-2xl font-bold text-heading tracking-tight tabular-nums leading-none"
               title={formatMoney(paidThisMonthTotal)}
             >
-              {paidThisMonthTotal == null ? '—' : formatCompactCurrency(paidThisMonthTotal)}
+              {paidThisMonthTotal == null ? <span className="text-base font-medium text-muted">No payments yet</span> : formatCompactCurrency(paidThisMonthTotal)}
             </span>
             <span className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0">
               MTD
@@ -757,7 +757,7 @@ export default function AccountsPayable() {
                   )}
                   <div className="min-w-0">
                     <h2 className="text-base font-bold text-heading leading-tight truncate" title={selectedRecord.vendor}>{selectedRecord.vendor}</h2>
-                    <p className="text-xs text-muted mt-0.5 truncate leading-tight">Invoice #{selectedRecord.invoiceNumber || 'N/A'}</p>
+                    <p className="text-xs text-muted mt-0.5 truncate leading-tight">{selectedRecord.invoiceNumber ? `Invoice #${selectedRecord.invoiceNumber}` : 'No invoice number'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">

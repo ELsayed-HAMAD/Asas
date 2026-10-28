@@ -114,7 +114,7 @@ describe('receivable inventory fulfillment', () => {
     }, 'user_1')
 
     expect(inventory.writeStockMovement).toHaveBeenCalledWith(tx, expect.objectContaining({
-      tenantId: 'tenant_1', productId: 'product_1', delta: -2, note: 'Sale — receivable INV-1', createdAt: now,
+      tenantId: 'tenant_1', productId: 'product_1', delta: -2, note: 'Sale: receivable INV-1', createdAt: now,
     }))
     expect(inventory.postValuedIssue).toHaveBeenCalledWith(tx, expect.objectContaining({
       tenantId: 'tenant_1', productId: 'product_1', stockMovementId: 'movement_1',
@@ -152,7 +152,7 @@ describe('receivable inventory fulfillment', () => {
     const result = await voidReceivable(prisma as never, 'tenant_1', 'invoice_1', 'Duplicate invoice', 'user_1')
 
     expect(inventory.writeStockMovement).toHaveBeenCalledWith(tx, expect.objectContaining({
-      tenantId: 'tenant_1', productId: 'product_1', delta: 2, note: 'Sale reversal — receivable INV-1',
+      tenantId: 'tenant_1', productId: 'product_1', delta: 2, note: 'Sale reversal: receivable INV-1',
     }))
     expect(inventory.reverseValuedSaleIssue).toHaveBeenCalledWith(tx, expect.objectContaining({
       tenantId: 'tenant_1', productId: 'product_1', originalStockMovementId: 'movement_issue',

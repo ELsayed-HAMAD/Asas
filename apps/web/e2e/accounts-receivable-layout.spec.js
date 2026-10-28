@@ -168,12 +168,10 @@ test('accounts receivable satisfies Apple-Glass polish, exact currency, aging ca
   await expect(page.locator('p').filter({ hasText: /^31-60 Days$/i }).first()).toBeVisible()
   await expect(page.locator('p').filter({ hasText: /^60\+ Days$/i }).first()).toBeVisible()
 
-  // Card 1: Subtext must NOT be "Collected MTD: Unavaila..."
-  const totalSubtext = page.getByText(/Collected MTD/)
+  // Card 1: MTD collections explain the state instead of showing a system placeholder
+  const totalSubtext = page.getByText('No collections yet')
   await expect(totalSubtext).toBeVisible()
-  const subtextContent = await totalSubtext.textContent()
-  expect(subtextContent).not.toContain('Unavaila')
-  expect(subtextContent).toContain('Collected MTD: —')
+  await expect(page.getByText(/Collected MTD: Unavaila/)).toHaveCount(0)
 
   // Card 5: Strict preservation of red left border accent, text-danger, and critical invoices
   const card60Plus = page.locator('div').filter({ has: page.locator('p').filter({ hasText: /^60\+ Days$/i }) }).last()

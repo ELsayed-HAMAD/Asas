@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { listCurrencies } from '@asas/domain/money'
-import { getAvailableTimeZones } from '../../../lib/timeZones'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -15,7 +14,10 @@ import TopBarActions from '../../../components/TopBarActions'
 import SettingsTabs from './SettingsTabs'
 import ConfirmDialog from '../../../components/common/ConfirmDialog'
 import FormDialog from '../../../components/common/FormDialog'
+import CurrencyCombobox from '../../../components/common/CurrencyCombobox'
+import TimeZoneCombobox from '../../../components/common/TimeZoneCombobox'
 import TwoFactorSettings from './TwoFactorSettings'
+import { EMPTY } from '../../../lib/emptyText'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
 import { Badge } from '../../../components/ui/badge'
@@ -32,6 +34,7 @@ import { settingsApi } from '../../../lib/api/settings'
 import { queryKeys } from '../../../lib/queryKeys'
 import { useActiveMemberRole, useActiveOrganization } from '../../../lib/authClient'
 import { getMemberRoleName } from '../../../lib/memberRole'
+import { clearOnboardingDraft, onboardingDraftStorage } from '../../../lib/onboardingDraft'
 
 export default function SettingsGeneral() {
   const navigate = useNavigate()
@@ -72,7 +75,6 @@ export default function SettingsGeneral() {
   // Form fields are seeded from the server response (the old page used uncontrolled
   // defaultValue + a no-op Save button; now Save is a real PATCH).
   const [form, setForm] = useState({ name: '', supportEmail: '', logoUrl: '', timezone: '', currency: '', dateFormat: '', overtimeThresholdHours: '8' })
-  const availableTimezones = getAvailableTimeZones(undefined, [localTimezone, form.timezone])
   const [saved, setSaved] = useState(false)
   const [rateForm, setRateForm] = useState({ currency: '', rateToBase: '', effectiveAt: '', reference: '' })
   const fileInputRef = useRef(null)
@@ -137,6 +139,8 @@ export default function SettingsGeneral() {
       // The active organization's status becomes PENDING, so the dashboard shell
       // redirects to /onboarding for the 3-choice flow.
       queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'asas' })
+      // Reconfiguring a cleared workspace is a fresh start, not a resume of an earlier draft.
+      clearOnboardingDraft(onboardingDraftStorage())
       navigate('/onboarding', { replace: true })
     },
   })
@@ -198,20 +202,18 @@ export default function SettingsGeneral() {
       <h1 className="sr-only">Settings</h1>
 
       <TopBarActions>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-strong shrink-0"></div>
-
+        <div className="flex items-center gap-3">
           <Button
             onClick={() => saveMutation.mutate()}
             disabled={!canManageSettings || saveMutation.isPending}
             title={!canManageSettings ? 'Only workspace admins and owners can change settings' : undefined}
-            className="px-5 py-1.5 h-8 text-sm font-semibold whitespace-nowrap"
+            className="h-9 whitespace-nowrap rounded-full px-5 text-sm font-medium"
           >
             {saved ? <Check size={14} /> : saveMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : null}
             {saved ? 'Saved' : 'Save Changes'}
           </Button>
           {saveMutation.isError && <p role="alert" className="text-xs text-danger">{saveMutation.error?.message || 'Unable to save settings.'}</p>}
-          {!canManageSettings && <span className="text-xs text-muted">View only — admin access is required to change workspace settings.</span>}
+          {!canManageSettings && <span className="hidden text-xs text-muted xl:inline">View only. Admin access is required.</span>}
         </div>
       </TopBarActions>
 
@@ -325,52 +327,29 @@ export default function SettingsGeneral() {
             <h2 className="text-lg font-bold text-heading mb-1">Localization</h2>
             <p className="text-sm text-muted mb-6">Configure regional settings for all users in this workspace.</p>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <label htmlFor="settings-timezone" className="block text-xs font-bold text-heading mb-1.5">Timezone</label>
-                <Select
+                <TimeZoneCombobox
+                  id="settings-timezone"
+                  ariaLabel="Timezone"
                   value={form.timezone || localTimezone}
-                  onValueChange={val => setForm(current => ({ ...current, timezone: val }))}
+                  onChange={val => setForm(current => ({ ...current, timezone: val }))}
                   disabled={!canManageSettings}
-                >
-                  <SelectTrigger id="settings-timezone" className="w-full text-sm bg-surface-raised">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="UTC">UTC (Universal Coordinated Time)</SelectItem>
-                    {localTimezone && localTimezone !== 'UTC' && (
-                      <SelectItem value={localTimezone}>Local System Timezone ({localTimezone})</SelectItem>
-                    )}
-                    {availableTimezones.filter(tz => tz !== 'UTC' && tz !== localTimezone).map(tz => (
-                      <SelectItem key={tz} value={tz}>
-                        {tz.replaceAll('_', ' ')}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  className="h-9 bg-surface-raised"
+                />
               </div>
               <div>
                 <label htmlFor="settings-currency" className="block text-xs font-bold text-heading mb-1.5">Currency</label>
-                <Select
+                <CurrencyCombobox
+                  id="settings-currency"
+                  ariaLabel="Currency"
                   value={form.currency || 'USD'}
-                  onValueChange={val => setForm(current => ({ ...current, currency: val }))}
+                  onChange={val => setForm(current => ({ ...current, currency: val }))}
                   disabled={!canManageSettings || Boolean(settings.currencyLockedAt)}
-                >
-                  <SelectTrigger
-                    id="settings-currency"
-                    className="w-full text-sm bg-surface-raised disabled:opacity-60"
-                    title={settings.currencyLockedAt ? 'Base currency is fixed once monetary data exists; relabeling is not FX conversion.' : 'Choose the base currency before entering monetary data.'}
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {listCurrencies().map(({ code }) => (
-                      <SelectItem key={code} value={code}>
-                        {code === 'USD' ? 'USD ($)' : code === 'EUR' ? 'EUR (€)' : code}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  className="h-9 bg-surface-raised"
+                  title={settings.currencyLockedAt ? 'Base currency is fixed once monetary data exists; relabeling is not FX conversion.' : 'Choose the base currency before entering monetary data.'}
+                />
                 <p className="mt-1.5 text-xs text-muted">{settings.currencyLockedAt ? 'Base currency is fixed to protect existing monetary records. Currency conversion requires an explicit FX workflow.' : 'Choose your base currency before adding salaries, invoices, products or budgets.'}</p>
               </div>
             </div>
@@ -466,7 +445,7 @@ export default function SettingsGeneral() {
                     <h3 className="text-sm font-bold text-heading">Reset sample data</h3>
                     <p className="text-sm text-body-light mt-0.5">
                       Remove the sample dataset and go back to the setup screen. Your account and
-                      workspace stay intact — you can start empty or upload your own data.
+                      workspace stay intact. You can start empty or upload your own data.
                     </p>
                   </div>
                 </div>
@@ -502,10 +481,10 @@ export default function SettingsGeneral() {
         </div>
 
         {/* Right: Subscription Inspector Panel */}
-        <div className="w-full xl:w-[360px] xl:flex-shrink-0 bg-surface-raised border-t xl:border-t-0 xl:border-l border-border-default flex flex-col shadow-panel z-10">
+        <div className="z-10 flex w-full flex-col border-t border-border-default bg-surface-raised/55 shadow-panel backdrop-blur-xl xl:my-8 xl:mr-5 xl:w-[360px] xl:flex-shrink-0 xl:overflow-hidden xl:rounded-[24px] xl:border xl:shadow-card">
 
-          <div className="xl:flex-1 xl:overflow-y-auto p-8">
-            <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-6">Subscription Inspector</h3>
+          <div className="p-6 xl:flex-1 xl:overflow-y-auto">
+            <h3 className="mb-5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">Subscription inspector</h3>
 
             {/* Current Plan Card */}
             <div className="bg-surface-muted border border-border-default rounded-card-sm p-5 mb-6 shadow-card">
@@ -538,7 +517,7 @@ export default function SettingsGeneral() {
                   <span className="text-[11px] font-medium text-body-light">
                     {activeSubscription?.seatsUsed != null && activeSubscription?.seatLimit != null
                       ? `${activeSubscription.seatsUsed.toLocaleString()} / ${activeSubscription.seatLimit.toLocaleString()}`
-                      : '—'}
+                      : EMPTY.unavailable}
                   </span>
                 </div>
                 <div className="w-full bg-surface-strong rounded-full h-1.5 overflow-hidden">
@@ -563,7 +542,7 @@ export default function SettingsGeneral() {
                   <span className="text-[11px] font-medium text-body-light">
                     {activeSubscription?.storageUsedGb != null && activeSubscription?.storageLimitGb != null
                       ? `${activeSubscription.storageUsedGb < 0.001 ? `${Math.round(activeSubscription.storageUsedGb * 1_000_000)} KB` : activeSubscription.storageUsedGb < 1 ? `${(activeSubscription.storageUsedGb * 1000).toFixed(1)} MB` : `${activeSubscription.storageUsedGb.toFixed(2)} GB`} / ${activeSubscription.storageLimitGb} GB`
-                      : '—'}
+                      : EMPTY.unavailable}
                   </span>
                 </div>
                 <div className="w-full bg-surface-strong rounded-full h-1.5 overflow-hidden">
@@ -586,7 +565,7 @@ export default function SettingsGeneral() {
           </div>
 
           {/* Sticky Bottom Actions */}
-          <div className="p-8 bg-surface-raised border-t border-border-subtle flex flex-col gap-4 mt-auto">
+          <div className="mt-auto flex flex-col gap-3 border-t border-border-subtle bg-surface-raised/35 p-5">
             <Button
               type="button"
               onClick={() => navigate('/dashboard/settings/billing')}
@@ -612,7 +591,7 @@ export default function SettingsGeneral() {
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => clearMutation.mutate()}
         title="Reset sample data?"
-        description="This permanently removes the sample dataset from this workspace — employees, deals, invoices, projects, and stock. Your account and workspace are kept. You'll return to the setup screen where you can start empty or upload your own data."
+        description="This permanently removes the sample dataset from this workspace, including employees, deals, invoices, projects, and stock. Your account and workspace are kept. You'll return to the setup screen where you can start empty or upload your own data."
         confirmLabel="Reset sample data"
         busy={clearMutation.isPending}
         danger

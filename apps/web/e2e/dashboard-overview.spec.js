@@ -138,6 +138,7 @@ test('a clean workspace shows truthful empty dashboard states, keyboard skip acc
     await expect(page.getByText('Recorded audits will appear here after the page refreshes', { exact: true })).toBeVisible()
     await expect(page.getByText('…', { exact: true })).toHaveCount(0)
     await expect(page.getByText('—', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('N/A', { exact: true })).toHaveCount(0)
     await expect(page.getByText(/Acme Global/)).toHaveCount(0)
 
     await page.keyboard.press('Tab')
@@ -166,6 +167,41 @@ test('a clean workspace shows truthful empty dashboard states, keyboard skip acc
     expect(csv).toContain('"Active Sprints","0"')
     expect(csv).toContain('"Requires attention","Detail","Amount / action"')
     expect(csv).not.toContain('…')
+  } finally {
+    await context.close()
+  }
+})
+
+test('desktop sidebar toggle stays in the topbar and never overlaps the collapsed brand', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' })
+  await mockDashboard(context, emptyEndpointData)
+
+  try {
+    const page = await context.newPage()
+    await page.goto('/dashboard')
+
+    const sidebar = page.locator('aside').first()
+    const collapseButton = page.getByRole('button', { name: 'Collapse sidebar', exact: true })
+    await expect(collapseButton).toBeVisible()
+    await collapseButton.click()
+
+    const expandButton = page.getByRole('button', { name: 'Expand sidebar', exact: true })
+    await expect(expandButton).toBeVisible()
+    await expect(sidebar.getByRole('button', { name: 'Expand sidebar' })).toHaveCount(0)
+
+    const sidebarBox = await sidebar.boundingBox()
+    expect(sidebarBox).not.toBeNull()
+    // The sidebar animates its width, so poll instead of sampling a mid-transition frame.
+    await expect.poll(async () => Math.round((await sidebar.boundingBox())?.width ?? 999)).toBeLessThanOrEqual(65)
+
+    const logoBox = await page.getByTestId('sidebar-brand-logo').boundingBox()
+    const expandBox = await expandButton.boundingBox()
+    expect(logoBox).not.toBeNull()
+    expect(expandBox).not.toBeNull()
+    expect(expandBox.x).toBeGreaterThanOrEqual(logoBox.x + logoBox.width)
+
+    await expandButton.click()
+    await expect(page.getByRole('button', { name: 'Collapse sidebar', exact: true })).toBeVisible()
   } finally {
     await context.close()
   }

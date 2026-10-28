@@ -213,7 +213,7 @@ const COMMAND_ITEMS = [
   },
   {
     id: 'nav-settings-general',
-    title: 'Settings — General',
+    title: 'Settings: General',
     subtitle: 'Workspace profile, timezone, currency and danger zone',
     category: 'Navigation',
     path: '/dashboard/settings',
@@ -222,7 +222,7 @@ const COMMAND_ITEMS = [
   },
   {
     id: 'nav-settings-members',
-    title: 'Settings — Members & Roles',
+    title: 'Settings: Members & Roles',
     subtitle: 'Invite colleagues, manage roles and permissions',
     category: 'Navigation',
     path: '/dashboard/settings/members',
@@ -231,7 +231,7 @@ const COMMAND_ITEMS = [
   },
   {
     id: 'nav-settings-billing',
-    title: 'Settings — Billing & Plans',
+    title: 'Settings: Billing & Plans',
     subtitle: 'Subscription tier, seats and invoice history',
     category: 'Navigation',
     path: '/dashboard/settings/billing',

@@ -27,7 +27,7 @@ export const projectSchema = z.object({
   unvaluedSettlementCount: z.int().min(0).default(0),
   /**
    * Budget utilization as a percentage, 0–100+ — a server-computed KPI (spent / budget).
-   * `null` when there is no budget to divide by, so the UI renders "—" rather than a fake 0.
+   * `null` when there is no budget to divide by, so the UI renders "N/A" rather than a fake 0.
    */
   utilizationPct: z.number().min(0).nullable(),
   timeline: isoDateTimeSchema.nullable(),

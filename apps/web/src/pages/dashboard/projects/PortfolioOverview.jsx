@@ -18,6 +18,7 @@ import { projectsApi } from '../../../lib/api/projects';
 import { hrApi } from '../../../lib/api/hr';
 import { queryKeys } from '../../../lib/queryKeys';
 import { formatCompactTableMoney, formatDate, formatMoney, formatCompactCurrency, formatFullCurrency } from '../../../lib/format';
+import { EMPTY } from '../../../lib/emptyText';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import SearchInput from '../../../components/common/SearchInput';
@@ -56,8 +57,8 @@ const formatStatus = (status) => {
 };
 
 // The utilization endpoint has no budget to divide by → `null`; the old page rendered a
-// hardcoded "0". We surface "—" instead of a fake zero (see PORT RULES / judgments).
-const pct = (value) => (value == null ? '—' : `${Math.round(value)}%`);
+// hardcoded "0". We surface "No budget" instead of a fake zero (see PORT RULES / judgments).
+const pct = (value) => (value == null ? EMPTY.budget : `${Math.round(value)}%`);
 
 export default function PortfolioOverview() {
   const queryClient = useQueryClient()
@@ -477,7 +478,7 @@ export default function PortfolioOverview() {
                       indicatorClassName="bg-indigo-600"
                     />
                     <span className="text-xs font-semibold text-indigo-600 shrink-0">
-                      {pct(selectedBudgetUtil)} Utilized
+                      {selectedBudgetUtil == null ? 'No budget set' : `${pct(selectedBudgetUtil)} Utilized`}
                     </span>
                   </div>
                 </div>

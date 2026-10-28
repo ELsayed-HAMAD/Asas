@@ -120,7 +120,7 @@ export default function NotificationPopover() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="relative h-9 w-9 flex items-center justify-center rounded-button text-body hover:text-heading hover:bg-surface-muted hover-lift transition-micro cursor-pointer active:scale-[0.98]"
+          className="relative flex h-9 w-9 items-center justify-center rounded-full border border-border-default/70 bg-surface-raised/45 text-muted shadow-none backdrop-blur-md transition-colors hover:bg-surface-raised hover:text-heading focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           title="Notifications"
           aria-label="Open notifications"
         >

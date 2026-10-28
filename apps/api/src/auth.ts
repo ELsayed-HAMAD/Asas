@@ -4,12 +4,14 @@ import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { createAccessControl, organization, twoFactor } from 'better-auth/plugins'
 import type { AsasEnv } from './config/env.js'
-import { invalidateAuthCacheForTenant, invalidateAuthCacheForUser } from './middlewares/rbac.js'
+import { invalidateAuthCacheForTenant, invalidateAuthCacheForToken, invalidateAuthCacheForUser } from './middlewares/rbac.js'
 import { closeStreamsForUser } from './plugins/sse.js'
 import { recordAuditLog } from './services/auditLog.js'
+import { getPlatformFlags } from './modules/platform/platformSettings.js'
 import { emailVerificationHtml, invitationHtml, passwordResetHtml } from './services/authEmailTemplates.js'
 import { releaseWorkspaceSeat, reserveWorkspaceSeat } from './services/entitlements.js'
 import { mailer } from './services/mailer.js'
+import { withTwoFactorSessionMarker } from './services/twoFactorSession.js'
 
 /**
  * Better Auth, with the `organization` plugin mapped onto the existing `Tenant` table.
@@ -83,6 +85,11 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv, logger: AuthLogge
     baseURL: env.betterAuthUrl,
     trustedOrigins: env.frontendOrigin.split(',').map(value => value.trim()),
     database: prismaAdapter(prisma, { provider: 'postgresql' }),
+    user: {
+      additionalFields: {
+        platformRole: { type: 'string', required: false, input: false },
+      },
+    },
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 12,
@@ -138,14 +145,6 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv, logger: AuthLogge
             google: {
               clientId: env.googleClientId,
               clientSecret: env.googleClientSecret,
-            },
-          }
-        : {}),
-      ...(env.appleClientId && env.appleClientSecret
-        ? {
-            apple: {
-              clientId: env.appleClientId,
-              clientSecret: env.appleClientSecret,
             },
           }
         : {}),
@@ -226,6 +225,7 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv, logger: AuthLogge
               currency: { type: 'string', required: false, input: false },
               dateFormat: { type: 'string', required: false },
               onboardingStatus: { type: 'string', required: false, input: false },
+              status: { type: 'string', required: false, input: false },
             },
           },
           member: {
@@ -247,18 +247,84 @@ export function createAuth(prisma: PrismaClient, env: AsasEnv, logger: AuthLogge
       }),
     ],
     databaseHooks: {
+      user: {
+        create: {
+          before: async user => {
+            const flags = await getPlatformFlags(prisma)
+            if (!flags.signupsEnabled) {
+              throw new APIError('FORBIDDEN', {
+                message: 'New signups are paused by the platform administrator. Please try again later.',
+              })
+            }
+            return { data: user }
+          },
+        },
+      },
       session: {
         create: {
-          before: async session => {
-            if (session.activeOrganizationId) return { data: session }
-            const membershipCount = await prisma.member.count({ where: { userId: session.userId } })
-            if (membershipCount === 1) {
-              const onlyMember = await prisma.member.findFirst({ where: { userId: session.userId } })
-              if (onlyMember) {
-                return { data: { ...session, activeOrganizationId: onlyMember.tenantId } }
+          before: async (session, context) => {
+            // A session created by a `/two-factor/verify-*` endpoint has completed the second
+            // factor. OAuth callbacks and trusted-device sign-ins do not pass through those
+            // endpoints, so their sessions stay unmarked and the platform console asks for a
+            // step-up verification.
+            const sessionData = withTwoFactorSessionMarker(session, context?.path)
+            // Bootstrap the platform owner as early as possible so the session payload exposes
+            // the role to the user menu. The platform guard repeats this (and audits it) for
+            // accounts that already had a session when the allow-list was added.
+            if (env.platformOwnerEmails.length > 0) {
+              const ownerCandidate = await prisma.user.findUnique({
+                where: { id: sessionData.userId },
+                select: { id: true, email: true, emailVerified: true, platformRole: true },
+              })
+              if (
+                ownerCandidate &&
+                ownerCandidate.emailVerified &&
+                env.platformOwnerEmails.includes(ownerCandidate.email.toLowerCase()) &&
+                ownerCandidate.platformRole === 'NONE'
+              ) {
+                await prisma.user.update({
+                  where: { id: ownerCandidate.id },
+                  data: { platformRole: 'OWNER' },
+                })
+                try {
+                  await prisma.platformAuditLog.create({
+                    data: {
+                      actorId: ownerCandidate.id,
+                      action: 'platform.owner.bootstrap',
+                      targetType: 'User',
+                      targetId: ownerCandidate.id,
+                      metadata: JSON.stringify({ email: ownerCandidate.email, source: 'session.create' }),
+                    },
+                  })
+                } catch {
+                  // Non-blocking audit: a missing audit table must not block sign-in.
+                }
               }
             }
-            return { data: session }
+            if (sessionData.activeOrganizationId) return { data: sessionData }
+            const membershipCount = await prisma.member.count({ where: { userId: sessionData.userId } })
+            if (membershipCount === 1) {
+              const onlyMember = await prisma.member.findFirst({ where: { userId: sessionData.userId } })
+              if (onlyMember) {
+                return { data: { ...sessionData, activeOrganizationId: onlyMember.tenantId } }
+              }
+            }
+            return { data: sessionData }
+          },
+        },
+        update: {
+          after: async (session: { token?: string | null }) => {
+            // `organization.setActive` rewrites `activeOrganizationId` on the session row through
+            // this update path. The RBAC context cache is keyed by session token and lives for
+            // five seconds; without this, API calls made right after switching workspaces would
+            // still resolve the previous tenant (and write settings/onboarding state there).
+            if (session?.token) invalidateAuthCacheForToken(session.token)
+          },
+        },
+        delete: {
+          after: async (session: { token?: string | null }) => {
+            // Sign-out must not leave a cached authorization context usable for its TTL.
+            if (session?.token) invalidateAuthCacheForToken(session.token)
           },
         },
       },

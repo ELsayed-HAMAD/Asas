@@ -16,6 +16,8 @@ import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tansta
 import { inventoryApi } from '../../../lib/api/inventory'
 import { queryKeys } from '../../../lib/queryKeys'
 import { formatDate } from '../../../lib/format'
+import { EMPTY } from '../../../lib/emptyText'
+import MissingValue from '../../../components/common/MissingValue'
 import { useActiveMemberRole, useActiveOrganization, useSession } from '../../../lib/authClient'
 import { useDebouncedValue } from '../../../lib/useDebouncedValue'
 import {
@@ -295,7 +297,7 @@ export default function StockMovements() {
               </div>
             </div>
             <p className="text-2xl font-bold text-heading tabular-nums">
-              {summary ? summary.totalIn.toLocaleString() : '—'}
+              {summary ? summary.totalIn.toLocaleString() : <MissingValue label={EMPTY.data} className="text-base" />}
             </p>
             <p className="text-[11px] text-muted mt-1.5 flex items-center gap-1">
               {summary?.recordedThisMonth ? (
@@ -320,7 +322,7 @@ export default function StockMovements() {
               </div>
             </div>
             <p className="text-2xl font-bold text-heading tabular-nums">
-              {summary ? summary.totalOut.toLocaleString() : '—'}
+              {summary ? summary.totalOut.toLocaleString() : <MissingValue label={EMPTY.data} className="text-base" />}
             </p>
             <p className="text-[11px] text-muted mt-1.5 flex items-center gap-1">
               {summary?.recordedThisMonth ? (
@@ -345,7 +347,7 @@ export default function StockMovements() {
               </div>
             </div>
             <p className="text-2xl font-bold text-heading tabular-nums">
-              {summary ? (summary.totalIn - summary.totalOut).toLocaleString() : '—'}
+              {summary ? (summary.totalIn - summary.totalOut).toLocaleString() : <MissingValue label={EMPTY.data} className="text-base" />}
             </p>
             <p className="text-[11px] text-muted mt-1.5">
               Net movement differential across catalog
@@ -523,7 +525,7 @@ export default function StockMovements() {
                               {movement.warehouse}
                             </Badge>
                           ) : (
-                            <span className="text-muted">—</span>
+                            <span className="text-muted">No warehouse</span>
                           )}
                         </TableCell>
                         <TableCell className="px-5 py-3.5 whitespace-nowrap">
@@ -548,7 +550,7 @@ export default function StockMovements() {
                           {Math.abs(movement.delta).toLocaleString()}
                         </TableCell>
                         <TableCell className="px-5 py-3.5 text-xs text-body max-w-xs truncate" title={movement.note || ''}>
-                          {movement.note || <span className="text-muted">—</span>}
+                          {movement.note || <MissingValue label={EMPTY.note} />}
                         </TableCell>
                       </TableRow>
                     )
@@ -647,7 +649,7 @@ export default function StockMovements() {
                 <SelectItem value="__none__">Select a product...</SelectItem>
                 {productOptions.map((product) => (
                   <SelectItem key={product.id} value={product.id}>
-                    {product.name} ({product.sku}) — {product.stock} on hand
+                    {product.name} ({product.sku}): {product.stock} on hand
                   </SelectItem>
                 ))}
               </SelectContent>

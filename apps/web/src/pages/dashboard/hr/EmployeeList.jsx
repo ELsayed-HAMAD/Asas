@@ -12,6 +12,8 @@ import { hrApi } from '../../../lib/api/hr'
 import { auditLogApi } from '../../../lib/api/auditLog'
 import { queryKeys } from '../../../lib/queryKeys'
 import { formatMoney, formatDate } from '../../../lib/format'
+import { EMPTY } from '../../../lib/emptyText'
+import MissingValue from '../../../components/common/MissingValue'
 import { cn } from '../../../lib/utils'
 import { exportsApi } from '../../../lib/api/exports'
 import FormDialog from '../../../components/common/FormDialog'
@@ -291,7 +293,7 @@ export default function EmployeeDirectory() {
       const match = departments.find(d => d.id === emp.departmentId)
       if (match?.name) return match.name
     }
-    return '—'
+    return 'No department'
   }
 
   return (
@@ -552,7 +554,7 @@ export default function EmployeeDirectory() {
                             <span className="text-xs sm:text-sm font-semibold text-heading truncate">{emp.name}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="px-3.5 py-2.5 text-xs sm:text-sm text-body-light truncate">{emp.title || '—'}</TableCell>
+                        <TableCell className="px-3.5 py-2.5 text-xs sm:text-sm text-body-light truncate">{emp.title || EMPTY.provided}</TableCell>
                         <TableCell className="px-3.5 py-2.5 text-xs sm:text-sm text-body-light truncate">{deptName}</TableCell>
                         <TableCell className="pr-4 pl-3.5 py-2.5 text-right rtl:text-left whitespace-nowrap">
                           <Badge variant={emp.status === 'ACTIVE' ? 'success' : 'warning'} className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold">
@@ -619,12 +621,12 @@ export default function EmployeeDirectory() {
                     <div className="min-w-0 flex-1">
                       <h2 className="text-base font-bold text-heading leading-tight truncate">{selected.name}</h2>
                       <p className="text-xs font-semibold text-heading leading-snug mt-0.5">
-                        {selected.title || '—'}
+                        {selected.title || <MissingValue label={EMPTY.provided} />}
                       </p>
                       <div className="flex flex-wrap items-center gap-1.5 mt-1">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-surface-muted text-muted border border-border-default/60">
                           <Calendar size={11} className="shrink-0 text-caption" />
-                          <span>Hired {selected.hiredAt ? formatDate(selected.hiredAt, { month: 'short', year: 'numeric' }) : '—'}</span>
+                          <span>{selected.hiredAt ? `Hired ${formatDate(selected.hiredAt, { month: 'short', year: 'numeric' })}` : 'Hire date not recorded'}</span>
                         </span>
                         {selected.employmentEndDate && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-500/10 text-amber-700 border border-amber-500/20">
@@ -739,7 +741,7 @@ export default function EmployeeDirectory() {
                       <div className="pt-1.5 border-t border-border-subtle/80">
                         <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-0.5">Equity</p>
                         <p className="text-xs font-bold text-heading tabular-nums">
-                          {selected.equityOptions != null ? `${selected.equityOptions.toLocaleString()} Options` : '—'}
+                          {selected.equityOptions != null ? `${selected.equityOptions.toLocaleString()} Options` : <MissingValue label="No options" />}
                         </p>
                       </div>
                     </div>
@@ -754,11 +756,11 @@ export default function EmployeeDirectory() {
                     <div className="space-y-1.5">
                       <div>
                         <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-0.5">Band</p>
-                        <p className="text-sm font-bold text-heading">{selected.band || '—'}</p>
+                        <p className="text-sm font-bold text-heading">{selected.band || <MissingValue label="No band" />}</p>
                       </div>
                       <div className="pt-1.5 border-t border-border-subtle/80">
                         <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-0.5">Location</p>
-                        <p className="text-xs font-bold text-heading truncate" title={selected.location || '—'}>{selected.location || '—'}</p>
+                        <p className="text-xs font-bold text-heading truncate" title={selected.location || EMPTY.provided}>{selected.location || <MissingValue label={EMPTY.provided} />}</p>
                       </div>
                     </div>
                   </div>

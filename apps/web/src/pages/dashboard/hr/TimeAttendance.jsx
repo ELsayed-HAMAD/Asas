@@ -19,6 +19,7 @@ import { Badge } from '../../../components/ui/badge';
 import { Switch } from '../../../components/ui/switch';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
 import { cn } from '../../../lib/utils';
+import { EMPTY } from '../../../lib/emptyText';
 import {
   Table,
   TableHeader,
@@ -36,7 +37,7 @@ import {
 } from '../../../components/ui/select';
 
 function formatShortDate(dateStr) {
-  if (!dateStr) return '—';
+  if (!dateStr) return EMPTY.recorded;
   return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: '2-digit' });
 }
 
@@ -408,7 +409,7 @@ export default function TimeAttendance() {
             </div>
           </div>
           <div className="text-2xl font-bold text-heading tracking-tight my-1 leading-none">
-            {summary.attendanceRate != null ? `${Math.round(summary.attendanceRate)}%` : '—'}
+            {summary.attendanceRate != null ? `${Math.round(summary.attendanceRate)}%` : <span className="text-base font-medium text-muted">{EMPTY.data}</span>}
           </div>
           <div className="pt-1.5 border-t border-border-subtle/80 text-[11px] text-muted leading-tight truncate">
             Past {summary.attendanceRateRangeDays} days · {summary.attendanceRateRecordedDays} recorded days
@@ -511,7 +512,7 @@ export default function TimeAttendance() {
                             </div>
                           </TableCell>
                           <TableCell className="w-[24%] px-2 py-2.5 text-xs sm:text-sm text-body whitespace-nowrap">
-                            {sheet.weekStart ? `Week of ${formatShortDate(sheet.weekStart)}` : '—'}
+                            {sheet.weekStart ? `Week of ${formatShortDate(sheet.weekStart)}` : EMPTY.recorded}
                           </TableCell>
                           <TableCell className="w-[22%] px-2 py-2.5 text-right rtl:text-left tabular-nums whitespace-nowrap">
                             <span className="text-xs sm:text-sm font-semibold text-heading">{sheet.totalHours || 0}h</span>
@@ -640,13 +641,13 @@ export default function TimeAttendance() {
                           ts.days.map((day, idx) => (
                             <TableRow key={day.id || idx} className="hover:bg-surface-muted/50 transition-colors border-0">
                               <TableCell className="px-3 py-2.5 text-body font-medium whitespace-nowrap">
-                                {day.dayLabel || '—'}
+                                {day.dayLabel || EMPTY.recorded}
                               </TableCell>
                               <TableCell className="px-2 py-2.5 font-semibold text-heading tabular-nums text-xs whitespace-nowrap">
-                                {day.clockIn || '—'}
+                                {day.clockIn || EMPTY.recorded}
                               </TableCell>
                               <TableCell className="px-2 py-2.5 font-semibold text-heading tabular-nums text-xs whitespace-nowrap">
-                                {day.clockOut || '—'}
+                                {day.clockOut || EMPTY.recorded}
                               </TableCell>
                               <TableCell className="px-2 py-2.5 text-body text-right rtl:text-left tabular-nums whitespace-nowrap">
                                 {day.totalHours || '0'}h

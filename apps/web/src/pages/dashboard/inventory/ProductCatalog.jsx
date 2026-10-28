@@ -27,6 +27,7 @@ import {
 } from '../../../lib/stockMovementDraft';
 import FormDialog from '../../../components/common/FormDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import MissingValue from '../../../components/common/MissingValue';
 import TopBarActions from '../../../components/TopBarActions';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '../../../components/ui/button';
@@ -62,6 +63,13 @@ const EMPTY_MOVEMENT_FORM = {
   reason: 'PURCHASE_RECEIPT',
   unitCost: '',
 };
+
+function formatLocation(product) {
+  if (!product?.warehouse) return 'No warehouse assigned';
+  return [product.warehouse, product.aisle && `Aisle ${product.aisle}`, product.bin && `Bin ${product.bin}`]
+    .filter(Boolean)
+    .join(' · ');
+}
 
 export default function Inventory() {
   const navigate = useNavigate();
@@ -500,7 +508,7 @@ export default function Inventory() {
     // The contract keeps stock non-negative (`stock: z.int().min(0)`); the server does not
     // clamp an over-issue, so surface it here instead of recording a negative on-hand count.
     if (movementForm.kind === 'issue' && qtyN > selectedProduct.stock) {
-      setMovementError(`Only ${selectedProduct.stock} unit${selectedProduct.stock === 1 ? '' : 's'} on hand — cannot issue ${qtyN}.`);
+      setMovementError(`Only ${selectedProduct.stock} unit${selectedProduct.stock === 1 ? '' : 's'} on hand; cannot issue ${qtyN}.`);
       return;
     }
     const isReceive = movementForm.kind === 'receive';
@@ -918,9 +926,9 @@ export default function Inventory() {
                       <label className="block text-xs font-medium text-muted mb-1">Location</label>
                       <div
                         className="w-full h-9 bg-surface-muted border border-border-default rounded-input px-3 flex items-center text-sm font-medium text-heading truncate whitespace-nowrap"
-                        title={selectedProduct.warehouse ? `${selectedProduct.warehouse} - Aisle ${selectedProduct.aisle || 'N/A'}, Bin ${selectedProduct.bin || 'N/A'}` : 'Location Not Set'}
+                        title={formatLocation(selectedProduct)}
                       >
-                        {selectedProduct.warehouse ? `${selectedProduct.warehouse} - Aisle ${selectedProduct.aisle || 'N/A'}, Bin ${selectedProduct.bin || 'N/A'}` : 'Location Not Set'}
+                        {formatLocation(selectedProduct)}
                       </div>
                     </div>
                   </div>
@@ -930,13 +938,13 @@ export default function Inventory() {
                     <div className="border border-border-default rounded-card-sm p-3 bg-surface-raised flex flex-col justify-between">
                       <p className="text-xs font-medium text-muted mb-1">Avg. Monthly Usage</p>
                       <p className="text-lg font-semibold text-heading leading-tight">
-                        {selectedProduct.avgMonthlyUsage == null ? '—' : `${selectedProduct.avgMonthlyUsage} Units`}
+                        {selectedProduct.avgMonthlyUsage == null ? <MissingValue label="No usage yet" className="text-base" /> : `${selectedProduct.avgMonthlyUsage} Units`}
                       </p>
                     </div>
                     <div className="border border-border-default rounded-card-sm p-3 bg-surface-raised flex flex-col justify-between">
                       <p className="text-xs font-medium text-muted mb-1">Lead Time</p>
                       <p className="text-lg font-semibold text-heading leading-tight">
-                        {selectedProduct.leadTimeDays == null ? '—' : `${selectedProduct.leadTimeDays} Days`}
+                        {selectedProduct.leadTimeDays == null ? <MissingValue label="No lead time" className="text-base" /> : `${selectedProduct.leadTimeDays} Days`}
                       </p>
                     </div>
                   </div>
@@ -1382,7 +1390,7 @@ export default function Inventory() {
                 type="text"
                 value={productForm.warehouse}
                 onChange={(e) => setProductForm((f) => ({ ...f, warehouse: e.target.value }))}
-                placeholder="e.g. Main — Bay A (optional)"
+                placeholder="e.g. Main, Bay A (optional)"
                 className="w-full"
               />
             </div>
@@ -1474,7 +1482,7 @@ export default function Inventory() {
           open={adjustDialogOpen}
           onClose={closeAdjustDialog}
           title="Adjust stock"
-          subtitle={selectedProduct ? `${selectedProduct.name} — currently ${selectedProduct.stock} on hand.` : undefined}
+          subtitle={selectedProduct ? `${selectedProduct.name}: currently ${selectedProduct.stock} on hand.` : undefined}
           confirmLabel="Record movement"
           busy={recordMovementMutation.isPending}
           onConfirm={handleMovementConfirm}

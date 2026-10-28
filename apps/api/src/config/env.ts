@@ -75,11 +75,12 @@ export interface AsasEnv {
   /** Google OAuth Client ID & Secret for Social SSO */
   googleClientId: string
   googleClientSecret: string
-  /** Apple OAuth Services ID & Secret */
-  appleClientId: string
-  appleClientSecret: string
   /** Local-only identity bypass for exercising the social onboarding UI without OAuth credentials. */
   devSocialAuthEnabled: boolean
+  /** Emails that bootstrap the first platform owner on sign-in. */
+  platformOwnerEmails: string[]
+  /** Require an enabled second factor before platform-console access. */
+  platformRequire2fa: boolean
 }
 
 /** Proxy values that disable the trust boundary entirely. They are never accepted. */
@@ -196,9 +197,12 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
     stripePriceIds: (source.STRIPE_PRICE_IDS ?? '').split(',').map(value => value.trim()).filter(Boolean),
     googleClientId: source.GOOGLE_CLIENT_ID?.trim() ?? '',
     googleClientSecret: source.GOOGLE_CLIENT_SECRET?.trim() ?? '',
-    appleClientId: source.APPLE_CLIENT_ID?.trim() ?? '',
-    appleClientSecret: source.APPLE_CLIENT_SECRET?.trim() ?? '',
     devSocialAuthEnabled: devSocialAuthRequested,
+    platformOwnerEmails: (source.PLATFORM_OWNER_EMAILS ?? '')
+      .split(',')
+      .map(value => value.trim().toLowerCase())
+      .filter(Boolean),
+    platformRequire2fa: source.PLATFORM_REQUIRE_2FA === 'true',
   }
 }
 

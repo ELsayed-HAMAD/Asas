@@ -44,7 +44,6 @@ describe('Auth providers and dev social login', () => {
     const json = res.json()
     expect(json.data).toEqual({
       google: false,
-      apple: false,
       email: false,
       devAuthAllowed: false,
     })
@@ -52,14 +51,12 @@ describe('Auth providers and dev social login', () => {
     await app.close()
   })
 
-  it('reports google and apple as true when client credentials are set', async () => {
+  it('reports google as true when client credentials are set', async () => {
     const env = loadEnv({
       NODE_ENV: 'development',
       DATABASE_URL: 'postgresql://mock:mock@localhost:5432/db',
       GOOGLE_CLIENT_ID: 'google-client-id-123',
       GOOGLE_CLIENT_SECRET: 'google-secret-456',
-      APPLE_CLIENT_ID: 'apple-client-id-789',
-      APPLE_CLIENT_SECRET: 'apple-secret-012',
       AUTH_SECRET: '01234567890123456789012345678901',
       DEV_SOCIAL_AUTH_ENABLED: 'true',
     })
@@ -96,7 +93,6 @@ describe('Auth providers and dev social login', () => {
     expect(res.statusCode).toBe(200)
     expect(res.json().data).toEqual({
       google: true,
-      apple: true,
       email: false,
       devAuthAllowed: true,
     })

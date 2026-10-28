@@ -219,7 +219,7 @@ test('crm deals pipeline UX reorganization, board columns, on-demand panel, and 
     // ──────────────────────────────────────────────────────────────────────────
     // TEST 2: 5 Stage Switcher Cards In ONE Row with Compact Money Formats
     // ──────────────────────────────────────────────────────────────────────────
-    const switcherCards = page.locator('button[aria-pressed]');
+    const switcherCards = page.getByTestId('deal-stage-switcher').locator('button[aria-pressed]');
     await expect(switcherCards).toHaveCount(5);
 
     // Verify all 5 cards sit side by side in ONE row (same Y coordinate)

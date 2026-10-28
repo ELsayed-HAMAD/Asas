@@ -11,11 +11,12 @@
 useDefault = true
 
 [allowlist]
-description = "Generated lockfiles, documented placeholders, and exact synthetic test values"
+description = "Generated lockfiles and exact synthetic/placeholder test values"
 
+# Environment templates are intentionally not path-allowlisted: a real secret
+# accidentally pasted into a tracked .env.example must still fail the scan.
 paths = [
   '''(^|/)pnpm-lock\.yaml$''',
-  '''(^|/)\.env\.example$''',
 ]
 
 regexes = [

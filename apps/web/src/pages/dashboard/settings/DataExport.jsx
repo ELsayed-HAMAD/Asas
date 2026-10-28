@@ -11,6 +11,7 @@ import SettingsTabs from './SettingsTabs';
 import SearchInput from '../../../components/common/SearchInput';
 import { Button } from '../../../components/ui/button';
 import { Badge } from '../../../components/ui/badge';
+import { Alert, AlertDescription } from '../../../components/ui/alert';
 import {
   Select,
   SelectContent,
@@ -22,6 +23,7 @@ import { exportsApi } from '../../../lib/api/exports';
 import { queryKeys } from '../../../lib/queryKeys';
 import { useActiveMemberRole } from '../../../lib/authClient';
 import { getMemberRoleName } from '../../../lib/memberRole';
+import { usePlatformPublicConfig } from '../../../lib/platformConfig';
 
 /** Each visible scope maps to an implemented export kind with a fixed output format. */
 const SCOPE_TO_KIND = {
@@ -36,6 +38,7 @@ export default function SettingsDataExport() {
   const pageTitle = pathname === '/dashboard/exports' ? 'Exports' : 'Data Export';
   const queryClient = useQueryClient();
   const { data: memberRole } = useActiveMemberRole();
+  const platformConfig = usePlatformPublicConfig();
   const roleName = getMemberRoleName(memberRole);
   const canManageExports = roleName === 'OWNER' || roleName === 'ADMIN';
   const [scope, setScope] = useState('Full Workspace');
@@ -126,25 +129,14 @@ export default function SettingsDataExport() {
       <h1 className="sr-only">{pageTitle}</h1>
 
       <TopBarActions>
-        <div className="flex flex-wrap items-center gap-3">
-          <SearchInput
-            value={jobSearch}
-            onChange={event => setJobSearch(event.target.value)}
-            placeholder="Search..."
-            wrapperClassName="w-64"
-          />
-
-          <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-strong shrink-0"></div>
-
-          <Button
-            variant="outline"
-            type="button"
-            onClick={() => setShowHistory(true)}
-            className="h-8 whitespace-nowrap"
-          >
-            View Export History
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          type="button"
+          onClick={() => setShowHistory(true)}
+          className="h-9 whitespace-nowrap rounded-full border-border-default bg-surface-raised/50 px-4 shadow-none"
+        >
+          View Export History
+        </Button>
       </TopBarActions>
 
       <SettingsTabs />
@@ -154,6 +146,15 @@ export default function SettingsDataExport() {
 
         {/* Left: Configuration Content Area */}
         <div className="w-full min-w-0 xl:flex-1 xl:min-h-0 xl:overflow-y-auto p-4 sm:p-8 max-w-4xl space-y-6 relative">
+
+          {/* Platform export pause */}
+          {platformConfig.data?.exportsEnabled === false && (
+            <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+              <AlertDescription>
+                New export jobs are paused by the platform administrator. Existing completed exports remain available in Export History.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* New Export Request Card */}
           <div className="bg-surface-raised border border-border-default rounded-card-sm p-card shadow-card">
@@ -239,8 +240,8 @@ export default function SettingsDataExport() {
                     format,
                     ...(!isWorkspaceArchive && dateFrom && dateTo ? { dateRange: { from: dateFrom, to: dateTo } } : {}),
                   })}
-                  disabled={!canManageExports || createMutation.isPending || dateRangeIncomplete || dateRangeInvalid}
-                  title={!canManageExports ? 'Only workspace admins and owners can create exports' : undefined}
+                  disabled={!canManageExports || platformConfig.data?.exportsEnabled === false || createMutation.isPending || dateRangeIncomplete || dateRangeInvalid}
+                  title={platformConfig.data?.exportsEnabled === false ? 'Exports are paused by the platform administrator' : !canManageExports ? 'Only workspace admins and owners can create exports' : undefined}
                   className="w-full"
                 >
                   {createMutation.isPending ? (
@@ -269,13 +270,19 @@ export default function SettingsDataExport() {
         </div>
 
         {/* Right: Recent Exports Panel */}
-        <div className="w-full xl:w-[360px] xl:flex-shrink-0 bg-surface-raised border-t xl:border-t-0 xl:border-l border-border-default flex flex-col z-10">
+        <div className="z-10 flex w-full flex-col border-t border-border-default bg-surface-raised/55 shadow-panel backdrop-blur-xl xl:my-8 xl:mr-5 xl:w-[360px] xl:flex-shrink-0 xl:overflow-hidden xl:rounded-[24px] xl:border xl:shadow-card">
 
-          <div className="xl:flex-1 xl:overflow-y-auto p-8 space-y-6">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-bold text-heading">{showHistory ? 'Export History' : 'Recent Exports'}</h2>
+          <div className="space-y-6 p-6 xl:flex-1 xl:overflow-y-auto">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-heading">{showHistory ? 'Export History' : 'Recent Exports'}</h2>
               {showHistory && <Button variant="link" size="sm" type="button" onClick={() => setShowHistory(false)} className="h-auto p-0 text-xs font-semibold text-accent hover:text-accent-hover">Recent</Button>}
             </div>
+            <SearchInput
+              value={jobSearch}
+              onChange={event => setJobSearch(event.target.value)}
+              placeholder="Search exports..."
+              wrapperClassName="mb-5 w-full"
+            />
             {downloadError && <p role="alert" className="rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-xs text-danger">{downloadError}</p>}
 
             {showHistory ? (

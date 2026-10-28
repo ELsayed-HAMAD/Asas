@@ -6,11 +6,14 @@ import { Money, type CurrencyCode } from '@asas/domain'
  * The API's wire layer carries raw decimal strings and never formats — but a PDF or an
  * Excel sheet is a *document*, and that is the one place where `1,234.50` belongs. Kept in
  * `services/` (not the modules) because both the hr and finance export paths render documents
- * and both need the exact same rendering: the same money, the same grouping, the same dashes.
+ * and both need the exact same rendering: the same money, the same grouping, the same labels.
  */
 
-/** The placeholder for an absent amount in a document, matching the web app's `—` convention. */
-export const MONEY_DASH = '—'
+/** A human-readable label for an absent amount in a generated document. */
+export const MONEY_DASH = 'Not stated'
+
+/** A human-readable label for an absent date in a generated document. */
+export const DATE_PLACEHOLDER = 'Not recorded'
 
 /**
  * Render a major-unit decimal string as a fixed-scale, grouped display string:
@@ -42,12 +45,12 @@ function groupThousands(decimal: string): string {
 }
 
 /**
- * Render a date as the document's fixed `YYYY-MM-DD` form (UTC). A `null` date is the dash,
- * not a blank, so a missing pay date is visibly absent rather than silently empty.
+ * Render a date as the document's fixed `YYYY-MM-DD` form (UTC). A `null` date is labeled
+ * explicitly, not left blank, so a missing pay date is visibly absent rather than silently empty.
  */
 export function formatDateDisplay(date: Date | string | null | undefined): string {
-  if (!date) return MONEY_DASH
+  if (!date) return DATE_PLACEHOLDER
   const parsed = typeof date === 'string' ? new Date(date) : date
-  if (Number.isNaN(parsed.getTime())) return MONEY_DASH
+  if (Number.isNaN(parsed.getTime())) return DATE_PLACEHOLDER
   return parsed.toISOString().slice(0, 10)
 }

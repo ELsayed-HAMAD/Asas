@@ -144,11 +144,11 @@ test('crm sales performance page strictly satisfies all layout rules at 1280px, 
     await page.goto('/dashboard/crm/sales-performance', { waitUntil: 'networkidle' });
     await page.waitForTimeout(200);
 
-    // 1) Top Bar (56px, one row, 12px gaps, nothing wraps)
+    // 1) Top Bar (64px, one row, restrained global controls)
     const topBar = page.locator('header').first();
     await expect(topBar).toBeVisible();
     const topBarHeight = await topBar.evaluate(el => Math.round(el.getBoundingClientRect().height));
-    expect(topBarHeight).toBe(56);
+    expect(topBarHeight).toBe(64);
 
     // Left: Breadcrumb ("Dashboard > CRM > Sales Performance")
     const breadcrumb = topBar.locator('nav[aria-label="Breadcrumb"]');
@@ -156,7 +156,7 @@ test('crm sales performance page strictly satisfies all layout rules at 1280px, 
     const breadcrumbRect = await breadcrumb.evaluate(el => el.getBoundingClientRect());
     expect(await breadcrumb.evaluate(el => getComputedStyle(el).whiteSpace)).toBe('nowrap');
 
-    // Right group: "Search or jump to..." (240px, 36px) and Bell (36x36)
+    // Right group: responsive "Search or jump to..." and Bell (36x36)
     const jumpSearchBtn = topBar.getByRole('button', { name: /Search or jump to\.\.\./i });
     await expect(jumpSearchBtn).toBeVisible();
     const jumpSearchRect = await jumpSearchBtn.evaluate(el => ({
@@ -165,7 +165,8 @@ test('crm sales performance page strictly satisfies all layout rules at 1280px, 
       width: Math.round(el.getBoundingClientRect().width),
       height: Math.round(el.getBoundingClientRect().height),
     }));
-    expect(jumpSearchRect.width).toBe(240);
+    expect(jumpSearchRect.width).toBeGreaterThanOrEqual(240);
+    expect(jumpSearchRect.width).toBeLessThanOrEqual(340);
     expect(jumpSearchRect.height).toBe(36);
     // Spacer: breadcrumb on left and command search on right never touch
     expect(jumpSearchRect.x).toBeGreaterThan(breadcrumbRect.x + breadcrumbRect.width + 50);

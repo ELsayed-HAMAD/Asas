@@ -30,6 +30,19 @@ The API refuses to boot in production unless the following are configured:
 
 Generate each secret independently with a cryptographically secure random source, store it in the deployment secret manager, and never commit it. Rotating an encryption key requires a planned decrypt-and-re-encrypt migration.
 
+### Platform owner console
+
+The `/admin` web console is backed by `/api/v1/platform/*`. It is separate from workspace Settings and requires a platform role on the user account.
+
+- `PLATFORM_OWNER_EMAILS` is a comma-separated bootstrap allow-list. The first verified session or platform-console request from an allow-listed account with no platform role promotes it to platform `OWNER`. Remove the address after promotion; otherwise a future account with that address can bootstrap again.
+- `PLATFORM_REQUIRE_2FA=true` requires both an enrolled second factor and a session that completed a challenge. Leave it off until the owner has enrolled TOTP, then turn it on. Better Auth challenges credential sign-ins itself; OAuth callbacks and trusted-device sign-ins create sessions without a challenge, so the console returns `403` with `details.reason = 'VERIFY'` until the operator verifies a code at `POST /api/v1/platform/step-up`. `details.reason = 'ENROLL'` means the account has no second factor yet.
+- Deploy migration `20261028120000_platform_admin` and `20261028130000_session_two_factor_verified` before starting the matching API version. They add `User.platformRole`, tenant suspension fields, `PlatformAuditLog`, `PlatformSetting`, and the `Session.twoFactorVerifiedAt` marker.
+- Platform writes are recorded in `PlatformAuditLog`. The table is append-only in the application; no update or delete endpoint exists.
+- Cross-tenant platform reads and writes run through `withPlatformAccess`, which enables the application cross-tenant scope and PostgreSQL `app.bypass_rls` for one transaction. Do not call it from workspace modules.
+- Global switches are `maintenance_mode`, `signups_enabled`, and `exports_enabled`. Maintenance blocks workspace API traffic while leaving auth, health, and platform routes reachable.
+- Workspace suspension sets `Tenant.status = 'SUSPENDED'`; the workspace guards return `403` with `details.code = 'WORKSPACE_SUSPENDED'`, and the web shell shows a suspended screen.
+- Paid Stripe subscriptions cannot be comped from the console. Plan comps are limited to workspaces without a Stripe subscription; Stripe remains the source of truth for paid billing.
+
 ### Tenant isolation
 
 Tenant-owned PostgreSQL tables have row-level security policies as defence-in-depth. The API also applies a Prisma client extension that reads a request-scoped tenant context after authentication and injects the active `tenantId` into reads, writes, counts, aggregates, and upserts on every model that has a `tenantId` column. An operation that explicitly references a different tenant is rejected before it reaches PostgreSQL.

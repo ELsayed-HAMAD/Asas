@@ -10,20 +10,98 @@ async function mockSignedOutSession(context) {
   })
 }
 
-test('landing page presents a truthful free-workspace entry point and clearly marked sample preview', async ({ page, context }) => {
+test('landing page renders its glass preview and switches product workflows without runtime errors', async ({ page, context }) => {
+  const runtimeErrors = []
+  page.on('pageerror', error => runtimeErrors.push(error.message))
+  await mockSignedOutSession(context)
+  await page.goto('/')
+
+  await expect(page.getByRole('heading', { name: /Everything connected/ })).toBeVisible()
+  await expect(page.getByText('Asas workspace', { exact: true })).toBeVisible()
+  await expect(page.getByText('Interactive preview', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'From invoice to reconciliation.' })).toBeVisible()
+  await expect(page.getByText('Illustrative workflow · no live business figures')).toBeVisible()
+  const finalCtaCopy = page.getByText('All current product areas are available on Free.')
+  await finalCtaCopy.scrollIntoViewIfNeeded()
+  await expect(finalCtaCopy).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Get started free' })).toHaveAttribute('href', '/register')
+
+  const financeTab = page.getByRole('button', { name: 'Finance', exact: true })
+  const peopleTab = page.getByRole('button', { name: 'People', exact: true })
+  await expect(financeTab).toHaveAttribute('aria-pressed', 'true')
+  await peopleTab.click()
+  await expect(peopleTab).toHaveAttribute('aria-pressed', 'true')
+  await expect(financeTab).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.getByRole('heading', { name: 'People operations, clearly organized.' })).toBeVisible()
+  await expect(page.getByText('Employee record', { exact: true })).toBeVisible()
+  expect(runtimeErrors).toEqual([])
+})
+
+test('marketing navbar remains fixed while landing content scrolls', async ({ page, context }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await mockSignedOutSession(context)
   await page.goto('/')
 
-  await expect(page.getByRole('heading', { name: /The unified workspace for/ })).toBeVisible()
-  await expect(page.getByText('workspace / dashboard')).toBeVisible()
-  await expect(page.getByText('Sample workspace', { exact: true })).toBeVisible()
-  await expect(page.getByText('Dashboard', { exact: true }).first()).toBeVisible()
-  await expect(page.getByText('Headcount', { exact: true })).toBeVisible()
-  await expect(page.getByText('Open pipeline value', { exact: true })).toBeVisible()
-  await expect(page.getByText('Active sprints', { exact: true })).toBeVisible()
-  await expect(page.getByText('All current product areas are available on the Free plan.')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Start Free Workspace' }).first()).toHaveAttribute('href', '/register')
+  const navbar = page.getByRole('banner')
+  await expect(navbar).toBeVisible()
+  await expect(navbar).toHaveCSS('position', 'fixed')
+  const initialTop = await navbar.evaluate(element => element.getBoundingClientRect().top)
+
+  await page.locator('#pricing').scrollIntoViewIfNeeded()
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+  const scrolledTop = await navbar.evaluate(element => element.getBoundingClientRect().top)
+  expect(scrolledTop).toBeCloseTo(initialTop, 0)
+})
+
+test('every product-area menu destination resolves to its matching solution view', async ({ page, context }) => {
+  await mockSignedOutSession(context)
+  await page.goto('/solutions')
+
+  const areas = [
+    { menu: /Finance & treasury/, tab: 'Finance', path: '/solutions?area=finance', heading: 'Finance & Receivables' },
+    { menu: /People & payroll/, tab: 'HR & Payroll', path: '/solutions?area=hr', heading: 'Workforce Management' },
+    { menu: /Customer workflows/, tab: 'CRM', path: '/solutions?area=crm', heading: 'Customer & Sales Workflows' },
+    { menu: /Projects & delivery/, tab: 'Projects', path: '/solutions?area=engineering', heading: 'Project Planning & Delivery' },
+    { menu: /Inventory records/, tab: 'Inventory', path: '/solutions?area=inventory', heading: 'Inventory Records' },
+    { menu: /Workspace administration/, tab: 'Workspace Security', path: '/solutions?area=governance', heading: 'Workspace Access & Administration' },
+  ]
+
+  for (const area of areas) {
+    await page.getByRole('button', { name: 'Browse product areas' }).click()
+    await page.getByRole('menuitem', { name: area.menu }).click()
+    await expect(page).toHaveURL(new RegExp(`${area.path.replace('?', '\\?')}$`))
+    await expect(page.locator('#solution-detail').getByRole('heading', { name: area.heading })).toBeVisible()
+    await expect(page.getByRole('button', { name: area.tab, exact: true })).toHaveAttribute('aria-pressed', 'true')
+  }
+
+  await page.getByRole('link', { name: 'Home', exact: true }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByRole('heading', { name: /Everything connected/ })).toBeVisible()
+})
+
+test('status page renders only the readiness fields reported by the API', async ({ page, context }) => {
+  let readinessRequests = 0
+  await mockSignedOutSession(context)
+  await context.route('**/api/v1/ready', route => {
+    readinessRequests += 1
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: { status: 'ok', database: 'connected', emailDelivery: 'disabled', objectStorage: 's3' } }),
+    })
+  })
+
+  await page.goto('/status')
+  await expect(page.getByRole('heading', { name: 'Platform status' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'The API readiness check passed.' })).toBeVisible()
+  await expect(page.getByText('Operational', { exact: true })).toHaveCount(2)
+  await expect(page.getByText('Connected', { exact: true })).toBeVisible()
+  await expect(page.getByText('Not configured', { exact: true })).toBeVisible()
+  await expect(page.getByText('Configured driver: s3. The readiness endpoint does not test writes.')).toBeVisible()
+  expect(readinessRequests).toBe(1)
+
+  await page.getByRole('button', { name: 'Refresh' }).click()
+  await expect.poll(() => readinessRequests).toBeGreaterThan(1)
 })
 
 test('desktop marketing navigation resolves product areas, resources, pricing, and workspace actions', async ({ page, context }) => {
@@ -49,6 +127,8 @@ test('desktop marketing navigation resolves product areas, resources, pricing, a
     await page.getByRole('link', { name: destination.label, exact: true }).first().click()
     await expect(page).toHaveURL(new RegExp(`${destination.path.replace('/', '\\/')}$`))
     await expect(page.getByRole('heading', { name: 'Plans for your team and workspace' })).toBeVisible()
+    await expect(page.getByText('Prices shown are monthly.')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Compare plan limits across tiers' })).toBeVisible()
   }
 
   await page.getByRole('button', { name: 'Resources' }).click()
@@ -68,9 +148,9 @@ test('desktop marketing navigation resolves product areas, resources, pricing, a
   await expect(page.getByText(/company, contact, and opportunity workflows/i)).toHaveCount(0)
   await expect(page.getByText(/Generate Report/)).toBeVisible()
   await page.getByRole('button', { name: 'Resources' }).click()
-  await page.getByRole('menuitem', { name: /Deployment status/ }).click()
-  await expect(page).toHaveURL(/\/status$/)
-  await expect(page.getByRole('heading', { name: 'Platform status' })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: /Deployment status/ })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('link', { name: 'System status' })).toHaveCount(0)
 
   await page.getByRole('link', { name: /Create workspace/ }).click()
   await expect(page).toHaveURL(/\/register$/)
@@ -87,8 +167,8 @@ test('public pages support keyboard skip, responsive layout, and reduced motion'
   const page = await context.newPage()
 
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: /The unified workspace for/ })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Start Free Workspace' }).first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Everything connected/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Get started free' })).toBeVisible()
 
   const landingOverflow = await page.evaluate(() => ({
     document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -111,12 +191,13 @@ test('public pages support keyboard skip, responsive layout, and reduced motion'
   await expect(financeTab).toHaveAttribute('aria-pressed', 'false')
   await expect(page.getByText('Record movements')).toBeVisible()
 
-  const animationDuration = await page.locator('.animate-float').first().evaluate(element => (
-    window.getComputedStyle(element).animationDuration
-  ))
-  const firstDuration = animationDuration.split(',')[0].trim()
-  const durationSeconds = firstDuration.endsWith('ms') ? parseFloat(firstDuration) / 1000 : parseFloat(firstDuration)
-  expect(durationSeconds).toBeLessThanOrEqual(0.01)
+  const reducedMotionStyles = await page.locator('[data-hero-title]').evaluate(element => ({
+    opacity: window.getComputedStyle(element).opacity,
+    transform: window.getComputedStyle(element).transform,
+  }))
+  expect(reducedMotionStyles.opacity).toBe('1')
+  expect(reducedMotionStyles.transform).toBe('none')
+  await expect(page.locator('[data-preview]')).toHaveCSS('opacity', '1')
 
   await page.goto('/pricing')
   await expect(page.getByRole('heading', { name: 'Plans for your team and workspace' })).toBeVisible()
@@ -179,6 +260,8 @@ test('mobile Sheet navigation opens accessibly, deep-links to a product area, an
   await menuButton.click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await expect(page.getByText('Explore product workflows, guides, and workspace options.')).toBeVisible()
+  await expect(page.getByRole('dialog').getByRole('link', { name: 'Home', exact: true })).toHaveAttribute('href', '/')
+  await expect(page.getByRole('dialog').getByText('Deployment status')).toHaveCount(0)
 
   await page.getByRole('dialog').getByRole('link', { name: /Inventory records/ }).click()
   await expect(page).toHaveURL(/\/solutions\?area=inventory$/)

@@ -18,6 +18,7 @@ import {
 import { inventoryApi } from '../../../lib/api/inventory'
 import { queryKeys } from '../../../lib/queryKeys'
 import { formatMoney } from '../../../lib/format'
+import { EMPTY } from '../../../lib/emptyText'
 import { useActiveMemberRole, useActiveOrganization } from '../../../lib/authClient'
 import { getMemberRoleName } from '../../../lib/memberRole'
 import TopBarActions from '../../../components/TopBarActions'
@@ -544,8 +545,8 @@ export default function InventoryValuation() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="FIFO" className="text-xs">FIFO — allocate the oldest layers first</SelectItem>
-                          <SelectItem value="WEIGHTED_AVERAGE" className="text-xs">Weighted average — blend cost across the position</SelectItem>
+                          <SelectItem value="FIFO" className="text-xs">FIFO: allocate the oldest layers first</SelectItem>
+                          <SelectItem value="WEIGHTED_AVERAGE" className="text-xs">Weighted average: blend cost across the position</SelectItem>
                         </SelectContent>
                       </Select>
                       <p className="text-[11px] text-slate-500">
@@ -747,7 +748,7 @@ export default function InventoryValuation() {
                   <p>
                     <span className="font-semibold text-heading">Unposted or inconsistent value:</span>{' '}
                     {(report?.currencies ?? []).filter(row => Number(row.unpostedValue) !== 0 || Number(row.subledgerDifference) !== 0)
-                      .map(row => `${row.currency} — unposted ${money(row.unpostedValue, row.currency)}, subledger difference ${money(row.subledgerDifference, row.currency)}`)
+                      .map(row => `${row.currency}: unposted ${money(row.unpostedValue, row.currency)}, subledger difference ${money(row.subledgerDifference, row.currency)}`)
                       .join('; ')}.
                   </p>
                 )}
@@ -945,7 +946,7 @@ export default function InventoryValuation() {
               <h3 className="text-xs font-bold text-slate-800">Back-dating & FIFO</h3>
               <p className="text-[11px] text-slate-500 leading-relaxed">
                 Inventory opening valuation posts a journal immediately, so the Finance opening
-                trial-balance/cutover flow — which requires an unused ledger — can no longer be used
+                trial-balance/cutover flow, which requires an unused ledger, can no longer be used
                 afterwards. Conversely, if a Finance opening balance is already posted, inventory opening
                 valuation is refused so the workspace cannot post two opening positions. Choose one opening
                 route. Changing the costing method after the first valuation posting is refused. Products
@@ -962,7 +963,7 @@ export default function InventoryValuation() {
         open={Boolean(openingProduct)}
         onClose={() => !openingMutation.isPending && setOpeningProduct(null)}
         title="Value opening stock"
-        subtitle={openingProduct ? `${openingProduct.name} — ${openingProduct.unvaluedQuantity} of ${openingProduct.stock} unit(s) have no cost.` : undefined}
+        subtitle={openingProduct ? `${openingProduct.name}: ${openingProduct.unvaluedQuantity} of ${openingProduct.stock} unit(s) have no cost.` : undefined}
         confirmLabel="Post opening valuation"
         busy={openingMutation.isPending}
         onConfirm={submitOpening}
@@ -996,7 +997,7 @@ export default function InventoryValuation() {
           <div className="rounded-input border border-border-default bg-surface px-3 py-2.5 text-xs text-muted flex items-center justify-between">
             <span>Opening value ({openingQuantity} unit{openingQuantity === 1 ? '' : 's'})</span>
             <span className="font-semibold text-heading tabular-nums">
-              {openingPreview == null ? '—' : money(openingPreview, openingProduct?.currency)}
+              {openingPreview == null ? EMPTY.amount : money(openingPreview, openingProduct?.currency)}
             </span>
           </div>
 

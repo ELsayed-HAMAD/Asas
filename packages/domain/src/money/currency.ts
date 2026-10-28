@@ -51,7 +51,7 @@ seed(THREE_DIGIT_CURRENCIES, 3)
 export class UnknownCurrencyError extends Error {
   constructor(readonly code: string) {
     super(
-      `Unknown currency code '${code}'. Register it with registerCurrency() before use — ` +
+      `Unknown currency code '${code}'. Register it with registerCurrency() before use. ` +
         'guessing a minor-unit exponent would silently corrupt every amount in that currency.',
     )
     this.name = 'UnknownCurrencyError'

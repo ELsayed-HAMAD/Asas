@@ -3,6 +3,9 @@ import { Outlet, Navigate, useLocation, Link } from 'react-router-dom'
 import { useSession, useActiveOrganization, useListOrganizations, authClient } from '../lib/authClient'
 import { authErrorMessage } from '../lib/authErrorMessage'
 import { setQueryScope } from '../lib/queryKeys'
+import { usePlatformPublicConfig } from '../lib/platformConfig'
+import MaintenanceScreen from '../components/common/MaintenanceScreen'
+import SuspendedWorkspace from '../components/common/SuspendedWorkspace'
 
 /**
  * Route guard for authenticated areas (dashboard, onboarding, workspace chooser).
@@ -23,6 +26,7 @@ export default function RequireAuth() {
   const sessionQuery = useSession()
   const organizationQuery = useActiveOrganization()
   const organizationsQuery = useListOrganizations()
+  const platformConfig = usePlatformPublicConfig()
   const { data: session, isPending: sessionPending } = sessionQuery
   const { data: activeOrganization, isPending: orgPending } = organizationQuery
   const { data: organizations, isPending: orgsPending } = organizationsQuery
@@ -145,6 +149,22 @@ export default function RequireAuth() {
 
   if (!session) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  }
+
+  if (platformConfig.data?.maintenanceMode) {
+    return (
+      <MaintenanceScreen
+        onRetry={() => {
+          void platformConfig.refetch()
+          void sessionQuery.refetch?.()
+          void organizationQuery.refetch?.()
+        }}
+      />
+    )
+  }
+
+  if (activeOrganization?.status === 'SUSPENDED') {
+    return <SuspendedWorkspace name={activeOrganization.name} />
   }
 
   if (activationError && !isOrgIndependentPath) {

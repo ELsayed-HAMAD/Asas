@@ -11,6 +11,7 @@
  */
 
 import { getCurrency } from '@asas/domain/money'
+import { EMPTY } from './emptyText.js'
 
 let defaultCurrency = 'USD'
 let defaultLocale = 'en-US'
@@ -66,16 +67,16 @@ export function moneyToMajor(value) {
 }
 
 export function formatCompactMoney(value, currency = defaultCurrency, locale = defaultLocale) {
-  if (value == null) return '—'
+  if (value == null) return EMPTY.amount
   try {
     const code = getCurrency(isMoneyWire(value) ? value.currency : currency).code
     const number = isMoneyWire(value) ? moneyToMajor(value) : Number(value)
-    if (!Number.isFinite(number)) return '—'
+    if (!Number.isFinite(number)) return EMPTY.amount
     return new Intl.NumberFormat(locale, {
       style: 'currency', currency: code, notation: 'compact', maximumFractionDigits: 1,
     }).format(number)
   } catch {
-    return '—'
+    return EMPTY.amount
   }
 }
 
@@ -91,11 +92,11 @@ export function formatCompactMoney(value, currency = defaultCurrency, locale = d
  * Handles money wire objects ({ amount, currency }), major numeric values, and strings.
  */
 export function formatCompactCurrency(value, currency = defaultCurrency, locale = defaultLocale) {
-  if (value == null) return '—'
+  if (value == null) return EMPTY.amount
   try {
     const code = getCurrency(isMoneyWire(value) ? value.currency : currency).code
     const number = isMoneyWire(value) ? moneyToMajor(value) : Number(value)
-    if (!Number.isFinite(number)) return '—'
+    if (!Number.isFinite(number)) return EMPTY.amount
 
     const abs = Math.abs(number)
     if (abs < 1000) {
@@ -115,7 +116,7 @@ export function formatCompactCurrency(value, currency = defaultCurrency, locale 
       maximumFractionDigits: maxDigits,
     }).format(number)
   } catch {
-    return '—'
+    return EMPTY.amount
   }
 }
 
@@ -127,9 +128,9 @@ export function formatFullCurrency(value, options = {}) {
 }
 
 export function formatCompactTableMoney(value, options = {}) {
-  if (value == null) return '—'
+  if (value == null) return EMPTY.amount
   const numeric = isMoneyWire(value) ? moneyToMajor(value) : Number(value)
-  if (!Number.isFinite(numeric)) return '—'
+  if (!Number.isFinite(numeric)) return EMPTY.amount
   if (Math.abs(numeric) < 1000) {
     return formatMoney(value, options)
   }
@@ -140,10 +141,10 @@ export function formatCompactTableMoney(value, options = {}) {
 /**
  * Format money values safely.
  * Accepts a wire object ({ amount: minor units, currency }), a major-unit number, or a
- * major-unit decimal string. Returns '—' for null/undefined/NaN.
+ * major-unit decimal string. Returns a plain-language placeholder for null/undefined/NaN.
  */
 export function formatMoney(value, options = {}) {
-  if (value == null) return '—'
+  if (value == null) return EMPTY.amount
 
   let numericValue
   let currencyCode = options.currency || defaultCurrency
@@ -154,11 +155,11 @@ export function formatMoney(value, options = {}) {
   } else {
     numericValue = Number(value)
   }
-  if (!Number.isFinite(numericValue)) return '—'
+  if (!Number.isFinite(numericValue)) return EMPTY.amount
   try {
     currencyCode = getCurrency(currencyCode).code
   } catch {
-    return '—'
+    return EMPTY.amount
   }
 
   const {
@@ -187,15 +188,15 @@ export function formatMoney(value, options = {}) {
 }
 
 export function formatCompactNumber(value, locale = defaultLocale) {
-  if (value == null) return '—'
+  if (value == null) return EMPTY.data
   const numeric = Number(value)
-  if (Number.isNaN(numeric)) return '—'
+  if (Number.isNaN(numeric)) return EMPTY.data
   return new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(numeric)
 }
 
 /** `value` is a 0–100 percentage (the API's `percentageSchema` scale). */
 export function formatPercent(value, options = {}) {
-  if (value == null || Number.isNaN(Number(value))) return '—'
+  if (value == null || Number.isNaN(Number(value))) return EMPTY.data
   const { locale = defaultLocale, minimumFractionDigits = 0, maximumFractionDigits = 1 } = options
   return new Intl.NumberFormat(locale, {
     style: 'percent',
@@ -213,10 +214,10 @@ function formatDatePattern(date, pattern, locale, timeZone) {
 }
 
 export function formatDate(value, options, locale = defaultLocale, timeZone = defaultTimeZone) {
-  if (!value) return '—'
+  if (!value) return EMPTY.recorded
   const dateOnly = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
   const date = dateOnly ? new Date(`${value}T00:00:00.000Z`) : typeof value === 'string' ? new Date(value) : value
-  if (Number.isNaN(date.getTime()) || (dateOnly && date.toISOString().slice(0, 10) !== value)) return '—'
+  if (Number.isNaN(date.getTime()) || (dateOnly && date.toISOString().slice(0, 10) !== value)) return EMPTY.recorded
   const effectiveTimeZone = dateOnly ? 'UTC' : timeZone
   if (options === undefined) return formatDatePattern(date, defaultDateFormat, locale, effectiveTimeZone)
   return new Intl.DateTimeFormat(locale, { ...options, timeZone: options.timeZone ?? effectiveTimeZone }).format(date)

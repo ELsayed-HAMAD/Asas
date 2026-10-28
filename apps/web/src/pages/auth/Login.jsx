@@ -5,7 +5,7 @@ import { authClient, signIn } from '../../lib/authClient'
 import { authErrorMessage } from '../../lib/authErrorMessage'
 import { authApi } from '../../lib/api/auth'
 import DevSocialModal from '../../components/auth/DevSocialModal'
-import { GoogleIcon, AppleIcon } from '../../components/common/BrandIcons'
+import { GoogleIcon } from '../../components/common/BrandIcons'
 import FormDialog from '../../components/common/FormDialog'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -25,7 +25,6 @@ export default function Login() {
   const [resendingVerification, setResendingVerification] = useState(false)
   const [resendVerificationNotice, setResendVerificationNotice] = useState('')
   const [devModalOpen, setDevModalOpen] = useState(false)
-  const [devModalProvider, setDevModalProvider] = useState('google')
 
   const [forgotOpen, setForgotOpen] = useState(false)
   const [forgotEmail, setForgotEmail] = useState('')
@@ -126,71 +125,59 @@ export default function Login() {
     }
   }
 
-  const handleSocialSignIn = async (provider) => {
+  const handleGoogleSignIn = async () => {
     setError('')
     try {
-      // Check if real OAuth provider is configured on the backend
+      // Check if the Google OAuth provider is configured on the backend
       const statusRes = await authApi.getProviders().catch(() => null)
       const providers = statusRes?.data || statusRes || {}
 
-      if (providers[provider]) {
+      if (providers.google) {
         const redirectTo = location.state?.from?.pathname || '/dashboard'
         const res = await authClient.signIn.social({
-          provider,
+          provider: 'google',
           callbackURL: `${window.location.origin}${redirectTo}`,
         })
         if (res?.error) {
-          setError(res.error?.message || `${provider === 'apple' ? 'Apple' : 'Google'} sign-in is not configured. Please use your work email.`)
+          setError(res.error?.message || 'Google sign-in is not configured. Please use your work email.')
         }
       } else if (providers.devAuthAllowed) {
         // Open local development SSO sandbox
-        setDevModalProvider(provider)
         setDevModalOpen(true)
       } else {
-        setError(`${provider === 'apple' ? 'Apple' : 'Google'} single sign-on is not configured for this deployment. Please sign in with your work email below.`)
+        setError('Google single sign-on is not configured for this deployment. Please sign in with your work email below.')
       }
     } catch (socialErr) {
-      setError(authErrorMessage(socialErr, `${provider === 'apple' ? 'Apple' : 'Google'} sign-in is currently unavailable in this environment.`))
+      setError(authErrorMessage(socialErr, 'Google sign-in is currently unavailable in this environment.'))
     }
   }
 
   return (
-    <div>
+    <div className="auth-form-stagger">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-heading mb-1">Welcome back</h1>
-        <p className="text-sm text-muted">Sign in to your Asas workspace</p>
+      <div className="mb-5">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.17em] text-[#0071e3]">Workspace access</p>
+        <h1 className="text-2xl font-semibold tracking-[-0.04em] text-[#1d1d1f]">Welcome back</h1>
+        <p className="mt-1.5 text-[13px] leading-5 text-[#737378]">Sign in to continue to your Asas workspace.</p>
       </div>
 
-      {/* Social SSO Buttons */}
-      <div className="grid grid-cols-2 gap-3 mb-5">
+      {/* Social SSO Button */}
+      <div className="mb-4">
         <Button
           type="button"
           variant="outline"
-          onClick={() => handleSocialSignIn('google')}
-          className="w-full flex items-center justify-center gap-2 text-xs font-medium h-10 border-border/80 hover:bg-surface-raised hover-lift transition-micro active:scale-[0.98] cursor-pointer shadow-xs"
+          onClick={handleGoogleSignIn}
+          className="h-10 w-full rounded-full border-black/10 bg-white/65 text-xs font-medium text-[#3a3a3c] shadow-none transition-colors hover:bg-white"
         >
           <GoogleIcon className="w-4 h-4" />
           <span>Google</span>
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => handleSocialSignIn('apple')}
-          className="w-full flex items-center justify-center gap-2 text-xs font-medium h-10 border-border/80 hover:bg-surface-raised hover-lift transition-micro active:scale-[0.98] cursor-pointer shadow-xs"
-        >
-          <AppleIcon className="w-4 h-4" />
-          <span>Apple</span>
-        </Button>
       </div>
 
-      <div className="relative mb-5">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-border-subtle" />
-        </div>
-        <div className="relative flex justify-center">
-          <span className="bg-surface-raised px-3 text-xs text-caption">or continue with work email</span>
-        </div>
+      <div className="mb-4 flex items-center gap-3">
+        <span className="h-px flex-1 bg-black/[0.07]" />
+        <span className="text-[10px] text-[#929297]">or continue with work email</span>
+        <span className="h-px flex-1 bg-black/[0.07]" />
       </div>
 
       {/* Error / Unverified Notice */}
@@ -255,11 +242,11 @@ export default function Login() {
       )}
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3">
 
         {/* Email */}
         <div>
-          <label htmlFor="login-email" className="block text-sm font-medium text-body mb-1.5">
+          <label htmlFor="login-email" className="mb-1.5 block text-[11px] font-medium text-[#3a3a3c]">
             Work email
           </label>
           <Input
@@ -270,13 +257,14 @@ export default function Login() {
             onChange={handleChange}
             placeholder="you@company.com"
             autoComplete="email"
+            className="h-10 rounded-xl border-black/10 bg-white/65 px-3 text-sm text-[#1d1d1f] shadow-none placeholder:text-[#a1a1a6] focus-visible:bg-white focus-visible:ring-[#0071e3]"
           />
         </div>
 
         {/* Password */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label htmlFor="login-password" className="text-sm font-medium text-body">Password</label>
+            <label htmlFor="login-password" className="text-[11px] font-medium text-[#3a3a3c]">Password</label>
             <Button
               type="button"
               variant="link"
@@ -286,7 +274,7 @@ export default function Login() {
                 setForgotSuccess('')
                 setForgotOpen(true)
               }}
-              className="text-xs text-muted hover:text-heading no-underline hover:no-underline font-normal cursor-pointer"
+              className="h-auto text-xs font-normal text-[#737378] no-underline hover:text-[#0071e3] hover:no-underline"
             >
               Forgot password?
             </Button>
@@ -300,7 +288,7 @@ export default function Login() {
               onChange={handleChange}
               placeholder="••••••••"
               autoComplete="current-password"
-              className="pr-10"
+              className="h-10 rounded-xl border-black/10 bg-white/65 px-3 pr-11 text-sm text-[#1d1d1f] shadow-none placeholder:text-[#a1a1a6] focus-visible:bg-white focus-visible:ring-[#0071e3]"
             />
             <Button
               type="button"
@@ -322,8 +310,9 @@ export default function Login() {
             id="remember"
             checked={rememberMe}
             onCheckedChange={checked => setRememberMe(checked === true)}
+            className="data-[state=checked]:border-[#0071e3] data-[state=checked]:bg-[#0071e3]"
           />
-          <label htmlFor="remember" className="text-sm text-muted cursor-pointer select-none">
+          <label htmlFor="remember" className="cursor-pointer select-none text-[11px] text-[#737378]">
             Keep me signed in
           </label>
         </div>
@@ -332,7 +321,7 @@ export default function Login() {
         <Button
           type="submit"
           disabled={loading}
-          className="w-full h-10 font-semibold cursor-pointer shadow-card hover:shadow-glow hover-lift transition-micro active:scale-[0.98]"
+          className="h-10 w-full rounded-full bg-[#0071e3] text-[13px] font-medium text-white shadow-[0_10px_30px_rgba(0,113,227,0.22)] transition-all hover:bg-[#0077ed] hover:shadow-[0_14px_36px_rgba(0,113,227,0.28)]"
         >
           {loading ? (
             <>
@@ -346,20 +335,10 @@ export default function Login() {
 
       </form>
 
-      {/* Divider */}
-      <div className="relative my-6">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-border-subtle" />
-        </div>
-        <div className="relative flex justify-center">
-          <span className="bg-surface-raised px-3 text-xs text-caption">or</span>
-        </div>
-      </div>
-
       {/* Register link */}
-      <p className="text-center text-sm text-muted">
+      <p className="mt-4 text-center text-xs text-[#737378]">
         Don't have an account?{' '}
-        <Link to="/register" className="text-heading font-semibold hover:underline">
+        <Link to="/register" className="font-semibold text-[#0071e3] hover:underline">
           Create workspace
         </Link>
       </p>
@@ -401,7 +380,6 @@ export default function Login() {
       <DevSocialModal
         isOpen={devModalOpen}
         onClose={() => setDevModalOpen(false)}
-        provider={devModalProvider}
         onSuccess={(data) => {
           setDevModalOpen(false)
           const target = location.state?.from?.pathname || data.redirectUrl || '/dashboard'

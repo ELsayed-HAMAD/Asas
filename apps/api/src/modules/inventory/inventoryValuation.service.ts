@@ -503,7 +503,7 @@ export async function postValuedReceipt(tx: Tx, input: {
       postedAt: input.postedAt,
       actorId: input.actorId,
       sourceType: 'INVENTORY_RECEIPT',
-      description: `Inventory receipt — ${context.product.sku} (${input.reason})`,
+      description: `Inventory receipt: ${context.product.sku} (${input.reason})`,
       lines: [
         { accountId: inventoryAccountId, side: 'DEBIT' },
         { accountId: offsetAccountId, side: 'CREDIT' },
@@ -612,7 +612,7 @@ export async function postValuedIssue(tx: Tx, input: {
       postedAt: input.postedAt,
       actorId: input.actorId,
       sourceType: 'INVENTORY_ISSUE',
-      description: `Inventory issue — ${context.product.sku} (${input.reason})`,
+      description: `Inventory issue: ${context.product.sku} (${input.reason})`,
       lines: [
         { accountId: offsetAccountId, side: 'DEBIT' },
         { accountId: inventoryAccountId, side: 'CREDIT' },
@@ -838,7 +838,7 @@ export async function postInventoryOpeningValuation(
       postedAt,
       actorId,
       sourceType: 'INVENTORY_RECEIPT',
-      description: `Inventory opening valuation — ${product.sku}`,
+      description: `Inventory opening valuation: ${product.sku}`,
       lines: [
         { accountId: inventoryAccountId, side: 'DEBIT' },
         { accountId: equityAccountId, side: 'CREDIT' },

@@ -175,7 +175,7 @@ describe('inventory valuation posting', () => {
       id: 'journal_issue', tenantId: 'tenant_1', currency: 'USD', amount: new Prisma.Decimal('22.00'),
       baseCurrency: 'USD', baseAmount: new Prisma.Decimal('22.00'), baseMinorUnitDigits: 2,
       fxRate: new Prisma.Decimal('1'), exchangeRateId: null, sourceType: 'INVENTORY_ISSUE',
-      currencyProvenance: 'DOCUMENT', description: 'Inventory issue — W-1 (SALE)',
+      currencyProvenance: 'DOCUMENT', description: 'Inventory issue: W-1 (SALE)',
       lines: [
         { accountId: 'acct_cogs', side: 'DEBIT', amount: new Prisma.Decimal('22.00'), baseAmount: new Prisma.Decimal('22.00') },
         { accountId: 'acct_inv', side: 'CREDIT', amount: new Prisma.Decimal('22.00'), baseAmount: new Prisma.Decimal('22.00') },

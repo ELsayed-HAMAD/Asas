@@ -206,18 +206,19 @@ test('inventory product catalog layout-only cleanup verified across 1280px, 1440
   const topbar = page.locator('header').first();
   await expect(topbar).toBeVisible();
   const topbarBox = await topbar.boundingBox();
-  expect(Math.round(topbarBox.height)).toBe(56);
+  expect(Math.round(topbarBox.height)).toBe(64);
 
   // Breadcrumb ("Dashboard > Inventory", nowrap)
   const breadcrumb = topbar.locator('nav[aria-label="Breadcrumb"]');
   await expect(breadcrumb).toBeVisible();
   await expect(breadcrumb.getByText('Inventory')).toBeVisible();
 
-  // "Search or jump to..." input button (fixed 240px, 36px)
+  // "Search or jump to..." input button (responsive 240-340px, 36px)
   const jumpSearch = topbar.getByRole('button', { name: /Search or jump to/i });
   await expect(jumpSearch).toBeVisible();
   const jumpSearchBox = await jumpSearch.boundingBox();
-  expect(Math.round(jumpSearchBox.width)).toBe(240);
+  expect(Math.round(jumpSearchBox.width)).toBeGreaterThanOrEqual(240);
+  expect(Math.round(jumpSearchBox.width)).toBeLessThanOrEqual(340);
   expect(Math.round(jumpSearchBox.height)).toBe(36);
 
   // Bell button (36x36)

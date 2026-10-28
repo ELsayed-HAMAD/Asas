@@ -24,6 +24,7 @@ import { dashboardApi } from '../../lib/api/dashboard'
 import { auditLogApi } from '../../lib/api/auditLog'
 import { queryKeys } from '../../lib/queryKeys'
 import { formatMoney, formatCompactMoney, moneyToMajor, formatCompactCurrency, formatFullCurrency } from '../../lib/format'
+import { EMPTY } from '../../lib/emptyText'
 import { countActiveSprints } from '../../lib/projectSprint'
 import { downloadCsv } from '../../lib/csv'
 
@@ -94,7 +95,7 @@ export default function DashboardOverview() {
   })
 
   // ── KPI cards: each value is a real server-side aggregate ──
-  const headcount = employees.isLoading ? '…' : employees.isError ? '—' : employees.data?.summary?.totalHeadcount ?? 0
+  const headcount = employees.isLoading ? '…' : employees.isError ? EMPTY.unavailable : employees.data?.summary?.totalHeadcount ?? 0
   const onLeaveCount = employees.data?.summary?.onLeaveCount ?? 0
   const hiredThisMonth = employees.data?.summary?.hiredThisMonth ?? 0
   const hiredPreviousMonthToDate = employees.data?.summary?.hiredPreviousMonthToDate ?? 0
@@ -142,7 +143,7 @@ export default function DashboardOverview() {
     },
     {
       label: 'Open Pipeline Value',
-      value: crm.isLoading ? '…' : crm.isError ? '—' : formatCompactCurrency(openTotal),
+      value: crm.isLoading ? '…' : crm.isError ? EMPTY.unavailable : formatCompactCurrency(openTotal),
       fullValue: crm.isLoading || crm.isError || !openTotal ? undefined : formatFullCurrency(openTotal),
       change: `${openCount} open deals`,
       subtitle: openCountDelta == null
@@ -153,7 +154,7 @@ export default function DashboardOverview() {
     },
     {
       label: 'Payables Outstanding',
-      value: finance.isLoading ? '…' : finance.isError ? '—' : formatCompactCurrency(payableOutstanding),
+      value: finance.isLoading ? '…' : finance.isError ? EMPTY.unavailable : formatCompactCurrency(payableOutstanding),
       fullValue: finance.isLoading || finance.isError || !payableOutstanding ? undefined : formatFullCurrency(payableOutstanding),
       change: payablesChangeText,
       subtitle: payables.data?.summary?.pendingApprovalCount > 0
@@ -164,7 +165,7 @@ export default function DashboardOverview() {
     },
     {
       label: 'Active Sprints',
-      value: sprints.isLoading ? '…' : sprints.isError ? '—' : activeSprintCount.toString(),
+      value: sprints.isLoading ? '…' : sprints.isError ? EMPTY.unavailable : activeSprintCount.toString(),
       change: activeSprintCount > 0 ? `${activeSprintCount} active` : 'No active sprint',
       subtitle: `${completedSprintCount} completed across portfolio`,
       trend: 'neutral',
@@ -311,7 +312,7 @@ export default function DashboardOverview() {
 
               {/* Tier 3: Bottom Row Recessed Subtext Footer */}
               <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500 truncate">
-                {stat.subtitle || '—'}
+                {stat.subtitle || 'No details yet'}
               </div>
             </div>
           );

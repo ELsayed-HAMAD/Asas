@@ -1227,7 +1227,7 @@ async function issueReceivableInventory(
       tenantId,
       productId: line.productId,
       delta: -line.quantity,
-      note: `Sale — receivable ${invoice.number ?? invoice.id}`,
+      note: `Sale: receivable ${invoice.number ?? invoice.id}`,
       createdAt: invoice.createdAt,
     })
     if (!movement) throw new AppError(409, 'The inventory fulfillment movement was not created')
@@ -1280,7 +1280,7 @@ async function reverseReceivableInventory(
       tenantId,
       productId: line.productId,
       delta: line.quantity,
-      note: `Sale reversal — receivable ${invoice.number ?? invoice.id}`,
+      note: `Sale reversal: receivable ${invoice.number ?? invoice.id}`,
       createdAt: postedAt,
     })
     if (!movement) throw new AppError(409, 'The inventory reversal movement was not created')
@@ -1863,7 +1863,7 @@ export async function getInvoiceDoc(prisma: FinanceClient, tenantId: string, inv
 
   return {
     tenantName: tenant.name,
-    vendorName: invoice.vendor?.name ?? '—',
+    vendorName: invoice.vendor?.name ?? 'Vendor not recorded',
     invoiceNumber: invoice.invoiceNumber,
     date: invoice.date.toISOString().slice(0, 10),
     currency: invoice.currency ?? tenant.currency,

@@ -26,7 +26,7 @@ export const currencyCodeSchema = z
       ctx.addIssue({
         code: 'custom',
         message:
-          `Unknown currency '${code}'. Register it in @asas/domain before use — guessing its ` +
+          `Unknown currency '${code}'. Register it in @asas/domain before use. Guessing its ` +
           'minor-unit exponent would silently corrupt every amount in that currency.',
       })
     }

@@ -8,7 +8,10 @@
 
 # Logs
 *.log
-logs/
+*.log.*
+/logs/
+/apps/api/logs/
+/apps/web/logs/
 npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
@@ -24,18 +27,31 @@ yarn.lock
 # Environment files and local overrides. Only sanitized templates are tracked.
 .env
 .env.*
-!.env.example
 !**/.env.example
+*.env
+!*.env.example
 *.env.local
 *.env.*.local
 .envrc
 *.envrc
+
+# Local Compose overrides often contain machine-specific credentials.
+docker-compose.override.yml
+docker-compose.override.yaml
+docker-compose.*.local.yml
+docker-compose.*.local.yaml
+compose.override.yml
+compose.override.yaml
 
 # Private keys, certificates, and credential stores
 *.pem
 *.key
 *.p12
 *.pfx
+*.p8
+*.pkcs8
+*.ppk
+*.mobileprovision
 *.crt
 *.cer
 *.csr
@@ -49,11 +65,44 @@ id_ed25519*
 id_ecdsa*
 id_dsa*
 .netrc
+_netrc
 .pgpass
 .npmrc
+.yarnrc
+.yarnrc.yml
+.pypirc
+**/.gem/credentials
+**/.cargo/credentials
+**/.cargo/credentials.toml
+.aws/
+.azure/
+**/.config/gcloud/
+.gcloud/
+.kube/
+kubeconfig
+kubeconfig.*
+*.kubeconfig
+.boto
+.s3cfg
+.rclone.conf
+**/.docker/config.json
 .dockercfg
 .htpasswd
 *.ovpn
+
+# Service-account keys and generated secret material
+**/credentials.json
+**/service-account*.json
+**/*-service-account.json
+**/client_secret_*.json
+**/secrets.json
+**/secrets.yaml
+**/secrets.yml
+*.secret
+*.secrets
+/secrets/
+/apps/api/secrets/
+/apps/web/secrets/
 
 # Build output and caches
 dist/
@@ -77,6 +126,16 @@ out/
 .serverless/
 .aws-sam/
 
+# Infrastructure-as-code state and variable files can contain secrets
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+cdk.out/
+.pulumi/
+
 # Test and coverage output
 coverage/
 **/coverage/
@@ -91,19 +150,31 @@ allure-results/
 allure-report/
 cypress/videos/
 cypress/screenshots/
+.screens/
+apps/web/.screens/
+.playwright/
+**/trace.zip
+*.har
+*.pcap
+*.pcapng
+*.heapsnapshot
+*.cpuprofile
 apps/web/.tmp/
 apps/web/.turbo/
 
 # Runtime data. Never commit uploads, generated exports, resumes, or local
 # database files. See the deployment notes for the S3 migration path.
-storage/
-apps/api/storage/
-uploads/
-resumes/
-exports/
-tmp/
-temp/
-.tmp/
+/storage/
+/apps/api/storage/
+/apps/api/uploads/
+/apps/api/resumes/
+/apps/api/exports/
+/uploads/
+/resumes/
+/exports/
+/tmp/
+/temp/
+/.tmp/
 .tmp-shims/
 *.pid
 *.seed
@@ -111,6 +182,8 @@ temp/
 # Local databases and dumps
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
 *.sqlite-journal
@@ -119,8 +192,11 @@ temp/
 *.dump
 *.sql.gz
 *.sql.tar
+*.sql.bz2
+*.sql.xz
 *.bak
 *.backup
+*.aof
 dump.rdb
 *.rdb
 
@@ -134,9 +210,14 @@ internal-notes/
 .vscode/*
 !.vscode/extensions.json
 .idea/
+.fleet/
 .history/
+*.iml
 *.suo
 *.sw?
+*.orig
+*.rej
+*~
 *.code-workspace
 .DS_Store
 .DS_Store?
@@ -170,5 +251,24 @@ $RECYCLE.BIN/
 .agent/
 .cline/
 .roo/
-.gemini/
+.gemini
+.trae/
+.kilocode/
+.amazonq/
+.qoder/
 .monkeyscode/
+
+# Credential stores, CLI auth tokens, and MCP server configs. These live on the
+# contributor's machine and often hold live provider secrets.
+.git-credentials
+.ssh/
+*.gpg
+*.pgp
+*.asc
+*.agekey
+age-key.txt
+.sentryclirc
+sentry.properties
+.stripe/
+.mcp.json
+.mcp/

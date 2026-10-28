@@ -3,7 +3,7 @@
 // declaration is maintained against it.
 // @ts-expect-error pdfkit has no bundled type declarations
 import PDFDocument from 'pdfkit'
-import { formatDateDisplay, formatMoneyDisplay, MONEY_DASH } from './money.js'
+import { formatDateDisplay, formatMoneyDisplay } from './money.js'
 
 /**
  * Deterministic PDF documents — payslips (hr) and payables invoices (finance).
@@ -215,7 +215,7 @@ export function renderInvoicePdf(doc: InvoiceDoc): Promise<Buffer> {
       .fontSize(9)
       .fillColor('#666666')
       .text(
-        `Invoice: ${doc.invoiceNumber ?? MONEY_DASH}    Date: ${formatDateDisplay(doc.date)}    Status: ${doc.status}`,
+        `Invoice: ${doc.invoiceNumber || 'Not assigned'}    Date: ${formatDateDisplay(doc.date)}    Status: ${doc.status}`,
         LEFT_COL,
         MARGIN + 70,
         { lineBreak: false },

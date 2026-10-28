@@ -4,6 +4,7 @@ import { Alert, AlertDescription } from '../../../components/ui/alert'
 import { Button } from '../../../components/ui/button'
 import { downloadCsv, inferCsvColumnMapping, parseCsvImport } from '../../../lib/csv'
 import { settingsApi } from '../../../lib/api/settings'
+import { EMPTY } from '../../../lib/emptyText'
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024
 const MAX_ROWS = 500
@@ -173,7 +174,7 @@ export default function CrmCompanyMigration({ projectId, onImported }) {
             </span>
           </div>
           {(mappingIssues.length > 0 || allIssues.length > 0 || validation.error) && <ul className="mt-2 max-h-28 space-y-1 overflow-auto text-xs text-danger" aria-live="polite">{mappingIssues.map((issue, index) => <li key={`mapping-${index}`}>{issue}</li>)}{allIssues.slice(0, 12).map((issue, index) => <li key={`${issue.rowNumber}-${issue.field}-${index}`}>Row {issue.rowNumber} · {issue.field}: {issue.message}</li>)}{allIssues.length > 12 && <li>And {allIssues.length - 12} more issues.</li>}{validation.error && <li>{validation.error}</li>}</ul>}
-          {companies.length > 0 && <div className="mt-3 max-h-64 overflow-auto"><table className="w-full min-w-max text-left text-xs"><thead className="sticky top-0 bg-surface"><tr className="text-muted">{FIELDS.filter(field => mapping[field.key] !== '').map(field => <th key={field.key} className="pb-2 pr-4 font-medium">{field.label}</th>)}</tr></thead><tbody>{companies.map((company, index) => <tr key={`${company.sourceId}-${index}`} className="border-t border-border-subtle text-body">{FIELDS.filter(field => mapping[field.key] !== '').map(field => <td key={field.key} className="py-2 pr-4">{company[field.key] || '—'}</td>)}</tr>)}</tbody></table></div>}
+          {companies.length > 0 && <div className="mt-3 max-h-64 overflow-auto"><table className="w-full min-w-max text-left text-xs"><thead className="sticky top-0 bg-surface"><tr className="text-muted">{FIELDS.filter(field => mapping[field.key] !== '').map(field => <th key={field.key} className="pb-2 pr-4 font-medium">{field.label}</th>)}</tr></thead><tbody>{companies.map((company, index) => <tr key={`${company.sourceId}-${index}`} className="border-t border-border-subtle text-body">{FIELDS.filter(field => mapping[field.key] !== '').map(field => <td key={field.key} className="py-2 pr-4">{company[field.key] || EMPTY.provided}</td>)}</tr>)}</tbody></table></div>}
         </div>
       </div>}
 

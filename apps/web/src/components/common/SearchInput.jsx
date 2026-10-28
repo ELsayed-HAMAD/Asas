@@ -25,7 +25,7 @@ const SearchInput = React.forwardRef(function SearchInput({
         type={type}
         placeholder={placeholder}
         className={cn(
-          'w-full h-9 pl-9 pr-3.5 text-sm rounded-xl bg-slate-100/75 backdrop-blur-md border border-slate-200/70 shadow-[inset_0_1px_2px_rgba(15,23,42,0.02)] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:border-slate-300 focus:bg-white/95 transition-all',
+          'h-9 w-full rounded-xl border border-border-default bg-surface-muted/80 pl-9 pr-3.5 text-sm text-body shadow-none backdrop-blur-md transition-colors placeholder:text-caption focus:border-accent/40 focus:bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent/20',
           className
         )}
         {...props}
@@ -34,7 +34,7 @@ const SearchInput = React.forwardRef(function SearchInput({
         size={16}
         aria-hidden="true"
         className={cn(
-          'pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 shrink-0 z-10',
+          'pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 shrink-0 -translate-y-1/2 text-muted',
           iconClassName
         )}
       />

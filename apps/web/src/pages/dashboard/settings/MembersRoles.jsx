@@ -17,6 +17,7 @@ import SettingsTabs from './SettingsTabs'
 import FormDialog from '../../../components/common/FormDialog'
 import ConfirmDialog from '../../../components/common/ConfirmDialog'
 import QueryState from '../../../components/common/QueryState'
+import { EMPTY } from '../../../lib/emptyText'
 import SearchInput from '../../../components/common/SearchInput'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
@@ -189,29 +190,21 @@ export default function MembersRoles() {
     <div className="flex-1 min-h-0 min-w-0 flex flex-col bg-surface overflow-hidden relative">
       <h1 className="sr-only">Members &amp; Roles</h1>
       <TopBarActions>
-        <div className="flex flex-wrap items-center gap-3">
-          <SearchInput
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search members..."
-            wrapperClassName="w-64"
-          />
-          {isAdmin && (
-            <Button
-              type="button"
-              onClick={() => {
-                setInviteError('')
-                setInviteEmail('')
-                setInviteRole('MEMBER')
-                setInviteOpen(true)
-              }}
-              className="h-8 gap-2 whitespace-nowrap"
-            >
-              <UserPlus size={15} />
-              Invite Member
-            </Button>
-          )}
-        </div>
+        {isAdmin && (
+          <Button
+            type="button"
+            onClick={() => {
+              setInviteError('')
+              setInviteEmail('')
+              setInviteRole('MEMBER')
+              setInviteOpen(true)
+            }}
+            className="h-9 gap-2 whitespace-nowrap rounded-full px-4"
+          >
+            <UserPlus size={15} />
+            Invite Member
+          </Button>
+        )}
       </TopBarActions>
 
       <SettingsTabs />
@@ -229,16 +222,24 @@ export default function MembersRoles() {
           >
             {/* Members Section */}
             <div className="bg-surface-raised border border-border-default rounded-card-sm shadow-card overflow-hidden">
-              <div className="p-5 border-b border-border-subtle flex items-center justify-between">
+              <div className="flex flex-col gap-3 border-b border-border-subtle p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-base font-bold text-heading">Workspace Members</h2>
-                  <p className="text-xs text-body-light mt-0.5">
+                  <h2 className="text-lg font-semibold text-heading">Workspace Members</h2>
+                  <p className="mt-1 text-xs text-body-light">
                     People with active access to this workspace.
                   </p>
                 </div>
-                <Badge variant="outline" className="text-xs font-semibold px-2.5 py-1">
-                  {members.length} {members.length === 1 ? 'member' : 'members'}
-                </Badge>
+                <div className="flex w-full items-center gap-2 sm:w-auto">
+                  <SearchInput
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search members..."
+                    wrapperClassName="w-full sm:w-56"
+                  />
+                  <Badge variant="outline" className="text-xs font-semibold px-2.5 py-1 whitespace-nowrap">
+                    {members.length} {members.length === 1 ? 'member' : 'members'}
+                  </Badge>
+                </div>
               </div>
 
               <div className="divide-y divide-border-subtle">
@@ -308,7 +309,7 @@ export default function MembersRoles() {
                                 day: 'numeric',
                                 year: 'numeric',
                               })
-                            : '—'}
+                            : EMPTY.recorded}
                         </span>
 
                         {isAdmin && (
@@ -443,7 +444,7 @@ export default function MembersRoles() {
         </div>
 
         {/* Right: Roles Overview Reference */}
-        <div className="w-full xl:w-[340px] xl:flex-shrink-0 xl:overflow-y-auto bg-surface-muted border-t xl:border-t-0 xl:border-l border-border-default p-8 flex flex-col space-y-6">
+        <div className="flex w-full flex-col space-y-6 border-t border-border-default bg-surface-muted/55 p-6 backdrop-blur-xl xl:my-8 xl:mr-5 xl:w-[360px] xl:flex-shrink-0 xl:overflow-y-auto xl:rounded-[24px] xl:border xl:shadow-card">
           <div>
             <h3 className="text-[10px] font-bold text-caption uppercase tracking-widest mb-4">
               Roles & Permissions

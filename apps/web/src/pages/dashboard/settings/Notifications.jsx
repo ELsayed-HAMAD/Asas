@@ -156,26 +156,15 @@ export default function SettingsNotifications() {
       <h1 className="sr-only">Notifications</h1>
 
       <TopBarActions>
-        <div className="flex flex-wrap items-center gap-3">
-          <SearchInput
-            value={search}
-            onChange={event => setSearch(event.target.value)}
-            placeholder="Search..."
-            wrapperClassName="w-64"
-          />
-
-          <div className="w-8 h-8 rounded-full bg-surface-strong border border-border-strong shrink-0"></div>
-
-          <Button
-            type="button"
-            disabled={!canManageSettings || updateMutation.isPending}
-            title={!canManageSettings ? 'Only workspace admins and owners can change notification settings' : undefined}
-            onClick={savePreferences}
-            className="h-8 whitespace-nowrap"
-          >
-            {updateMutation.isPending ? 'Saving...' : updateMutation.isError ? 'Retry Save' : updateMutation.isSuccess ? 'Saved' : 'Save Preferences'}
-          </Button>
-        </div>
+        <Button
+          type="button"
+          disabled={!canManageSettings || updateMutation.isPending}
+          title={!canManageSettings ? 'Only workspace admins and owners can change notification settings' : undefined}
+          onClick={savePreferences}
+          className="h-9 whitespace-nowrap rounded-full px-4"
+        >
+          {updateMutation.isPending ? 'Saving...' : updateMutation.isError ? 'Retry Save' : updateMutation.isSuccess ? 'Saved' : 'Save Preferences'}
+        </Button>
       </TopBarActions>
 
       <SettingsTabs />
@@ -237,8 +226,18 @@ export default function SettingsNotifications() {
           {/* Event Triggers & Channels Card */}
           <Card className="rounded-card-sm border-border-default shadow-card">
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-bold text-heading">Event Triggers & Channels</CardTitle>
-              <CardDescription className="text-sm text-muted">In-app alerts are active. Email and Slack delivery are not connected for this deployment.</CardDescription>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1.5">
+                  <CardTitle className="text-lg font-semibold text-heading">Event Triggers & Channels</CardTitle>
+                  <CardDescription className="text-sm text-muted">In-app alerts are active. Email and Slack delivery are not connected for this deployment.</CardDescription>
+                </div>
+                <SearchInput
+                  value={search}
+                  onChange={event => setSearch(event.target.value)}
+                  placeholder="Search events..."
+                  wrapperClassName="w-full sm:w-56"
+                />
+              </div>
             </CardHeader>
 
             <CardContent className="pt-0">
@@ -279,9 +278,9 @@ export default function SettingsNotifications() {
         </div>
 
         {/* Right: Example and usage panel */}
-        <div className="w-full xl:w-[360px] xl:flex-shrink-0 bg-surface-raised border-t xl:border-t-0 xl:border-l border-border-default flex flex-col z-10">
+        <div className="z-10 flex w-full flex-col border-t border-border-default bg-surface-raised/55 shadow-panel backdrop-blur-xl xl:my-8 xl:mr-5 xl:w-[360px] xl:flex-shrink-0 xl:overflow-hidden xl:rounded-[24px] xl:border xl:shadow-card">
 
-          <div className="xl:flex-1 xl:overflow-y-auto p-8 space-y-8">
+          <div className="space-y-8 p-6 xl:flex-1 xl:overflow-y-auto">
 
             {/* Illustrative notification preview */}
             <div>

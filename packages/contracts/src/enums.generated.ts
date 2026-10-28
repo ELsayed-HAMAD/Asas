@@ -317,6 +317,17 @@ export const payrollRunStatusSchema = z.enum(PayrollRunStatusValues)
 
 export type PayrollRunStatus = z.infer<typeof payrollRunStatusSchema>
 
+export const PlatformRoleValues = [
+  'NONE',
+  'SUPPORT',
+  'ADMIN',
+  'OWNER',
+] as const satisfies readonly string[]
+
+export const platformRoleSchema = z.enum(PlatformRoleValues)
+
+export type PlatformRole = z.infer<typeof platformRoleSchema>
+
 export const ProductStockStatusValues = [
   'IN_STOCK',
   'LOW_STOCK',
@@ -451,6 +462,7 @@ export const prismaEnums = {
   PayableStatus: PayableStatusValues,
   PayFrequency: PayFrequencyValues,
   PayrollRunStatus: PayrollRunStatusValues,
+  PlatformRole: PlatformRoleValues,
   ProductStockStatus: ProductStockStatusValues,
   ProjectStatus: ProjectStatusValues,
   ReceivableStatus: ReceivableStatusValues,

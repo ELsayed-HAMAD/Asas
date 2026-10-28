@@ -48,6 +48,8 @@ import { createObjectStorage, type ObjectStorage } from './services/objectStorag
 import { createStripeBillingProvider, type StripeBillingProvider } from './services/stripeBilling.js'
 import { createTenantScope, runWithTenantScope } from './services/tenantContext.js'
 import { stripeBillingRoutes } from './modules/billing/stripe.routes.js'
+import { platformRoutes } from './modules/platform/platform.routes.js'
+import { getPlatformFlags } from './modules/platform/platformSettings.js'
 
 /**
  * The Fastify logger configuration shared by every build.
@@ -267,6 +269,7 @@ export async function buildApp(
 
   await app.register(cors, {
     origin: environment.frontendOrigin.split(',').map(value => value.trim()),
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
   })
 
@@ -370,6 +373,25 @@ export async function buildApp(
     }
     // Register the concrete "render a kind into bytes" handlers before any job can dispatch.
     registerExportHandlers(app.exportQueue, app.prisma)
+
+    // Platform maintenance mode blocks workspace traffic but leaves auth, health, and the
+    // platform console reachable so the owner can turn it back off.
+    app.addHook('onRequest', async (request, reply) => {
+      if (request.method === 'OPTIONS') return
+      const path = request.url.split('?', 1)[0] ?? ''
+      if (!path.startsWith('/api/v1/')) return
+      if (path.startsWith('/api/v1/platform') || path.startsWith('/api/v1/auth')) return
+      const flags = await getPlatformFlags(app.prisma!)
+      if (!flags.maintenanceMode) return
+      await reply.code(503).send({
+        error: {
+          message: 'Asas is under scheduled maintenance. Please try again shortly.',
+          details: { code: 'MAINTENANCE_MODE' },
+        },
+      })
+    })
+
+    await app.register(platformRoutes, { prefix: '/api/v1/platform', env: environment })
     await app.register(hrRoutes, { prefix: '/api/v1/hr' })
     await app.register(payrollRoutes, { prefix: '/api/v1/hr' })
     await app.register(candidateRoutes, { prefix: '/api/v1/hr' })

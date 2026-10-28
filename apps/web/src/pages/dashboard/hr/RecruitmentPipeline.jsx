@@ -11,6 +11,7 @@ import { queryKeys } from '../../../lib/queryKeys'
 import { cn } from '../../../lib/utils'
 import { useActiveMemberRole } from '../../../lib/authClient'
 import { getMemberRoleName } from '../../../lib/memberRole'
+import { EMPTY } from '../../../lib/emptyText'
 import FormDialog from '../../../components/common/FormDialog'
 import QueryState from '../../../components/common/QueryState'
 import { Button } from '../../../components/ui/button'
@@ -151,11 +152,11 @@ function CandidateInspector({ candidate, interviews = [], onClose, canWrite, can
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
             <span className="px-2.5 py-1 rounded-lg bg-surface-muted border border-border-default text-[11px] text-body inline-flex items-center gap-1.5 shadow-xs max-w-full">
               <MapPin size={12} className="text-muted shrink-0" />
-              <span className="truncate">{profile.location || '—'}</span>
+              <span className="truncate">{profile.location || EMPTY.provided}</span>
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-surface-muted border border-border-default text-[11px] text-body inline-flex items-center gap-1.5 shadow-xs max-w-full">
               <Mail size={12} className="text-muted shrink-0" />
-              <span className="truncate">{profile.email || 'Email'}</span>
+              <span className="truncate">{profile.email || EMPTY.email}</span>
             </span>
           </div>
 
@@ -192,15 +193,15 @@ function CandidateInspector({ candidate, interviews = [], onClose, canWrite, can
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-surface-muted/80 border border-border-default rounded-xl p-2 min-w-0">
                 <span className="block text-muted text-[10px] mb-0.5 truncate">Current Role</span>
-                <span className="font-bold text-heading text-xs truncate block" title={profile.currentRole || '—'}>{profile.currentRole || '—'}</span>
+                <span className="font-bold text-heading text-xs truncate block" title={profile.currentRole || EMPTY.provided}>{profile.currentRole || EMPTY.provided}</span>
               </div>
               <div className="bg-surface-muted/80 border border-border-default rounded-xl p-2 min-w-0">
                 <span className="block text-muted text-[10px] mb-0.5 truncate">Experience</span>
-                <span className="font-bold text-heading text-xs truncate block" title={profile.experience || '—'}>{profile.experience || '—'}</span>
+                <span className="font-bold text-heading text-xs truncate block" title={profile.experience || EMPTY.provided}>{profile.experience || EMPTY.provided}</span>
               </div>
               <div className="bg-surface-muted/80 border border-border-default rounded-xl p-2 min-w-0">
                 <span className="block text-muted text-[10px] mb-0.5 truncate">Source</span>
-                <span className="font-bold text-heading text-xs truncate block" title={profile.source || '—'}>{profile.source || '—'}</span>
+                <span className="font-bold text-heading text-xs truncate block" title={profile.source || EMPTY.provided}>{profile.source || EMPTY.provided}</span>
               </div>
             </div>
           </div>
@@ -270,7 +271,7 @@ function CandidateInspector({ candidate, interviews = [], onClose, canWrite, can
                           ? 'Interview cancelled'
                           : 'Candidate created'}
                       </p>
-                      <p className="text-[11px] text-body-light leading-relaxed mt-0.5 truncate">{log.description || '—'}</p>
+                      <p className="text-[11px] text-body-light leading-relaxed mt-0.5 truncate">{log.description || 'No activity recorded'}</p>
                       <p className="text-[10px] text-muted mt-1 font-mono">
                         {new Date(log.createdAt).toLocaleString('en-US', {
                           month: 'short',
@@ -643,12 +644,12 @@ export default function RecruitmentPipeline() {
     : `${current - previous > 0 ? '+' : ''}${(current - previous).toFixed(digits)} ${unit} vs prior MTD`
   const hasCandidateFilters = Boolean(search.trim() || roleFilter !== 'ALL' || stageFilter !== 'ALL')
   const displayStats = [
-    { label: 'ACTIVE CANDIDATES', value: summary?.activeCandidates ?? '—', trend: 'neutral', sub: 'Current pipeline' },
-    { label: 'HIRED (MTD)', value: summary?.hiredThisPeriod ?? '—', trend: 'neutral', sub: periodDelta(summary?.hiredThisPeriod, summary?.hiredPreviousPeriod, 'hires') },
-    { label: 'AVG TIME TO HIRE (MTD)', value: summary?.averageTimeToHireThisPeriod == null ? '—' : `${summary.averageTimeToHireThisPeriod} days`, trend: 'neutral', sub: periodDelta(summary?.averageTimeToHireThisPeriod, summary?.averageTimeToHirePreviousPeriod, 'days', 1) },
+    { label: 'ACTIVE CANDIDATES', value: summary?.activeCandidates ?? EMPTY.data, trend: 'neutral', sub: 'Current pipeline' },
+    { label: 'HIRED (MTD)', value: summary?.hiredThisPeriod ?? EMPTY.data, trend: 'neutral', sub: periodDelta(summary?.hiredThisPeriod, summary?.hiredPreviousPeriod, 'hires') },
+    { label: 'AVG TIME TO HIRE (MTD)', value: summary?.averageTimeToHireThisPeriod == null ? EMPTY.data : `${summary.averageTimeToHireThisPeriod} days`, trend: 'neutral', sub: periodDelta(summary?.averageTimeToHireThisPeriod, summary?.averageTimeToHirePreviousPeriod, 'days', 1) },
     {
       label: 'OFFER ACCEPTANCE (MTD)',
-      value: summary?.offerAcceptanceRateThisPeriod == null ? '—' : `${summary.offerAcceptanceRateThisPeriod}%`,
+      value: summary?.offerAcceptanceRateThisPeriod == null ? EMPTY.data : `${summary.offerAcceptanceRateThisPeriod}%`,
       trend: 'neutral',
       sub: `${summary?.offersDecidedThisPeriod ?? 0} decisions · ${summary?.offerAcceptanceRateThisPeriod == null || summary?.offerAcceptanceRatePreviousPeriod == null ? 'No prior data' : periodDelta(summary?.offerAcceptanceRateThisPeriod, summary?.offerAcceptanceRatePreviousPeriod, 'pts', 1)}`
     },
@@ -868,7 +869,7 @@ export default function RecruitmentPipeline() {
                             </div>
                             <div className="min-w-0">
                               <p className="text-xs sm:text-sm font-semibold text-heading truncate leading-tight">{cand.name}</p>
-                              <p className="text-[11px] text-muted truncate">{cand.email || '—'}</p>
+                              <p className="text-[11px] text-muted truncate">{cand.email || EMPTY.email}</p>
                             </div>
                           </div>
                         </TableCell>
@@ -879,7 +880,7 @@ export default function RecruitmentPipeline() {
                           </Badge>
                         </TableCell>
                         <TableCell className="px-4 py-2.5 text-xs font-medium tabular-nums text-muted text-right rtl:text-left whitespace-nowrap">
-                          {cand.timeInStage || '—'}
+                          {cand.timeInStage || EMPTY.recorded}
                         </TableCell>
                       </TableRow>
                     )

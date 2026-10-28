@@ -1,15 +1,16 @@
-import { useState, useEffect, useRef } from 'react'
+import { Suspense, useState, useEffect, useRef } from 'react'
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, CreditCard, Briefcase,
   Package, FolderKanban, Settings, HelpCircle,
-  ChevronDown, ChevronLeft, ChevronRight, Plus, LogOut, Menu,
-  Check, User, Moon, Download, Search, Globe, Mail, Building2
+  ChevronDown, PanelLeftClose, PanelLeftOpen, Plus, LogOut, Menu, Loader2,
+  Check, User, Moon, Download, Search, Globe, Mail, Building2, ShieldCheck
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { changeLanguage } from '../lib/i18n'
 import { validatePasswordPolicy } from '../lib/passwordPolicy'
+import { clearOnboardingDraft, onboardingDraftStorage } from '../lib/onboardingDraft'
 import {
   authClient, useSession, useActiveOrganization, useActiveMemberRole,
   useListOrganizations, signOut
@@ -38,6 +39,7 @@ import {
   BreadcrumbSeparator,
 } from '../components/ui/breadcrumb'
 import { Kbd } from '../components/ui/kbd'
+import { AsasLogo } from '../components/common/AsasLogo'
 import {
   Tooltip,
   TooltipTrigger,
@@ -370,8 +372,19 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t, i
   )
 }
 
+function DashboardPageLoading() {
+  return (
+    <div className="flex min-h-0 flex-1 items-center justify-center p-8" role="status" aria-live="polite">
+      <div className="flex items-center gap-3 rounded-2xl border border-border-default bg-surface-raised/65 px-5 py-3 text-sm text-muted shadow-card backdrop-blur-xl">
+        <Loader2 size={16} className="animate-spin text-accent" />
+        Loading workspace…
+      </div>
+    </div>
+  )
+}
+
 // ── Sidebar Content Component ────────────────────────────────
-function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollapse }) {
+function SidebarContent({ navProps, navigate, isCollapsed = false }) {
   const { t, i18n } = useTranslation()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const navRef = useRef(null)
@@ -417,6 +430,8 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
   const queryClient = useQueryClient()
 
   const displayName = session?.user?.name || 'User'
+  const platformRole = session?.user?.platformRole
+  const isPlatformAdmin = Boolean(platformRole && platformRole !== 'NONE')
   const roleName = typeof activeMemberRole === 'string' ? activeMemberRole : activeMemberRole?.role
   const roleLabel = roleName ? roleName.charAt(0) + roleName.slice(1).toLowerCase() : 'Member'
   const tenantName = activeOrganization?.name || 'Enterprise ERP'
@@ -488,6 +503,8 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
         throw new Error(setActiveRes.error?.message || 'Could not activate new workspace.')
       }
       queryClient.clear()
+      // The new workspace starts from a clean wizard, never from a draft left by an earlier one.
+      clearOnboardingDraft(onboardingDraftStorage())
       window.location.assign('/onboarding')
     } catch (err) {
       setCreateWorkspaceError(err?.message || 'Could not create workspace.')
@@ -594,8 +611,8 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
       {/* Brand */}
       <div className={`px-4 py-3.5 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} border-b border-border-subtle flex-shrink-0`}>
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded-button bg-primary text-on-primary flex items-center justify-center text-sm font-bold flex-shrink-0 shadow-card transition-micro">
-            A
+          <div data-testid="sidebar-brand-logo" className="w-8 h-8 rounded-button bg-primary text-on-primary flex items-center justify-center flex-shrink-0 shadow-card transition-micro">
+            <AsasLogo className="w-4.5 h-4.5 text-on-primary" />
           </div>
           {!isCollapsed && (
             <div className="min-w-0">
@@ -611,17 +628,6 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
             </div>
           )}
         </div>
-        {toggleCollapse && (
-          <button
-            type="button"
-            onClick={toggleCollapse}
-            className="hidden md:flex text-muted hover:text-heading p-1 rounded hover:bg-surface-muted transition-colors cursor-pointer"
-            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {isCollapsed ? <ChevronRight size={14} className="rtl:rotate-180" /> : <ChevronLeft size={14} className="rtl:rotate-180" />}
-          </button>
-        )}
       </div>
 
       {/* Quick action */}
@@ -692,9 +698,10 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
           </DropdownMenuTrigger>
 
           <DropdownMenuContent
-            side={isCollapsed ? 'right' : 'top'}
-            align={isCollapsed ? 'end' : 'start'}
-            sideOffset={isCollapsed ? 12 : 8}
+            side="top"
+            align="start"
+            alignOffset={12}
+            sideOffset={8}
             className="w-[248px] p-2 glass-popover bg-white/78 backdrop-blur-2xl backdrop-saturate-180 border border-white/90 ring-1 ring-slate-900/[0.08] rounded-2xl shadow-[0_20px_48px_-12px_rgba(15,23,42,0.16),0_4px_12px_-2px_rgba(15,23,42,0.06),inset_0_1px_0_0_rgba(255,255,255,0.95)] space-y-1.5 text-slate-800 z-50 overflow-hidden animate-scale-in"
           >
             {/* 1. Top Translucent Glass Pod: Identity & Workspace */}
@@ -838,6 +845,15 @@ function SidebarContent({ navProps, navigate, isCollapsed = false, toggleCollaps
 
             {/* 3. Bottom Section — Crisp Log Out Row */}
             <div className="pt-1 border-t border-slate-200/60">
+              {isPlatformAdmin && (
+                <DropdownMenuItem
+                  onClick={() => { setUserMenuOpen(false); navigate('/admin') }}
+                  className="w-full px-2.5 py-1.5 rounded-xl hover:bg-indigo-50 flex items-center gap-2.5 text-xs font-semibold text-indigo-700 transition-all cursor-pointer"
+                >
+                  <ShieldCheck size={14} />
+                  <span>Platform console</span>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 onClick={handleLogout}
                 className="w-full px-2.5 py-1.5 rounded-xl hover:bg-rose-500/10 flex items-center gap-2.5 text-xs font-semibold text-rose-600 transition-all cursor-pointer"
@@ -1080,6 +1096,7 @@ export default function DashboardLayout() {
   const location  = useLocation()
   const navigate  = useNavigate()
   const pathname  = location.pathname
+  const isSettingsRoute = pathname.startsWith('/dashboard/settings')
 
   const { data: session } = useSession()
   const { data: activeOrganization } = useActiveOrganization()
@@ -1176,7 +1193,7 @@ export default function DashboardLayout() {
       {/* ── Desktop sidebar ── */}
       <TooltipProvider delayDuration={150}>
         <aside className={`hidden md:flex ${sidebarCollapsed ? 'w-16 min-w-16' : 'w-55 min-w-55'} h-screen max-h-screen glass-strong border-e border-border-subtle/60 flex-col relative z-30 transition-all duration-300 ease-out`}>
-          <SidebarContent navProps={navProps} navigate={navigate} isCollapsed={sidebarCollapsed} toggleCollapse={toggleCollapse} />
+          <SidebarContent navProps={navProps} navigate={navigate} isCollapsed={sidebarCollapsed} />
         </aside>
       </TooltipProvider>
 
@@ -1198,11 +1215,10 @@ export default function DashboardLayout() {
       )}
 
       {/* ── Right side: topbar + page content ── */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+      <div className={`flex-1 flex flex-col overflow-hidden min-w-0 ${isSettingsRoute ? 'settings-glass-shell' : ''}`}>
 
-        {/* Topbar */}
-        {/* Topbar (56px, one row, 12px gaps, nothing wraps) */}
-        <header className="glass-strong border-b border-border-subtle/60 px-4 md:px-6 h-14 min-h-[56px] flex items-center justify-between gap-3 min-w-0">
+        {/* Topbar (64px, one row, restrained global controls) */}
+        <header className="glass-strong flex h-16 min-h-16 flex-shrink-0 items-center justify-between gap-4 border-b border-border-subtle/60 px-4 md:px-6 min-w-0">
 
           {/* Left: hamburger (mobile only) + breadcrumb */}
           <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1216,6 +1232,17 @@ export default function DashboardLayout() {
               aria-controls="mobile-navigation-drawer"
             >
               <Menu size={20} />
+            </button>
+
+            <button
+              type="button"
+              onClick={toggleCollapse}
+              className="hidden md:flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-heading"
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-pressed={sidebarCollapsed}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
             </button>
 
             {/* Breadcrumb */}
@@ -1251,27 +1278,26 @@ export default function DashboardLayout() {
           {/* Spacer: flex: 1 so the left and right groups never touch */}
           <div className="flex-1" />
 
-          {/* Right group: Global search ⌘K (max 320px) + bell + portal */}
-          <div className="ml-auto flex items-center justify-end gap-3 shrink-0 flex-nowrap min-w-0">
-            <div className="hidden sm:flex items-center gap-3 shrink min-w-0">
-              <Button
-                variant="outline"
-                type="button"
-                onClick={() => setCommandPaletteOpen(true)}
-                className="justify-between w-60 h-9 px-3 text-xs text-muted bg-surface-muted hover:bg-surface hover:text-muted border-border-default shadow-sm font-normal shrink-0"
-                title="Global search (⌘K or Ctrl+K)"
-                aria-label="Search or jump to..."
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <Search size={14} className="text-caption flex-shrink-0" />
-                  <span className="truncate text-body-light">{t('common.searchJump', 'Search or jump to...')}</span>
-                </div>
-                <Kbd>⌘K</Kbd>
-              </Button>
-              <NotificationPopover />
-            </div>
+          {/* Right group: global command search, notifications, page actions */}
+          <div className="ml-auto flex min-w-0 flex-nowrap items-center justify-end gap-2.5">
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => setCommandPaletteOpen(true)}
+              className="hidden h-9 w-[clamp(220px,24vw,340px)] shrink-0 justify-between rounded-full border-border-default/80 bg-surface-muted/70 px-4 text-xs font-normal text-muted shadow-none backdrop-blur-md hover:bg-surface-raised hover:text-body lg:flex"
+              title="Global search (⌘K or Ctrl+K)"
+              aria-label="Search or jump to..."
+            >
+              <div className="flex min-w-0 items-center gap-2.5">
+                <Search size={15} className="flex-shrink-0 text-caption" />
+                <span className="truncate text-body-light">{t('common.searchJump', 'Search or jump to...')}</span>
+              </div>
+              <Kbd className="border-border-default/70 bg-surface-raised/70">⌘K</Kbd>
+            </Button>
 
-            <div id="topbar-actions-portal" className="flex min-w-0 items-center justify-end gap-2 flex-shrink-0 empty:hidden border-s border-border-default ps-3" />
+            <NotificationPopover />
+
+            <div id="topbar-actions-portal" className="flex min-w-0 items-center justify-end gap-2 overflow-x-auto no-scrollbar empty:hidden flex-shrink-0 border-s border-border-default ps-2.5" />
           </div>
         </header>
 
@@ -1290,7 +1316,9 @@ export default function DashboardLayout() {
               </Link>
             </div>
           )}
-          <Outlet />
+          <Suspense fallback={<DashboardPageLoading />}>
+            <Outlet />
+          </Suspense>
         </main>
 
       </div>

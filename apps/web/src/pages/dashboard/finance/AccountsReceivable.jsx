@@ -602,7 +602,7 @@ export default function AccountsReceivable() {
             {money(totalOutstanding)}
           </p>
           <p className="mt-1.5 text-[11px] text-slate-500 leading-snug truncate" title={mtdSubtext}>
-            {collectedThisMonth ? `Collected MTD: ${money(collectedThisMonth)}` : 'Collected MTD: —'}
+            {collectedThisMonth ? `Collected MTD: ${money(collectedThisMonth)}` : 'No collections yet'}
           </p>
         </div>
 
@@ -881,7 +881,7 @@ export default function AccountsReceivable() {
                           {inv.inventoryLines?.length > 0 && (
                             <span
                               className="inline-flex items-center gap-1 text-slate-500"
-                              title={inv.inventoryLines.map(line => `${line.productName} × ${line.quantity} — ${formatMoney(line.costValue)}`).join('\n')}
+                              title={inv.inventoryLines.map(line => `${line.productName} × ${line.quantity}: ${formatMoney(line.costValue)}`).join('\n')}
                             >
                               • <Package size={11} /> {inv.inventoryLines.length} line{inv.inventoryLines.length === 1 ? '' : 's'}
                             </span>

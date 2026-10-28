@@ -89,7 +89,7 @@ describe('resolveAuthContext', () => {
     const auth = stubAuth({ session: { activeOrganizationId: null }, user: { id: 'user_1' } })
     const prisma = stubPrisma({ role: 'MEMBER', employeeId: null })
     const context = await resolveAuthContext(auth, prisma, {})
-    expect(context).toEqual({ userId: 'user_1', tenantId: 'tenant_1', role: 'MEMBER', employeeId: null })
+    expect(context).toEqual({ userId: 'user_1', tenantId: 'tenant_1', role: 'MEMBER', employeeId: null, tenantStatus: 'ACTIVE' })
   })
 
   it('refuses to guess a tenant when the user has multiple memberships and no active organization', async () => {
@@ -111,14 +111,14 @@ describe('resolveAuthContext', () => {
     const auth = stubAuth({ session: { activeOrganizationId: null }, user: { id: 'user_1' } })
     const prisma = stubPrisma({ role: 'MEMBER', employeeId: null })
     const context = await resolveAuthContext(auth, prisma, {})
-    expect(context).toEqual({ userId: 'user_1', tenantId: 'tenant_1', role: 'MEMBER', employeeId: null })
+    expect(context).toEqual({ userId: 'user_1', tenantId: 'tenant_1', role: 'MEMBER', employeeId: null, tenantStatus: 'ACTIVE' })
   })
 
   it('resolves tenant, role, and employeeId once session and membership agree', async () => {
     const auth = stubAuth({ session: { activeOrganizationId: 'tenant_1' }, user: { id: 'user_1' } })
     const prisma = stubPrisma({ role: 'ADMIN', employeeId: 'emp_1' })
     const context = await resolveAuthContext(auth, prisma, {})
-    expect(context).toEqual({ userId: 'user_1', tenantId: 'tenant_1', role: 'ADMIN', employeeId: 'emp_1' })
+    expect(context).toEqual({ userId: 'user_1', tenantId: 'tenant_1', role: 'ADMIN', employeeId: 'emp_1', tenantStatus: 'ACTIVE' })
   })
 
   it('caches a resolved context by session token so subsequent calls skip the DB', async () => {
@@ -141,7 +141,7 @@ describe('resolveAuthContext', () => {
     const headers = { cookie: 'better-auth.session_token=cached_test_token' }
 
     const first = await resolveAuthContext(auth, prisma, headers)
-    expect(first).toEqual({ userId: 'user_1', tenantId: 'tenant_1', role: 'ADMIN', employeeId: 'emp_1' })
+    expect(first).toEqual({ userId: 'user_1', tenantId: 'tenant_1', role: 'ADMIN', employeeId: 'emp_1', tenantStatus: 'ACTIVE' })
     expect(getSessionCalls).toBe(1)
     expect(memberLookupCalls).toBe(1)
 

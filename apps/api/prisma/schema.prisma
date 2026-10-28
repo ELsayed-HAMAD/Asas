@@ -15,6 +15,14 @@ enum UserRole {
   MEMBER
 }
 
+/// Platform-operator role. Separate from a workspace `Member.role`.
+enum PlatformRole {
+  NONE
+  SUPPORT
+  ADMIN
+  OWNER
+}
+
 enum OnboardingStatus {
   PENDING
   EMPTY
@@ -278,6 +286,8 @@ model Tenant {
   onboardingStatus       OnboardingStatus @default(PENDING)
   status                 String           @default("ACTIVE")
   archivedAt             DateTime?
+  suspendedAt            DateTime?
+  suspendedReason        String?
   sampleDataManifest     Json?
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
@@ -480,6 +490,7 @@ model User {
   email            String   @unique
   emailVerified    Boolean  @default(false)
   twoFactorEnabled Boolean  @default(false)
+  platformRole     PlatformRole @default(NONE)
   image            String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -518,6 +529,10 @@ model Session {
   userAgent            String?
   userId               String
   activeOrganizationId String?
+  // Set only when this session completed a Better Auth second-factor challenge. OAuth
+  // callbacks and trusted-device sign-ins create sessions without one, so privileged
+  // surfaces such as the platform console use it to require a step-up verification.
+  twoFactorVerifiedAt  DateTime?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -642,6 +657,30 @@ model AuditLog {
 
   @@index([tenantId, createdAt])
   @@index([tenantId, action])
+}
+
+/// Immutable trail of platform-operator actions. Not tenant-owned and not RLS-scoped.
+model PlatformAuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  targetType String?
+  targetId   String?
+  metadata   String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([targetType, targetId])
+}
+
+/// Global platform switches (maintenance, signups, exports). Not tenant-owned.
+model PlatformSetting {
+  key         String   @id
+  value       Json
+  updatedById String?
+  updatedAt   DateTime @updatedAt
 }
 
 model Department {

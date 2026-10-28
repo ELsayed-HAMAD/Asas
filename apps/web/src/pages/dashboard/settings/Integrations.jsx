@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import TopBarActions from '../../../components/TopBarActions';
 import SettingsTabs from './SettingsTabs';
 import SearchInput from '../../../components/common/SearchInput';
+import FormDialog from '../../../components/common/FormDialog';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Badge } from '../../../components/ui/badge';
@@ -132,34 +133,15 @@ export default function SettingsIntegrations() {
       <h1 className="sr-only">Integrations</h1>
 
       <TopBarActions>
-        <div className="flex flex-wrap items-center gap-3">
-          <SearchInput
-            placeholder="Search integrations..."
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            wrapperClassName="w-64"
-          />
-
-          <Button
-            variant="outline"
-            type="button"
-            onClick={() => setStatusFilter(statusFilter === 'ALL' ? 'CONNECTED' : statusFilter === 'CONNECTED' ? 'CONFIGURE' : 'ALL')}
-            className="h-8 gap-2 text-body"
-          >
-            Status: {statusFilter === 'ALL' ? 'All' : statusFilter === 'CONNECTED' ? 'Last check passed' : 'Check required'}
-            <ChevronDown size={14} className="text-caption" />
-          </Button>
-
-          <Button
-            type="button"
-            onClick={() => setShowCreate(true)}
-            disabled={!canManageIntegrations}
-            title={!canManageIntegrations ? 'Only workspace admins and owners can manage integrations' : undefined}
-            className="h-8 gap-2"
-          >
-            <Plus size={16} /> Custom Endpoint
-          </Button>
-        </div>
+        <Button
+          type="button"
+          onClick={() => { createMutation.reset(); setShowCreate(true); }}
+          disabled={!canManageIntegrations}
+          title={!canManageIntegrations ? 'Only workspace admins and owners can manage integrations' : undefined}
+          className="h-9 gap-2 rounded-full px-4"
+        >
+          <Plus size={16} /> Custom Endpoint
+        </Button>
       </TopBarActions>
 
       <SettingsTabs />
@@ -169,7 +151,24 @@ export default function SettingsIntegrations() {
 
         {/* Left: Integration Cards Grid */}
         <div className="w-full min-w-0 xl:flex-1 xl:min-h-0 xl:overflow-y-auto p-4 sm:p-8 relative">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-4xl">
+          <div className="mb-6 flex max-w-4xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <SearchInput
+              placeholder="Search integrations..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              wrapperClassName="w-full sm:w-64"
+            />
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => setStatusFilter(statusFilter === 'ALL' ? 'CONNECTED' : statusFilter === 'CONNECTED' ? 'CONFIGURE' : 'ALL')}
+              className="h-9 gap-2 self-start rounded-full border-border-default bg-surface-raised/50 px-4 text-body shadow-none sm:self-auto"
+            >
+              Status: {statusFilter === 'ALL' ? 'All' : statusFilter === 'CONNECTED' ? 'Last check passed' : 'Check required'}
+              <ChevronDown size={14} className="text-caption" />
+            </Button>
+          </div>
+          <div className="grid max-w-4xl grid-cols-1 gap-6 sm:grid-cols-2">
 
             {visibleItems.map((integration) => {
               const isSelected = selected?.id === integration.id;
@@ -213,9 +212,9 @@ export default function SettingsIntegrations() {
         </div>
 
         {/* Right: Integration Configuration Panel */}
-        <div className="w-full xl:w-[400px] xl:flex-shrink-0 bg-surface-raised border-t xl:border-t-0 xl:border-l border-border-default flex flex-col shadow-panel z-10">
+        <div className="z-10 flex w-full flex-col border-t border-border-default bg-surface-raised/55 shadow-panel backdrop-blur-xl xl:my-8 xl:mr-5 xl:w-[380px] xl:flex-shrink-0 xl:overflow-hidden xl:rounded-[24px] xl:border xl:shadow-card">
 
-          <div className="xl:flex-1 xl:overflow-y-auto p-8">
+          <div className="p-6 xl:flex-1 xl:overflow-y-auto">
 
             {selected ? (
               <>
@@ -264,7 +263,7 @@ export default function SettingsIntegrations() {
                       <Button
                         type="button"
                         variant="link"
-                        onClick={() => { setCredentialInput(''); setShowCredentialModal(true); }}
+                        onClick={() => { toggleMutation.reset(); setCredentialInput(''); setShowCredentialModal(true); }}
                         disabled={!canManageIntegrations}
                         title={!canManageIntegrations ? 'Only workspace admins and owners can manage integrations' : undefined}
                         className="text-xs font-semibold text-accent hover:text-accent-hover"
@@ -362,75 +361,85 @@ export default function SettingsIntegrations() {
 
         </div>
       </div>
-      {showCredentialModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">
-          <form className="w-full max-w-md rounded-card bg-surface-raised p-6 shadow-panel" onSubmit={(event) => {
-            event.preventDefault();
-            const val = credentialInput.trim();
-            if (val && selected) {
-              toggleMutation.mutate({ id: selected.id, patch: { credential: { value: val } } }, {
-                onSuccess: () => {
-                  setShowCredentialModal(false);
-                  setCredentialInput('');
-                },
-              });
-            }
-          }}>
-            <h2 className="mb-2 text-lg font-bold text-heading">Configure endpoint</h2>
-            <p className="mb-4 text-xs text-muted">Enter the public HTTPS URL for {selected?.name}. It is encrypted at rest and checked only when you send a test ping.</p>
-            {toggleMutation.isError && <p role="alert" className="mb-3 text-sm text-danger">{toggleMutation.error?.message || 'Could not save the endpoint. Try again.'}</p>}
-            <label className="mb-4 block text-sm font-semibold text-heading">Public HTTPS endpoint
-              <Input
-                type="password"
-                autoFocus
-                required
-                maxLength={4096}
-                value={credentialInput}
-                onChange={(event) => setCredentialInput(event.target.value)}
-                placeholder="https://hooks.example.com/asas"
-                className="mt-1 w-full bg-surface"
-              />
-            </label>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setShowCredentialModal(false)}>Cancel</Button>
-              <Button type="submit" disabled={!canManageIntegrations || !credentialInput.trim() || toggleMutation.isPending}>
-                {toggleMutation.isPending ? 'Saving…' : 'Save endpoint'}
-              </Button>
-            </div>
-          </form>
+      <FormDialog
+        open={showCredentialModal}
+        onClose={() => {
+          setShowCredentialModal(false);
+          setCredentialInput('');
+        }}
+        title="Configure endpoint"
+        subtitle={`Enter the public HTTPS URL for ${selected?.name || 'this integration'}. It is encrypted at rest and checked only when you send a test ping.`}
+        confirmLabel="Save endpoint"
+        busy={toggleMutation.isPending}
+        isConfirmDisabled={!canManageIntegrations || !credentialInput.trim()}
+        onConfirm={() => {
+          const val = credentialInput.trim();
+          if (!val || !selected) return;
+          toggleMutation.mutate({ id: selected.id, patch: { credential: { value: val } } }, {
+            onSuccess: () => {
+              setShowCredentialModal(false);
+              setCredentialInput('');
+            },
+          });
+        }}
+        error={toggleMutation.isError ? (toggleMutation.error?.message || 'Could not save the endpoint. Try again.') : undefined}
+      >
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="integration-endpoint-url" className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">Public HTTPS endpoint</label>
+            <Input
+              id="integration-endpoint-url"
+              type="password"
+              autoFocus
+              required
+              maxLength={4096}
+              value={credentialInput}
+              onChange={(event) => setCredentialInput(event.target.value)}
+              placeholder="https://hooks.example.com/asas"
+              className="w-full bg-surface-muted"
+            />
+          </div>
         </div>
-      )}
-      {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">
-          <form className="w-full max-w-md rounded-card bg-surface-raised p-6 shadow-panel" onSubmit={(event) => {
-            event.preventDefault();
-            const name = newName.trim();
-            if (name) {
-              createMutation.mutate({
-                name,
-                description: newDescription.trim() || undefined,
-                credential: newCredential.trim() || undefined,
-              });
-            }
-          }}>
-            <h2 className="mb-4 text-lg font-bold text-heading">Add endpoint check</h2>
-            <label className="mb-3 block text-sm font-semibold text-heading">Name
-              <Input autoFocus required maxLength={120} value={newName} onChange={(event) => setNewName(event.target.value)} className="mt-1 w-full bg-surface" />
-            </label>
-            <label className="mb-3 block text-sm font-semibold text-heading">Description
-              <Input maxLength={500} value={newDescription} onChange={(event) => setNewDescription(event.target.value)} className="mt-1 w-full bg-surface" />
-            </label>
-            <label className="mb-5 block text-sm font-semibold text-heading">Public HTTPS endpoint (optional)
-              <Input type="url" maxLength={4096} value={newCredential} onChange={(event) => setNewCredential(event.target.value)} placeholder="https://hooks.example.com/asas" className="mt-1 w-full bg-surface" />
-            </label>
-            {createMutation.isError && <p role="alert" className="mb-3 text-sm text-danger">{createMutation.error?.message || 'Could not create the endpoint check. Verify the name and public HTTPS URL.'}</p>}
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-              <Button type="submit" disabled={!canManageIntegrations || createMutation.isPending || !newName.trim()}>{createMutation.isPending ? 'Adding…' : 'Add integration'}</Button>
-            </div>
-          </form>
+      </FormDialog>
+      <FormDialog
+        open={showCreate}
+        onClose={() => {
+          setShowCreate(false);
+          setNewName('');
+          setNewDescription('');
+          setNewCredential('');
+        }}
+        title="Add endpoint check"
+        subtitle="Track a public HTTPS endpoint and confirm it responds to test pings."
+        confirmLabel="Add integration"
+        busy={createMutation.isPending}
+        isConfirmDisabled={!canManageIntegrations || !newName.trim()}
+        onConfirm={() => {
+          const name = newName.trim();
+          if (!name) return;
+          createMutation.mutate({
+            name,
+            description: newDescription.trim() || undefined,
+            credential: newCredential.trim() || undefined,
+          });
+        }}
+        error={createMutation.isError ? (createMutation.error?.message || 'Could not create the endpoint check. Verify the name and public HTTPS URL.') : undefined}
+      >
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="integration-name" className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">Name</label>
+            <Input id="integration-name" autoFocus required maxLength={120} value={newName} onChange={(event) => setNewName(event.target.value)} className="w-full bg-surface-muted" />
+          </div>
+          <div>
+            <label htmlFor="integration-description" className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">Description</label>
+            <Input id="integration-description" maxLength={500} value={newDescription} onChange={(event) => setNewDescription(event.target.value)} className="w-full bg-surface-muted" />
+          </div>
+          <div>
+            <label htmlFor="integration-endpoint" className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">Public HTTPS endpoint (optional)</label>
+            <Input id="integration-endpoint" type="url" maxLength={4096} value={newCredential} onChange={(event) => setNewCredential(event.target.value)} placeholder="https://hooks.example.com/asas" className="w-full bg-surface-muted" />
+          </div>
         </div>
-      )}
+      </FormDialog>
     </div>
   );
 }

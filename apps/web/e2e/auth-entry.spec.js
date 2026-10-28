@@ -25,7 +25,7 @@ async function mockSignedOut(context, { invitation, signIn, invitationFailure } 
     return json(route, {})
   })
   await context.route('**/api/v1/auth/providers', route => json(route, {
-    data: { google: false, apple: false, devAuthAllowed: false },
+    data: { google: false, devAuthAllowed: false },
   }))
 }
 
@@ -34,15 +34,31 @@ test('login and registration explain unavailable social providers without fake O
 
   await page.goto('/login')
   await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Asas home' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Apple', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Google', exact: true }).click()
   await expect(page.getByText(/Google single sign-on is not configured for this deployment/)).toBeVisible()
   await expect(page).toHaveURL(/\/login$/)
 
   await page.goto('/register')
   await expect(page.getByRole('heading', { name: 'Create your workspace' })).toBeVisible()
-  await page.getByRole('button', { name: 'Apple', exact: true }).click()
-  await expect(page.getByText(/Apple single sign-on is not configured for this deployment/)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Apple', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Google', exact: true }).click()
+  await expect(page.getByText(/Google single sign-on is not configured for this deployment/)).toBeVisible()
   await expect(page).toHaveURL(/\/register$/)
+})
+
+test('sign-in and sign-up lead with the Apple-blue brand accent', async ({ page, context }) => {
+  await mockSignedOut(context)
+
+  await page.goto('/login')
+  await expect(page.getByText('Workspace access', { exact: true })).toHaveCSS('color', 'rgb(0, 113, 227)')
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toHaveCSS('background-color', 'rgb(0, 113, 227)')
+  await expect(page.getByRole('link', { name: 'Asas home' }).locator('span').first()).toHaveCSS('background-color', 'rgb(29, 29, 31)')
+
+  await page.goto('/register')
+  await expect(page.getByText('New workspace')).toHaveCSS('color', 'rgb(0, 113, 227)')
+  await expect(page.getByRole('button', { name: 'Create Account' })).toHaveCSS('background-color', 'rgb(0, 113, 227)')
 })
 
 test('invitation entry shows the invited workspace and exposes explicit account choices', async ({ page, context }) => {

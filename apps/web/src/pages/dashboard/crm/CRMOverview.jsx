@@ -22,6 +22,7 @@ import {
   moneyToMajor,
   formatCompactCurrency,
 } from '../../../lib/format';
+import { EMPTY } from '../../../lib/emptyText';
 import TopBarActions from '../../../components/TopBarActions';
 import FormDialog from '../../../components/common/FormDialog';
 import SearchInput from '../../../components/common/SearchInput';
@@ -151,7 +152,7 @@ export default function CRMOverview() {
   const proposalConv = conversion('LEADS', 'PROPOSAL');
   const negotiationConv = conversion('PROPOSAL', 'NEGOTIATION');
   const closedConv = conversion('NEGOTIATION', 'CLOSED_WON');
-  const formatConversion = rate => rate == null ? '—' : `${Math.round(rate)}%`;
+  const formatConversion = rate => rate == null ? EMPTY.data : `${Math.round(rate)}%`;
 
   const monthly = (forecast?.monthlyPipeline || []).map((row) => ({ month: row.month, value: toMajor(row.value) }));
   const pipelineSpark = monthly.map((row) => ({ v: row.value }));
@@ -283,9 +284,9 @@ export default function CRMOverview() {
 
             <p
               className="relative z-10 text-[11px] text-slate-500 leading-tight pt-1.5 border-t border-slate-100"
-              title={`MTD ${formatPercent(currentPeriodWinRate)} · Prior period ${monthlyWinRateDelta == null ? formatPercent(previousPeriodWinRate) : `${monthlyWinRateDelta > 0 ? '+' : ''}${monthlyWinRateDelta.toFixed(1)} pts`}`}
+              title={`MTD: ${formatPercent(currentPeriodWinRate)} · Prior: ${monthlyWinRateDelta == null ? formatPercent(previousPeriodWinRate) : `${monthlyWinRateDelta > 0 ? '+' : ''}${monthlyWinRateDelta.toFixed(1)} pts`}`}
             >
-              MTD {formatPercent(currentPeriodWinRate)} · Prior period {monthlyWinRateDelta == null ? formatPercent(previousPeriodWinRate) : `${monthlyWinRateDelta > 0 ? '+' : ''}${monthlyWinRateDelta.toFixed(1)} pts`}
+              MTD: {formatPercent(currentPeriodWinRate)} · Prior: {monthlyWinRateDelta == null ? formatPercent(previousPeriodWinRate) : `${monthlyWinRateDelta > 0 ? '+' : ''}${monthlyWinRateDelta.toFixed(1)} pts`}
             </p>
           </div>
 

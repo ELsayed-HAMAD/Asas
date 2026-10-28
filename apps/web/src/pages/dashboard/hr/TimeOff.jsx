@@ -17,6 +17,7 @@ import { hrApi } from '../../../lib/api/hr';
 import { queryKeys } from '../../../lib/queryKeys';
 import { useActiveMemberRole } from '../../../lib/authClient';
 import { getMemberRoleName } from '../../../lib/memberRole';
+import { EMPTY } from '../../../lib/emptyText';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Alert, AlertDescription } from '../../../components/ui/alert';
@@ -37,7 +38,7 @@ import {
 } from '../../../components/ui/select';
 
 function formatShortDate(dateStr) {
-  if (!dateStr) return '—';
+  if (!dateStr) return EMPTY.recorded;
   return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: '2-digit' });
 }
 
@@ -570,9 +571,9 @@ export default function TimeOff() {
                     <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted px-3 py-2 bg-surface-muted/95 border-b border-border-default/60 sticky top-0 z-10">
                       <span className="flex-1 min-w-0">Employee / Type</span>
                       <div className="flex items-center gap-1 text-center shrink-0">
-                        <span className="w-10">Allow</span>
+                        <span className="w-14">Allow</span>
                         <span className="w-10">Pend</span>
-                        <span className="w-11">Rem</span>
+                        <span className="w-14">Rem</span>
                       </div>
                     </div>
 
@@ -591,14 +592,14 @@ export default function TimeOff() {
                             </p>
                           </div>
                           <div className="flex items-center gap-1 text-right shrink-0 tabular-nums">
-                            <div className="w-10 text-center font-mono font-medium text-body text-xs" title={`Allowed: ${item.annualAllowanceDays ?? '—'}`}>
-                              {item.annualAllowanceDays ?? '—'}
+                            <div className="w-14 text-center font-mono font-medium text-body text-xs" title={item.annualAllowanceDays != null ? `Allowed: ${item.annualAllowanceDays}` : 'Allowed: not set'}>
+                              {item.annualAllowanceDays ?? EMPTY.value}
                             </div>
                             <div className="w-10 text-center font-mono font-medium text-warning text-xs" title={`Pending: ${item.pendingDays}`}>
                               {item.pendingDays}
                             </div>
-                            <div className="w-11 text-center font-mono font-bold text-heading text-xs" title={`Remaining: ${item.remainingDays ?? '—'} days`}>
-                              {item.remainingDays ?? '—'}d
+                            <div className="w-14 text-center font-mono font-bold text-heading text-xs" title={item.remainingDays != null ? `Remaining: ${item.remainingDays} days` : 'Remaining: not set'}>
+                              {item.remainingDays != null ? `${item.remainingDays}d` : EMPTY.value}
                             </div>
                           </div>
                         </div>

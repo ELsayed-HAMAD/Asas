@@ -21,6 +21,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { crmApi } from '../../../lib/api/crm';
 import { queryKeys } from '../../../lib/queryKeys';
 import { moneyToMajor, formatCompactMoney, formatMoney } from '../../../lib/format';
+import { EMPTY } from '../../../lib/emptyText';
 import { downloadCsv } from '../../../lib/csv';
 import { useActiveMemberRole } from '../../../lib/authClient';
 import { getMemberRoleName } from '../../../lib/memberRole';
@@ -272,7 +273,7 @@ export default function RevenueForecast() {
               </div>
             </div>
             <p className="text-2xl font-bold tracking-tight text-slate-900 my-1 tabular-nums">
-              {closedWon == null ? '—' : formatCurrency(wonMajor)}
+              {closedWon == null ? EMPTY.data : formatCurrency(wonMajor)}
             </p>
             <div className="mt-auto pt-1">
               <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
@@ -297,7 +298,7 @@ export default function RevenueForecast() {
               </div>
             </div>
             <p className="text-2xl font-bold tracking-tight text-slate-900 my-1 tabular-nums">
-              {committedTotal === 0 ? '—' : formatCurrency(committedTotal)}
+              {committedTotal === 0 ? EMPTY.data : formatCurrency(committedTotal)}
             </p>
             <div className="mt-auto pt-1">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold w-fit bg-blue-50 text-blue-700 border border-blue-200/60">
@@ -316,7 +317,7 @@ export default function RevenueForecast() {
               </div>
             </div>
             <p className="text-2xl font-bold tracking-tight text-slate-900 my-1 tabular-nums">
-              {bestCaseTotal === 0 ? '—' : formatCurrency(bestCaseTotal)}
+              {bestCaseTotal === 0 ? EMPTY.data : formatCurrency(bestCaseTotal)}
             </p>
             <div className="mt-auto pt-1">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold w-fit bg-amber-50 text-amber-800 border border-amber-200/60">
@@ -335,7 +336,7 @@ export default function RevenueForecast() {
               </div>
             </div>
             <p className="text-2xl font-bold tracking-tight text-slate-900 my-1 tabular-nums">
-              {coverage == null ? '—' : `${coverage.toFixed(1)}x`}
+              {coverage == null ? 'No quota' : `${coverage.toFixed(1)}x`}
             </p>
             <div className="mt-auto pt-1">
               <div className="bg-slate-50/80 border border-slate-200/60 rounded-xl px-2.5 py-1.5 text-[11px] text-slate-500 leading-tight space-y-0.5">
@@ -479,8 +480,8 @@ export default function RevenueForecast() {
                                 style={{ width: `${repQuotaPct == null ? 0 : Math.min(100, repQuotaPct)}%` }}
                               />
                             </div>
-                            <span className="text-xs font-semibold text-slate-600 w-8 text-right tabular-nums">
-                              {repQuotaPct == null ? '—' : `${Math.round(repQuotaPct)}%`}
+                            <span className="text-xs font-semibold text-slate-600 w-16 text-right tabular-nums">
+                              {repQuotaPct == null ? 'No quota' : `${Math.round(repQuotaPct)}%`}
                             </span>
                           </div>
                         </TableCell>
@@ -520,11 +521,13 @@ export default function RevenueForecast() {
               <div className="my-2 relative z-10">
                 <div className="flex items-baseline gap-2.5 flex-wrap">
                   <span className="text-3xl sm:text-4xl font-extrabold tracking-tight text-rose-600 tabular-nums">
-                    {expectedShortfall == null ? '—' : formatCurrency(expectedShortfall)}
+                    {expectedShortfall == null ? 'No quota' : formatCurrency(expectedShortfall)}
                   </span>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-200/60">
-                    vs Quota
-                  </span>
+                  {expectedShortfall != null && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-200/60">
+                      vs Quota
+                    </span>
+                  )}
                 </div>
               </div>
 
