@@ -37,6 +37,13 @@ const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 const AVAILABLE_TIMEZONES = getAvailableTimeZones(undefined, [localTimezone])
 const DEFAULT_TIMEZONE = AVAILABLE_TIMEZONES.includes(localTimezone) ? localTimezone : 'UTC'
 
+/**
+ * The sample workspace pack writes across every module in one long transaction. Request-scoped
+ * function hosts time out before it finishes, so the deployment can hide the option instead of
+ * letting the launch fail after a minute.
+ */
+const SAMPLE_DATA_ENABLED = import.meta.env.VITE_DISABLE_SAMPLE_DATA !== 'true'
+
 const START_MODE_LABELS = {
   empty: 'Clean workspace',
   sample: 'Sample data',
@@ -139,6 +146,7 @@ export default function Onboarding() {
   }, [step])
 
   const chooseDataMode = mode => {
+    if (mode === 'sample' && !SAMPLE_DATA_ENABLED) return
     setDataMode(mode)
     if (mode !== 'import') setEmployeeRows([])
   }
@@ -178,11 +186,17 @@ export default function Onboarding() {
       if (draft.companyName) setCompanyName(draft.companyName)
       setCurrency(draft.currency)
       setTimezone(draft.timezone)
-      setDataMode(draft.dataMode)
+      setDataMode(draft.dataMode === 'sample' && !SAMPLE_DATA_ENABLED ? 'empty' : draft.dataMode)
       setMigrationModules(draft.migrationModules)
     }
     setDraftReady(true)
   }, [draftUserId, forceCreateWorkspace, redirectingToDashboard])
+
+  // A draft saved before the deployment disabled sample data must not keep the user on a mode
+  // that can no longer finish inside the function timeout.
+  useEffect(() => {
+    if (!SAMPLE_DATA_ENABLED && dataMode === 'sample') setDataMode('empty')
+  }, [dataMode])
 
   // Persist every edit after hydration so a reload resumes the current step and choices.
   // While launching we leave the last saved draft untouched: success clears it, failure keeps
@@ -606,7 +620,8 @@ export default function Onboarding() {
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-accent">Start mode</p>
                 <h1 ref={stepHeadingRef} tabIndex={-1} className="mt-2 text-2xl font-bold tracking-tight text-heading focus:outline-none sm:text-3xl">Choose how to start</h1>
                 <p className="text-sm text-body-light mt-1">
-                  Set up the workspace first, then bring company data across. Plan a migration, import an employee CSV, or explore clearly marked sample data.
+                  Set up the workspace first, then bring company data across. Plan a migration or import an employee CSV.
+                  {SAMPLE_DATA_ENABLED ? ' You can also explore clearly marked sample data.' : ''}
                 </p>
               </div>
 
@@ -646,7 +661,8 @@ export default function Onboarding() {
                   </div>
                 </button>
 
-                {/* Sample data remains an explicit opt-in for exploration only. */}
+                {/* Sample data remains an explicit opt-in; deployments can hide it with VITE_DISABLE_SAMPLE_DATA. */}
+                {SAMPLE_DATA_ENABLED && (
                 <button
                   type="button"
                   onClick={() => chooseDataMode('sample')}
@@ -679,6 +695,7 @@ export default function Onboarding() {
                     </p>
                   </div>
                 </button>
+                )}
 
                 {/* Guided migration keeps the supported scope visible and reviews all rows before commit. */}
                 <button

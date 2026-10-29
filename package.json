@@ -2,9 +2,13 @@
   "name": "asas",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "packageManager": "pnpm@11.9.0",
   "engines": {
     "node": ">=22"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3"
   },
   "scripts": {
     "dev": "turbo run dev",
@@ -16,6 +20,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
+    "prisma": "6.19.3",
     "turbo": "^2.10.12",
     "typescript": "^7.0.2"
   }

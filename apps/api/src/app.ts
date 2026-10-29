@@ -44,6 +44,7 @@ import { withStorageCapacity } from './services/entitlements.js'
 import { mailerQueuePlugin } from './services/mailerQueue.js'
 import { mailer } from './services/mailer.js'
 import { ResendTransport } from './services/resendTransport.js'
+import { SmtpTransport } from './services/smtpTransport.js'
 import { createObjectStorage, type ObjectStorage } from './services/objectStorage.js'
 import { createStripeBillingProvider, type StripeBillingProvider } from './services/stripeBilling.js'
 import { createTenantScope, runWithTenantScope } from './services/tenantContext.js'
@@ -262,9 +263,21 @@ export async function buildApp(
   })
 
   mailer.setDefaultFrom(environment.mailFrom || 'noreply@asas.app')
-  mailer.setTransport(environment.resendApiKey ? new ResendTransport(environment.resendApiKey) : null)
-  if (environment.isProduction && !environment.resendApiKey) {
-    app.log.warn('Email delivery is disabled: configure RESEND_API_KEY and MAIL_FROM')
+  const emailTransport = environment.resendApiKey
+    ? new ResendTransport(environment.resendApiKey)
+    : environment.smtpHost
+      ? new SmtpTransport({
+          host: environment.smtpHost,
+          port: environment.smtpPort,
+          secure: environment.smtpSecure,
+          user: environment.smtpUser,
+          pass: environment.smtpPass,
+        })
+      : null
+  mailer.setTransport(emailTransport)
+  const emailDelivery = emailTransport ? 'configured' as const : 'disabled' as const
+  if (environment.isProduction && !emailTransport) {
+    app.log.warn('Email delivery is disabled: configure RESEND_API_KEY or SMTP_HOST with MAIL_FROM')
   }
 
   await app.register(cors, {
@@ -341,11 +354,17 @@ export async function buildApp(
     // Decorate `ssePublish` on the *root* so every module route (a child of root) can call
     // `request.server.ssePublish(tenantId, keys)` after a write mutation. The SSE route itself
     // is registered with a prefix so it ends up at `/api/v1/events`.
-    if (environment.redisUrl) {
+    if (environment.redisUrl && !environment.serverless) {
       initSseRedis(environment.redisUrl)
     }
     app.decorate('ssePublish', publish)
-    await app.register(ssePlugin, { prefix: '/api/v1' })
+    if (environment.serverless) {
+      // A request-scoped function cannot hold an open text/event-stream connection. The client
+      // disables its EventSource when VITE_DISABLE_SSE=true and refetches on interaction instead.
+      app.log.info('SSE is disabled in serverless mode')
+    } else {
+      await app.register(ssePlugin, { prefix: '/api/v1' })
+    }
     // The export queue. `QUEUE_URL` set → pg-boss worker; empty (default) → inline, so a job
     // row goes QUEUED → DONE before the request that created it returns. The store is a thin
     // adapter over the `ExportJob` model so the queue stays transport-agnostic.
@@ -364,7 +383,7 @@ export async function buildApp(
       },
       storage: objectStorage,
     })
-    if (environment.resendApiKey) {
+    if (emailTransport) {
       await mailerQueuePlugin(app, { queueUrl: environment.queueUrl || undefined })
     } else {
       // Do not queue email that cannot possibly be delivered; enqueue then appears successful
@@ -444,7 +463,7 @@ export async function buildApp(
             data: {
               status: 'ok' as const,
               database: 'connected' as const,
-              emailDelivery: environment.resendApiKey ? 'configured' as const : 'disabled' as const,
+              emailDelivery,
               objectStorage: objectStorage.mode,
               uptime,
               timestamp: now,
@@ -457,7 +476,7 @@ export async function buildApp(
             data: {
               status: 'unhealthy' as const,
               database: 'disconnected' as const,
-              emailDelivery: environment.resendApiKey ? 'configured' as const : 'disabled' as const,
+              emailDelivery,
               objectStorage: objectStorage.mode,
               uptime,
               timestamp: now,
@@ -470,7 +489,7 @@ export async function buildApp(
         data: {
           status: 'ok' as const,
           database: 'disabled' as const,
-          emailDelivery: environment.resendApiKey ? 'configured' as const : 'disabled' as const,
+          emailDelivery,
           objectStorage: objectStorage.mode,
           uptime,
           timestamp: now,

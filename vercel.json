@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --filter @asas/domain build && pnpm --filter @asas/contracts build && pnpm --filter @asas/api prisma:generate && pnpm --filter @asas/api build && pnpm --filter @asas/web build",
+  "outputDirectory": "apps/web/dist",
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 300,
+      "regions": ["iad1"],
+      "includeFiles": "node_modules/.pnpm/@prisma+client*/node_modules/.prisma/client/**"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}

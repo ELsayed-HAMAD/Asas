@@ -246,7 +246,7 @@ export default function AcceptInvitation() {
     try {
       const invitationPath = `/accept-invitation?invitationId=${encodeURIComponent(invitationId)}`
       const redirectTo = `${window.location.origin}/reset-password?returnTo=${encodeURIComponent(invitationPath)}`
-      const res = await authClient.forgetPassword({ email: targetEmail, redirectTo })
+      const res = await authClient.requestPasswordReset({ email: targetEmail, redirectTo })
       if (res?.error) {
         throw new Error(authErrorMessage(res.error, 'Could not send a password reset link.'))
       }

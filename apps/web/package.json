@@ -42,6 +42,7 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-i18next": "^17.0.16",
+    "react-qr-code": "^2.2.0",
     "react-router-dom": "^7.18.0",
     "recharts": "^3.10.1",
     "tailwind-merge": "^3.7.0",

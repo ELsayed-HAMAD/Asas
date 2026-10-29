@@ -18,7 +18,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     return {
       data: {
         google: Boolean(env.googleClientId && env.googleClientSecret),
-        email: Boolean(env.resendApiKey),
+        email: Boolean(env.resendApiKey || env.smtpHost),
         devAuthAllowed: env.devSocialAuthEnabled,
       },
     }

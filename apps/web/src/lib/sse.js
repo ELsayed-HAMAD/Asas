@@ -16,6 +16,13 @@ const SSE_ORIGIN = import.meta.env.VITE_API_URL?.trim()
   || (import.meta.env.DEV ? 'http://127.0.0.1:4000' : '')
 const SSE_URL = `${SSE_ORIGIN}/api/v1/events`
 
+/**
+ * Request-scoped function hosts cannot hold an open text/event-stream connection. When the
+ * deployment sets VITE_DISABLE_SSE=true the client skips EventSource entirely and relies on
+ * normal query refetching instead of reconnecting every time the function times out.
+ */
+const SSE_DISABLED = import.meta.env.VITE_DISABLE_SSE === 'true'
+
 /** No frame (data or keepalive comment) for this long → treat an "open" socket as dead. */
 const STALE_AFTER_MS = 30_000
 /**
@@ -27,6 +34,7 @@ const REBUILD_BASE_DELAY_MS = 1_000
 const REBUILD_MAX_DELAY_MS = 30_000
 
 export function startSse({ queryClient, onConnect }) {
+  if (SSE_DISABLED) return () => {}
   let es = null
   let lastEventAt = Date.now()
   let disposed = false

@@ -30,6 +30,11 @@ export interface AsasEnv {
   nodeEnv: string
   isProduction: boolean
   /**
+   * True when the API runs inside a request-scoped function (Vercel). Long-lived transports such
+   * as the SSE stream cannot survive there, and the deploy-time maintenance timers must not run.
+   */
+  serverless: boolean
+  /**
    * Explicit reverse-proxy IPs/CIDRs whose `X-Forwarded-*` headers are trusted. An empty list
    * means no proxy is trusted, which is the safe default. Trust-all ranges are rejected.
    */
@@ -59,6 +64,12 @@ export interface AsasEnv {
   resendApiKey: string
   /** Verified sender address configured with the email provider. */
   mailFrom: string
+  /** Optional SMTP relay used when Resend is not configured (Gmail app password, Brevo, etc.). */
+  smtpHost: string
+  smtpPort: number
+  smtpSecure: boolean
+  smtpUser: string
+  smtpPass: string
   /** File backend. Local storage is intended for development; S3-compatible storage is durable. */
   objectStorageDriver: 'local' | 's3'
   objectStorageBucket: string
@@ -179,6 +190,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
     betterAuthUrl,
     nodeEnv,
     isProduction: nodeEnv === 'production',
+    serverless: Boolean(source.VERCEL) || source.SERVERLESS === 'true',
     trustedProxyCidrs: resolveTrustedProxyCidrs(source),
     tenantGuardEnabled: rlsEnforcement === 'enforce',
     queueUrl: source.QUEUE_URL ?? '',
@@ -186,6 +198,11 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
     redisUrl: source.REDIS_URL ?? '',
     resendApiKey: source.RESEND_API_KEY ?? '',
     mailFrom: source.MAIL_FROM?.trim() ?? '',
+    smtpHost: source.SMTP_HOST?.trim() ?? '',
+    smtpPort: Number(source.SMTP_PORT ?? 587),
+    smtpSecure: source.SMTP_SECURE === 'true',
+    smtpUser: source.SMTP_USER?.trim() ?? '',
+    smtpPass: source.SMTP_PASS ?? '',
     objectStorageDriver,
     objectStorageBucket: source.S3_BUCKET ?? '',
     objectStorageRegion: source.S3_REGION ?? 'us-east-1',
@@ -238,8 +255,14 @@ export function assertEnv(environment: AsasEnv = loadEnv()): AsasEnv {
       throw new Error('FRONTEND_ORIGIN must use HTTPS in production to prevent cookie leakage over plaintext')
     }
   }
-  if (environment.nodeEnv === 'production' && environment.resendApiKey && !environment.mailFrom) {
-    throw new Error('Missing required environment variable: MAIL_FROM (required with RESEND_API_KEY)')
+  if (environment.nodeEnv === 'production' && (environment.resendApiKey || environment.smtpHost) && !environment.mailFrom) {
+    throw new Error('Missing required environment variable: MAIL_FROM (required with an email provider)')
+  }
+  if (Boolean(environment.smtpUser) !== Boolean(environment.smtpPass)) {
+    throw new Error('SMTP_USER and SMTP_PASS must be configured together')
+  }
+  if (environment.smtpHost && (!Number.isInteger(environment.smtpPort) || environment.smtpPort < 1 || environment.smtpPort > 65535)) {
+    throw new Error('SMTP_PORT must be an integer between 1 and 65535')
   }
   if (environment.objectStorageDriver === 's3' && !environment.objectStorageBucket.trim()) {
     throw new Error('Missing required environment variable: S3_BUCKET (required with OBJECT_STORAGE_DRIVER=s3)')

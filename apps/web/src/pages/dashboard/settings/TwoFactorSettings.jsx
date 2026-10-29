@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Loader2, ShieldCheck, ShieldOff, RefreshCw } from 'lucide-react'
+import QRCode from 'react-qr-code'
 import { authClient } from '../../../lib/authClient'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
@@ -26,6 +27,7 @@ export default function TwoFactorSettings() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  const [resetBusy, setResetBusy] = useState(false)
   const enabled = Boolean(query.data?.user?.twoFactorEnabled)
 
   const startEnrollment = async (event) => {
@@ -115,6 +117,32 @@ export default function TwoFactorSettings() {
     }
   }
 
+  const sendResetLink = async () => {
+    setError('')
+    setNotice('')
+    const email = query.data?.user?.email
+    if (!email) {
+      setError('Your account email is unavailable. Reload the page and try again.')
+      return
+    }
+    setResetBusy(true)
+    try {
+      const result = await authClient.requestPasswordReset({
+        email,
+        redirectTo: window.location.origin + '/reset-password',
+      })
+      if (result?.error) {
+        setError(getError(result, 'Could not send a reset link.'))
+        return
+      }
+      setNotice('If this account has an email address, a reset link is on its way. Reset the password, then return here to set up the authenticator.')
+    } catch (err) {
+      setError(err?.message || 'Could not send a reset link.')
+    } finally {
+      setResetBusy(false)
+    }
+  }
+
   return (
     <section className="space-y-5 rounded-card-sm border border-border-default bg-surface-raised p-5 shadow-card" aria-labelledby="two-factor-heading">
       <div className="flex items-start gap-3">
@@ -128,7 +156,8 @@ export default function TwoFactorSettings() {
       </div>
 
       <p className="rounded-input border border-border-default bg-surface-muted p-3 text-sm text-body">
-        Google and Apple sign-ins use the security controls configured with those identity providers. Asas authenticator verification applies to email and password sign-ins.
+        Google sign-in uses the security controls configured with Google. Asas authenticator verification applies after you confirm with your Asas password.
+        If you usually sign in with Google and do not remember an Asas password, send yourself a reset link below.
       </p>
 
       {error && (
@@ -144,11 +173,17 @@ export default function TwoFactorSettings() {
 
       {enrollment ? (
         <form onSubmit={verifyEnrollment} className="space-y-4">
-          <div className="space-y-2">
+          <div className="space-y-3">
             <h3 className="text-sm font-semibold text-heading">Set up your authenticator</h3>
-            <p className="text-sm text-body">Add Asas to your authenticator app using this setup key, then enter the app's current six-digit code to verify it.</p>
-            <code className="block break-all rounded-input border border-border-default bg-surface-muted p-3 text-sm text-heading">{totpSecret(enrollment.totpURI) || enrollment.totpURI}</code>
-            <p className="text-xs text-muted">Keep this key private. It can generate sign-in codes for your account.</p>
+            <p className="text-sm text-body">Scan this QR code with your authenticator app, then enter the app's current six-digit code to verify it.</p>
+            <div className="flex justify-center rounded-input border border-border-default bg-white p-4">
+              <QRCode value={enrollment.totpURI} size={176} bgColor="#ffffff" fgColor="#111827" />
+            </div>
+            <details className="rounded-input border border-border-default bg-surface-muted p-3 text-sm">
+              <summary className="cursor-pointer font-medium text-body">Can't scan? Use the setup key</summary>
+              <code className="mt-2 block break-all text-heading">{totpSecret(enrollment.totpURI) || enrollment.totpURI}</code>
+            </details>
+            <p className="text-xs text-muted">Keep this code private. It can generate sign-in codes for your account.</p>
           </div>
           <label className="block text-sm font-medium text-body" htmlFor="enrollment-code">Authenticator code</label>
           <Input id="enrollment-code" value={code} onChange={event => setCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" className="w-full tracking-widest" placeholder="6-digit code" />
@@ -163,6 +198,14 @@ export default function TwoFactorSettings() {
         <form onSubmit={enabled ? disableTwoFactor : startEnrollment} className="space-y-4">
           <label className="block text-sm font-medium text-body" htmlFor="two-factor-password">Confirm with your password</label>
           <Input id="two-factor-password" type="password" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} className="w-full" placeholder="Current password" />
+          <button
+            type="button"
+            onClick={sendResetLink}
+            disabled={resetBusy}
+            className="text-xs font-medium text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {resetBusy ? 'Sending reset link...' : 'Forgot your password? Email me a reset link'}
+          </button>
           <div className="flex flex-wrap gap-2">
             <Button type="submit" variant={enabled ? 'destructive' : 'default'} disabled={busy || !password}>
               {busy ? <Loader2 size={15} className="animate-spin" /> : enabled ? <ShieldOff size={15} /> : <ShieldCheck size={15} />}

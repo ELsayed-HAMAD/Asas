@@ -40,7 +40,7 @@ export default function Login() {
     setForgotLoading(true)
     setForgotError('')
     try {
-      const res = await authClient.forgetPassword({
+      const res = await authClient.requestPasswordReset({
         email: forgotEmail.trim(),
         redirectTo: window.location.origin + '/reset-password',
       })

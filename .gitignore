@@ -272,3 +272,6 @@ sentry.properties
 .stripe/
 .mcp.json
 .mcp/
+
+.vercel
+.env*
