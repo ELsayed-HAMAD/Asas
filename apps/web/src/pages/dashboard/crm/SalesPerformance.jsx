@@ -46,7 +46,7 @@ import {
   SelectValue,
 } from '../../../components/ui/select';
 
-const REP_SPARK_COLORS = ['#10b981', '#3b82f6', '#ef4444'];
+const REP_SPARK_COLORS = ['var(--color-chart-emerald)', 'var(--color-chart-blue-soft)', 'var(--color-chart-red)'];
 
 // Avatar backgrounds cycle through the old page's three accent tints.
 const AVATAR_STYLES = ['bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700', 'bg-orange-100 text-orange-700'];
@@ -130,8 +130,8 @@ export default function SalesPerformance() {
 
   const closedTotal = summary.totalWonCount + summary.totalLostCount;
   const winLossData = summary.overallWinRate == null ? [] : [
-    { name: 'Won', value: Math.round(summary.overallWinRate), color: '#10b981' },
-    { name: 'Lost', value: Math.round(100 - summary.overallWinRate), color: '#f87171' },
+    { name: 'Won', value: Math.round(summary.overallWinRate), color: 'var(--color-chart-emerald)' },
+    { name: 'Lost', value: Math.round(100 - summary.overallWinRate), color: 'var(--color-chart-negative)' },
   ];
   const weeklyActivity = data.weeklyActivity || [];
   const maxWeeklyActivity = Math.max(1, ...weeklyActivity.map(week => week.active + week.won + week.lost));
@@ -228,7 +228,7 @@ export default function SalesPerformance() {
                 <Button
                   type="button"
                   onClick={downloadReport}
-                  className="h-9 px-4 text-xs font-semibold text-white bg-[#0f172a] hover:bg-slate-800 rounded-xl shadow-xs shrink-0 inline-flex items-center justify-center whitespace-nowrap"
+                  className="h-9 px-4 text-xs font-semibold text-white bg-surface-inverse-strong hover:bg-slate-800 rounded-xl shadow-xs shrink-0 inline-flex items-center justify-center whitespace-nowrap"
                 >
                   Download Report
                 </Button>
@@ -277,11 +277,11 @@ export default function SalesPerformance() {
                   <AreaChart data={closedSpark} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="closedGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                        <stop offset="5%" stopColor="var(--color-chart-emerald)" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="var(--color-chart-emerald)" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <Area type="monotone" dataKey="v" stroke="#10b981" strokeWidth={1.5} fill="url(#closedGrad)" dot={false} activeDot={false} />
+                    <Area type="monotone" dataKey="v" stroke="var(--color-chart-emerald)" strokeWidth={1.5} fill="url(#closedGrad)" dot={false} activeDot={false} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -393,8 +393,8 @@ export default function SalesPerformance() {
                     ) : (
                       filteredReps.map((rep, idx) => {
                         const isZeroRevenue = !rep.wonValue?.amount || rep.wonValue.amount === 0;
-                        const sparkColor = isZeroRevenue ? '#cbd5e1' : REP_SPARK_COLORS[idx % REP_SPARK_COLORS.length];
-                        const sparkFill = isZeroRevenue ? '#f1f5f9' : REP_SPARK_COLORS[idx % REP_SPARK_COLORS.length];
+                        const sparkColor = isZeroRevenue ? 'var(--color-chart-empty)' : REP_SPARK_COLORS[idx % REP_SPARK_COLORS.length];
+                        const sparkFill = isZeroRevenue ? 'var(--color-chart-grid)' : REP_SPARK_COLORS[idx % REP_SPARK_COLORS.length];
 
                         return (
                           <TableRow key={rep.ownerEmployeeId || `unassigned-${idx}`} className="h-[52px] min-h-[52px] hover:bg-surface-muted/60 transition-colors border-0">

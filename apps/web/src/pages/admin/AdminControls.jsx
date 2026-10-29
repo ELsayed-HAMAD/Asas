@@ -88,7 +88,7 @@ export default function AdminControls() {
           return (
             <section key={flag.key} className="rounded-[24px] border border-white/80 bg-white/65 p-5 shadow-[0_12px_40px_-24px_rgba(15,23,42,0.3)] backdrop-blur-xl">
               <div className="flex items-start justify-between gap-3">
-                <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${enabled ? 'bg-[#1e1b4b] text-white' : 'bg-surface-muted text-muted'}`}>
+                <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${enabled ? 'bg-primary-solid text-white' : 'bg-surface-muted text-muted'}`}>
                   <Icon size={16} />
                 </span>
                 <Switch

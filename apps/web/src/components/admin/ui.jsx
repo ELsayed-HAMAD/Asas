@@ -16,7 +16,7 @@ export function AdminPageHeader({ title, description, actions }) {
 
 export function AdminKpiCard({ label, value, detail, icon: Icon, tone = 'indigo' }) {
   const tones = {
-    indigo: 'bg-[#1e1b4b] text-white',
+    indigo: 'bg-primary-solid text-white',
     emerald: 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20',
     amber: 'bg-amber-500/10 text-amber-700 border border-amber-500/20',
     rose: 'bg-rose-500/10 text-rose-700 border border-rose-500/20',

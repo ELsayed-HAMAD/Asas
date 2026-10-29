@@ -928,7 +928,7 @@ export default function AccountsPayable() {
                 </div>
 
                 {/* PDF Viewer Container */}
-                <div className="bg-[#1e293b] p-2 flex justify-center items-center rounded-xl border border-border-default h-[320px] overflow-hidden">
+                <div className="bg-surface-inverse p-2 flex justify-center items-center rounded-xl border border-border-default h-[320px] overflow-hidden">
                   {pdfUrl ? (
                     <iframe
                       key={`${selectedRecord.id}`}
@@ -1199,7 +1199,7 @@ export default function AccountsPayable() {
             </div>
 
             {/* Modal Body: Large Document Viewer */}
-            <div className="flex-1 bg-[#374151] p-4 sm:p-6 overflow-hidden flex items-center justify-center">
+            <div className="flex-1 bg-inverse-gray p-4 sm:p-6 overflow-hidden flex items-center justify-center">
               {pdfUrl ? (
                 <div className="w-full max-w-[850px] h-full shadow-2xl rounded overflow-hidden">
                   <iframe

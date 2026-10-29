@@ -183,7 +183,7 @@ export default function Solutions() {
     >
       <div className="grid gap-8 lg:grid-cols-[240px_minmax(0,1fr)]">
         <aside className="h-fit rounded-[24px] border border-white/80 bg-white/50 p-2.5 shadow-[0_16px_50px_rgba(0,0,0,0.05)] backdrop-blur-xl lg:sticky lg:top-28">
-          <p className="px-3 pb-2 pt-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#929297]">Product areas</p>
+          <p className="px-3 pb-2 pt-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-subtle">Product areas</p>
           <nav aria-label="Solution areas" className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
             {SOLUTIONS.map((solution) => {
               const TabIcon = solution.icon
@@ -195,9 +195,9 @@ export default function Solutions() {
                   onClick={() => selectSolution(solution.id)}
                   aria-pressed={active}
                   aria-controls="solution-detail"
-                  className={`flex min-w-max items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-xs font-medium transition-colors lg:w-full ${active ? 'bg-white text-[#1d1d1f] shadow-[0_4px_16px_rgba(0,0,0,0.07)]' : 'text-[#737378] hover:bg-white/50 hover:text-[#1d1d1f]'}`}
+                  className={`flex min-w-max items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-xs font-medium transition-colors lg:w-full ${active ? 'bg-white text-ink shadow-[0_4px_16px_rgba(0,0,0,0.07)]' : 'text-ink-muted hover:bg-white/50 hover:text-ink'}`}
                 >
-                  <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${active ? 'bg-[#e8f1fd] text-[#0071e3]' : 'bg-black/[0.035] text-[#86868b]'}`}><TabIcon className="h-4 w-4" /></span>
+                  <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${active ? 'bg-action-soft text-action' : 'bg-black/[0.035] text-ink-soft'}`}><TabIcon className="h-4 w-4" /></span>
                   <span>{solution.badge}</span>
                 </button>
               )
@@ -210,44 +210,44 @@ export default function Solutions() {
           <div key={currentSolution.id} className="animate-fade-in p-6 sm:p-9 lg:p-11">
             <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-start">
               <div>
-                <Badge variant="outline" className="border-[#cfe1f8] bg-[#e8f1fd] text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0071e3] shadow-none">{currentSolution.badge}</Badge>
-                <h2 className="mt-5 text-3xl font-semibold tracking-[-0.04em] text-[#1d1d1f] sm:text-4xl">{currentSolution.title}</h2>
-                <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[#4b4b50]">{currentSolution.subtitle}</p>
+                <Badge variant="outline" className="border-action-border bg-action-soft text-[10px] font-semibold uppercase tracking-[0.14em] text-action shadow-none">{currentSolution.badge}</Badge>
+                <h2 className="mt-5 text-3xl font-semibold tracking-[-0.04em] text-ink sm:text-4xl">{currentSolution.title}</h2>
+                <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-ink-muted-strong">{currentSolution.subtitle}</p>
               </div>
-              <span className="hidden h-13 w-13 shrink-0 items-center justify-center rounded-2xl border border-black/[0.05] bg-white text-[#0071e3] shadow-[0_10px_30px_rgba(0,0,0,0.06)] sm:flex"><Icon className="h-6 w-6" /></span>
+              <span className="hidden h-13 w-13 shrink-0 items-center justify-center rounded-2xl border border-black/[0.05] bg-white text-action shadow-[0_10px_30px_rgba(0,0,0,0.06)] sm:flex"><Icon className="h-6 w-6" /></span>
             </div>
-            <p className="mt-5 max-w-3xl text-sm leading-7 text-[#737378]">{currentSolution.description}</p>
+            <p className="mt-5 max-w-3xl text-sm leading-7 text-ink-muted">{currentSolution.description}</p>
 
             <div className="mt-10 grid gap-9 border-t border-black/[0.07] pt-9 lg:grid-cols-[1fr_0.82fr]">
               <div>
-                <h3 className="text-[10px] font-semibold uppercase tracking-[0.17em] text-[#929297]">Key capabilities</h3>
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.17em] text-ink-subtle">Key capabilities</h3>
                 <div className="mt-5 space-y-4">
                   {currentSolution.capabilities.map((capability) => (
-                    <div key={capability} className="flex items-start gap-3 text-sm leading-6 text-[#4b4b50]">
-                      <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-[#0071e3]" />
+                    <div key={capability} className="flex items-start gap-3 text-sm leading-6 text-ink-muted-strong">
+                      <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-action" />
                       <span>{capability}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="rounded-[22px] border border-black/[0.05] bg-[#f5f5f7]/85 p-5 sm:p-6">
-                <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#929297]">
-                  <Cpu className="h-4 w-4 text-[#0071e3]" />
+              <div className="rounded-[22px] border border-black/[0.05] bg-canvas/85 p-5 sm:p-6">
+                <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-subtle">
+                  <Cpu className="h-4 w-4 text-action" />
                   <span>Example workflow</span>
                 </div>
                 <div className="mt-5">
                   {workflowSteps.map((step, index) => (
                     <div key={step.label}>
                       <div className="rounded-2xl border border-black/[0.05] bg-white/80 p-4 shadow-[0_4px_16px_rgba(0,0,0,0.035)]">
-                        <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">{step.label}</span>
-                        <p className="mt-1.5 text-xs font-semibold leading-5 text-[#3a3a3c]">{step.value}</p>
+                        <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-action">{step.label}</span>
+                        <p className="mt-1.5 text-xs font-semibold leading-5 text-ink-body">{step.value}</p>
                       </div>
-                      {index < workflowSteps.length - 1 && <div className="flex justify-center py-2 text-[#a1a1a6]"><ArrowDown className="h-3.5 w-3.5" /></div>}
+                      {index < workflowSteps.length - 1 && <div className="flex justify-center py-2 text-ink-faint"><ArrowDown className="h-3.5 w-3.5" /></div>}
                     </div>
                   ))}
                 </div>
-                <Button asChild className="mt-6 h-10 w-full rounded-full bg-[#0071e3] text-xs font-medium text-white shadow-[0_8px_24px_rgba(0,113,227,0.2)] hover:bg-[#0077ed]">
+                <Button asChild className="mt-6 h-10 w-full rounded-full bg-action text-xs font-medium text-white shadow-[0_8px_24px_rgba(0,113,227,0.2)] hover:bg-action-hover">
                   <Link to="/register">Start Free Workspace <ArrowRight className="h-3.5 w-3.5" /></Link>
                 </Button>
               </div>

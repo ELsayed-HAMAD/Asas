@@ -40,7 +40,7 @@ function SidebarContent({ me, onNavigate }) {
   return (
     <div data-testid="platform-sidebar" className="flex h-full flex-col border-r border-border-subtle bg-white text-body">
       <div className="flex items-center gap-3 px-5 pt-5 pb-6">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1e1b4b] text-white">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-solid text-white">
           <AsasLogo className="h-4.5 w-4.5" />
         </span>
         <div className="min-w-0">
@@ -61,7 +61,7 @@ function SidebarContent({ me, onNavigate }) {
               className={({ isActive }) => cn(
                 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-medium transition-colors',
                 isActive
-                  ? 'bg-[#eef2ff] font-semibold text-[#1e1b4b] shadow-[inset_0_0_0_1px_rgba(30,27,75,0.06)]'
+                  ? 'bg-primary-light font-semibold text-primary shadow-[inset_0_0_0_1px_rgba(30,27,75,0.06)]'
                   : 'text-body hover:bg-slate-100 hover:text-heading',
               )}
             >
@@ -115,7 +115,7 @@ export default function PlatformLayout() {
   }, [])
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#f5f5f7] text-body">
+    <div className="flex h-screen overflow-hidden bg-canvas text-body">
       <aside className="hidden w-[236px] shrink-0 lg:block">
         <SidebarContent me={me} />
       </aside>

@@ -214,11 +214,11 @@ export default function CRMOverview() {
                   <YAxis hide domain={([min, max]) => [min - (max - min) * 3, max]} />
                   <defs>
                     <linearGradient id="pipelineSparkGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                      <stop offset="5%" stopColor="var(--color-chart-indigo)" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="var(--color-chart-indigo)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <Area type="monotone" dataKey="v" stroke="#6366f1" strokeWidth={1.5} fill="url(#pipelineSparkGrad)" dot={false} activeDot={false} />
+                  <Area type="monotone" dataKey="v" stroke="var(--color-chart-indigo)" strokeWidth={1.5} fill="url(#pipelineSparkGrad)" dot={false} activeDot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -259,11 +259,11 @@ export default function CRMOverview() {
                   <YAxis hide domain={[0, 100]} />
                   <defs>
                     <linearGradient id="winrateSparkGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      <stop offset="5%" stopColor="var(--color-chart-emerald)" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="var(--color-chart-emerald)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <Area type="monotone" dataKey="v" stroke="#10b981" strokeWidth={1.5} fill="url(#winrateSparkGrad)" dot={false} activeDot={false} />
+                  <Area type="monotone" dataKey="v" stroke="var(--color-chart-emerald)" strokeWidth={1.5} fill="url(#winrateSparkGrad)" dot={false} activeDot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -369,26 +369,26 @@ export default function CRMOverview() {
                 <AreaChart data={monthly} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="crmRevGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.01} />
+                      <stop offset="5%" stopColor="var(--color-chart-blue-soft)" stopOpacity={0.15} />
+                      <stop offset="95%" stopColor="var(--color-chart-blue-soft)" stopOpacity={0.01} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }} dy={8} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 500 }} tickFormatter={(value) => formatCompact(value, currency)} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-chart-axis)', fontWeight: 500 }} dy={8} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-chart-axis-muted)', fontWeight: 500 }} tickFormatter={(value) => formatCompact(value, currency)} />
                   <Tooltip
                     contentStyle={{
                       borderRadius: 12,
-                      border: '1px solid rgba(226, 232, 240, 0.8)',
-                      boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.08)',
+                      border: '1px solid var(--color-chart-tooltip-border)',
+                      boxShadow: 'var(--shadow-chart-tooltip)',
                       fontSize: 12,
-                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      backgroundColor: 'var(--color-chart-tooltip-bg)',
                       backdropFilter: 'blur(8px)',
                     }}
                     formatter={(value) => [formatCompact(value, currency), 'Revenue']}
-                    labelStyle={{ fontWeight: 600, color: '#0f172a' }}
+                    labelStyle={{ fontWeight: 600, color: 'var(--color-chart-label)' }}
                   />
-                  <Area type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2.5} fill="url(#crmRevGrad)" dot={false} activeDot={{ r: 5, fill: '#2563eb', strokeWidth: 2, stroke: '#fff' }} animationDuration={1200} />
+                  <Area type="monotone" dataKey="value" stroke="var(--color-chart-blue-strong)" strokeWidth={2.5} fill="url(#crmRevGrad)" dot={false} activeDot={{ r: 5, fill: 'var(--color-chart-blue-strong)', strokeWidth: 2, stroke: 'var(--color-chart-dot-stroke)' }} animationDuration={1200} />
                 </AreaChart>
               </ResponsiveContainer>
               {monthly.length === 0 && (
@@ -410,7 +410,7 @@ export default function CRMOverview() {
 
             <div className="flex flex-col items-center justify-between flex-1 w-full space-y-1.5 pt-1">
               {/* Leads (100% width) */}
-              <div className="w-full h-9 bg-[#dbeafe] text-[#1e3a8a] px-3.5 rounded-xl flex justify-between items-center text-xs font-bold shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+              <div className="w-full h-9 bg-info-soft text-info-text-deep px-3.5 rounded-xl flex justify-between items-center text-xs font-bold shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
                 <span className="whitespace-nowrap">Leads</span>
                 <span className="tabular-nums shrink-0 cursor-help" title={formatMoney(s.leads.value)}>
                   {formatCompactCurrency(s.leads.value)}
@@ -421,7 +421,7 @@ export default function CRMOverview() {
               </div>
 
               {/* Proposal (94% width) */}
-              <div className="w-[94%] h-9 bg-[#ffedd5] text-[#9a3412] px-3.5 rounded-xl flex justify-between items-center text-xs font-bold shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+              <div className="w-[94%] h-9 bg-orange-soft text-orange-text-deep px-3.5 rounded-xl flex justify-between items-center text-xs font-bold shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
                 <span className="whitespace-nowrap">Proposal</span>
                 <span className="tabular-nums shrink-0 cursor-help" title={formatMoney(s.proposal.value)}>
                   {formatCompactCurrency(s.proposal.value)}
@@ -432,7 +432,7 @@ export default function CRMOverview() {
               </div>
 
               {/* Negotiation (88% width) */}
-              <div className="w-[88%] h-9 bg-[#fee2e2] text-[#991b1b] px-3.5 rounded-xl flex justify-between items-center text-xs font-bold shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+              <div className="w-[88%] h-9 bg-danger-soft text-danger-text px-3.5 rounded-xl flex justify-between items-center text-xs font-bold shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
                 <span className="whitespace-nowrap">Negotiation</span>
                 <span className="tabular-nums shrink-0 cursor-help" title={formatMoney(s.negotiation.value)}>
                   {formatCompactCurrency(s.negotiation.value)}

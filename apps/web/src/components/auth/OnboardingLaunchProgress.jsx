@@ -74,7 +74,7 @@ export default function OnboardingLaunchProgress({ message, dataMode, stage }) {
         </div>
 
         {dataMode === 'sample' && (
-          <p className="mt-4 rounded-xl border border-accent/10 bg-accent-light/60 px-3 py-2.5 text-center text-[10px] leading-5 text-[#4f4b7a]">
+          <p className="mt-4 rounded-xl border border-accent/10 bg-accent-light/60 px-3 py-2.5 text-center text-[10px] leading-5 text-ink-indigo">
             Loading the sample workspace can take a few minutes because finance, people, customer, project, and inventory records are prepared together.
           </p>
         )}

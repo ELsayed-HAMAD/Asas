@@ -54,7 +54,7 @@ export default function AdminWorkspaces() {
               type="button"
               onClick={() => { setStatus(value); setPage(1) }}
               className={`rounded-full px-3 py-1.5 text-[11px] font-semibold capitalize transition-colors ${
-                status === value ? 'bg-[#1e1b4b] text-white' : 'text-muted hover:text-heading'
+                status === value ? 'bg-primary-solid text-white' : 'text-muted hover:text-heading'
               }`}
             >
               {value === 'ALL' ? 'All' : value.toLowerCase()}

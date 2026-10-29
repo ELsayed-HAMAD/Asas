@@ -369,45 +369,45 @@ export default function DashboardOverview() {
                 <AreaChart data={cashFlowData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="cashFlowGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.15} />
-                      <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
+                      <stop offset="5%" stopColor="var(--color-chart-secondary)" stopOpacity={0.15} />
+                      <stop offset="95%" stopColor="var(--color-chart-secondary)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
                   <XAxis
                     dataKey="month"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }}
+                    tick={{ fontSize: 11, fill: 'var(--color-chart-axis)', fontWeight: 500 }}
                     dy={8}
                   />
                   <YAxis
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 500 }}
+                    tick={{ fontSize: 11, fill: 'var(--color-chart-axis-muted)', fontWeight: 500 }}
                     tickFormatter={(v) => formatCompactMoney(v, finance.data?.cashFlow?.[0]?.net?.currency || 'USD')}
                     dx={-4}
                   />
                   <Tooltip
                     contentStyle={{
                       borderRadius: 12,
-                      border: '1px solid rgba(226, 232, 240, 0.8)',
-                      boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.08)',
+                      border: '1px solid var(--color-chart-tooltip-border)',
+                      boxShadow: 'var(--shadow-chart-tooltip)',
                       fontSize: 12,
-                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      backgroundColor: 'var(--color-chart-tooltip-bg)',
                       backdropFilter: 'blur(8px)',
                     }}
                     formatter={(value) => [formatCompactMoney(value, finance.data?.cashFlow?.[0]?.net?.currency || 'USD'), 'Net Cash Flow']}
-                    labelStyle={{ fontWeight: 600, color: '#0f172a' }}
+                    labelStyle={{ fontWeight: 600, color: 'var(--color-chart-label)' }}
                   />
                   <Area
                     type="monotone"
                     dataKey="value"
-                    stroke="#4f46e5"
+                    stroke="var(--color-chart-secondary)"
                     strokeWidth={2.5}
                     fill="url(#cashFlowGrad)"
                     dot={false}
-                    activeDot={{ r: 5, fill: '#4f46e5', strokeWidth: 2, stroke: '#fff' }}
+                    activeDot={{ r: 5, fill: 'var(--color-chart-secondary)', strokeWidth: 2, stroke: 'var(--color-chart-dot-stroke)' }}
                     animationDuration={1200}
                   />
                 </AreaChart>

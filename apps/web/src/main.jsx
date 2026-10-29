@@ -33,11 +33,11 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       const showDetail = import.meta.env.DEV
       return (
-        <div style={{ padding: '2rem', fontFamily: 'system-ui', color: '#7f1d1d', backgroundColor: '#fef2f2', minHeight: '100vh' }}>
+        <div style={{ padding: '2rem', fontFamily: 'system-ui', color: 'var(--color-danger-text-deep)', backgroundColor: 'var(--color-danger-light)', minHeight: '100vh' }}>
           <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Something went wrong</h1>
           <p>Reload the page. If this keeps happening, sign out and sign back in.</p>
           {showDetail && (
-            <pre style={{ overflowX: 'auto', background: '#fff', padding: '1rem', marginTop: '1rem', fontSize: '12px', color: '#333' }}>
+            <pre style={{ overflowX: 'auto', background: 'var(--color-surface-raised)', padding: '1rem', marginTop: '1rem', fontSize: '12px', color: 'var(--color-code-ink)' }}>
               {this.state.error && this.state.error.toString()}
               {'\n'}
               {this.state.errorInfo && this.state.errorInfo.componentStack}

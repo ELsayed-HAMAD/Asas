@@ -47,17 +47,17 @@ export default function Register() {
     return (
       <div className="auth-form-stagger flex flex-col text-center">
         <div className="mb-5">
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.17em] text-[#0071e3]">Session active</p>
-          <h1 className="text-2xl font-semibold tracking-[-0.04em] text-[#1d1d1f]">Already signed in</h1>
-          <p className="mt-1.5 text-[13px] leading-5 text-[#737378]">
-            You are currently signed in as <strong className="font-medium text-[#1d1d1f]">{session.user.email}</strong>.
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.17em] text-action">Session active</p>
+          <h1 className="text-2xl font-semibold tracking-[-0.04em] text-ink">Already signed in</h1>
+          <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">
+            You are currently signed in as <strong className="font-medium text-ink">{session.user.email}</strong>.
           </p>
         </div>
 
         <div className="mb-5 space-y-2.5">
           <Link
             to="/onboarding"
-            className="flex h-10 w-full items-center justify-center gap-2 rounded-full bg-[#0071e3] text-[13px] font-medium text-white shadow-[0_10px_30px_rgba(0,113,227,0.22)] transition-all hover:bg-[#0077ed]"
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-full bg-action text-[13px] font-medium text-white shadow-[0_10px_30px_rgba(0,113,227,0.22)] transition-all hover:bg-action-hover"
           >
             Continue to Workspace
           </Link>
@@ -66,7 +66,7 @@ export default function Register() {
             variant="outline"
             disabled={signingOut}
             onClick={handleSignOut}
-            className="h-10 w-full rounded-full border-black/10 bg-white/65 text-[13px] text-[#1d1d1f] shadow-none hover:bg-white"
+            className="h-10 w-full rounded-full border-black/10 bg-white/65 text-[13px] text-ink shadow-none hover:bg-white"
           >
             {signingOut ? <Loader2 size={16} className="animate-spin" /> : 'Sign out to create a new account'}
           </Button>
@@ -79,15 +79,15 @@ export default function Register() {
     return (
       <div className="auth-form-stagger flex flex-col text-center">
         <div className="mb-4">
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.17em] text-[#0071e3]">Signups paused</p>
-          <h1 className="text-2xl font-semibold tracking-[-0.04em] text-[#1d1d1f]">New signups are paused</h1>
-          <p className="mt-1.5 text-[13px] leading-5 text-[#737378]">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.17em] text-action">Signups paused</p>
+          <h1 className="text-2xl font-semibold tracking-[-0.04em] text-ink">New signups are paused</h1>
+          <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">
             The platform is not accepting new workspaces right now. If you already have an account, sign in to continue.
           </p>
         </div>
         <Link
           to="/login"
-          className="flex h-10 w-full items-center justify-center rounded-full bg-[#0071e3] text-[13px] font-medium text-white shadow-[0_10px_30px_rgba(0,113,227,0.22)] transition-all hover:bg-[#0077ed]"
+          className="flex h-10 w-full items-center justify-center rounded-full bg-action text-[13px] font-medium text-white shadow-[0_10px_30px_rgba(0,113,227,0.22)] transition-all hover:bg-action-hover"
         >
           Sign in instead
         </Link>
@@ -158,14 +158,14 @@ export default function Register() {
       {/* Header */}
       <div className="auth-register-intro mb-4">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-[#0071e3]">New workspace</p>
-          <span className="inline-flex items-center gap-1 rounded-full border border-[#0071e3]/15 bg-[#0071e3]/[0.07] px-2 py-0.5 text-[9px] font-medium text-[#0066cc]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-action">New workspace</p>
+          <span className="inline-flex items-center gap-1 rounded-full border border-action/15 bg-action/[0.07] px-2 py-0.5 text-[9px] font-medium text-action-text">
             <Check size={10} />
             About 2 minutes
           </span>
         </div>
-        <h1 className="text-2xl font-semibold tracking-[-0.04em] text-[#1d1d1f]">Create your workspace</h1>
-        <p className="mt-1.5 text-[13px] leading-5 text-[#737378]">Set up a secure workspace for your company’s finance, people, and daily operations.</p>
+        <h1 className="text-2xl font-semibold tracking-[-0.04em] text-ink">Create your workspace</h1>
+        <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">Set up a secure workspace for your company’s finance, people, and daily operations.</p>
       </div>
 
       {/* Social SSO Button */}
@@ -174,7 +174,7 @@ export default function Register() {
           type="button"
           variant="outline"
           onClick={handleGoogleSignUp}
-          className="h-10 w-full rounded-full border-black/10 bg-white/65 text-xs font-medium text-[#3a3a3c] shadow-none transition-colors hover:bg-white"
+          className="h-10 w-full rounded-full border-black/10 bg-white/65 text-xs font-medium text-ink-body shadow-none transition-colors hover:bg-white"
         >
           <GoogleIcon className="w-4 h-4" />
           <span>Google</span>
@@ -183,7 +183,7 @@ export default function Register() {
 
       <div className="auth-register-divider mb-4 flex items-center gap-3">
         <span className="h-px flex-1 bg-black/[0.07]" />
-        <span className="text-[10px] text-[#929297]">or register with work email</span>
+        <span className="text-[10px] text-ink-subtle">or register with work email</span>
         <span className="h-px flex-1 bg-black/[0.07]" />
       </div>
 
@@ -212,7 +212,7 @@ export default function Register() {
           </Alert>
         )}
         <div>
-          <label className="mb-1 block text-[11px] font-medium text-[#3a3a3c]" htmlFor="name">
+          <label className="mb-1 block text-[11px] font-medium text-ink-body" htmlFor="name">
             Full Name
           </label>
           <Input
@@ -223,13 +223,13 @@ export default function Register() {
             onChange={handleChange}
             placeholder="Jane Doe"
             autoComplete="name"
-            className="h-10 rounded-xl border-black/10 bg-white/65 px-3 text-sm text-[#1d1d1f] shadow-none placeholder:text-[#a1a1a6] focus-visible:bg-white focus-visible:ring-[#0071e3]"
+            className="h-10 rounded-xl border-black/10 bg-white/65 px-3 text-sm text-ink shadow-none placeholder:text-ink-faint focus-visible:bg-white focus-visible:ring-action"
             required
           />
         </div>
 
         <div>
-          <label className="mb-1 block text-[11px] font-medium text-[#3a3a3c]" htmlFor="email">
+          <label className="mb-1 block text-[11px] font-medium text-ink-body" htmlFor="email">
             Work Email
           </label>
           <Input
@@ -240,13 +240,13 @@ export default function Register() {
             onChange={handleChange}
             placeholder="name@company.com"
             autoComplete="email"
-            className="h-10 rounded-xl border-black/10 bg-white/65 px-3 text-sm text-[#1d1d1f] shadow-none placeholder:text-[#a1a1a6] focus-visible:bg-white focus-visible:ring-[#0071e3]"
+            className="h-10 rounded-xl border-black/10 bg-white/65 px-3 text-sm text-ink shadow-none placeholder:text-ink-faint focus-visible:bg-white focus-visible:ring-action"
             required
           />
         </div>
 
         <div>
-          <label className="mb-1 block text-[11px] font-medium text-[#3a3a3c]" htmlFor="password">
+          <label className="mb-1 block text-[11px] font-medium text-ink-body" htmlFor="password">
             Password
           </label>
           <div className="relative">
@@ -259,7 +259,7 @@ export default function Register() {
               placeholder="Create a strong password"
               autoComplete="new-password"
               aria-describedby="password-policy"
-              className="h-10 rounded-xl border-black/10 bg-white/65 px-3 pr-11 text-sm text-[#1d1d1f] shadow-none placeholder:text-[#a1a1a6] focus-visible:bg-white focus-visible:ring-[#0071e3]"
+              className="h-10 rounded-xl border-black/10 bg-white/65 px-3 pr-11 text-sm text-ink shadow-none placeholder:text-ink-faint focus-visible:bg-white focus-visible:ring-action"
               required
             />
             <Button
@@ -277,8 +277,8 @@ export default function Register() {
 
           <div id="password-policy" className="mt-2 space-y-1.5" aria-live="polite">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-[10px] font-medium text-[#737378]">Password strength</span>
-              <span className={`text-[10px] font-semibold ${form.password ? 'text-[#3a3a3c]' : 'text-[#a1a1a6]'}`}>
+              <span className="text-[10px] font-medium text-ink-muted">Password strength</span>
+              <span className={`text-[10px] font-semibold ${form.password ? 'text-ink-body' : 'text-ink-faint'}`}>
                 {passwordStrength.label || 'Not started'}
               </span>
             </div>
@@ -290,8 +290,8 @@ export default function Register() {
             </div>
             <div className="flex flex-wrap gap-x-3 gap-y-1">
               {passwordChecks.map(check => (
-                <span key={check.label} className={`flex items-center gap-1.5 text-[10px] leading-4 ${check.met ? 'text-[#0071e3]' : 'text-[#929297]'}`}>
-                  <span className={`flex h-3 w-3 shrink-0 items-center justify-center rounded-full border ${check.met ? 'border-[#0071e3] bg-[#0071e3] text-white' : 'border-black/10 bg-white/60 text-transparent'}`}>
+                <span key={check.label} className={`flex items-center gap-1.5 text-[10px] leading-4 ${check.met ? 'text-action' : 'text-ink-subtle'}`}>
+                  <span className={`flex h-3 w-3 shrink-0 items-center justify-center rounded-full border ${check.met ? 'border-action bg-action text-white' : 'border-black/10 bg-white/60 text-transparent'}`}>
                     <Check size={7} />
                   </span>
                   {check.label}
@@ -304,23 +304,23 @@ export default function Register() {
         <Button
           type="submit"
           disabled={isLoading}
-          className="auth-register-submit mt-4 h-10 w-full rounded-full bg-[#0071e3] text-[13px] font-medium text-white shadow-[0_10px_30px_rgba(0,113,227,0.22)] transition-all hover:bg-[#0077ed] hover:shadow-[0_14px_36px_rgba(0,113,227,0.28)]"
+          className="auth-register-submit mt-4 h-10 w-full rounded-full bg-action text-[13px] font-medium text-white shadow-[0_10px_30px_rgba(0,113,227,0.22)] transition-all hover:bg-action-hover hover:shadow-[0_14px_36px_rgba(0,113,227,0.28)]"
         >
           {isLoading ? <Loader2 size={16} className="animate-spin" /> : 'Create Account'}
         </Button>
       </form>
 
       {/* TOS Disclaimer */}
-      <p className="auth-register-legal mt-3 text-center text-[10px] leading-4 text-[#929297]">
+      <p className="auth-register-legal mt-3 text-center text-[10px] leading-4 text-ink-subtle">
         By creating an account, you agree to our{' '}
-        <Link to="/terms" className="underline hover:text-[#0071e3]">Terms of Service</Link> and{' '}
-        <Link to="/privacy" className="underline hover:text-[#0071e3]">Privacy Policy</Link>.
+        <Link to="/terms" className="underline hover:text-action">Terms of Service</Link> and{' '}
+        <Link to="/privacy" className="underline hover:text-action">Privacy Policy</Link>.
       </p>
 
       {/* Footer Link */}
-      <p className="auth-register-switch mt-3 text-center text-xs text-[#737378]">
+      <p className="auth-register-switch mt-3 text-center text-xs text-ink-muted">
         Already have an account?{' '}
-        <Link to="/login" className="font-semibold text-[#0071e3] hover:underline">
+        <Link to="/login" className="font-semibold text-action hover:underline">
           Sign in
         </Link>
       </p>

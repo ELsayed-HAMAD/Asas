@@ -653,12 +653,12 @@ export default function ActiveSprints() {
                   </div>
                   <ResponsiveContainer width="100%" height={180}>
                     <LineChart data={burndownData.points} margin={{ top: 8, right: 12, bottom: 0, left: -18 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                      <XAxis dataKey="date" tickFormatter={date => date.slice(5)} tick={{ fill: '#64748b', fontSize: 11 }} />
-                      <YAxis allowDecimals={false} domain={[0, 'dataMax']} tick={{ fill: '#64748b', fontSize: 11 }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
+                      <XAxis dataKey="date" tickFormatter={date => date.slice(5)} tick={{ fill: 'var(--color-chart-axis)', fontSize: 11 }} />
+                      <YAxis allowDecimals={false} domain={[0, 'dataMax']} tick={{ fill: 'var(--color-chart-axis)', fontSize: 11 }} />
                       <Tooltip labelFormatter={date => date} />
-                      <Line type="monotone" dataKey="remaining" name="Remaining" stroke="#4f46e5" strokeWidth={2} dot={false} />
-                      <Line type="linear" dataKey="ideal" name="Ideal" stroke="#94a3b8" strokeDasharray="4 4" dot={false} />
+                      <Line type="monotone" dataKey="remaining" name="Remaining" stroke="var(--color-chart-secondary)" strokeWidth={2} dot={false} />
+                      <Line type="linear" dataKey="ideal" name="Ideal" stroke="var(--color-chart-axis-muted)" strokeDasharray="4 4" dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </section>

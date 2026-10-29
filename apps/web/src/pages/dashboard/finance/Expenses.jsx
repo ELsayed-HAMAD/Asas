@@ -647,7 +647,7 @@ export default function Expenses() {
                       size="sm"
                       disabled={!selectedRecord || statusMutation.isPending || selectedRecord.status !== 'PENDING'}
                       onClick={() => statusMutation.mutate('APPROVED')}
-                      className="h-9 px-3 rounded-xl text-xs font-semibold bg-[#0f172a] text-white hover:bg-slate-800 shadow-xs whitespace-nowrap cursor-pointer disabled:opacity-50"
+                      className="h-9 px-3 rounded-xl text-xs font-semibold bg-surface-inverse-strong text-white hover:bg-slate-800 shadow-xs whitespace-nowrap cursor-pointer disabled:opacity-50"
                     >
                       Approve
                     </Button>

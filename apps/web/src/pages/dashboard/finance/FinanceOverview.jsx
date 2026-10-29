@@ -340,11 +340,11 @@ export default function FinanceOverview() {
               <AreaChart data={netSeries} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="netCashGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--color-chart-primary, #6366f1)" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="var(--color-chart-primary, #6366f1)" stopOpacity={0} />
+                    <stop offset="5%" stopColor="var(--color-chart-primary, var(--color-chart-indigo))" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="var(--color-chart-primary, var(--color-chart-indigo))" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <Area type="monotone" dataKey="v" stroke="var(--color-chart-primary, #6366f1)" strokeWidth={2} fill="url(#netCashGrad)" dot={false} animationDuration={800} />
+                <Area type="monotone" dataKey="v" stroke="var(--color-chart-primary, var(--color-chart-indigo))" strokeWidth={2} fill="url(#netCashGrad)" dot={false} animationDuration={800} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -449,7 +449,7 @@ export default function FinanceOverview() {
                   <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 13, fontWeight: 500, color: 'var(--color-muted)' }} formatter={(value) => value.charAt(0).toUpperCase() + value.slice(1)} />
                   <Bar dataKey="inflow" fill="var(--color-chart-positive)" radius={[4, 4, 0, 0]} barSize={20} animationDuration={1000} />
                   <Bar dataKey="outflow" fill="var(--color-chart-negative)" radius={[4, 4, 0, 0]} barSize={20} animationDuration={1000} />
-                  <Line type="monotone" dataKey="net" stroke="var(--color-chart-primary)" strokeWidth={3} dot={{ r: 4, fill: 'var(--color-chart-primary)', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} animationDuration={1200} />
+                  <Line type="monotone" dataKey="net" stroke="var(--color-chart-primary)" strokeWidth={3} dot={{ r: 4, fill: 'var(--color-chart-primary)', strokeWidth: 2, stroke: 'var(--color-chart-dot-stroke)' }} activeDot={{ r: 6 }} animationDuration={1200} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>

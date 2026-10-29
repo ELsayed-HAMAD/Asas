@@ -46,7 +46,7 @@ export default function AdminOverview() {
         title="Platform overview"
         description="A live view across every workspace. Use the sections on the left to inspect workspaces, users, billing, health, and platform controls."
         actions={(
-          <Link to="/admin/workspaces" className="inline-flex items-center gap-1.5 rounded-full bg-[#1e1b4b] px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#312e81]">
+          <Link to="/admin/workspaces" className="inline-flex items-center gap-1.5 rounded-full bg-primary-solid px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-primary-solid-hover">
             Browse workspaces <ArrowRight size={13} />
           </Link>
         )}
@@ -76,7 +76,7 @@ export default function AdminOverview() {
               <div key={row.planName} className="grid grid-cols-[minmax(0,1fr)_2fr_auto] items-center gap-3 text-xs">
                 <span className="truncate font-medium text-heading">{row.planName}</span>
                 <div className="h-2 overflow-hidden rounded-full bg-surface-muted">
-                  <div className="h-full rounded-full bg-[#1e1b4b]" style={{ width: `${Math.max(4, (row.count / maxPlan) * 100)}%` }} />
+                  <div className="h-full rounded-full bg-primary-solid" style={{ width: `${Math.max(4, (row.count / maxPlan) * 100)}%` }} />
                 </div>
                 <span className="w-8 text-right font-semibold tabular-nums text-body">{row.count}</span>
               </div>

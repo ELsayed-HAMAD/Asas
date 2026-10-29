@@ -183,7 +183,7 @@ export default function App() {
 
       {/* ── Platform owner console (separate from tenant dashboards) ── */}
       <Route element={<RequirePlatformAdmin />}>
-        <Route element={<Suspense fallback={<div className="flex h-screen items-center justify-center bg-[#f5f5f7] text-sm text-muted">Loading platform console...</div>}><PlatformLayout /></Suspense>}>
+        <Route element={<Suspense fallback={<div className="flex h-screen items-center justify-center bg-canvas text-sm text-muted">Loading platform console...</div>}><PlatformLayout /></Suspense>}>
           <Route path="/admin" element={<AdminOverview />} />
           <Route path="/admin/workspaces" element={<AdminWorkspaces />} />
           <Route path="/admin/workspaces/:id" element={<AdminWorkspaceDetail />} />

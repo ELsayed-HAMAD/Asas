@@ -133,7 +133,7 @@ test('support workspace satisfies calm 2-section layout, clean global header, an
   const submitButton = page.getByRole('button', { name: 'Submit' })
   await expect(submitButton).toBeVisible()
   // Primary dark brand button style
-  await expect(submitButton).toHaveClass(/bg-\[#131722\]/)
+  await expect(submitButton).toHaveClass(/bg-brand-ink/)
 
   // 4. Section 2: SUPPORT REQUESTS (0) Card with Integrated Toolbar & Recessed Empty State
   await expect(page.getByText('SUPPORT REQUESTS (0)')).toBeVisible()

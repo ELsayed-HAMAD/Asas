@@ -82,7 +82,7 @@ export default function AuthShowcase({ variant = 'security' }) {
       data-variant={variant}
       data-modules="5"
       aria-hidden="true"
-      className={`auth-showcase auth-showcase-${theme} relative hidden overflow-clip rounded-[32px] border border-[#bfdbfe]/10 lg:flex lg:max-h-[calc(100vh-2rem)]`}
+      className={`auth-showcase auth-showcase-${theme} relative hidden overflow-clip rounded-[32px] border border-info-border/10 lg:flex lg:max-h-[calc(100vh-2rem)]`}
     >
       <div className="auth-showcase-atmosphere pointer-events-none absolute inset-0" />
       <div className="auth-showcase-veil auth-showcase-veil-a pointer-events-none absolute" />

@@ -151,7 +151,7 @@ const PERSONAS = [
 
 function SectionLabel({ children }) {
   return (
-    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0071e3]">{children}</p>
+    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-action">{children}</p>
   )
 }
 
@@ -421,7 +421,7 @@ export default function Landing() {
   }, [location.pathname, location.hash])
 
   return (
-    <div ref={pageRef} className="min-h-screen overflow-clip bg-[#f5f5f7] font-sans text-[#1d1d1f] selection:bg-[#dbeafe] selection:text-[#0b3b70]">
+    <div ref={pageRef} className="min-h-screen overflow-clip bg-canvas font-sans text-ink selection:bg-info-soft selection:text-action-text-deep">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-70 focus:rounded-full focus:bg-white focus:px-5 focus:py-3 focus:text-sm focus:font-semibold focus:text-slate-950 focus:shadow-lg">
         Skip to content
       </a>
@@ -435,33 +435,33 @@ export default function Landing() {
           <div data-ambient-secondary className="absolute right-[-8%] top-[18%] -z-10 h-[420px] w-[420px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(221,214,254,0.42),transparent_70%)] blur-3xl" aria-hidden="true" />
 
           <div className="mx-auto max-w-6xl text-center">
-            <div data-hero-eyebrow className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/50 px-4 py-2 text-xs font-medium text-[#4b4b50] shadow-[0_8px_30px_rgba(0,0,0,0.04)] backdrop-blur-xl">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#0071e3]" aria-hidden="true" />
+            <div data-hero-eyebrow className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/50 px-4 py-2 text-xs font-medium text-ink-muted-strong shadow-[0_8px_30px_rgba(0,0,0,0.04)] backdrop-blur-xl">
+              <span className="h-1.5 w-1.5 rounded-full bg-action" aria-hidden="true" />
               One connected business workspace
             </div>
 
             <h1 data-hero-title className="mx-auto mt-8 max-w-6xl text-[clamp(3rem,7.6vw,7rem)] font-semibold leading-[0.96] tracking-[-0.065em]">
               <span data-hero-line className="block overflow-hidden pb-[0.08em]"><span className="inline-block">Everything connected.</span></span>
-              <span data-hero-line className="block overflow-hidden pb-[0.1em] text-[#86868b]"><span className="inline-block">Nothing complicated.</span></span>
+              <span data-hero-line className="block overflow-hidden pb-[0.1em] text-ink-soft"><span className="inline-block">Nothing complicated.</span></span>
             </h1>
 
-            <p data-hero-copy className="mx-auto mt-7 max-w-2xl text-lg leading-8 text-[#626267] sm:text-xl sm:leading-9">
+            <p data-hero-copy className="mx-auto mt-7 max-w-2xl text-lg leading-8 text-ink-secondary sm:text-xl sm:leading-9">
               Finance, people, customers, projects, and inventory in one thoughtful workspace, so your team always knows what matters next.
             </p>
 
             <div data-hero-actions className="mt-9 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Button asChild className="h-12 rounded-full bg-[#0071e3] px-7 text-sm font-medium text-white shadow-[0_10px_30px_rgba(0,113,227,0.22)] transition-all hover:bg-[#0077ed] hover:shadow-[0_14px_36px_rgba(0,113,227,0.28)]">
+              <Button asChild className="h-12 rounded-full bg-action px-7 text-sm font-medium text-white shadow-[0_10px_30px_rgba(0,113,227,0.22)] transition-all hover:bg-action-hover hover:shadow-[0_14px_36px_rgba(0,113,227,0.28)]">
                 <Link to={session?.user ? '/dashboard' : '/register'} data-magnetic="0.16">
                   {session?.user ? 'Open your workspace' : 'Get started free'}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
-              <Link to="/#features" data-magnetic="0.08" className="group inline-flex h-12 items-center gap-2 rounded-full px-5 text-sm font-medium text-[#0071e3] transition-colors hover:bg-white/60">
+              <Link to="/#features" data-magnetic="0.08" className="group inline-flex h-12 items-center gap-2 rounded-full px-5 text-sm font-medium text-action transition-colors hover:bg-white/60">
                 Explore the platform
                 <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
               </Link>
             </div>
-            <p className="mt-5 text-xs text-[#86868b]">Free workspace · All current product areas</p>
+            <p className="mt-5 text-xs text-ink-soft">Free workspace · All current product areas</p>
           </div>
 
           <div data-preview-motion className="mx-auto mt-16 max-w-6xl sm:mt-20" style={{ perspective: '1400px' }}>
@@ -478,18 +478,18 @@ export default function Landing() {
               <div className="flex h-14 items-center justify-between border-b border-black/[0.06] px-5 sm:px-6">
                 <div className="flex items-center gap-3">
                   <div className="flex gap-1.5" aria-hidden="true">
-                    <span className="h-2 w-2 rounded-full bg-[#d8d8dc]" />
-                    <span className="h-2 w-2 rounded-full bg-[#d8d8dc]" />
-                    <span className="h-2 w-2 rounded-full bg-[#d8d8dc]" />
+                    <span className="h-2 w-2 rounded-full bg-surface-silver" />
+                    <span className="h-2 w-2 rounded-full bg-surface-silver" />
+                    <span className="h-2 w-2 rounded-full bg-surface-silver" />
                   </div>
-                  <span className="ml-1 text-xs font-medium text-[#626267]">Asas workspace</span>
+                  <span className="ml-1 text-xs font-medium text-ink-secondary">Asas workspace</span>
                 </div>
-                <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#86868b]">Interactive preview</span>
+                <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-soft">Interactive preview</span>
               </div>
 
               <div className="p-5 sm:p-8 lg:p-10">
                 <div className="flex justify-center overflow-x-auto pb-1" role="group" aria-label="Choose a product workflow">
-                  <div className="inline-flex min-w-max rounded-full border border-black/[0.05] bg-[#f0f0f2]/80 p-1">
+                  <div className="inline-flex min-w-max rounded-full border border-black/[0.05] bg-canvas-muted/80 p-1">
                     {WORKFLOWS.map((workflow, index) => {
                       const active = index === activeWorkflowIndex
                       return (
@@ -498,7 +498,7 @@ export default function Landing() {
                           type="button"
                           aria-pressed={active}
                           onClick={() => setActiveWorkflowIndex(index)}
-                          className={`rounded-full px-4 py-2 text-xs font-medium transition-all sm:px-5 ${active ? 'bg-white text-[#1d1d1f] shadow-[0_2px_10px_rgba(0,0,0,0.08)]' : 'text-[#737378] hover:text-[#1d1d1f]'}`}
+                          className={`rounded-full px-4 py-2 text-xs font-medium transition-all sm:px-5 ${active ? 'bg-white text-ink shadow-[0_2px_10px_rgba(0,0,0,0.08)]' : 'text-ink-muted hover:text-ink'}`}
                         >
                           {workflow.label}
                         </button>
@@ -510,28 +510,28 @@ export default function Landing() {
                 <div ref={workflowPanelRef} data-testid="workflow-panel" className="mt-9 sm:mt-11">
                   <div data-workflow-content className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
                     <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-[#0071e3]">{activeWorkflow.eyebrow}</p>
-                      <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#1d1d1f] sm:text-3xl">{activeWorkflow.title}</h2>
-                      <p className="mt-3 max-w-2xl text-sm leading-6 text-[#737378]">{activeWorkflow.description}</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-action">{activeWorkflow.eyebrow}</p>
+                      <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink sm:text-3xl">{activeWorkflow.title}</h2>
+                      <p className="mt-3 max-w-2xl text-sm leading-6 text-ink-muted">{activeWorkflow.description}</p>
                     </div>
-                    <span className="hidden h-12 w-12 items-center justify-center rounded-2xl border border-black/[0.05] bg-white text-[#0071e3] shadow-[0_8px_24px_rgba(0,0,0,0.05)] lg:flex">
+                    <span className="hidden h-12 w-12 items-center justify-center rounded-2xl border border-black/[0.05] bg-white text-action shadow-[0_8px_24px_rgba(0,0,0,0.05)] lg:flex">
                       <ActiveWorkflowIcon className="h-5 w-5" />
                     </span>
                   </div>
 
                   <div className="mt-8 grid gap-3 md:grid-cols-3">
                     {activeWorkflow.steps.map((step, index) => (
-                      <div data-workflow-step key={step.label} className="rounded-2xl border border-black/[0.04] bg-[#f5f5f7]/80 p-5 transition-transform duration-300 hover:-translate-y-0.5">
+                      <div data-workflow-step key={step.label} className="rounded-2xl border border-black/[0.04] bg-canvas/80 p-5 transition-transform duration-300 hover:-translate-y-0.5">
                         <div className="flex items-center justify-between">
-                          <span className="font-mono text-[10px] text-[#9a9aa0]">0{index + 1}</span>
-                          <CheckCircle2 className="h-4 w-4 text-[#0071e3]" />
+                          <span className="font-mono text-[10px] text-ink-faint-soft">0{index + 1}</span>
+                          <CheckCircle2 className="h-4 w-4 text-action" />
                         </div>
-                        <p className="mt-6 text-sm font-semibold text-[#2c2c2f]">{step.label}</p>
-                        <p className="mt-1.5 text-xs leading-5 text-[#86868b]">{step.detail}</p>
+                        <p className="mt-6 text-sm font-semibold text-ink-strong">{step.label}</p>
+                        <p className="mt-1.5 text-xs leading-5 text-ink-soft">{step.detail}</p>
                       </div>
                     ))}
                   </div>
-                  <p className="mt-5 text-[10px] text-[#9a9aa0]">Illustrative workflow · no live business figures</p>
+                  <p className="mt-5 text-[10px] text-ink-faint-soft">Illustrative workflow · no live business figures</p>
                 </div>
               </div>
             </div>
@@ -541,7 +541,7 @@ export default function Landing() {
 
           <nav aria-label="Product areas" className="mx-auto mt-10 flex max-w-4xl flex-wrap items-center justify-center gap-x-7 gap-y-4 sm:gap-x-10">
             {PLATFORM_CAPABILITIES.map((capability) => (
-              <Link key={capability.id} to={`/solutions?area=${capability.id}`} className="text-sm font-medium text-[#737378] transition-colors hover:text-[#0071e3]">
+              <Link key={capability.id} to={`/solutions?area=${capability.id}`} className="text-sm font-medium text-ink-muted transition-colors hover:text-action">
                 {capability.name}
               </Link>
             ))}
@@ -555,7 +555,7 @@ export default function Landing() {
                 <SectionLabel>Why Asas</SectionLabel>
                 <h2 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.04] tracking-[-0.045em] sm:text-6xl">Complex operations.<br />Made to feel simple.</h2>
               </div>
-              <p className="max-w-lg text-base leading-7 text-[#737378] lg:justify-self-end">A focused workspace for the work your team already does, without extra layers of noise.</p>
+              <p className="max-w-lg text-base leading-7 text-ink-muted lg:justify-self-end">A focused workspace for the work your team already does, without extra layers of noise.</p>
             </div>
 
             <div data-reveal-group className="mt-16 grid gap-10 md:grid-cols-3 md:gap-8">
@@ -564,18 +564,18 @@ export default function Landing() {
                 { number: '02', title: 'Clear team workflows', copy: 'Each area has a purpose and a clear next step, so handoffs feel natural instead of fragmented.' },
                 { number: '03', title: 'Control without clutter', copy: 'Workspace roles, tenant-scoped access, and audit history protect your data behind the scenes.' },
               ].map((item) => (
-                <article key={item.number} className="border-t border-black/10 pt-6 transition-[transform,border-color] duration-500 ease-out hover:-translate-y-1 hover:border-[#0071e3]/30">
-                  <span className="font-mono text-[10px] text-[#0071e3]">{item.number}</span>
+                <article key={item.number} className="border-t border-black/10 pt-6 transition-[transform,border-color] duration-500 ease-out hover:-translate-y-1 hover:border-action/30">
+                  <span className="font-mono text-[10px] text-action">{item.number}</span>
                   <h3 className="mt-8 text-xl font-semibold tracking-[-0.02em]">{item.title}</h3>
-                  <p className="mt-3 text-sm leading-6 text-[#737378]">{item.copy}</p>
+                  <p className="mt-3 text-sm leading-6 text-ink-muted">{item.copy}</p>
                 </article>
               ))}
             </div>
 
-            <div data-reveal className="mt-14 flex items-center gap-3 border-t border-black/[0.06] pt-6 text-xs text-[#737378]">
-              <ShieldCheck className="h-4 w-4 text-[#0071e3]" />
+            <div data-reveal className="mt-14 flex items-center gap-3 border-t border-black/[0.06] pt-6 text-xs text-ink-muted">
+              <ShieldCheck className="h-4 w-4 text-action" />
               <span>Server-side access controls and tenant-scoped data access.</span>
-              <Link to="/documentation#security" className="ml-auto shrink-0 font-medium text-[#0071e3] hover:underline">Security details</Link>
+              <Link to="/documentation#security" className="ml-auto shrink-0 font-medium text-action hover:underline">Security details</Link>
             </div>
           </div>
         </section>
@@ -585,14 +585,14 @@ export default function Landing() {
             <div data-reveal className="mx-auto max-w-3xl text-center">
               <SectionLabel>Built around your team</SectionLabel>
               <h2 className="mt-5 text-4xl font-semibold leading-[1.05] tracking-[-0.045em] sm:text-6xl">A clearer view<br />for every team.</h2>
-              <p className="mx-auto mt-6 max-w-xl text-base leading-7 text-[#737378]">Different responsibilities, with the same shared context.</p>
+              <p className="mx-auto mt-6 max-w-xl text-base leading-7 text-ink-muted">Different responsibilities, with the same shared context.</p>
             </div>
 
             <div data-reveal className="mt-12 flex flex-wrap justify-center gap-2" role="group" aria-label="Choose a team view">
               {PERSONAS.map((persona) => {
                 const active = activePersona.id === persona.id
                 return (
-                  <button key={persona.id} type="button" aria-pressed={active} onClick={() => setActivePersona(persona)} className={`rounded-full px-4 py-2.5 text-xs font-medium transition-all sm:px-5 ${active ? 'bg-[#1d1d1f] text-white shadow-[0_8px_24px_rgba(0,0,0,0.14)]' : 'border border-black/[0.06] bg-white/50 text-[#737378] hover:bg-white hover:text-[#1d1d1f]'}`}>
+                  <button key={persona.id} type="button" aria-pressed={active} onClick={() => setActivePersona(persona)} className={`rounded-full px-4 py-2.5 text-xs font-medium transition-all sm:px-5 ${active ? 'bg-inverse-ink text-white shadow-[0_8px_24px_rgba(0,0,0,0.14)]' : 'border border-black/[0.06] bg-white/50 text-ink-muted hover:bg-white hover:text-ink'}`}>
                     {persona.role}
                   </button>
                 )
@@ -602,17 +602,17 @@ export default function Landing() {
             <div ref={personaPanelRef} data-testid="persona-panel" aria-live="polite" data-reveal className={`${GLASS_PANEL} mx-auto mt-8 max-w-5xl rounded-[28px] p-6 sm:p-10`}>
               <div className="flex items-start justify-between gap-5">
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-[#0071e3]">{activePersona.role}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-action">{activePersona.role}</p>
                   <h3 className="mt-5 max-w-3xl text-2xl font-semibold leading-tight tracking-[-0.03em] sm:text-4xl">{activePersona.title}</h3>
-                  <p className="mt-5 max-w-2xl text-sm leading-7 text-[#737378]">{activePersona.focus}</p>
+                  <p className="mt-5 max-w-2xl text-sm leading-7 text-ink-muted">{activePersona.focus}</p>
                 </div>
-                <span className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white bg-white/70 text-[#0071e3] sm:flex"><ActivePersonaIcon className="h-5 w-5" /></span>
+                <span className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white bg-white/70 text-action sm:flex"><ActivePersonaIcon className="h-5 w-5" /></span>
               </div>
               <div className="mt-9 grid border-t border-black/[0.07] pt-6 sm:grid-cols-3">
                 {activePersona.metrics.map((metric) => (
                   <div key={metric.label} className="border-b border-black/[0.06] py-4 last:border-b-0 sm:border-b-0 sm:border-r sm:px-5 sm:first:pl-0 sm:last:border-r-0">
-                    <p className="text-[10px] uppercase tracking-[0.12em] text-[#929297]">{metric.label}</p>
-                    <p className="mt-2 text-xs font-semibold text-[#3a3a3c]">{metric.value}</p>
+                    <p className="text-[10px] uppercase tracking-[0.12em] text-ink-subtle">{metric.label}</p>
+                    <p className="mt-2 text-xs font-semibold text-ink-body">{metric.value}</p>
                   </div>
                 ))}
               </div>
@@ -627,10 +627,10 @@ export default function Landing() {
                 <SectionLabel>Simple pricing</SectionLabel>
                 <h2 className="mt-5 text-4xl font-semibold tracking-[-0.045em] sm:text-6xl">Start free.<br />Grow when ready.</h2>
               </div>
-              <p className="max-w-md text-sm leading-6 text-[#737378]">Every workspace starts on Free. Paid checkout depends on Stripe being configured for your deployment.</p>
+              <p className="max-w-md text-sm leading-6 text-ink-muted">Every workspace starts on Free. Paid checkout depends on Stripe being configured for your deployment.</p>
             </div>
 
-            <div data-reveal className="mt-14 overflow-hidden rounded-[28px] border border-black/[0.07] bg-[#f7f7f8]">
+            <div data-reveal className="mt-14 overflow-hidden rounded-[28px] border border-black/[0.07] bg-canvas-soft">
               <div className="grid md:grid-cols-2 xl:grid-cols-4">
                 {PLATFORM_PLANS.map((plan) => {
                   const isFree = plan.id === 'free'
@@ -639,19 +639,19 @@ export default function Landing() {
                     <article key={plan.id} className="flex flex-col border-b border-black/[0.07] p-6 transition-colors duration-300 last:border-b-0 hover:bg-white/55 md:border-r md:[&:nth-child(2n)]:border-r-0 xl:border-b-0 xl:[&:nth-child(2n)]:border-r xl:last:border-r-0">
                       <div className="flex min-h-6 items-center justify-between gap-2">
                         <h3 className="text-sm font-semibold">{plan.name}</h3>
-                        {plan.popular && <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#0071e3]">Most popular</span>}
+                        {plan.popular && <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-action">Most popular</span>}
                       </div>
-                      <p className="mt-2 min-h-10 text-xs leading-5 text-[#86868b]">{plan.tagline}</p>
+                      <p className="mt-2 min-h-10 text-xs leading-5 text-ink-soft">{plan.tagline}</p>
                       <div className="mt-7 flex items-end gap-2">
                         <span className="text-4xl font-semibold tracking-[-0.04em]">{price}</span>
-                        <span className="pb-1 text-[10px] text-[#86868b]">/ month</span>
+                        <span className="pb-1 text-[10px] text-ink-soft">/ month</span>
                       </div>
-                      <ul className="mt-7 space-y-3 text-xs text-[#6e6e73]">
-                        <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-[#0071e3]" />Up to {plan.seatLimit.toLocaleString()} members</li>
-                        <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-[#0071e3]" />{plan.storageLimitGb.toLocaleString()} GB storage</li>
-                        <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-[#0071e3]" />Current product modules</li>
+                      <ul className="mt-7 space-y-3 text-xs text-ink-muted-soft">
+                        <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-action" />Up to {plan.seatLimit.toLocaleString()} members</li>
+                        <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-action" />{plan.storageLimitGb.toLocaleString()} GB storage</li>
+                        <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-action" />Current product modules</li>
                       </ul>
-                      <Button asChild variant={isFree ? 'default' : 'outline'} className={`mt-8 h-10 w-full rounded-full text-xs font-medium ${isFree ? 'bg-[#0071e3] text-white hover:bg-[#0077ed]' : 'border-black/10 bg-transparent text-[#1d1d1f] shadow-none hover:bg-white'}`}>
+                      <Button asChild variant={isFree ? 'default' : 'outline'} className={`mt-8 h-10 w-full rounded-full text-xs font-medium ${isFree ? 'bg-action text-white hover:bg-action-hover' : 'border-black/10 bg-transparent text-ink shadow-none hover:bg-white'}`}>
                         <Link to="/register">{isFree ? 'Start free' : 'Start on Free'}</Link>
                       </Button>
                     </article>
@@ -665,10 +665,10 @@ export default function Landing() {
         <section className="relative isolate overflow-hidden px-4 py-24 sm:px-6 sm:py-32">
           <div className="absolute left-1/2 top-1/2 -z-10 h-[500px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(174,210,255,0.4),transparent_68%)] blur-2xl" aria-hidden="true" />
           <div data-reveal className={`${GLASS_PANEL} mx-auto max-w-5xl rounded-[32px] px-6 py-16 text-center sm:px-12 sm:py-20`}>
-            <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl border border-white bg-white/65 text-[#1d1d1f] shadow-sm"><AsasLogo className="h-4.5 w-4.5" /></span>
+            <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl border border-white bg-white/65 text-ink shadow-sm"><AsasLogo className="h-4.5 w-4.5" /></span>
             <h2 className="mx-auto mt-7 max-w-3xl text-4xl font-semibold leading-[1.04] tracking-[-0.045em] sm:text-6xl">Bring your business<br />into focus.</h2>
-            <p className="mx-auto mt-6 max-w-xl text-base leading-7 text-[#737378]">Set up your workspace and give every team a clearer next step. All current product areas are available on Free.</p>
-            <Button asChild className="mt-8 h-12 rounded-full bg-[#0071e3] px-7 text-sm font-medium text-white shadow-[0_10px_30px_rgba(0,113,227,0.22)] transition-all hover:bg-[#0077ed]">
+            <p className="mx-auto mt-6 max-w-xl text-base leading-7 text-ink-muted">Set up your workspace and give every team a clearer next step. All current product areas are available on Free.</p>
+            <Button asChild className="mt-8 h-12 rounded-full bg-action px-7 text-sm font-medium text-white shadow-[0_10px_30px_rgba(0,113,227,0.22)] transition-all hover:bg-action-hover">
               <Link to={session?.user ? '/dashboard' : '/register'} data-magnetic="0.12">{session?.user ? 'Open your workspace' : 'Create your free workspace'}<ArrowRight className="h-4 w-4" /></Link>
             </Button>
           </div>
@@ -679,35 +679,35 @@ export default function Landing() {
         <div className="mx-auto grid max-w-6xl grid-cols-2 gap-10 md:grid-cols-5">
           <div className="col-span-2">
             <Link to="/" className="flex w-fit items-center gap-2.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#1d1d1f] text-white"><AsasLogo className="h-4 w-4" /></span>
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-inverse-ink text-white"><AsasLogo className="h-4 w-4" /></span>
               <span className="text-base font-semibold tracking-tight">Asas</span>
             </Link>
-            <p className="mt-4 max-w-xs text-xs leading-6 text-[#86868b]">One thoughtful workspace for finance, people, customers, projects, and inventory.</p>
-            <p className="mt-6 text-[10px] text-[#9a9aa0]">© {new Date().getFullYear()} Asas Technologies Inc. All rights reserved.</p>
+            <p className="mt-4 max-w-xs text-xs leading-6 text-ink-soft">One thoughtful workspace for finance, people, customers, projects, and inventory.</p>
+            <p className="mt-6 text-[10px] text-ink-faint-soft">© {new Date().getFullYear()} Asas Technologies Inc. All rights reserved.</p>
           </div>
           <div>
-            <h3 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#626267]">Product</h3>
-            <ul className="space-y-3 text-xs text-[#86868b]">
-              <li><Link to="/#features" className="transition-colors hover:text-[#0071e3]">Features</Link></li>
-              <li><Link to="/solutions" className="transition-colors hover:text-[#0071e3]">Solutions</Link></li>
-              <li><Link to="/pricing" className="transition-colors hover:text-[#0071e3]">Pricing</Link></li>
+            <h3 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-secondary">Product</h3>
+            <ul className="space-y-3 text-xs text-ink-soft">
+              <li><Link to="/#features" className="transition-colors hover:text-action">Features</Link></li>
+              <li><Link to="/solutions" className="transition-colors hover:text-action">Solutions</Link></li>
+              <li><Link to="/pricing" className="transition-colors hover:text-action">Pricing</Link></li>
             </ul>
           </div>
           <div>
-            <h3 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#626267]">Resources</h3>
-            <ul className="space-y-3 text-xs text-[#86868b]">
-              <li><Link to="/documentation" className="transition-colors hover:text-[#0071e3]">Documentation</Link></li>
-              <li><Link to="/documentation#api-reference" className="transition-colors hover:text-[#0071e3]">API reference</Link></li>
-              <li><Link to="/documentation#security" className="transition-colors hover:text-[#0071e3]">Access & data handling</Link></li>
+            <h3 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-secondary">Resources</h3>
+            <ul className="space-y-3 text-xs text-ink-soft">
+              <li><Link to="/documentation" className="transition-colors hover:text-action">Documentation</Link></li>
+              <li><Link to="/documentation#api-reference" className="transition-colors hover:text-action">API reference</Link></li>
+              <li><Link to="/documentation#security" className="transition-colors hover:text-action">Access & data handling</Link></li>
             </ul>
           </div>
           <div>
-            <h3 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#626267]">Legal & trust</h3>
-            <ul className="space-y-3 text-xs text-[#86868b]">
-              <li><Link to="/privacy" className="transition-colors hover:text-[#0071e3]">Privacy policy</Link></li>
-              <li><CookieSettingsButton className="transition-colors hover:text-[#0071e3]" /></li>
-              <li><Link to="/terms" className="transition-colors hover:text-[#0071e3]">Terms of service</Link></li>
-              <li><Link to="/documentation#security" className="transition-colors hover:text-[#0071e3]">Security practices</Link></li>
+            <h3 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-secondary">Legal & trust</h3>
+            <ul className="space-y-3 text-xs text-ink-soft">
+              <li><Link to="/privacy" className="transition-colors hover:text-action">Privacy policy</Link></li>
+              <li><CookieSettingsButton className="transition-colors hover:text-action" /></li>
+              <li><Link to="/terms" className="transition-colors hover:text-action">Terms of service</Link></li>
+              <li><Link to="/documentation#security" className="transition-colors hover:text-action">Security practices</Link></li>
             </ul>
           </div>
         </div>

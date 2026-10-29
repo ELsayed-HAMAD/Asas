@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '../components/ui/alert'
 
 function PlatformDenied() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#f5f5f7] px-6 text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-canvas px-6 text-center">
       <p className="text-5xl font-bold text-heading">404</p>
       <p className="text-sm text-muted">Page not found</p>
       <Button asChild variant="link" className="text-sm">
@@ -21,7 +21,7 @@ function PlatformDenied() {
 
 function PlatformShell({ icon, title, children }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f5f5f7] px-6">
+    <div className="flex min-h-screen items-center justify-center bg-canvas px-6">
       <div className="w-full max-w-md rounded-[26px] border border-white/80 bg-white/70 p-7 text-center shadow-[0_24px_70px_-32px_rgba(15,23,42,0.35)] backdrop-blur-xl">
         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-700">
           {icon}
@@ -165,7 +165,7 @@ export default function RequirePlatformAdmin() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f5f5f7] text-sm text-muted">
+      <div className="flex min-h-screen items-center justify-center bg-canvas text-sm text-muted">
         Verifying platform access...
       </div>
     )

@@ -156,9 +156,9 @@ export default function Login() {
     <div className="auth-form-stagger">
       {/* Header */}
       <div className="mb-5">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.17em] text-[#0071e3]">Workspace access</p>
-        <h1 className="text-2xl font-semibold tracking-[-0.04em] text-[#1d1d1f]">Welcome back</h1>
-        <p className="mt-1.5 text-[13px] leading-5 text-[#737378]">Sign in to continue to your Asas workspace.</p>
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.17em] text-action">Workspace access</p>
+        <h1 className="text-2xl font-semibold tracking-[-0.04em] text-ink">Welcome back</h1>
+        <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">Sign in to continue to your Asas workspace.</p>
       </div>
 
       {/* Social SSO Button */}
@@ -167,7 +167,7 @@ export default function Login() {
           type="button"
           variant="outline"
           onClick={handleGoogleSignIn}
-          className="h-10 w-full rounded-full border-black/10 bg-white/65 text-xs font-medium text-[#3a3a3c] shadow-none transition-colors hover:bg-white"
+          className="h-10 w-full rounded-full border-black/10 bg-white/65 text-xs font-medium text-ink-body shadow-none transition-colors hover:bg-white"
         >
           <GoogleIcon className="w-4 h-4" />
           <span>Google</span>
@@ -176,7 +176,7 @@ export default function Login() {
 
       <div className="mb-4 flex items-center gap-3">
         <span className="h-px flex-1 bg-black/[0.07]" />
-        <span className="text-[10px] text-[#929297]">or continue with work email</span>
+        <span className="text-[10px] text-ink-subtle">or continue with work email</span>
         <span className="h-px flex-1 bg-black/[0.07]" />
       </div>
 
@@ -246,7 +246,7 @@ export default function Login() {
 
         {/* Email */}
         <div>
-          <label htmlFor="login-email" className="mb-1.5 block text-[11px] font-medium text-[#3a3a3c]">
+          <label htmlFor="login-email" className="mb-1.5 block text-[11px] font-medium text-ink-body">
             Work email
           </label>
           <Input
@@ -257,14 +257,14 @@ export default function Login() {
             onChange={handleChange}
             placeholder="you@company.com"
             autoComplete="email"
-            className="h-10 rounded-xl border-black/10 bg-white/65 px-3 text-sm text-[#1d1d1f] shadow-none placeholder:text-[#a1a1a6] focus-visible:bg-white focus-visible:ring-[#0071e3]"
+            className="h-10 rounded-xl border-black/10 bg-white/65 px-3 text-sm text-ink shadow-none placeholder:text-ink-faint focus-visible:bg-white focus-visible:ring-action"
           />
         </div>
 
         {/* Password */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label htmlFor="login-password" className="text-[11px] font-medium text-[#3a3a3c]">Password</label>
+            <label htmlFor="login-password" className="text-[11px] font-medium text-ink-body">Password</label>
             <Button
               type="button"
               variant="link"
@@ -274,7 +274,7 @@ export default function Login() {
                 setForgotSuccess('')
                 setForgotOpen(true)
               }}
-              className="h-auto text-xs font-normal text-[#737378] no-underline hover:text-[#0071e3] hover:no-underline"
+              className="h-auto text-xs font-normal text-ink-muted no-underline hover:text-action hover:no-underline"
             >
               Forgot password?
             </Button>
@@ -288,7 +288,7 @@ export default function Login() {
               onChange={handleChange}
               placeholder="••••••••"
               autoComplete="current-password"
-              className="h-10 rounded-xl border-black/10 bg-white/65 px-3 pr-11 text-sm text-[#1d1d1f] shadow-none placeholder:text-[#a1a1a6] focus-visible:bg-white focus-visible:ring-[#0071e3]"
+              className="h-10 rounded-xl border-black/10 bg-white/65 px-3 pr-11 text-sm text-ink shadow-none placeholder:text-ink-faint focus-visible:bg-white focus-visible:ring-action"
             />
             <Button
               type="button"
@@ -310,9 +310,9 @@ export default function Login() {
             id="remember"
             checked={rememberMe}
             onCheckedChange={checked => setRememberMe(checked === true)}
-            className="data-[state=checked]:border-[#0071e3] data-[state=checked]:bg-[#0071e3]"
+            className="data-[state=checked]:border-action data-[state=checked]:bg-action"
           />
-          <label htmlFor="remember" className="cursor-pointer select-none text-[11px] text-[#737378]">
+          <label htmlFor="remember" className="cursor-pointer select-none text-[11px] text-ink-muted">
             Keep me signed in
           </label>
         </div>
@@ -321,7 +321,7 @@ export default function Login() {
         <Button
           type="submit"
           disabled={loading}
-          className="h-10 w-full rounded-full bg-[#0071e3] text-[13px] font-medium text-white shadow-[0_10px_30px_rgba(0,113,227,0.22)] transition-all hover:bg-[#0077ed] hover:shadow-[0_14px_36px_rgba(0,113,227,0.28)]"
+          className="h-10 w-full rounded-full bg-action text-[13px] font-medium text-white shadow-[0_10px_30px_rgba(0,113,227,0.22)] transition-all hover:bg-action-hover hover:shadow-[0_14px_36px_rgba(0,113,227,0.28)]"
         >
           {loading ? (
             <>
@@ -336,9 +336,9 @@ export default function Login() {
       </form>
 
       {/* Register link */}
-      <p className="mt-4 text-center text-xs text-[#737378]">
+      <p className="mt-4 text-center text-xs text-ink-muted">
         Don't have an account?{' '}
-        <Link to="/register" className="font-semibold text-[#0071e3] hover:underline">
+        <Link to="/register" className="font-semibold text-action hover:underline">
           Create workspace
         </Link>
       </p>

@@ -15,8 +15,8 @@ const STEPS = [
 function SummaryRow({ label, value, muted = false }) {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-black/[0.05] py-1.5 last:border-b-0">
-      <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.09em] text-[#929297]">{label}</span>
-      <span className={`min-w-0 break-words text-right text-xs font-medium leading-5 ${muted ? 'text-[#929297]' : 'text-[#2c2c2f]'}`}>{value}</span>
+      <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.09em] text-ink-subtle">{label}</span>
+      <span className={`min-w-0 break-words text-right text-xs font-medium leading-5 ${muted ? 'text-ink-subtle' : 'text-ink-strong'}`}>{value}</span>
     </div>
   )
 }
@@ -25,8 +25,8 @@ export function OnboardingProgress({ step, onStepSelect }) {
   return (
     <div data-testid="onboarding-mobile-progress" className="lg:hidden">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#929297]">Workspace setup</p>
-        <span className="text-[10px] font-semibold text-[#312e81]">Step {step} of 3</span>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-subtle">Workspace setup</p>
+        <span className="text-[10px] font-semibold text-primary-hover">Step {step} of 3</span>
       </div>
       <ol className="grid grid-cols-3 gap-1.5" aria-label="Workspace setup progress">
         {STEPS.map((item) => {
@@ -41,10 +41,10 @@ export function OnboardingProgress({ step, onStepSelect }) {
                 onClick={() => onStepSelect(item.id)}
                 className={`w-full rounded-xl border px-2 py-2 text-left transition-colors ${
                   active
-                    ? 'border-[#1e1b4b] bg-[#1e1b4b] text-white'
+                    ? 'border-primary bg-primary-solid text-white'
                     : complete
-                      ? 'border-[#1e1b4b]/15 bg-[#eef2ff] text-[#312e81]'
-                      : 'border-black/[0.06] bg-white/45 text-[#929297]'
+                      ? 'border-primary/15 bg-primary-light text-primary-hover'
+                      : 'border-black/[0.06] bg-white/45 text-ink-subtle'
                 }`}
               >
                 <span className="flex items-center gap-1.5 text-[10px] font-semibold">
@@ -123,7 +123,7 @@ export default function OnboardingRail({
         <div data-testid="onboarding-summary" className="mt-4 rounded-2xl border border-black/[0.06] bg-white/50 p-3">
           <div className="mb-1 flex items-center gap-2">
             <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary-light text-primary"><LayoutGrid size={12} /></span>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#929297]">Setup summary</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-ink-subtle">Setup summary</p>
           </div>
           <SummaryRow label="Workspace" value={workspaceName || 'Not named yet'} muted={!workspaceName} />
           <SummaryRow label="Currency" value={currency} />
@@ -134,7 +134,7 @@ export default function OnboardingRail({
         </div>
 
         <div className="mt-auto pt-4 [@media(max-height:700px)]:hidden">
-          <div className="flex items-start gap-2 rounded-2xl bg-[#eef2ff]/70 p-2.5 text-[10px] leading-5 text-[#4f4b7a]">
+          <div className="flex items-start gap-2 rounded-2xl bg-primary-light/70 p-2.5 text-[10px] leading-5 text-ink-indigo">
             <ShieldCheck size={14} className="mt-0.5 shrink-0" />
             <span>Workspace roles, tenant isolation, and audit history stay active from the first sign-in.</span>
           </div>

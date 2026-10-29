@@ -144,7 +144,7 @@ export default function SupportDashboard() {
               type="button"
               disabled={!subject.trim() || createTicket.isPending}
               onClick={() => createTicket.mutate()}
-              className="h-10 px-5 rounded-xl bg-[#131722] hover:bg-slate-800 active:bg-slate-950 text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-2 shadow-xs transition-all shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-10 px-5 rounded-xl bg-brand-ink hover:bg-slate-800 active:bg-slate-950 text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-2 shadow-xs transition-all shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {createTicket.isPending && <Loader2 size={14} className="animate-spin text-white" />}
               <span>Submit</span>

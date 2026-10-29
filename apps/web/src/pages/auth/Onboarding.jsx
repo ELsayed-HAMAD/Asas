@@ -437,8 +437,8 @@ export default function Onboarding() {
                 </div>
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="hidden truncate text-[10px] font-medium text-caption sm:inline">{session?.user?.email}</span>
-                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#1e1b4b]/10 bg-white/50 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-[#312e81]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#4f46e5]" />
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-primary/10 bg-white/50 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-primary-hover">
+                    <span className="h-1.5 w-1.5 rounded-full bg-accent-solid" />
                     Setup in progress
                   </span>
                 </div>

@@ -361,9 +361,9 @@ export default function RevenueForecast() {
           <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
             <h2 className="text-base font-bold text-slate-900">Revenue by Close Month</h2>
             <div className="bg-slate-100/80 border border-slate-200/60 rounded-xl px-3 py-1.5 flex items-center gap-4 text-xs font-medium text-slate-600 shrink-0">
-              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-[#0f172a]" /> Closed Won</div>
-              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-[#a5b4fc]" /> Commit</div>
-              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-[#e5e7eb]" /> Other Open</div>
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-surface-inverse-strong" /> Closed Won</div>
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-accent-muted" /> Commit</div>
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-surface-cloud" /> Other Open</div>
             </div>
           </div>
 
@@ -371,27 +371,27 @@ export default function RevenueForecast() {
           <div className="w-full h-[230px] sm:h-[250px] relative">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }} maxBarSize={56}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-chart-grid)" />
                 <XAxis
                   dataKey="month"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                  tick={{ fontSize: 12, fill: 'var(--color-chart-axis)', fontWeight: 500 }}
                   dy={8}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 500 }}
+                  tick={{ fontSize: 11, fill: 'var(--color-chart-axis-muted)', fontWeight: 500 }}
                   tickFormatter={(v) => formatCompactMoney(v, summary.totalQuota?.currency || 'USD')}
                 />
                 <Tooltip
                   contentStyle={{
                     borderRadius: 12,
-                    border: '1px solid rgba(226, 232, 240, 0.8)',
-                    boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.08)',
+                    border: '1px solid var(--color-chart-tooltip-border)',
+                    boxShadow: 'var(--shadow-chart-tooltip)',
                     fontSize: 12,
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    backgroundColor: 'var(--color-chart-tooltip-bg)',
                     backdropFilter: 'blur(8px)',
                   }}
                   formatter={(value, name) => {
@@ -399,11 +399,11 @@ export default function RevenueForecast() {
                     const label = name === 'closed' ? 'Closed' : name === 'commit' ? 'Commit' : 'Pipeline';
                     return [formatCompactMoney(value, summary.totalQuota?.currency || 'USD'), label];
                   }}
-                  labelStyle={{ fontWeight: 600, color: '#0f172a' }}
+                  labelStyle={{ fontWeight: 600, color: 'var(--color-chart-label)' }}
                 />
-                <Bar dataKey="closed" stackId="a" fill="#0f172a" maxBarSize={56} animationDuration={1000} />
-                <Bar dataKey="commit" stackId="a" fill="#a5b4fc" maxBarSize={56} animationDuration={1000} />
-                <Bar dataKey="pipeline" stackId="a" fill="#e5e7eb" radius={[6, 6, 0, 0]} maxBarSize={56} animationDuration={1000} />
+                <Bar dataKey="closed" stackId="a" fill="var(--color-chart-label)" maxBarSize={56} animationDuration={1000} />
+                <Bar dataKey="commit" stackId="a" fill="var(--color-chart-lavender)" maxBarSize={56} animationDuration={1000} />
+                <Bar dataKey="pipeline" stackId="a" fill="var(--color-chart-muted)" radius={[6, 6, 0, 0]} maxBarSize={56} animationDuration={1000} />
               </BarChart>
             </ResponsiveContainer>
             {chartData.length === 0 && (

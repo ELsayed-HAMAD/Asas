@@ -296,7 +296,7 @@ function DetailPanel({
 
       {/* Amount: 24px bold, existing blue, tabular-nums */}
       <div className="pt-1 pb-1">
-        <p className="text-2xl font-bold text-[#2563eb] tracking-tight tabular-nums leading-none">
+        <p className="text-2xl font-bold text-info tracking-tight tabular-nums leading-none">
           {formatMoney(deal.value)}
         </p>
       </div>

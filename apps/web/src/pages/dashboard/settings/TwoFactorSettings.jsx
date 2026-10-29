@@ -176,8 +176,8 @@ export default function TwoFactorSettings() {
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-heading">Set up your authenticator</h3>
             <p className="text-sm text-body">Scan this QR code with your authenticator app, then enter the app's current six-digit code to verify it.</p>
-            <div className="flex justify-center rounded-input border border-border-default bg-white p-4">
-              <QRCode value={enrollment.totpURI} size={176} bgColor="#ffffff" fgColor="#111827" />
+            <div className="flex justify-center rounded-input border border-border-default bg-qr-surface p-4">
+              <QRCode value={enrollment.totpURI} size={176} bgColor="var(--color-qr-surface)" fgColor="var(--color-qr-foreground)" />
             </div>
             <details className="rounded-input border border-border-default bg-surface-muted p-3 text-sm">
               <summary className="cursor-pointer font-medium text-body">Can't scan? Use the setup key</summary>

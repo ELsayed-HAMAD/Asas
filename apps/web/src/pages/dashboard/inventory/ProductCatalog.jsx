@@ -757,7 +757,7 @@ export default function Inventory() {
                               className={`h-[22px] min-w-[96px] px-2.5 rounded text-xs font-semibold whitespace-nowrap justify-center ${
                                 isLowStock
                                   ? 'bg-danger-light text-danger border-danger-border'
-                                  : 'bg-success-light text-success-text border-[#bbf7d0]'
+                                  : 'bg-success-light text-success-text border-green-border'
                               }`}
                             >
                               {product.stock} {product.status.replaceAll('_', ' ')}
@@ -908,7 +908,7 @@ export default function Inventory() {
                         <AlertTriangle size={15} className="text-danger" />
                         <h3 className="text-xs font-bold text-danger-hover uppercase tracking-wide">Stock Alert</h3>
                       </div>
-                      <p className="text-sm text-[#991b1b] ps-6 leading-relaxed">
+                      <p className="text-sm text-danger-text ps-6 leading-relaxed">
                         Current stock ({selectedProduct.stock}) is {selectedProduct.stock === 0 ? 'empty' : `below minimum threshold (${selectedProduct.minThreshold})`}. Action required.
                       </p>
                     </div>

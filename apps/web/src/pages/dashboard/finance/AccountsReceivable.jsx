@@ -580,7 +580,7 @@ export default function AccountsReceivable() {
               if (selectedId && !newInvoiceCustomerId) setNewInvoiceCustomerId(selectedId);
               setInvoiceModalOpen(true);
             }}
-            className="h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 bg-[#0f172a] text-white hover:bg-slate-800 shadow-sm whitespace-nowrap cursor-pointer"
+            className="h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 bg-surface-inverse-strong text-white hover:bg-slate-800 shadow-sm whitespace-nowrap cursor-pointer"
             title="Create new customer invoice"
           >
             <Plus size={14} />
