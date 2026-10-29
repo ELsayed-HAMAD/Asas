@@ -39,6 +39,10 @@ export default function RequireAuth() {
   const isLoading = sessionPending || orgPending || (Boolean(session) && orgsPending) || isSyncing
   const isOrgIndependentPath =
     location.pathname === '/onboarding' || location.pathname === '/choose-workspace'
+  // Creating or activating a workspace refetches the auth queries. On onboarding, that must
+  // not unmount the wizard: its launch sequence owns the in-flight state. Wait only until the
+  // session itself is known, then keep the onboarding UI mounted through org refetches.
+  const canRenderOrgIndependent = isOrgIndependentPath && Boolean(session)
 
   const activateOrganization = useCallback(async (organizationId) => {
     attemptedOrganizationRef.current = organizationId
@@ -76,6 +80,10 @@ export default function RequireAuth() {
       return
     }
 
+    // Onboarding and the chooser decide which workspace to activate themselves. Letting this
+    // effect race them would trigger extra session refetches and remount the launch screen.
+    if (isOrgIndependentPath) return
+
     // 1. Sync a session workspace only after confirming the user is still a member.
     // A stale session value can otherwise make setActive fail and trap the user here.
     const sessionOrganizationId = session?.session?.activeOrganizationId
@@ -110,7 +118,7 @@ export default function RequireAuth() {
         void activateOrganization(lastId)
       }
     }
-  }, [session, activeOrganization, orgPending, orgsPending, orgList, isSyncing, activateOrganization])
+  }, [session, activeOrganization, orgPending, orgsPending, orgList, isSyncing, isOrgIndependentPath, activateOrganization])
 
   useEffect(() => {
     setLoadingExpired(false)
@@ -131,7 +139,7 @@ export default function RequireAuth() {
     ])
   }, [sessionQuery.refetch, organizationQuery.refetch, organizationsQuery.refetch])
 
-  if (isLoading) {
+  if (isLoading && !canRenderOrgIndependent) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-surface px-6 text-center">
         <p className="text-sm text-muted">Loading workspace…</p>

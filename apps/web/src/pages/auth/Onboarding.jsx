@@ -44,6 +44,37 @@ const DEFAULT_TIMEZONE = AVAILABLE_TIMEZONES.includes(localTimezone) ? localTime
  */
 const SAMPLE_DATA_ENABLED = import.meta.env.VITE_DISABLE_SAMPLE_DATA !== 'true'
 
+const ONBOARDED_STATUSES = new Set(['EMPTY', 'SAMPLE_LOADED', 'IMPORTED'])
+const READY_HOLD_MS = 900
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+/**
+ * Read the persisted setup state, retrying only transient request failures. `setActive` updates
+ * the session cookie, but a request can still land before the browser applies it; retrying keeps
+ * the launch from surfacing a raw 401/404 as an "internal error".
+ */
+async function readOnboardingStatus(attempts = 4) {
+  let lastError
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await http.get('/onboarding/status')
+    } catch (error) {
+      lastError = error
+      if (attempt < attempts - 1) await sleep(250 * (attempt + 1))
+    }
+  }
+  throw lastError
+}
+
+function launchErrorMessage(error) {
+  const message = authErrorMessage(error, 'Unable to complete workspace configuration.')
+  if (/internal server error|request failed|an error occurred/i.test(message)) {
+    return 'The workspace service hit a temporary problem. Your progress is saved; try again in a moment.'
+  }
+  return message
+}
+
 const START_MODE_LABELS = {
   empty: 'Clean workspace',
   sample: 'Sample data',
@@ -109,6 +140,7 @@ export default function Onboarding() {
 
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [launchStarted, setLaunchStarted] = useState(false)
   const [loadingMessage, setLoadingMessage] = useState('')
   const [launchStage, setLaunchStage] = useState(LAUNCH_STAGE.WORKSPACE)
   const [error, setError] = useState('')
@@ -116,6 +148,7 @@ export default function Onboarding() {
   const [createdOrganizationId, setCreatedOrganizationId] = useState(null)
   const [draftReady, setDraftReady] = useState(false)
   const draftHydratedRef = useRef(false)
+  const launchingRef = useRef(false)
   const workspaceMembershipUnverified = Boolean(organizationsError) &&
     !forceCreateWorkspace &&
     !activeOrganization &&
@@ -125,7 +158,7 @@ export default function Onboarding() {
   const [companyName, setCompanyName] = useState(
     forceCreateWorkspace
       ? (session?.user?.name ? `${session.user.name}'s Workspace` : '')
-      : activeOrganization?.name || (session?.user?.name ? `${session.user.name}'s Workspace` : '')
+      : activeOrganization?.name || ''
   )
   const [currency, setCurrency] = useState('USD')
   const [timezone, setTimezone] = useState(DEFAULT_TIMEZONE)
@@ -136,6 +169,7 @@ export default function Onboarding() {
   const [migrationModules, setMigrationModules] = useState(['hr'])
   const stepHeadingRef = useRef(null)
   const hasRenderedStep = useRef(false)
+  const companyNameTouchedRef = useRef(false)
 
   useEffect(() => {
     if (!hasRenderedStep.current) {
@@ -159,16 +193,23 @@ export default function Onboarding() {
   }
 
   useEffect(() => {
+    if (companyNameTouchedRef.current) return
     const suggestedName = forceCreateWorkspace
       ? (session?.user?.name ? `${session.user.name}'s Workspace` : '')
       : activeOrganization?.name || (session?.user?.name ? `${session.user.name}'s Workspace` : '')
-    if (suggestedName) setCompanyName(current => current || suggestedName)
+    setCompanyName(suggestedName)
   }, [activeOrganization?.name, forceCreateWorkspace, session?.user?.name])
 
   const draftUserId = session?.user?.id ?? null
-  const redirectingToDashboard = Boolean(activeOrganization) &&
+  // Only a persisted terminal status may skip the wizard. A missing status is the transient
+  // state Better Auth can expose right after setActive(); treating it as "done" used to bounce
+  // the owner from the launch screen to /dashboard and back again.
+  const redirectingToDashboard = !loading &&
+    !launchStarted &&
+    !launchingRef.current &&
     !forceCreateWorkspace &&
-    activeOrganization.onboardingStatus !== 'PENDING'
+    Boolean(activeOrganization) &&
+    ONBOARDED_STATUSES.has(activeOrganization.onboardingStatus)
 
   // Restore the wizard once the session identifies the user. Without this, any reload or
   // redirect restarts at step 1 and discards the choices the owner already made.
@@ -183,7 +224,10 @@ export default function Onboarding() {
     const draft = readOnboardingDraft(onboardingDraftStorage(), draftUserId)
     if (draft) {
       setStep(draft.step)
-      if (draft.companyName) setCompanyName(draft.companyName)
+      if (draft.companyName) {
+        companyNameTouchedRef.current = true
+        setCompanyName(draft.companyName)
+      }
       setCurrency(draft.currency)
       setTimezone(draft.timezone)
       setDataMode(draft.dataMode === 'sample' && !SAMPLE_DATA_ENABLED ? 'empty' : draft.dataMode)
@@ -258,10 +302,13 @@ export default function Onboarding() {
     : ''
 
   const finishOnboarding = async () => {
+    if (launchingRef.current) return
+    launchingRef.current = true
+    setLaunchStarted(true)
     setError('')
     setLoading(true)
     setLaunchStage(LAUNCH_STAGE.WORKSPACE)
-    setLoadingMessage('Configuring your workspace...')
+    setLoadingMessage('Creating or activating your workspace...')
     let migrationProjectId = null
     const expectedStatus = dataMode === 'sample' ? 'SAMPLE_LOADED' : dataMode === 'import' ? 'IMPORTED' : 'EMPTY'
     try {
@@ -335,7 +382,22 @@ export default function Onboarding() {
         }
       }
 
-      // Update General Settings (Currency, Timezone, Company Name)
+      // Read the persisted status before writing anything. A retry after a committed data step
+      // can skip straight to Ready instead of replaying setup and colliding with its own work.
+      setLoadingMessage('Checking your workspace...')
+      const currentStatus = await readOnboardingStatus()
+      if (ONBOARDED_STATUSES.has(currentStatus?.onboardingStatus)) {
+        setLaunchStage(LAUNCH_STAGE.COMPLETE)
+        setLoadingMessage('Your workspace is ready. Opening your dashboard...')
+        clearOnboardingDraft(onboardingDraftStorage())
+        await sleep(READY_HOLD_MS)
+        window.location.replace('/dashboard')
+        return
+      }
+      if (currentStatus?.onboardingStatus !== 'PENDING') {
+        throw new Error(`Your workspace is in an unexpected state (status: ${currentStatus?.onboardingStatus ?? 'unknown'}). Reload the page and try again.`)
+      }
+
       setLaunchStage(LAUNCH_STAGE.SETTINGS)
       setLoadingMessage('Saving currency and timezone...')
       await http.patch('/settings/general', {
@@ -346,8 +408,8 @@ export default function Onboarding() {
         },
       })
 
-      // Provision the default plan before finalizing workspace onboarding. If billing setup
-      // fails, the organization remains PENDING and the owner can retry this flow safely.
+      // Provision the default plan before finalizing workspace onboarding. The endpoint is
+      // idempotent for the Free plan, so a retry after a later failure is safe.
       setLoadingMessage('Starting your Free plan...')
       await http.post('/billing/switch-plan', { body: { planId: 'free' } })
 
@@ -364,8 +426,7 @@ export default function Onboarding() {
         migrationProjectId = migrationProject.id
       }
 
-      // Apply Data Mode last. Both initializers persist onboardingStatus, so there must be no
-      // later setup step that can fail after this transition.
+      // Apply Data Mode last. The initializer is the step that commits the terminal status.
       try {
         if (dataMode === 'sample') {
           setLoadingMessage('Loading sample data for exploration...')
@@ -379,29 +440,31 @@ export default function Onboarding() {
         }
       } catch (applyErr) {
         // An interrupted response may follow a committed initializer. Verify the persisted state
-        // before treating a retry as successful; never swallow an unrelated 409 or service error.
-        const status = await http.get('/onboarding/status').catch(() => null)
-        if (status?.onboardingStatus !== expectedStatus) throw applyErr
+        // before treating a retry as successful; never swallow an unrelated service error.
+        const statusAfterApply = await readOnboardingStatus(3).catch(() => null)
+        if (statusAfterApply?.onboardingStatus !== expectedStatus) {
+          throw new Error(launchErrorMessage(applyErr))
+        }
       }
 
-      // The dashboard shell redirects any workspace that is still PENDING back to onboarding.
-      // Verify the committed status first so a successful-looking response cannot bounce the
-      // owner back to step 1; a mismatch keeps the draft so retrying resumes here.
-      setLaunchStage(LAUNCH_STAGE.DATA)
+      // Wait for the terminal state before navigating. The dashboard gate also reads this
+      // status; navigating early is what made the flow bounce back to onboarding.
       setLoadingMessage('Verifying your workspace setup...')
-      const finalStatus = await http.get('/onboarding/status')
-      if (finalStatus?.onboardingStatus !== expectedStatus) {
+      const finalStatus = await readOnboardingStatus(4)
+      if (!ONBOARDED_STATUSES.has(finalStatus?.onboardingStatus)) {
         throw new Error(`Your workspace is still finishing setup (status: ${finalStatus?.onboardingStatus ?? 'unknown'}). Please try again in a moment.`)
       }
 
-      setLaunchStage(LAUNCH_STAGE.READY)
-      setLoadingMessage('Opening your dashboard...')
+      setLaunchStage(LAUNCH_STAGE.COMPLETE)
+      setLoadingMessage('Your workspace is ready. Opening your dashboard...')
       clearOnboardingDraft(onboardingDraftStorage())
-      window.location.href = '/dashboard'
+      await sleep(READY_HOLD_MS)
+      window.location.replace('/dashboard')
     } catch (err) {
-      const msg = authErrorMessage(err, 'Unable to complete workspace configuration.')
-      setError(msg)
+      setError(launchErrorMessage(err))
       setLoading(false)
+    } finally {
+      launchingRef.current = false
     }
   }
 
@@ -499,7 +562,10 @@ export default function Onboarding() {
                     id="onboarding-company-name"
                     name="organizationName"
                     value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
+                    onChange={(e) => {
+                      companyNameTouchedRef.current = true
+                      setCompanyName(e.target.value)
+                    }}
                     placeholder="e.g. Acme Global Holdings Inc."
                     autoComplete="organization"
                     maxLength={200}

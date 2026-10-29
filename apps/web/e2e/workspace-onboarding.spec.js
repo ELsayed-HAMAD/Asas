@@ -496,6 +496,9 @@ test('desktop progress rail summarizes setup and the launch panel shows staged p
     await sampleGate
     await json(route, { data: { onboardingStatus: 'SAMPLE_LOADED' } }).catch(() => {})
   })
+  await context.route('**/api/v1/onboarding/status', route => json(route, {
+    data: { onboardingStatus: 'PENDING' },
+  }))
 
   try {
     const page = await context.newPage()
@@ -554,6 +557,109 @@ test('desktop progress rail summarizes setup and the launch panel shows staged p
     await context.close()
   }
 })
+
+test('onboarding launch stays on the progress panel through every stage before opening the dashboard', async ({ browser }) => {
+  const context = await browser.newContext({ reducedMotion: 'reduce' })
+  const user = { id: 'owner_smooth_launch', name: 'Smooth Owner', email: 'smooth@example.test', emailVerified: true }
+  const workspace = {
+    id: 'workspace_smooth_launch',
+    name: "Smooth Owner's Workspace",
+    slug: 'smooth-owners-workspace',
+    logo: null,
+    currency: 'USD',
+    createdAt: new Date().toISOString(),
+  }
+  let created = false
+  let activeOrganizationId = null
+  let sampleLoaded = false
+  let resolveSettings
+  let resolveSample
+  const settingsGate = new Promise(resolve => { resolveSettings = resolve })
+  const sampleGate = new Promise(resolve => { resolveSample = resolve })
+  const json = (route, body, status = 200) => route.fulfill({
+    status, contentType: 'application/json', body: JSON.stringify(body),
+  })
+
+  await context.route('**/api/auth/**', async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/get-session')) {
+      return json(route, {
+        session: { id: 'session_smooth_launch', token: 'token', userId: user.id, activeOrganizationId },
+        user,
+      })
+    }
+    if (path.endsWith('/organization/create')) {
+      created = true
+      activeOrganizationId = workspace.id
+      // Deliberately omit onboardingStatus: this is the transient shape that used to look
+      // "finished" and bounce the owner to /dashboard mid-launch.
+      return json(route, workspace)
+    }
+    if (path.endsWith('/organization/set-active')) {
+      activeOrganizationId = route.request().postDataJSON().organizationId
+      return json(route, { id: activeOrganizationId })
+    }
+    if (path.endsWith('/organization/list')) {
+      return json(route, created ? [workspace] : [])
+    }
+    if (path.endsWith('/organization/get-full-organization')) {
+      return json(route, created ? workspace : null)
+    }
+    if (path.endsWith('/organization/get-active-member-role')) return json(route, { role: 'OWNER' })
+    return json(route, {})
+  })
+  await context.route('**/api/v1/onboarding/status', route => json(route, {
+    data: { onboardingStatus: sampleLoaded ? 'SAMPLE_LOADED' : 'PENDING' },
+  }))
+  await context.route('**/api/v1/settings/general', async route => {
+    await settingsGate
+    return json(route, { data: {} })
+  })
+  await context.route('**/api/v1/billing/switch-plan', route => json(route, { data: {} }))
+  await context.route('**/api/v1/onboarding/sample', async route => {
+    await sampleGate
+    sampleLoaded = true
+    return json(route, { data: { onboardingStatus: 'SAMPLE_LOADED' } })
+  })
+
+  try {
+    const page = await context.newPage()
+    await page.goto('/onboarding?new=1')
+    await page.getByRole('button', { name: 'Review workspace areas' }).click()
+    await page.getByRole('button', { name: 'Choose how to start' }).click()
+    await page.getByRole('button', { name: /Load sample data/ }).click()
+    await page.getByRole('button', { name: 'Launch workspace' }).click()
+
+    const launch = page.getByTestId('onboarding-launch-progress')
+    await expect(launch).toBeVisible()
+    await expect(page).toHaveURL(/\/onboarding\?new=1$/)
+
+    // Settings is blocked on its gate: the page must stay put, with Workspace already done.
+    await expect(launch.getByText('Saving currency and timezone...')).toBeVisible()
+    await expect(launch.getByText('Done', { exact: true })).toHaveCount(1)
+    await expect(page).toHaveURL(/\/onboarding\?new=1$/)
+
+    resolveSettings()
+    await expect(launch.getByText('Loading sample data for exploration...')).toBeVisible()
+
+    // Data is blocked on the sample gate: still no dashboard navigation, and Data is active.
+    await expect(launch.getByText('Done', { exact: true })).toHaveCount(2)
+    await expect(launch.getByText('In progress', { exact: true })).toHaveCount(1)
+    await expect(page).toHaveURL(/\/onboarding\?new=1$/)
+
+    resolveSample()
+    await expect(launch.getByText('Your workspace is ready')).toBeVisible({ timeout: 15_000 })
+    await expect(launch.getByText('Done', { exact: true })).toHaveCount(4)
+    await page.waitForURL(/\/dashboard$/, { timeout: 15_000 })
+    expect(created).toBe(true)
+    expect(activeOrganizationId).toBe(workspace.id)
+  } finally {
+    resolveSettings?.()
+    resolveSample?.()
+    await context.close()
+  }
+})
+
 
 test('onboarding reviews and maps an employee CSV before enabling import', async ({ browser }) => {
   const context = await browser.newContext({ reducedMotion: 'reduce' })
