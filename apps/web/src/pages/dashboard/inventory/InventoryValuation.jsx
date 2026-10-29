@@ -35,13 +35,6 @@ import {
   TableHead,
   TableCell,
 } from '../../../components/ui/table'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../../../components/ui/select'
 
 const ACCOUNT_ROLES = [
   {
@@ -120,6 +113,12 @@ export default function InventoryValuation() {
   const [saveError, setSaveError] = useState('')
   const [saved, setSaved] = useState(false)
 
+  const [setupExpanded, setSetupExpanded] = useState(false)
+  const [accountInputsOpen, setAccountInputsOpen] = useState(false)
+  const [reconciliationOpen, setReconciliationOpen] = useState(false)
+  const [unvaluedOpen, setUnvaluedOpen] = useState(false)
+  const setupAutoOpened = useRef(false)
+
   const [openingProduct, setOpeningProduct] = useState(null)
   const [openingCurrency, setOpeningCurrency] = useState('')
   const [openingCost, setOpeningCost] = useState('')
@@ -138,6 +137,11 @@ export default function InventoryValuation() {
   const setup = setupQuery.data
   const configured = setup?.configured === true
   const postingsLocked = (setup?.valuationPostings ?? 0) > 0
+  const methodLabel = setup?.costingMethod === 'WEIGHTED_AVERAGE'
+    ? 'Weighted average'
+    : setup?.costingMethod === 'FIFO'
+      ? 'FIFO'
+      : 'Not set'
 
   const reportQuery = useQuery({
     queryKey: queryKeys.inventory.valuationReport(),
@@ -182,6 +186,12 @@ export default function InventoryValuation() {
     }
   }, [setup])
 
+  useEffect(() => {
+    if (!setup || setupAutoOpened.current) return
+    setupAutoOpened.current = true
+    setSetupExpanded(!setup.configured)
+  }, [setup])
+
   // The workspace currency is a sensible default for the first mapping, but only fill a blank so
   // a currency the operator is typing is never replaced.
   useEffect(() => {
@@ -197,6 +207,8 @@ export default function InventoryValuation() {
     onSuccess: () => {
       setSaveError('')
       setSaved(true)
+      setSetupExpanded(false)
+      setAccountInputsOpen(false)
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all() })
       queryClient.invalidateQueries({ queryKey: queryKeys.finance.all() })
     },
@@ -274,6 +286,16 @@ export default function InventoryValuation() {
     setSaved(false)
   }
 
+  function toggleSetup() {
+    const next = !setupExpanded
+    setSetupExpanded(next)
+    if (next) {
+      window.requestAnimationFrame(() => {
+        document.getElementById('valuation-setup')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+    }
+  }
+
   function handleSave() {
     setSaveError('')
     const normalized = mappings.map(mapping => ({
@@ -340,47 +362,36 @@ export default function InventoryValuation() {
       <section className="flex-1 overflow-y-auto p-4 sm:p-5 lg:p-6">
         <div className="mx-auto max-w-[1500px] space-y-4">
 
-          {/* ── 1. Compact Unified Header Card (Merged Title + Badges + Integrated Amber Warning) ── */}
-          <header className="bg-gradient-to-b from-surface-raised to-surface-raised/80 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-card space-y-3 flex flex-col">
-            <div className="flex flex-wrap xl:flex-nowrap items-center justify-between gap-4">
-              <div className="flex items-center gap-3.5 min-w-0">
-                <span className="w-10 h-10 rounded-xl bg-info-light border border-info-border text-info flex items-center justify-center shrink-0 shadow-xs">
+          <header className="bg-gradient-to-b from-surface-raised to-surface-raised/80 backdrop-blur-xl border border-border-default rounded-2xl p-5 shadow-card">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex min-w-0 items-start gap-3.5">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-info-border bg-info-light text-info shadow-xs">
                   <Scale size={20} />
                 </span>
                 <div className="min-w-0">
-                  <h1 className="text-lg font-bold text-heading tracking-tight truncate">Inventory valuation</h1>
-                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed truncate sm:whitespace-normal">
-                    The company costing policy, the real ledger accounts it posts to, and the
-                    reconciliation between on-hand stock and the inventory control account.
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="truncate text-lg font-bold tracking-tight text-heading">Inventory valuation</h1>
+                    <Badge
+                      variant="outline"
+                      className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
+                        configured
+                          ? 'border-success-border bg-success-light text-success-text'
+                          : 'border-warning-border bg-warning-light text-warning-text'
+                      }`}
+                    >
+                      {configured ? <CheckCircle2 size={11} className="mr-1 inline" /> : <AlertTriangle size={11} className="mr-1 inline" />}
+                      {configured ? 'Live' : 'Setup needed'}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 max-w-2xl text-sm leading-relaxed text-body-light">
+                    {configured
+                      ? 'Stock value posts to your ledger and reconciles with the inventory control account.'
+                      : 'Stock is tracked by quantity only. Set up valuation so every unit carries a real cost and the ledger can reconcile.'}
                   </p>
                 </div>
               </div>
 
-              {/* Badges + Refresh on ONE Single Horizontal Row */}
-              <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
-                <Badge
-                  variant={configured ? 'success' : 'outline'}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium border shrink-0 ${
-                    configured
-                      ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
-                      : 'bg-amber-500/10 text-amber-700 border-amber-500/20'
-                  }`}
-                >
-                  {configured ? <CheckCircle2 size={12} className="mr-1 inline" /> : <AlertTriangle size={12} className="mr-1 inline" />}
-                  {configured ? 'Valuation configured' : 'Quantity only'}
-                </Badge>
-                <Badge
-                  variant="secondary"
-                  className="px-2.5 py-1 rounded-full text-xs font-medium bg-surface-muted text-heading border border-border-subtle shrink-0"
-                >
-                  {setup?.costingMethod === 'WEIGHTED_AVERAGE' ? 'Weighted average' : setup?.costingMethod === 'FIFO' ? 'FIFO' : 'No costing method'}
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className="px-2.5 py-1 rounded-full text-xs font-medium border border-border-default bg-surface-raised text-heading shrink-0"
-                >
-                  {setup?.valuationPostings ?? 0} valuation posting{(setup?.valuationPostings ?? 0) === 1 ? '' : 's'}
-                </Badge>
+              <div className="flex shrink-0 items-center gap-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -391,570 +402,686 @@ export default function InventoryValuation() {
                     unvaluedQuery.refetch()
                   }}
                   disabled={setupQuery.isFetching || reportQuery.isFetching || unvaluedQuery.isFetching}
-                  className="h-8.5 px-3 rounded-xl border border-border-default bg-surface-raised hover:bg-surface-muted text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0"
+                  className="h-8.5 rounded-xl px-3 text-xs font-semibold shadow-xs"
                 >
                   <RefreshCw size={13} className={(setupQuery.isFetching || reportQuery.isFetching || unvaluedQuery.isFetching) ? 'animate-spin' : ''} />
-                  <span>Refresh</span>
+                  <span className="ml-1.5">Refresh</span>
                 </Button>
+                {(canWrite || setupExpanded) && (
+                  <Button
+                    type="button"
+                    variant={configured || setupExpanded ? 'outline' : 'default'}
+                    size="sm"
+                    onClick={toggleSetup}
+                    className="h-8.5 rounded-xl px-3.5 text-xs font-semibold"
+                  >
+                    {setupExpanded ? 'Hide setup' : configured ? 'Edit policy' : 'Set up valuation'}
+                  </Button>
+                )}
               </div>
             </div>
-
-            {/* Bottom Integrated Amber Alert Bar */}
-            {!configured && !setupQuery.isLoading && (
-              <div className="px-3.5 py-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 flex items-center gap-2.5 text-xs text-amber-900 leading-relaxed">
-                <AlertTriangle size={15} className="shrink-0 text-amber-600 mt-0.5" />
-                <span>
-                  Inventory is currently quantity-only. Stock can move, but no cost is posted to the
-                  ledger and no valuation report can reconcile. Choose a costing method and map real
-                  ledger accounts below. Nothing is valued from a product&apos;s selling price.
-                </span>
-              </div>
-            )}
-
-            {openingResult && (
-              <div className="px-3.5 py-2.5 rounded-xl bg-emerald-50/80 border border-emerald-200/80 flex items-center justify-between gap-3 text-xs text-emerald-900 leading-relaxed">
-                <span className="flex items-center gap-2">
-                  <CheckCircle2 size={15} className="shrink-0 text-emerald-600" />
-                  <span>
-                    Valued {openingResult.quantity} unit{openingResult.quantity === 1 ? '' : 's'} for{' '}
-                    {money(openingResult.value, openingCurrency)}.
-                    Journal entry <span className="font-semibold tabular-nums">{openingResult.journalEntryId}</span> was posted
-                    against inventory opening equity.
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  className="text-[11px] font-bold underline underline-offset-2 shrink-0 cursor-pointer"
-                  onClick={() => setOpeningResult(null)}
-                >
-                  Dismiss
-                </button>
-              </div>
-            )}
-
-            {configured && report && !totals.allReconciled && reconciledRows.length > 0 && (
-              <div className="px-3.5 py-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-xs text-amber-900 leading-relaxed space-y-1">
-                <div className="flex items-center gap-2 font-semibold">
-                  <AlertTriangle size={15} className="shrink-0 text-amber-600" />
-                  <span>Valuation does not reconcile for every currency.</span>
-                </div>
-                <div className="pl-6 space-y-0.5 text-[11px]">
-                  {reconciledRows.map(row => (
-                    <p key={row.currency}>
-                      <span className="font-semibold">{row.currency}:</span>{' '}
-                      {[
-                        row.unvaluedQuantity > 0 ? `${row.unvaluedQuantity} unit(s) without cost` : null,
-                        row.valuedQuantity > row.quantityOnHand ? `${row.valuedQuantity - row.quantityOnHand} more valued unit(s) than stock` : null,
-                        Number(row.unpostedValue) !== 0 ? `${money(row.unpostedValue, row.currency)} recorded but not posted` : null,
-                        Number(row.ledgerDifference) !== 0 ? `${money(row.ledgerDifference, row.currency)} ledger difference` : null,
-                        Number(row.subledgerDifference) !== 0 ? `${money(row.subledgerDifference, row.currency)} subledger difference` : null,
-                      ].filter(Boolean).join(' · ')}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            )}
           </header>
 
-          {/* ── 2. Row 1: Standardized 4 Apple-Glass KPI Cards ── */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <SummaryCard
-              label="Costing method"
-              value={setup?.costingMethod === 'WEIGHTED_AVERAGE' ? 'Weighted average' : setup?.costingMethod === 'FIFO' ? 'FIFO' : 'Not set'}
-              hint={postingsLocked ? 'Locked after the first valuation posting' : 'Can still be changed until a posting exists'}
-              icon={Layers}
-              tone="default"
-            />
-            <SummaryCard
-              label="Mapped currencies"
-              value={String(totals.currencies)}
-              hint="Each currency posts to its own accounts"
-              icon={Wallet}
-              tone="info"
-            />
-            <SummaryCard
-              label="Units without cost"
-              value={totals.unvaluedQuantity.toLocaleString()}
-              hint={totals.unvaluedQuantity > 0 ? 'Opening valuation is required' : 'Every on-hand unit carries cost'}
-              icon={AlertTriangle}
-              tone={totals.unvaluedQuantity > 0 ? 'warning' : 'default'}
-            />
-            <SummaryCard
-              label="Reconciliation"
-              value={!configured ? 'Not available' : totals.currencies === 0 ? 'No stock' : totals.allReconciled ? 'Reconciled' : 'Needs attention'}
-              hint={!configured ? 'Configure a policy first' : totals.currencies === 0 ? 'There is no on-hand quantity to reconcile' : totals.allReconciled ? 'Stock, subledger, and ledger agree' : 'See the currency detail below'}
-              icon={CheckCircle2}
-              tone={!configured || totals.currencies === 0 ? 'default' : totals.allReconciled ? 'success' : 'warning'}
-            />
-          </div>
+          {saved && !saveError && (
+            <Alert className="border-success-border bg-success-light py-2.5 text-success-text">
+              <AlertDescription className="text-xs text-success-text">
+                Valuation policy saved. New receipts, issues, and openings will post to these accounts.
+              </AlertDescription>
+            </Alert>
+          )}
 
-          {/* ── 3. Row 2: Full-Width Compact 2-Column Bento for Costing Policy & Ledger Mapping ── */}
-          <section className="bg-gradient-to-b from-surface-raised to-surface-raised/80 backdrop-blur-xl border border-border-default rounded-2xl p-5 shadow-card space-y-4">
-            {/* Card Header with Immediate Action Buttons */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-border-subtle">
+          {openingResult && (
+            <div className="flex items-start justify-between gap-3 rounded-xl border border-success-border bg-success-light px-4 py-3 text-xs leading-relaxed text-success-text">
+              <span className="flex items-start gap-2">
+                <CheckCircle2 size={15} className="mt-0.5 shrink-0" />
+                <span>
+                  Valued {openingResult.quantity} unit{openingResult.quantity === 1 ? '' : 's'} for{' '}
+                  {money(openingResult.value, openingCurrency)}. Journal entry{' '}
+                  <span className="font-semibold tabular-nums">{openingResult.journalEntryId}</span> was posted against inventory opening equity.
+                </span>
+              </span>
+              <button
+                type="button"
+                className="shrink-0 text-[11px] font-bold underline underline-offset-2"
+                onClick={() => setOpeningResult(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {configured && report && !totals.allReconciled && reconciledRows.length > 0 && (
+            <div className="flex items-start gap-2.5 rounded-xl border border-warning-border bg-warning-light px-4 py-3 text-xs leading-relaxed text-warning-text">
+              <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+              <span className="flex-1">Some currencies do not reconcile. Open the report to see the difference.</span>
+              <button
+                type="button"
+                className="shrink-0 font-semibold underline underline-offset-2"
+                onClick={() => setReconciliationOpen(true)}
+              >
+                Review
+              </button>
+            </div>
+          )}
+
+          {!configured ? (
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                {
+                  icon: Layers,
+                  title: '1. Choose a costing method',
+                  text: 'FIFO or weighted average. You can change it until the first valuation posting.',
+                },
+                {
+                  icon: Wallet,
+                  title: '2. Map five ledger accounts',
+                  text: 'Sensible default account codes are prefilled for your workspace currency.',
+                },
+                {
+                  icon: Scale,
+                  title: '3. Value existing stock',
+                  text: totals.unvaluedQuantity > 0
+                    ? `${totals.unvaluedQuantity.toLocaleString()} units currently have no cost.`
+                    : 'Enable valuation, then value any stock that is already on hand.',
+                },
+              ].map(({ icon: Icon, title, text }) => (
+                <div key={title} className="rounded-2xl border border-border-default bg-surface-raised/75 p-4 shadow-xs backdrop-blur-xl">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl border border-accent/15 bg-accent-light text-accent">
+                    <Icon size={15} />
+                  </span>
+                  <p className="mt-3 text-xs font-semibold text-heading">{title}</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted">{text}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-3">
+              <SummaryCard
+                label="Costing method"
+                value={methodLabel}
+                hint={postingsLocked ? 'Locked after the first valuation posting' : 'Can still be changed until a posting exists'}
+                icon={Layers}
+                tone="default"
+              />
+              <SummaryCard
+                label="Currencies mapped"
+                value={`${mappedCurrencies.size} ${mappedCurrencies.size === 1 ? 'currency' : 'currencies'}`}
+                hint={`${totals.unvaluedQuantity.toLocaleString()} units without cost`}
+                icon={Wallet}
+                tone={totals.unvaluedQuantity > 0 ? 'warning' : 'info'}
+              />
+              <SummaryCard
+                label="Reconciliation"
+                value={totals.currencies === 0 ? 'No stock' : totals.allReconciled ? 'Reconciled' : 'Needs attention'}
+                hint={totals.currencies === 0 ? 'There is no on-hand quantity to reconcile' : totals.allReconciled ? 'Stock, subledger, and ledger agree' : 'Open the report for the currency detail'}
+                icon={CheckCircle2}
+                tone={totals.currencies === 0 ? 'default' : totals.allReconciled ? 'success' : 'warning'}
+              />
+            </div>
+          )}
+
+          <section id="valuation-setup" className="bg-gradient-to-b from-surface-raised to-surface-raised/80 backdrop-blur-xl border border-border-default rounded-2xl shadow-card scroll-mt-4">
+            <div className="border-b border-border-subtle p-5">
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-bold text-heading">Costing policy and ledger mapping</h2>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-base font-bold text-heading">Valuation policy</h2>
                   {postingsLocked && (
-                    <Badge variant="outline" className="h-6 px-2 text-[10px] font-semibold gap-1 shrink-0">
+                    <Badge variant="outline" className="h-6 shrink-0 gap-1 px-2 text-[10px] font-semibold">
                       <Lock size={10} /> Method locked
                     </Badge>
                   )}
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5 max-w-3xl leading-relaxed">
-                  Missing accounts are created with the accounting kind shown. An existing account with a
-                  different kind is rejected rather than reclassified. Every role needs a distinct account so
-                  each journal has two different sides.
+                <p className="mt-1 text-xs leading-relaxed text-body-light">
+                  {configured
+                    ? `${methodLabel} · ${mappedCurrencies.size} ${mappedCurrencies.size === 1 ? 'currency' : 'currencies'} mapped. Every currency posts to its own five ledger accounts.`
+                    : 'Three short steps. Default account codes are ready, so you can enable valuation without an accounting setup.'}
                 </p>
               </div>
-              {canWrite && (
-                <div className="flex items-center gap-2 shrink-0">
-                  <Button
-                    type="button"
+            </div>
+
+            {setupExpanded && (
+              <div className="space-y-6 p-5">
+                {setupQuery.isLoading ? (
+                  <div className="flex items-center justify-center gap-2 py-10 text-xs text-muted">
+                    <Loader2 size={14} className="animate-spin" /> Loading valuation setup…
+                  </div>
+                ) : setupQuery.isError ? (
+                  <Alert variant="destructive" className="py-2 px-3">
+                    <AlertDescription className="text-xs text-danger">
+                      {setupQuery.error?.message || 'Could not load the valuation setup.'}
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <>
+                    {/* Step 1 — method */}
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-light text-[11px] font-bold text-accent">1</span>
+                        <div>
+                          <h3 className="text-sm font-bold text-heading">Choose a costing method</h3>
+                          <p className="mt-0.5 text-xs leading-relaxed text-body-light">
+                            This decides how cost leaves inventory. You can change it until the first valuation posting.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {[
+                          { value: 'FIFO', title: 'FIFO', text: 'Oldest costs leave first. Best when stock is traceable and you want exact layer costs.' },
+                          { value: 'WEIGHTED_AVERAGE', title: 'Weighted average', text: 'Blends all units into one average cost. Simpler when identical items are mixed.' },
+                        ].map(option => {
+                          const selected = method === option.value
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              aria-pressed={selected}
+                              disabled={!canWrite || postingsLocked}
+                              onClick={() => { setMethod(option.value); setSaved(false) }}
+                              className={`rounded-xl border p-3.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                                selected
+                                  ? 'border-accent bg-accent-light ring-2 ring-accent/20'
+                                  : 'border-border-default bg-surface hover:border-border-strong'
+                              }`}
+                            >
+                              <span className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-bold text-heading">{option.title}</span>
+                                {selected && <CheckCircle2 size={16} className="text-accent" />}
+                              </span>
+                              <span className="mt-1 block text-[11px] leading-relaxed text-muted">{option.text}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {postingsLocked && (
+                        <p className="text-[11px] text-muted">
+                          {setup?.valuationPostings} valuation posting{(setup?.valuationPostings ?? 0) === 1 ? '' : 's'} already exist, so the method cannot change.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Step 2 — accounts */}
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-light text-[11px] font-bold text-accent">2</span>
+                        <div>
+                          <h3 className="text-sm font-bold text-heading">Map the ledger accounts</h3>
+                          <p className="mt-0.5 text-xs leading-relaxed text-body-light">
+                            Missing accounts are created with the type shown. Defaults are prefilled; edit them if your chart of accounts uses different codes.
+                          </p>
+                        </div>
+                      </div>
+
+                      {mappings.map((mapping, index) => (
+                        <div key={index} className="space-y-3 rounded-xl border border-border-subtle bg-surface-muted/35 p-3.5">
+                          <div className="flex flex-wrap items-end justify-between gap-3">
+                            <div>
+                              <label className="block text-xs font-semibold text-heading" htmlFor={`valuation-currency-${index}`}>Currency</label>
+                              <Input
+                                id={`valuation-currency-${index}`}
+                                type="text"
+                                value={mapping.currency}
+                                maxLength={3}
+                                onChange={(event) => updateMapping(index, { currency: event.target.value.toUpperCase() })}
+                                placeholder="USD"
+                                disabled={!canWrite}
+                                className="mt-1 h-8.5 w-28 text-xs font-semibold uppercase tabular-nums"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] text-muted">Five accounts</span>
+                              {mappings.length > 1 && canWrite && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeCurrency(index)}
+                                  className="h-7 px-2 text-[11px] text-danger hover:bg-danger-light"
+                                  aria-label={`Remove ${mapping.currency || 'currency'} mapping`}
+                                >
+                                  <Trash2 size={12} className="mr-1" /> Remove
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {ACCOUNT_ROLES.map(role => (
+                              <div key={role.key} className="rounded-lg border border-border-subtle bg-surface-raised/65 p-2.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs font-semibold text-heading">{role.label}</span>
+                                  <Badge variant="outline" className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase">
+                                    {role.kind}
+                                  </Badge>
+                                </div>
+                                {accountInputsOpen ? (
+                                  <div className="mt-2 grid gap-2 sm:grid-cols-[0.8fr_1.2fr]">
+                                    <Input
+                                      type="text"
+                                      value={mapping.accounts[role.key].code}
+                                      maxLength={32}
+                                      onChange={(event) => updateAccount(index, role.key, 'code', event.target.value.toUpperCase())}
+                                      placeholder="ACCOUNT_CODE"
+                                      disabled={!canWrite}
+                                      aria-label={`${role.label} account code for ${mapping.currency || 'currency'}`}
+                                      className="h-8 px-2 text-[11px] font-semibold tabular-nums"
+                                    />
+                                    <Input
+                                      type="text"
+                                      value={mapping.accounts[role.key].name}
+                                      maxLength={120}
+                                      onChange={(event) => updateAccount(index, role.key, 'name', event.target.value)}
+                                      placeholder="Account name"
+                                      disabled={!canWrite}
+                                      aria-label={`${role.label} account name for ${mapping.currency || 'currency'}`}
+                                      className="h-8 px-2 text-[11px]"
+                                    />
+                                  </div>
+                                ) : (
+                                  <p className="mt-1.5 truncate text-[11px] text-muted">
+                                    <span className="font-mono text-heading">{mapping.accounts[role.key].code}</span>
+                                    <span> · {mapping.accounts[role.key].name}</span>
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+
+                      {canWrite && (
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                          <Button type="button" variant="outline" size="sm" onClick={addCurrency} className="h-8.5 rounded-xl px-3 text-xs">
+                            <Plus size={14} className="mr-1" /> Add currency
+                          </Button>
+                          <button
+                            type="button"
+                            onClick={() => setAccountInputsOpen(value => !value)}
+                            className="text-xs font-semibold text-accent hover:underline"
+                          >
+                            {accountInputsOpen ? 'Done editing codes' : 'Edit account codes'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={resetToDefaultNumbering}
+                            className="text-xs font-medium text-muted hover:text-heading hover:underline"
+                          >
+                            Reset defaults
+                          </button>
+                        </div>
+                      )}
+
+                      <details className="rounded-xl border border-border-subtle bg-surface-muted/35 p-3 text-xs">
+                        <summary className="cursor-pointer font-semibold text-body">What do these accounts do?</summary>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          {ACCOUNT_ROLES.map(role => (
+                            <div key={role.key}>
+                              <p className="font-semibold text-heading">{role.label}</p>
+                              <p className="mt-0.5 leading-relaxed text-muted">{role.description}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    </div>
+
+                    {/* Step 3 — save */}
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-light text-[11px] font-bold text-accent">3</span>
+                        <div>
+                          <h3 className="text-sm font-bold text-heading">{configured ? 'Review and save' : 'Enable valuation'}</h3>
+                          <p className="mt-0.5 text-xs leading-relaxed text-body-light">
+                            {configured ? 'Save changes to the policy. Existing postings are never revalued.' : 'Once enabled, valued receipts, issues, and opening stock will post to these accounts.'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-3 rounded-xl border border-border-default bg-surface-raised/65 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-heading">{method === 'WEIGHTED_AVERAGE' ? 'Weighted average' : 'FIFO'} · {mappings.length} {mappings.length === 1 ? 'currency' : 'currencies'}</p>
+                          <p className="mt-0.5 text-[11px] text-muted">Five account roles per currency. Every role uses a different account.</p>
+                        </div>
+                        {canWrite ? (
+                          <Button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={saveMutation.isPending}
+                            className="h-9 rounded-xl px-4 text-xs font-semibold"
+                          >
+                            {saveMutation.isPending && <Loader2 size={14} className="mr-1.5 animate-spin" />}
+                            {configured ? 'Save policy' : 'Enable valuation'}
+                          </Button>
+                        ) : (
+                          <p className="text-[11px] text-muted">Only owners and administrators can change this policy.</p>
+                        )}
+                      </div>
+                      {saveError && (
+                        <Alert variant="destructive" className="py-2 px-3">
+                          <AlertDescription className="text-xs text-danger">{saveError}</AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </section>
+
+          {configured && (
+          <section className="overflow-hidden rounded-2xl border border-border-default bg-gradient-to-b from-surface-raised to-surface-raised/80 shadow-card backdrop-blur-xl">
+            <div className="border-b border-border-subtle p-5">
+              <h2 className="text-base font-bold text-heading">Health checks</h2>
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                Two checks confirm that stock, the subledger, and the ledger agree.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-semibold text-heading">Reconciliation</h3>
+                  <Badge
                     variant="outline"
-                    size="sm"
-                    onClick={resetToDefaultNumbering}
-                    className="h-8.5 px-3 rounded-xl border border-border-default bg-surface-raised hover:bg-surface-muted text-xs font-semibold shadow-xs cursor-pointer"
+                    className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                      reportQuery.isLoading
+                        ? 'border-border-default bg-surface-muted text-muted'
+                        : totals.currencies === 0
+                          ? 'border-border-default bg-surface-muted text-muted'
+                          : totals.allReconciled
+                            ? 'border-success-border bg-success-light text-success-text'
+                            : 'border-warning-border bg-warning-light text-warning-text'
+                    }`}
                   >
-                    Reset to default numbering
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handleSave}
-                    disabled={saveMutation.isPending}
-                    className="h-8.5 px-4 rounded-xl text-xs font-semibold shadow-sm cursor-pointer inline-flex items-center gap-1.5"
-                  >
-                    {saveMutation.isPending && <Loader2 size={14} className="animate-spin" />}
-                    Save valuation policy
-                  </Button>
+                    {reportQuery.isLoading
+                      ? 'Checking'
+                      : totals.currencies === 0
+                        ? 'No stock'
+                        : totals.allReconciled
+                          ? 'Reconciled'
+                          : 'Needs attention'}
+                  </Badge>
                 </div>
+                <p className="mt-1 text-xs leading-relaxed text-muted">
+                  {reportQuery.isLoading
+                    ? 'Comparing stock value with the inventory control account.'
+                    : totals.currencies === 0
+                      ? 'This report appears once products exist in a mapped currency.'
+                      : totals.allReconciled
+                        ? 'Stock, subledger, and ledger agree.'
+                        : 'Some currencies need attention.'}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setReconciliationOpen(value => !value)}
+                className="h-8.5 shrink-0 rounded-xl px-3 text-xs font-semibold"
+              >
+                {reconciliationOpen ? 'Hide report' : 'View report'}
+              </Button>
+            </div>
+
+            {reconciliationOpen && (
+              <div className="space-y-3.5 px-5 pb-5">
+                {reportQuery.isLoading ? (
+                  <div className="flex items-center justify-center gap-2 py-8 text-xs text-muted">
+                    <Loader2 size={14} className="animate-spin" /> Loading reconciliation…
+                  </div>
+                ) : reportQuery.isError ? (
+                  <Alert variant="destructive" className="py-2 px-3">
+                    <AlertDescription className="text-xs text-danger">
+                      {reportQuery.error?.message || 'Could not load the reconciliation report.'}
+                    </AlertDescription>
+                  </Alert>
+                ) : (report?.currencies.length ?? 0) === 0 ? (
+                  <div className="py-8 text-center">
+                    <Scale size={28} className="mx-auto mb-2 text-muted/60" />
+                    <p className="text-sm font-semibold text-heading">No inventory positions yet</p>
+                    <p className="mt-1 text-xs text-muted">The report appears once products exist in a mapped currency.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table className="w-full border-collapse text-left">
+                      <TableHeader className="sticky top-0 z-10 h-10 border-b border-border-default bg-surface-muted/60">
+                        <TableRow className="h-10 border-0 hover:bg-transparent">
+                          <TableHead className="h-10 py-0 pl-4 pr-3 text-left text-xs font-semibold uppercase tracking-[0.04em] text-muted rtl:text-right">Currency</TableHead>
+                          <TableHead className="h-10 whitespace-nowrap px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted">On hand</TableHead>
+                          <TableHead className="h-10 whitespace-nowrap px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted">Valued</TableHead>
+                          <TableHead className="h-10 whitespace-nowrap px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted">Unvalued</TableHead>
+                          <TableHead className="h-10 whitespace-nowrap px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted">Inventory value</TableHead>
+                          <TableHead className="h-10 whitespace-nowrap px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted">Posted</TableHead>
+                          <TableHead className="h-10 whitespace-nowrap px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted">GL balance</TableHead>
+                          <TableHead className="h-10 whitespace-nowrap px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted">Difference</TableHead>
+                          <TableHead className="h-10 whitespace-nowrap py-0 pl-3 pr-4 text-center text-xs font-semibold uppercase tracking-[0.04em] text-muted">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody className="divide-y divide-border-subtle">
+                        {report.currencies.map(row => (
+                          <TableRow key={row.currency} className="h-11 transition-colors hover:bg-surface-muted/60">
+                            <TableCell className="pl-4 pr-3 py-2.5 text-xs font-bold tabular-nums text-heading">{row.currency}</TableCell>
+                            <TableCell className="px-3 py-2.5 text-right text-xs font-medium tabular-nums text-body">{row.quantityOnHand.toLocaleString()}</TableCell>
+                            <TableCell className="px-3 py-2.5 text-right text-xs font-medium tabular-nums text-body">{row.valuedQuantity.toLocaleString()}</TableCell>
+                            <TableCell className={`px-3 py-2.5 text-right text-xs tabular-nums ${row.unvaluedQuantity > 0 ? 'font-semibold text-warning-text' : 'font-medium text-body'}`}>
+                              {row.unvaluedQuantity.toLocaleString()}
+                            </TableCell>
+                            <TableCell className="px-3 py-2.5 text-right text-xs font-semibold tabular-nums text-heading">{money(row.inventoryValue, row.currency)}</TableCell>
+                            <TableCell className="px-3 py-2.5 text-right text-xs font-medium tabular-nums text-body">{money(row.postedValue, row.currency)}</TableCell>
+                            <TableCell className="px-3 py-2.5 text-right text-xs font-medium tabular-nums text-body">{money(row.ledgerAssetBalance, row.currency)}</TableCell>
+                            <TableCell className={`px-3 py-2.5 text-right text-xs tabular-nums ${Number(row.ledgerDifference) !== 0 ? 'font-semibold text-danger' : 'font-medium text-body'}`}>
+                              {money(row.ledgerDifference, row.currency)}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap py-2.5 pl-3 pr-4 text-center">
+                              <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                                row.reconciled
+                                  ? 'border-success-border bg-success-light text-success-text'
+                                  : 'border-warning-border bg-warning-light text-warning-text'
+                              }`}>
+                                {row.reconciled ? 'Reconciled' : 'Needs attention'}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+
+                {(totals.unvaluedMovements > 0 || (report?.currencies ?? []).some(row => Number(row.unpostedValue) !== 0 || Number(row.subledgerDifference) !== 0) || totals.unvaluedQuantity > 0) && (
+                  <div className="space-y-1.5 rounded-xl border border-border-subtle bg-surface-muted/40 p-3 text-[11px] leading-relaxed text-muted">
+                    {totals.unvaluedQuantity > 0 && (
+                      <p>
+                        {totals.unvaluedQuantity.toLocaleString()} unit{totals.unvaluedQuantity === 1 ? '' : 's'} across {unvaluedProducts.length} product{unvaluedProducts.length === 1 ? '' : 's'} still need an opening cost.
+                      </p>
+                    )}
+                    {(report?.currencies ?? []).some(row => Number(row.unpostedValue) !== 0 || Number(row.subledgerDifference) !== 0) && (
+                      <p>
+                        <span className="font-semibold text-heading">Unposted or inconsistent value:</span>{' '}
+                        {(report?.currencies ?? []).filter(row => Number(row.unpostedValue) !== 0 || Number(row.subledgerDifference) !== 0)
+                          .map(row => `${row.currency}: unposted ${money(row.unpostedValue, row.currency)}, subledger difference ${money(row.subledgerDifference, row.currency)}`)
+                          .join('; ')}.
+                      </p>
+                    )}
+                    {totals.unvaluedMovements > 0 && (
+                      <p>
+                        <span className="font-semibold text-heading">{totals.unvaluedMovements} historical movement(s) have no valuation event.</span>{' '}
+                        Opening valuation assigns cost to current on-hand quantity; it cannot recreate cost of goods sold for issues recorded before valuation existed.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3 border-t border-border-subtle p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-semibold text-heading">Stock without cost</h3>
+                  <Badge
+                    variant="outline"
+                    className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                      unvaluedProducts.length > 0
+                        ? 'border-warning-border bg-warning-light text-warning-text'
+                        : 'border-success-border bg-success-light text-success-text'
+                    }`}
+                  >
+                    {unvaluedProducts.length > 0 ? `${unvaluedProducts.length} product${unvaluedProducts.length === 1 ? '' : 's'}` : 'Complete'}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-muted">
+                  {unvaluedProducts.length > 0
+                    ? 'Assign a cost to stock received before valuation existed. This posts the opening value to the ledger.'
+                    : 'Every on-hand unit currently has an established cost.'}
+                </p>
+              </div>
+              {unvaluedProducts.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setUnvaluedOpen(value => !value)}
+                  className="h-8.5 shrink-0 rounded-xl px-3 text-xs font-semibold"
+                >
+                  {unvaluedOpen ? 'Hide stock' : 'Review stock'}
+                </Button>
               )}
             </div>
 
-            {/* Mappings */}
-            <div className="space-y-4">
-              {mappings.map((mapping, index) => (
-                <div key={index} className="space-y-3.5">
-                  {/* Top Controls Row (Costing method & Currency) */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start bg-slate-50/70 p-3.5 rounded-xl border border-border-subtle">
-                    <div className="md:col-span-8 space-y-1">
-                      <label className="block text-xs font-bold text-heading">Costing method</label>
-                      <Select value={method} onValueChange={(value) => { setMethod(value); setSaved(false) }} disabled={!canWrite || postingsLocked}>
-                        <SelectTrigger className="w-full h-8.5 text-xs bg-surface-raised" aria-label="Costing method">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="FIFO" className="text-xs">FIFO: allocate the oldest layers first</SelectItem>
-                          <SelectItem value="WEIGHTED_AVERAGE" className="text-xs">Weighted average: blend cost across the position</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-[11px] text-slate-500">
-                        {postingsLocked
-                          ? `${setup.valuationPostings} posting${setup.valuationPostings === 1 ? '' : 's'} already exist, so the method cannot change.`
-                          : 'Changing the costing method requires an empty valuation history.'}
-                      </p>
-                    </div>
-                    <div className="md:col-span-4 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <label className="block text-xs font-bold text-heading">Currency</label>
-                        {mappings.length > 1 && canWrite && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeCurrency(index)}
-                            className="h-6 px-1.5 text-danger text-[11px] hover:bg-danger-light"
-                            aria-label={`Remove ${mapping.currency || 'currency'} mapping`}
-                          >
-                            <Trash2 size={12} className="mr-1" /> Remove
-                          </Button>
-                        )}
-                      </div>
-                      <Input
-                        type="text"
-                        value={mapping.currency}
-                        maxLength={3}
-                        onChange={(event) => updateMapping(index, { currency: event.target.value.toUpperCase() })}
-                        placeholder="USD"
-                        disabled={!canWrite}
-                        aria-label={`Currency for mapping ${index + 1}`}
-                        className="h-8.5 text-xs font-semibold uppercase tabular-nums bg-surface-raised"
-                      />
-                      <p className="text-[11px] text-slate-500">
-                        Currency for these 5 control ledger accounts.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* 5 GL Account Mappings in a 2-Column Bento Grid */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {ACCOUNT_ROLES.map(role => (
-                      <div key={role.key} className="p-3.5 rounded-xl border border-border-subtle bg-slate-50/50 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-heading">{role.label}</span>
-                          <Badge variant="outline" className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase font-sans">
-                            {role.kind}
-                          </Badge>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          <Input
-                            type="text"
-                            value={mapping.accounts[role.key].code}
-                            maxLength={32}
-                            onChange={(event) => updateAccount(index, role.key, 'code', event.target.value.toUpperCase())}
-                            placeholder="ACCOUNT_CODE"
-                            disabled={!canWrite}
-                            aria-label={`${role.label} account code for ${mapping.currency || 'currency'}`}
-                            className="h-8.5 px-3 rounded-lg text-xs font-semibold tabular-nums border border-border-default bg-surface-raised"
-                          />
-                          <Input
-                            type="text"
-                            value={mapping.accounts[role.key].name}
-                            maxLength={120}
-                            onChange={(event) => updateAccount(index, role.key, 'name', event.target.value)}
-                            placeholder="Account name"
-                            disabled={!canWrite}
-                            aria-label={`${role.label} account name for ${mapping.currency || 'currency'}`}
-                            className="h-8.5 px-3 rounded-lg text-xs font-medium border border-border-default bg-surface-raised"
-                          />
-                        </div>
-                        <p className="text-[11px] text-slate-500 leading-snug">{role.description}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {canWrite && (
-              <div className="flex items-center gap-2 pt-1">
-                <Button type="button" variant="outline" size="sm" onClick={addCurrency} className="h-8.5 px-3 rounded-xl text-xs gap-1.5 cursor-pointer">
-                  <Plus size={14} /> Add currency mapping
-                </Button>
-              </div>
-            )}
-
-            {!canWrite && (
-              <p className="text-[11px] text-muted">
-                Only workspace owners and administrators can change the valuation policy.
-              </p>
-            )}
-
-            {saveError && (
-              <Alert variant="destructive" className="py-2 px-3">
-                <AlertDescription className="text-xs text-danger">{saveError}</AlertDescription>
-              </Alert>
-            )}
-
-            {saved && !saveError && (
-              <Alert className="py-2 px-3 border-success-border bg-success-light text-success-text">
-                <AlertDescription className="text-xs text-success-text">
-                  Valuation policy saved. New receipts, issues, and openings will post to these accounts.
-                </AlertDescription>
-              </Alert>
-            )}
-          </section>
-
-          {/* ── 4. Row 3: Full-Width Reconciliation Card (Eliminates Horizontal Clipping & Scrollbar!) ── */}
-          <section className="bg-gradient-to-b from-surface-raised to-surface-raised/80 backdrop-blur-xl border border-border-default rounded-2xl p-5 shadow-card space-y-3.5">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 pb-3 border-b border-border-subtle">
-              <div>
-                <h2 className="text-base font-bold text-heading">Reconciliation</h2>
-                <p className="text-xs text-slate-500 mt-0.5 max-w-3xl leading-relaxed">
-                  On-hand quantity is compared with the valued subledger and the mapped inventory
-                  asset account. A currency reconciles only when every unit has cost, all value is
-                  posted, and the subledger and ledger differences are zero.
-                </p>
-              </div>
-            </div>
-
-            {reportQuery.isLoading ? (
-              <div className="p-8 flex items-center justify-center text-muted text-xs gap-2">
-                <Loader2 size={14} className="animate-spin" /> Loading reconciliation…
-              </div>
-            ) : reportQuery.isError ? (
-              <div className="py-2">
-                <Alert variant="destructive" className="py-2 px-3">
-                  <AlertDescription className="text-xs text-danger">
-                    {reportQuery.error?.message || 'Could not load the reconciliation report.'}
-                  </AlertDescription>
-                </Alert>
-              </div>
-            ) : (report?.currencies.length ?? 0) === 0 ? (
-              <div className="p-8 text-center">
-                <Scale size={28} className="mx-auto text-muted/60 mb-2" />
-                <p className="text-sm font-semibold text-heading">No inventory positions yet</p>
-                <p className="text-xs text-muted mt-1">
-                  The report appears once products exist in a mapped currency.
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table className="w-full text-left border-collapse">
-                  <TableHeader className="bg-surface-muted/60 border-b border-border-default sticky top-0 z-10 h-10">
-                    <TableRow className="h-10 hover:bg-transparent border-0">
-                      <TableHead className="pl-4 pr-3 py-0 text-left rtl:text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10">Currency</TableHead>
-                      <TableHead className="px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10 whitespace-nowrap">On hand</TableHead>
-                      <TableHead className="px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10 whitespace-nowrap">Valued</TableHead>
-                      <TableHead className="px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10 whitespace-nowrap">Unvalued</TableHead>
-                      <TableHead className="px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10 whitespace-nowrap">Inventory value</TableHead>
-                      <TableHead className="px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10 whitespace-nowrap">Posted</TableHead>
-                      <TableHead className="px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10 whitespace-nowrap">GL balance</TableHead>
-                      <TableHead className="px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10 whitespace-nowrap">Difference</TableHead>
-                      <TableHead className="pl-3 pr-4 py-0 text-center text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10 whitespace-nowrap">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="divide-y divide-border-subtle">
-                    {report.currencies.map(row => (
-                      <TableRow key={row.currency} className="h-11 hover:bg-surface-muted/60 transition-colors">
-                        <TableCell className="pl-4 pr-3 py-2.5 text-xs font-bold text-heading tabular-nums">{row.currency}</TableCell>
-                        <TableCell className="px-3 py-2.5 text-right tabular-nums text-xs font-medium text-body">{row.quantityOnHand.toLocaleString()}</TableCell>
-                        <TableCell className="px-3 py-2.5 text-right tabular-nums text-xs font-medium text-body">{row.valuedQuantity.toLocaleString()}</TableCell>
-                        <TableCell className={`px-3 py-2.5 text-right tabular-nums text-xs ${row.unvaluedQuantity > 0 ? 'text-amber-700 font-semibold' : 'text-body font-medium'}`}>
-                          {row.unvaluedQuantity.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="px-3 py-2.5 text-right tabular-nums text-xs font-semibold text-heading">{money(row.inventoryValue, row.currency)}</TableCell>
-                        <TableCell className="px-3 py-2.5 text-right tabular-nums text-xs font-medium text-body">{money(row.postedValue, row.currency)}</TableCell>
-                        <TableCell className="px-3 py-2.5 text-right tabular-nums text-xs font-medium text-body">{money(row.ledgerAssetBalance, row.currency)}</TableCell>
-                        <TableCell className={`px-3 py-2.5 text-right tabular-nums text-xs ${Number(row.ledgerDifference) !== 0 ? 'text-danger font-semibold' : 'text-body font-medium'}`}>
-                          {money(row.ledgerDifference, row.currency)}
-                        </TableCell>
-                        <TableCell className="pl-3 pr-4 py-2.5 text-center whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${
-                            row.reconciled
-                              ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
-                              : 'bg-amber-500/10 text-amber-700 border-amber-500/20'
-                          }`}>
-                            {row.reconciled ? 'Reconciled' : 'Needs attention'}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-
-            {/* Recessed Footer Explanation */}
-            {(totals.unvaluedMovements > 0 || (report?.currencies ?? []).some(row => Number(row.unpostedValue) !== 0 || Number(row.subledgerDifference) !== 0) || totals.unvaluedQuantity > 0) && (
-              <div className="p-3 rounded-xl bg-slate-50/80 border border-border-subtle text-xs text-slate-600 leading-relaxed space-y-1.5">
-                {totals.unvaluedQuantity > 0 && (
-                  <p>
-                    All on-hand stock ({totals.unvaluedQuantity.toLocaleString()} unit{totals.unvaluedQuantity === 1 ? '' : 's'} across {unvaluedProducts.length} product{unvaluedProducts.length === 1 ? '' : 's'}) is still unvalued until an opening valuation is posted.
-                  </p>
-                )}
-                {(report?.currencies ?? []).some(row => Number(row.unpostedValue) !== 0 || Number(row.subledgerDifference) !== 0) && (
-                  <p>
-                    <span className="font-semibold text-heading">Unposted or inconsistent value:</span>{' '}
-                    {(report?.currencies ?? []).filter(row => Number(row.unpostedValue) !== 0 || Number(row.subledgerDifference) !== 0)
-                      .map(row => `${row.currency}: unposted ${money(row.unpostedValue, row.currency)}, subledger difference ${money(row.subledgerDifference, row.currency)}`)
-                      .join('; ')}.
-                  </p>
-                )}
-                {totals.unvaluedMovements > 0 && (
-                  <p>
-                    <span className="font-semibold text-heading">{totals.unvaluedMovements} historical movement(s) have no valuation event.</span>{' '}
-                    Opening valuation assigns cost to current on-hand quantity; it cannot recreate cost
-                    of goods sold for issues that were recorded before valuation existed.
-                  </p>
-                )}
-              </div>
-            )}
-          </section>
-
-          {/* ── 5. Row 4: Paginated & Searchable On-hand Quantity Without Cost ── */}
-          <section className="bg-gradient-to-b from-surface-raised to-surface-raised/80 backdrop-blur-xl border border-border-default rounded-2xl shadow-card overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-border-subtle flex flex-wrap items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-bold text-heading">On-hand quantity without cost</h2>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-700 border border-amber-500/20 shrink-0">
-                    {unvaluedProducts.length} product{unvaluedProducts.length === 1 ? '' : 's'}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                  These units exist in the quantity ledger but have no valuation layer yet. Value the
-                  remainder to establish cost and post the opening position. This posts Dr Inventory /
-                  Cr Inventory opening equity immediately.
-                </p>
-              </div>
-
-              {/* Local SKU/Product Search Input */}
-              <div className="relative flex items-center w-full sm:w-64 shrink-0">
-                <input
-                  type="text"
-                  placeholder="Search product or SKU..."
-                  value={unvaluedSearch}
-                  onChange={(e) => {
-                    setUnvaluedSearch(e.target.value)
-                    setUnvaluedPage(1)
-                  }}
-                  className="w-full h-8.5 pl-8 pr-3 rounded-xl border border-border-default bg-surface-raised text-xs text-heading placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-slate-300"
-                />
-                <Search size={14} className="pointer-events-none absolute left-2.5 text-muted shrink-0" />
-              </div>
-            </div>
-
             {unvaluedQuery.isLoading ? (
-              <div className="p-8 flex items-center justify-center text-muted text-xs gap-2">
-                <Loader2 size={14} className="animate-spin" /> Loading unvalued products…
+              <div className="flex items-center gap-2 px-5 pb-5 text-xs text-muted">
+                <Loader2 size={14} className="animate-spin" /> Loading stock…
               </div>
-            ) : unvaluedProducts.length === 0 ? (
-              <div className="p-8 text-center">
-                <CheckCircle2 size={28} className="mx-auto text-success mb-2" />
-                <p className="text-sm font-semibold text-heading">No unvalued on-hand quantity</p>
-                <p className="text-xs text-muted mt-1">
-                  Every unit currently on hand has an established cost.
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table className="w-full text-left border-collapse">
-                  <TableHeader className="bg-surface-muted/60 border-b border-border-default sticky top-0 z-10 h-10">
-                    <TableRow className="h-10 hover:bg-transparent border-0">
-                      <TableHead className="pl-4 pr-3 py-0 text-left rtl:text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10">Product</TableHead>
-                      <TableHead className="px-3 py-0 text-left rtl:text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10">SKU</TableHead>
-                      <TableHead className="px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10 whitespace-nowrap">On hand</TableHead>
-                      <TableHead className="px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10 whitespace-nowrap">Valued</TableHead>
-                      <TableHead className="px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10 whitespace-nowrap">Unvalued</TableHead>
-                      <TableHead className="px-3 py-0 text-left text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10">Currency</TableHead>
-                      <TableHead className="pl-3 pr-4 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted h-10">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="divide-y divide-border-subtle">
-                    {pagedUnvalued.map(product => {
-                      const mapped = mappedCurrencies.has(product.currency)
-                      return (
-                        <TableRow key={product.id} className="h-11 hover:bg-surface-muted/60 transition-colors">
-                          <TableCell className="pl-4 pr-3 py-2.5 text-xs font-semibold text-heading">
-                            {product.name}
-                            {product.archivedAt && <Badge variant="outline" className="ml-2">Archived</Badge>}
-                          </TableCell>
-                          <TableCell className="px-3 py-2.5 text-xs font-medium text-slate-500 tabular-nums">{product.sku}</TableCell>
-                          <TableCell className="px-3 py-2.5 text-right tabular-nums text-xs font-medium text-body">{product.stock.toLocaleString()}</TableCell>
-                          <TableCell className="px-3 py-2.5 text-right tabular-nums text-xs font-medium text-body">{product.valuedQuantity.toLocaleString()}</TableCell>
-                          <TableCell className="px-3 py-2.5 text-right tabular-nums text-xs font-semibold text-amber-700">
-                            {product.unvaluedQuantity.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="px-3 py-2.5 text-xs font-medium text-slate-600 tabular-nums">{product.currency}</TableCell>
-                          <TableCell className="pl-3 pr-4 py-2.5 text-right whitespace-nowrap">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={!configured || !canWrite || !mapped}
-                              title={
-                                !configured
-                                  ? 'Configure the valuation policy first'
-                                  : !mapped
+            ) : unvaluedProducts.length === 0 ? null : unvaluedOpen ? (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle p-4">
+                  <p className="text-[11px] text-muted">Value the remainder to establish cost and post the opening position.</p>
+                  <div className="relative flex w-full items-center sm:w-64">
+                    <input
+                      type="text"
+                      placeholder="Search product or SKU..."
+                      value={unvaluedSearch}
+                      onChange={(event) => {
+                        setUnvaluedSearch(event.target.value)
+                        setUnvaluedPage(1)
+                      }}
+                      className="h-8.5 w-full rounded-xl border border-border-default bg-surface-raised pl-8 pr-3 text-xs text-heading placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                    />
+                    <Search size={14} className="pointer-events-none absolute left-2.5 shrink-0 text-muted" />
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <Table className="w-full border-collapse text-left">
+                    <TableHeader className="sticky top-0 z-10 h-10 border-b border-border-default bg-surface-muted/60">
+                      <TableRow className="h-10 border-0 hover:bg-transparent">
+                        <TableHead className="h-10 py-0 pl-4 pr-3 text-left text-xs font-semibold uppercase tracking-[0.04em] text-muted rtl:text-right">Product</TableHead>
+                        <TableHead className="h-10 px-3 py-0 text-left text-xs font-semibold uppercase tracking-[0.04em] text-muted rtl:text-right">SKU</TableHead>
+                        <TableHead className="h-10 whitespace-nowrap px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted">On hand</TableHead>
+                        <TableHead className="h-10 whitespace-nowrap px-3 py-0 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted">Unvalued</TableHead>
+                        <TableHead className="h-10 px-3 py-0 text-left text-xs font-semibold uppercase tracking-[0.04em] text-muted">Currency</TableHead>
+                        <TableHead className="h-10 py-0 pl-3 pr-4 text-right text-xs font-semibold uppercase tracking-[0.04em] text-muted">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody className="divide-y divide-border-subtle">
+                      {pagedUnvalued.map(product => {
+                        const mapped = mappedCurrencies.has(product.currency)
+                        return (
+                          <TableRow key={product.id} className="h-11 transition-colors hover:bg-surface-muted/60">
+                            <TableCell className="pl-4 pr-3 py-2.5 text-xs font-semibold text-heading">
+                              {product.name}
+                              {product.archivedAt && <Badge variant="outline" className="ml-2">Archived</Badge>}
+                            </TableCell>
+                            <TableCell className="px-3 py-2.5 text-xs font-medium tabular-nums text-muted">{product.sku}</TableCell>
+                            <TableCell className="px-3 py-2.5 text-right text-xs font-medium tabular-nums text-body">{product.stock.toLocaleString()}</TableCell>
+                            <TableCell className="px-3 py-2.5 text-right text-xs font-semibold tabular-nums text-warning-text">
+                              {product.unvaluedQuantity.toLocaleString()}
+                            </TableCell>
+                            <TableCell className="px-3 py-2.5 text-xs font-medium tabular-nums text-body">{product.currency}</TableCell>
+                            <TableCell className="whitespace-nowrap py-2.5 pl-3 pr-4 text-right">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={!canWrite || !mapped}
+                                title={
+                                  !mapped
                                     ? `Add a ledger-account mapping for ${product.currency} first`
                                     : !canWrite
                                       ? 'Only workspace administrators can value opening stock'
                                       : undefined
-                              }
-                              onClick={() => openOpeningDialog(product)}
-                              className="h-8 px-3 rounded-lg text-xs font-semibold cursor-pointer border-border-default hover:bg-surface-muted"
-                            >
-                              Value opening
-                            </Button>
+                                }
+                                onClick={() => openOpeningDialog(product)}
+                                className="h-8 rounded-lg px-3 text-xs font-semibold"
+                              >
+                                Value opening
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                      {filteredUnvalued.length === 0 && (
+                        <TableRow className="border-0 hover:bg-transparent">
+                          <TableCell colSpan={6} className="px-6 py-8 text-center text-xs text-muted">
+                            No products match your search.
                           </TableCell>
                         </TableRow>
-                      )
-                    })}
-                    {filteredUnvalued.length === 0 && (
-                      <TableRow className="hover:bg-transparent border-0">
-                        <TableCell colSpan={7} className="px-6 py-8 text-center text-muted text-xs">
-                          No products match your search.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
 
-            {/* Standard Pagination Footer (10 rows per page) */}
-            {filteredUnvalued.length > 0 && (
-              <div className="px-4 py-3 border-t border-border-subtle bg-surface-muted/30 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-                <div>
-                  Showing <span className="font-semibold text-heading">{(unvaluedPage - 1) * UNVALUED_PAGE_SIZE + 1}–{Math.min(unvaluedPage * UNVALUED_PAGE_SIZE, filteredUnvalued.length)}</span> of <span className="font-semibold text-heading">{filteredUnvalued.length}</span> products
-                  {filteredUnvalued.length !== unvaluedProducts.length && (
-                    <span className="ml-1 text-[11px] text-muted">
-                      (filtered from {unvaluedProducts.length})
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={unvaluedPage <= 1}
-                    onClick={() => setUnvaluedPage(p => Math.max(1, p - 1))}
-                    className="h-8 px-2.5 text-xs rounded-lg cursor-pointer"
-                  >
-                    <ChevronLeft size={14} className="mr-1" /> Previous
-                  </Button>
-                  <span className="text-xs font-medium px-1">
-                    Page {unvaluedPage} of {totalUnvaluedPages}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={unvaluedPage >= totalUnvaluedPages}
-                    onClick={() => setUnvaluedPage(p => Math.min(totalUnvaluedPages, p + 1))}
-                    className="h-8 px-2.5 text-xs rounded-lg cursor-pointer"
-                  >
-                    Next <ChevronRight size={14} className="ml-1" />
-                  </Button>
-                </div>
-              </div>
-            )}
+                {filteredUnvalued.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle p-4 text-xs text-muted">
+                    <div>
+                      Showing <span className="font-semibold text-heading">{(unvaluedPage - 1) * UNVALUED_PAGE_SIZE + 1}–{Math.min(unvaluedPage * UNVALUED_PAGE_SIZE, filteredUnvalued.length)}</span> of <span className="font-semibold text-heading">{filteredUnvalued.length}</span> products
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button type="button" variant="outline" size="sm" disabled={unvaluedPage <= 1} onClick={() => setUnvaluedPage(page => Math.max(1, page - 1))} className="h-8 rounded-lg px-2.5 text-xs">
+                        <ChevronLeft size={14} className="mr-1" /> Previous
+                      </Button>
+                      <span className="px-1 text-xs font-medium">Page {unvaluedPage} of {totalUnvaluedPages}</span>
+                      <Button type="button" variant="outline" size="sm" disabled={unvaluedPage >= totalUnvaluedPages} onClick={() => setUnvaluedPage(page => Math.min(totalUnvaluedPages, page + 1))} className="h-8 rounded-lg px-2.5 text-xs">
+                        Next <ChevronRight size={14} className="ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : null}
           </section>
+          )}
 
-          {/* ── 6. Row 5: 3-Column Apple-Glass Reference Grid ── */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-2xl border border-border-default bg-slate-50/60 shadow-xs space-y-1.5">
-              <h3 className="text-xs font-bold text-slate-800">Architecture note</h3>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                New receivable invoices can optionally issue valued stock and post the related cost-of-goods
-                journal; an invoice without stock lines remains total-only. The Accounts Receivable action menu
-                exposes the exact-reversal void and the unpaid-only delete action, and historical unvalued issues
-                are not backfilled. A purchase receipt credits goods received not invoiced. Accounts Payable can
-                link one bill to one fully received, valued, single-line purchase order; a pending or rejected bill
-                can correct or clear that link. Approval debits the exact GRNI account from that receipt. Partial
-                receipts, multi-line orders, taxes/freight, and price differences remain unsupported and cannot be
-                matched. Every manual stock movement now carries a client request key: an unchanged retry returns
-                the original movement, while a changed payload reusing the key is rejected. Purchase-order receiving
-                and other system movements remain protected by their state transitions and transactions.
-              </p>
+          <details className="rounded-2xl border border-border-default bg-surface-raised/60 p-4 shadow-xs backdrop-blur-xl">
+            <summary className="cursor-pointer text-xs font-semibold text-body">
+              Good to know: how valuation posts, reconciles, and opens
+            </summary>
+            <div className="mt-3.5 grid gap-4 border-t border-border-subtle pt-3.5 sm:grid-cols-3">
+              <div>
+                <h3 className="text-[11px] font-bold uppercase tracking-wide text-heading">Posting flows</h3>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                  A purchase receipt credits goods received not invoiced. A receivable invoice can issue stock and
+                  post cost of goods sold; an invoice without stock lines stays total-only. One approved bill can
+                  clear GRNI for a fully received, valued, single-line purchase order. Partial receipts, multi-line
+                  orders, tax, freight, and price variances cannot be matched.
+                </p>
+              </div>
+              <div>
+                <h3 className="text-[11px] font-bold uppercase tracking-wide text-heading">What reconciles</h3>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                  The report compares stock value with the mapped inventory asset account only. GRNI, cost of goods
+                  sold, and adjustment accounts are posted but not reconciled here. Use a dedicated control account,
+                  because any unrelated journal posted to it is included in the ledger balance.
+                </p>
+              </div>
+              <div>
+                <h3 className="text-[11px] font-bold uppercase tracking-wide text-heading">Opening and method changes</h3>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                  Opening valuation posts a journal immediately, so the Finance opening trial-balance flow can no
+                  longer be used afterwards. If a Finance opening balance already exists, inventory opening is
+                  refused — choose one route. The costing method is locked after the first valuation posting, and
+                  products in an unmapped currency stay quantity-only rather than being silently valued.
+                </p>
+              </div>
             </div>
-
-            <div className="p-4 rounded-2xl border border-border-default bg-slate-50/60 shadow-xs space-y-1.5">
-              <h3 className="text-xs font-bold text-slate-800">Currency reconciliation</h3>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                Reconciliation compares stock value with the mapped inventory asset control account only.
-                Goods received not invoiced, cost of goods sold, and adjustment accounts are posted but are
-                not reconciled by this report. Use a dedicated inventory control account; any unrelated
-                journal posted to the same account is included in the ledger balance.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-2xl border border-border-default bg-slate-50/60 shadow-xs space-y-1.5">
-              <h3 className="text-xs font-bold text-slate-800">Back-dating & FIFO</h3>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                Inventory opening valuation posts a journal immediately, so the Finance opening
-                trial-balance/cutover flow, which requires an unused ledger, can no longer be used
-                afterwards. Conversely, if a Finance opening balance is already posted, inventory opening
-                valuation is refused so the workspace cannot post two opening positions. Choose one opening
-                route. Changing the costing method after the first valuation posting is refused. Products
-                whose currency has no mapping cannot receive or issue valued stock; they are listed in the
-                report but not silently valued.
-              </p>
-            </div>
-          </div>
+          </details>
 
         </div>
       </section>
@@ -1023,29 +1150,29 @@ export default function InventoryValuation() {
 
 function SummaryCard({ label, value, hint, icon: Icon, tone = 'default' }) {
   const iconBadgeStyle = tone === 'warning'
-    ? 'bg-amber-500/10 border-amber-500/20 text-amber-600'
+    ? 'border-warning-border bg-warning-light text-warning-text'
     : tone === 'success'
-      ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600'
+      ? 'border-success-border bg-success-light text-success-text'
       : tone === 'info'
-        ? 'bg-blue-500/10 border-blue-500/20 text-blue-600'
-        : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-600';
+        ? 'border-info-border bg-info-light text-info'
+        : 'border-accent/15 bg-accent-light text-accent';
 
   return (
-    <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[120px]">
+    <div className="flex min-h-[112px] flex-col justify-between rounded-2xl border border-border-default bg-gradient-to-b from-surface-raised to-surface-raised/60 p-4 shadow-xs backdrop-blur-xl">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 leading-none">
+        <span className="text-[11px] font-semibold uppercase leading-none tracking-wider text-muted">
           {label}
         </span>
-        <div className={`w-8 h-8 rounded-xl border flex items-center justify-center shrink-0 ${iconBadgeStyle}`}>
+        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border ${iconBadgeStyle}`}>
           <Icon size={16} />
         </div>
       </div>
       <div className="my-1">
-        <p className="text-2xl font-bold tracking-tight text-heading tabular-nums leading-none truncate">
+        <p className="truncate text-xl font-bold leading-none tracking-tight text-heading tabular-nums">
           {value}
         </p>
       </div>
-      <div className="pt-1.5 border-t border-border-subtle text-[11px] text-slate-500 leading-snug">
+      <div className="border-t border-border-subtle pt-1.5 text-[11px] leading-snug text-muted">
         {hint}
       </div>
     </div>

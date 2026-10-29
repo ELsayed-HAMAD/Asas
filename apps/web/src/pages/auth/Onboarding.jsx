@@ -163,8 +163,8 @@ export default function Onboarding() {
   const [currency, setCurrency] = useState('USD')
   const [timezone, setTimezone] = useState(DEFAULT_TIMEZONE)
 
-  // Sample data is explicit opt-in for a real workspace.
-  const [dataMode, setDataMode] = useState('empty')
+  // Sample data is the recommended first-run experience so every area has something to show.
+  const [dataMode, setDataMode] = useState(SAMPLE_DATA_ENABLED ? 'sample' : 'empty')
   const [employeeRows, setEmployeeRows] = useState([])
   const [migrationModules, setMigrationModules] = useState(['hr'])
   const stepHeadingRef = useRef(null)
@@ -686,48 +686,14 @@ export default function Onboarding() {
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-accent">Start mode</p>
                 <h1 ref={stepHeadingRef} tabIndex={-1} className="mt-2 text-2xl font-bold tracking-tight text-heading focus:outline-none sm:text-3xl">Choose how to start</h1>
                 <p className="text-sm text-body-light mt-1">
-                  Set up the workspace first, then bring company data across. Plan a migration or import an employee CSV.
-                  {SAMPLE_DATA_ENABLED ? ' You can also explore clearly marked sample data.' : ''}
+                  {SAMPLE_DATA_ENABLED
+                    ? 'Sample data is recommended while you explore. Choose a clean workspace for real business records, or bring existing employee data across.'
+                    : 'Start with a clean workspace for real business records, or bring existing employee data across.'}
                 </p>
               </div>
 
               <div className="grid gap-2.5 md:grid-cols-2">
-                {/* The recommended path is first so a real workspace is the default choice. */}
-                <button
-                  type="button"
-                  onClick={() => chooseDataMode('empty')}
-                  aria-pressed={dataMode === 'empty'}
-                  className={`w-full p-3.5 rounded-2xl border text-left flex items-start gap-3.5 transition-all cursor-pointer ${
-                    dataMode === 'empty'
-                      ? 'bg-accent-light border-accent ring-2 ring-accent/20'
-                      : 'bg-surface border-border-default hover:border-border-strong'
-                  }`}
-                >
-                  <div className="p-2.5 rounded-card-sm bg-surface-muted text-muted flex-shrink-0 mt-0.5">
-                    <Briefcase className="w-5 h-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <h3 className="text-sm font-bold text-heading">Start with a clean workspace</h3>
-                        <span className="text-[9px] font-semibold uppercase px-2 py-0.5 rounded-full bg-success-light text-success-text border border-success-border">Recommended</span>
-                      </div>
-                      <div
-                        className={`w-5 h-5 shrink-0 rounded-full flex items-center justify-center ${
-                          dataMode === 'empty' ? 'bg-accent text-on-primary' : 'border border-border-default'
-                        }`}
-                      >
-                        {dataMode === 'empty' && <Check className="w-3.5 h-3.5" />}
-                      </div>
-                    </div>
-                    <p className="text-xs text-body-light mt-1.5 leading-relaxed">
-                      Starts without demonstration records. You can then enter business information through the available
-                      workflows, including CSV bank-statement reconciliation where available.
-                    </p>
-                  </div>
-                </button>
-
-                {/* Sample data remains an explicit opt-in; deployments can hide it with VITE_DISABLE_SAMPLE_DATA. */}
+                {/* Sample data is the recommended first-run experience. Deployments can hide it. */}
                 {SAMPLE_DATA_ENABLED && (
                 <button
                   type="button"
@@ -743,9 +709,10 @@ export default function Onboarding() {
                     <Sparkles className="w-5 h-5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-bold text-heading">Load sample data</h3>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <h3 className="text-sm font-bold text-heading">Explore with sample data</h3>
+                        <span className="text-[9px] font-semibold uppercase px-2 py-0.5 rounded-full bg-accent-light text-accent border border-accent/30">Recommended</span>
                       </div>
                       <div
                         className={`w-5 h-5 shrink-0 rounded-full flex items-center justify-center ${
@@ -756,12 +723,42 @@ export default function Onboarding() {
                       </div>
                     </div>
                     <p className="text-xs text-body-light mt-1.5 leading-relaxed">
-                      Adds demonstration records to the new workspace so you can explore the available areas. Do not choose
-                      this for a workspace you intend to use with real business records.
+                      Adds realistic demonstration records across finance, people, CRM, projects, and inventory so every screen has something to show. Use a clean workspace for real business records.
                     </p>
                   </div>
                 </button>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => chooseDataMode('empty')}
+                  aria-pressed={dataMode === 'empty'}
+                  className={`w-full p-3.5 rounded-2xl border text-left flex items-start gap-3.5 transition-all cursor-pointer ${
+                    dataMode === 'empty'
+                      ? 'bg-accent-light border-accent ring-2 ring-accent/20'
+                      : 'bg-surface border-border-default hover:border-border-strong'
+                  }`}
+                >
+                  <div className="p-2.5 rounded-card-sm bg-surface-muted text-muted flex-shrink-0 mt-0.5">
+                    <Briefcase className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-sm font-bold text-heading">Start with a clean workspace</h3>
+                      <div
+                        className={`w-5 h-5 shrink-0 rounded-full flex items-center justify-center ${
+                          dataMode === 'empty' ? 'bg-accent text-on-primary' : 'border border-border-default'
+                        }`}
+                      >
+                        {dataMode === 'empty' && <Check className="w-3.5 h-3.5" />}
+                      </div>
+                    </div>
+                    <p className="text-xs text-body-light mt-1.5 leading-relaxed">
+                      No demonstration records. Use this for a real workspace and enter information through the available workflows.
+                    </p>
+                  </div>
+                </button>
+
 
                 {/* Guided migration keeps the supported scope visible and reviews all rows before commit. */}
                 <button

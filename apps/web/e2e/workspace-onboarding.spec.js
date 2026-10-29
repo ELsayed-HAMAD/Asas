@@ -280,6 +280,7 @@ test('onboarding retries on the same workspace after a setup failure', async ({ 
     await page.goto('/onboarding?new=1')
     await page.getByRole('button', { name: 'Review workspace areas' }).click()
     await page.getByRole('button', { name: 'Choose how to start' }).click()
+    await page.getByRole('button', { name: /Start with a clean workspace/ }).click()
     await page.getByRole('button', { name: 'Launch workspace' }).click()
 
     await expect(page.getByRole('alert')).toContainText('Simulated settings outage.')
@@ -329,8 +330,8 @@ test('onboarding resumes the current step and choices after a reload', async ({ 
     await page.getByPlaceholder('e.g. Acme Global Holdings Inc.').fill('Draft Workspace')
     await page.getByRole('button', { name: 'Review workspace areas' }).click()
     await page.getByRole('button', { name: 'Choose how to start' }).click()
-    await page.getByRole('button', { name: /Load sample data/ }).click()
-    await expect(page.getByRole('button', { name: /Load sample data/ })).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('button', { name: /Explore with sample data/ }).click()
+    await expect(page.getByRole('button', { name: /Explore with sample data/ })).toHaveAttribute('aria-pressed', 'true')
 
     await page.waitForFunction(() => {
       try {
@@ -345,7 +346,7 @@ test('onboarding resumes the current step and choices after a reload', async ({ 
 
     // The reload must land on step 3 with the sample mode still selected, not restart at step 1.
     await expect(page.getByRole('heading', { name: 'Choose how to start', level: 1 })).toBeVisible()
-    await expect(page.getByRole('button', { name: /Load sample data/ })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('button', { name: /Explore with sample data/ })).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByTestId('onboarding-summary')).toContainText('Draft Workspace')
 
     await page.getByRole('button', { name: /^Profile Company and locale$/ }).click()
@@ -390,6 +391,7 @@ test('onboarding verifies the committed workspace status before opening the dash
     await page.goto('/onboarding')
     await page.getByRole('button', { name: 'Review workspace areas' }).click()
     await page.getByRole('button', { name: 'Choose how to start' }).click()
+    await page.getByRole('button', { name: /Start with a clean workspace/ }).click()
     await page.getByRole('button', { name: 'Launch workspace' }).click()
 
     await expect(page.getByRole('alert')).toContainText('still finishing setup')
@@ -508,7 +510,7 @@ test('desktop progress rail summarizes setup and the launch panel shows staged p
     await expect(summary).toBeVisible()
     await expect(summary).toContainText('Rail Workspace')
     await expect(summary).toContainText('All 5 included')
-    await expect(summary).toContainText('Clean workspace')
+    await expect(summary).toContainText('Sample data')
     await expect(page.getByTestId('onboarding-mobile-progress')).toBeHidden()
 
     // Desktop setup has to fit the viewport so no step needs scrolling to continue.
@@ -532,7 +534,7 @@ test('desktop progress rail summarizes setup and the launch panel shows staged p
 
     await page.getByRole('button', { name: 'Review workspace areas' }).click()
     await page.getByRole('button', { name: 'Choose how to start' }).click()
-    await page.getByRole('button', { name: /Load sample data/ }).click()
+    await page.getByRole('button', { name: /Explore with sample data/ }).click()
     await expect(summary).toContainText('Sample data')
 
     await page.getByRole('button', { name: /^Profile Company and locale$/ }).click()
@@ -627,7 +629,7 @@ test('onboarding launch stays on the progress panel through every stage before o
     await page.goto('/onboarding?new=1')
     await page.getByRole('button', { name: 'Review workspace areas' }).click()
     await page.getByRole('button', { name: 'Choose how to start' }).click()
-    await page.getByRole('button', { name: /Load sample data/ }).click()
+    await page.getByRole('button', { name: /Explore with sample data/ }).click()
     await page.getByRole('button', { name: 'Launch workspace' }).click()
 
     const launch = page.getByTestId('onboarding-launch-progress')
@@ -747,9 +749,9 @@ test('onboarding saves a resumable company migration project before launching a 
     await page.goto('/onboarding')
     await page.getByRole('button', { name: 'Review workspace areas' }).click()
     await page.getByRole('button', { name: 'Choose how to start' }).click()
-    await expect(page.getByRole('button', { name: /Start with a clean workspace/ })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('button', { name: /Explore with sample data/ })).toHaveAttribute('aria-pressed', 'true')
     await page.getByRole('button', { name: /Plan a company-wide migration/ }).click()
-    await expect(page.getByRole('button', { name: /Start with a clean workspace/ })).toHaveAttribute('aria-pressed', 'false')
+    await expect(page.getByRole('button', { name: /Explore with sample data/ })).toHaveAttribute('aria-pressed', 'false')
     await expect(page.getByRole('button', { name: /Plan a company-wide migration/ })).toHaveAttribute('aria-pressed', 'true')
     await page.getByRole('button', { name: /People & payroll/ }).click()
     await expect(page.getByRole('alert')).toContainText('Select at least one company area')
