@@ -586,7 +586,8 @@ test('dashboard summary cards and cash-flow chart fit with populated large value
       await expect(page.locator('.recharts-surface').first()).toBeVisible()
       for (const label of ['Open Pipeline Value', 'Payables Outstanding']) {
         const card = page.locator('div.bg-gradient-to-b').filter({ has: page.getByText(label, { exact: true }) }).first()
-        const metric = card.locator('span.text-2xl').first()
+        // The KPI value moved from a span to a paragraph; match the typography class, not the tag.
+        const metric = card.locator('.text-2xl').first()
         await expect(metric).toBeVisible()
         const dimensions = await metric.evaluate(element => ({
           clientWidth: element.clientWidth,

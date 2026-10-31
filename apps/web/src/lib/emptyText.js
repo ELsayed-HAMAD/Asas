@@ -7,7 +7,7 @@
  * - `provided`  imported or profile data arrived without this field
  * - `recorded`  a historical event or date has no entry
  * - `scheduled` a future date has not been planned yet
- * - `data`      an aggregate has nothing to compute from
+ * - `data`      an aggregate has nothing to compute from; metrics always render a dash, never words
  * - `amount`    a monetary value is absent
  * - `note`      an optional free-text note is empty
  * - `budget`    utilization has no budget to divide by
@@ -18,7 +18,7 @@ export const EMPTY = {
   provided: 'Not provided',
   recorded: 'Not recorded',
   scheduled: 'Not scheduled',
-  data: 'No data',
+  data: '-',
   amount: 'No amount',
   note: 'No note',
   tax: 'No tax',

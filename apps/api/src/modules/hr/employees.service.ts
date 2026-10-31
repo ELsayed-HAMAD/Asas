@@ -26,6 +26,30 @@ type PrismaEmployeeWithIncludes = PrismaEmployee & {
   salaryHistory: { salary: Prisma.Decimal; salaryBasis: 'ANNUAL' | 'MONTHLY' | null; currency: string; effectiveFrom: Date }[]
 }
 
+let warnedAboutBankDecryption = false
+
+/**
+ * Bank details are auxiliary: one row written under a rotated BANK_DATA_ENCRYPTION_KEY must not
+ * fail the whole directory (a single bad row used to 500 the employee list and the dashboard
+ * headcount). An unreadable value is reported as absent rather than as a server error.
+ */
+function readBankDetail(
+  value: string | null,
+  tenantId: string,
+  field: 'routingNumber' | 'accountNumber' | 'iban' | 'bic',
+): string | null {
+  if (!value) return null
+  try {
+    return decryptBankDetail(value, tenantId, field)
+  } catch {
+    if (!warnedAboutBankDecryption) {
+      warnedAboutBankDecryption = true
+      console.warn('[hr] Some employee bank details could not be decrypted. Confirm BANK_DATA_ENCRYPTION_KEY matches the key used when those values were stored.')
+    }
+    return null
+  }
+}
+
 /**
  * Maps a Prisma row onto the wire shape. `canReadSalary` is the one place `employee.salary`
  * gets redacted \u2014 see the `employee.salary.read` permission in middlewares/permissions.ts.
@@ -58,11 +82,11 @@ function mapEmployee(employee: PrismaEmployeeWithIncludes, canReadSalary: boolea
     location: employee.location,
     employeeNumber: employee.employeeNumber,
     email: employee.email,
-    bankRoutingNumber: canReadSalary ? decryptBankDetail(employee.bankRoutingNumber, employee.tenantId, 'routingNumber') : null,
-    bankAccountNumber: canReadSalary ? decryptBankDetail(employee.bankAccountNumber, employee.tenantId, 'accountNumber') : null,
+    bankRoutingNumber: canReadSalary ? readBankDetail(employee.bankRoutingNumber, employee.tenantId, 'routingNumber') : null,
+    bankAccountNumber: canReadSalary ? readBankDetail(employee.bankAccountNumber, employee.tenantId, 'accountNumber') : null,
     bankAccountType: canReadSalary ? (employee.bankAccountType ?? null) : null,
-    bankIban: canReadSalary ? decryptBankDetail(employee.bankIban, employee.tenantId, 'iban') : null,
-    bankBic: canReadSalary ? decryptBankDetail(employee.bankBic, employee.tenantId, 'bic') : null,
+    bankIban: canReadSalary ? readBankDetail(employee.bankIban, employee.tenantId, 'iban') : null,
+    bankBic: canReadSalary ? readBankDetail(employee.bankBic, employee.tenantId, 'bic') : null,
     createdAt: employee.createdAt.toISOString(),
     updatedAt: employee.updatedAt.toISOString(),
   }

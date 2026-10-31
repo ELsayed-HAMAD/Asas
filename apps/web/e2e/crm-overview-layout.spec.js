@@ -185,7 +185,7 @@ test('crm overview dashboard strictly satisfies all layout rules at 1280px, 1440
 
         // Check required verbatim copy:
         await expect(page.getByText('Prior-month value (as of 2026-09-16) unavailable')).toBeVisible()
-        await expect(page.getByText('MTD: No data · Prior: No data')).toBeVisible()
+        await expect(page.getByText('MTD: - · Prior: -')).toBeVisible()
         await expect(page.getByText('+0 this week')).toBeVisible()
         await expect(page.getByText('0 deals')).toBeVisible()
 
@@ -237,10 +237,10 @@ test('crm overview dashboard strictly satisfies all layout rules at 1280px, 1440
         const closedLostWidth = (await closedLostRow.boundingBox()).width
         expect(closedLostWidth / leadsWidth).toBeGreaterThanOrEqual(0.74)
 
-        // Check connector chips are visible (including the "No data" connector when null)
+        // Check connector chips are visible (including the dash connector when a rate is null)
         await expect(page.getByText('67%')).toBeVisible()
         await expect(page.getByText('50%')).toBeVisible()
-        await expect(page.getByText('No data', { exact: true }).first()).toBeVisible()
+        await expect(page.getByText('-', { exact: true }).first()).toBeVisible()
 
         // 6. Verify Bottom Row
         await expect(page.getByRole('heading', { name: 'Daily Agenda' })).toBeVisible()

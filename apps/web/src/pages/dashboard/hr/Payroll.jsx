@@ -591,18 +591,10 @@ export default function Payroll() {
       <h1 className="sr-only">Payroll</h1>
       {/* ── Unified Apple-Glass Top Command Toolbar + Run Metadata Strip ── */}
       <div className="relative z-30 bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-3 shadow-xs space-y-2.5 flex-shrink-0">
-        {/* Row 1 — Interactive Controls (Wraps when the viewport needs it) */}
-        <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
-          {/* Left Cluster: Search + Dept + Run Select */}
-          <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap xl:flex-none">
-            <SearchInput
-              value={tableSearch}
-              onChange={e => setTableSearch(e.target.value)}
-              placeholder="Search employees..."
-              wrapperClassName="w-full sm:w-52 xl:w-56 shrink-0"
-              className="h-8.5 text-xs pl-8 pr-3"
-            />
-
+        {/* Row 1 — Interactive Controls (one row from lg up so the run status cannot resize it) */}
+        <div className="flex flex-wrap items-center justify-between gap-2 min-w-0 lg:flex-nowrap">
+          {/* Left Cluster: Dept + Run Select */}
+          <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap lg:flex-nowrap">
             <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
               <SelectTrigger aria-label="Department" className="h-8.5 px-3 rounded-xl text-xs font-medium shrink-0 w-auto min-w-[100px] bg-surface-muted hover:bg-surface-muted/80 border border-border-default shadow-xs">
                 <SelectValue placeholder="All Depts" />
@@ -618,9 +610,10 @@ export default function Payroll() {
             <Select
               value={activeRun?.id || undefined}
               onValueChange={val => { setSelectedRunId(val); setSelectedId(null) }}
+              disabled={runs.length === 0}
             >
-              <SelectTrigger aria-label="Payroll run" className="inline-flex items-center justify-between gap-2 w-auto h-8.5 px-3 rounded-xl text-xs font-semibold shrink-0 bg-surface-muted hover:bg-surface-muted/80 border border-border-default shadow-xs">
-                <SelectValue placeholder="Select payroll run" />
+              <SelectTrigger aria-label="Payroll run" className="inline-flex items-center justify-between gap-2 w-auto max-w-[190px] h-8.5 px-3 rounded-xl text-xs font-semibold shrink bg-surface-muted hover:bg-surface-muted/80 border border-border-default shadow-xs disabled:cursor-not-allowed disabled:opacity-70">
+                <SelectValue placeholder={runs.length === 0 ? 'No payroll runs yet' : 'Select payroll run'} />
               </SelectTrigger>
               <SelectContent>
                 {runs.map(item => (
@@ -911,32 +904,42 @@ export default function Payroll() {
           </div>
         </div>
 
-        {/* Row 2 — Unified Telemetry & Status Bar (With Auto-priced on creation on Right) */}
-        <div className="px-3.5 py-1.5 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs bg-surface-muted/60 border border-border-subtle text-muted">
-          <div className="flex items-center gap-1.5 truncate min-w-0">
-            <span className="shrink-0 font-medium text-heading">Pay date {activeRun?.payDate ? formatDate(activeRun.payDate) : 'not scheduled'}</span>
-            <span>·</span>
-            <span className="truncate">Earning period {run?.periodStart && run?.periodEnd ? `${run.periodStart} – ${run.periodEnd}` : 'not recorded (legacy run)'}</span>
-            {run?.createdById && (
-              <>
-                <span>·</span>
-                <span className="truncate text-caption">Prepared by: {run.createdById}</span>
-              </>
-            )}
-            {run?.approvedById && (
-              <>
-                <span>·</span>
-                <span className="truncate text-success">Approved by: {run.approvedById} {run.approvedAt ? `(${formatDate(run.approvedAt)})` : ''}</span>
-              </>
-            )}
-          </div>
+        {/* Row 2 — Search beside the unified telemetry & status bar */}
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchInput
+            value={tableSearch}
+            onChange={e => setTableSearch(e.target.value)}
+            placeholder="Search employees..."
+            wrapperClassName="w-full sm:w-56 shrink-0"
+            className="h-8 text-xs pl-8 pr-3"
+          />
 
-          <div
-            title="Payroll line amounts are priced from saved salary and tax inputs when a run is created."
-            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-medium shrink-0 bg-surface-raised/70 border border-border-default/60 text-muted shadow-xs"
-          >
-            <Calculator size={13} className="text-accent shrink-0" />
-            <span>Auto-priced on creation</span>
+          <div className="px-3.5 py-1.5 rounded-xl flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2 text-xs bg-surface-muted/60 border border-border-subtle text-muted">
+            <div className="flex min-w-0 items-center gap-1.5 truncate">
+              <span className="shrink-0 font-medium text-heading">Pay date {activeRun?.payDate ? formatDate(activeRun.payDate) : 'not scheduled'}</span>
+              <span>·</span>
+              <span className="truncate">Earning period {run?.periodStart && run?.periodEnd ? `${run.periodStart} – ${run.periodEnd}` : 'not recorded (legacy run)'}</span>
+              {run?.createdById && (
+                <>
+                  <span>·</span>
+                  <span className="truncate text-caption">Prepared by: {run.createdById}</span>
+                </>
+              )}
+              {run?.approvedById && (
+                <>
+                  <span>·</span>
+                  <span className="truncate text-success">Approved by: {run.approvedById} {run.approvedAt ? `(${formatDate(run.approvedAt)})` : ''}</span>
+                </>
+              )}
+            </div>
+
+            <div
+              title="Payroll line amounts are priced from saved salary and tax inputs when a run is created."
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-medium shrink-0 bg-surface-raised/70 border border-border-default/60 text-muted shadow-xs"
+            >
+              <Calculator size={13} className="text-accent shrink-0" />
+              <span>Auto-priced on creation</span>
+            </div>
           </div>
         </div>
       </div>
@@ -1128,15 +1131,7 @@ export default function Payroll() {
                 {error?.message || 'Unable to load payroll.'}
               </div>
             )}
-            {!isLoading && !isError && records.length === 0 && (
-              <div className="p-10 text-center">
-                <p className="text-base font-semibold text-heading mb-1">No payroll lines</p>
-                <p className="text-sm text-muted">
-                  {tableSearch ? 'No employees matching search criteria.' : 'Load the sample pack or create a payroll run to see data here.'}
-                </p>
-              </div>
-            )}
-            {!isLoading && records.length > 0 && (
+            {!isLoading && !isError && (
               <Table wrapperClassName="overflow-visible" className="w-full table-fixed text-left border-collapse">
                 <colgroup>
                   <col className="w-[38%]" />
@@ -1155,7 +1150,16 @@ export default function Payroll() {
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-border-subtle">
-                  {records.map(record => {
+                  {records.length === 0 ? (
+                    <TableRow className="border-0 hover:bg-transparent">
+                      <TableCell colSpan={5} className="px-6 py-16 text-center">
+                        <p className="text-base font-semibold text-heading mb-1">No payroll lines</p>
+                        <p className="text-sm text-muted">
+                          {tableSearch ? 'No employees matching search criteria.' : 'Load the sample pack or create a payroll run to see data here.'}
+                        </p>
+                      </TableCell>
+                    </TableRow>
+                  ) : records.map(record => {
                     const isSelected = selectedId === record.id
                     return (
                       <TableRow

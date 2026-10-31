@@ -253,7 +253,7 @@ export default function DashboardOverview() {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
+    <div className="w-full p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
       <h1 className="sr-only">Dashboard overview</h1>
 
       <TopBarActions>
@@ -280,7 +280,7 @@ export default function DashboardOverview() {
           return (
             <div
               key={stat.label}
-              className="bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col justify-between min-h-[126px]"
+              className="bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col justify-between min-h-[150px]"
             >
               {/* Tier 1: Top Row */}
               <div className="flex items-center justify-between gap-2">
@@ -292,22 +292,24 @@ export default function DashboardOverview() {
                 </div>
               </div>
 
-              {/* Tier 2: Middle Row */}
-              <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 my-1.5 min-w-0">
-                <span
-                  className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums whitespace-nowrap cursor-help"
+              {/* Tier 2: Value and chip keep a fixed rhythm so a long value never resizes the row */}
+              <div className="my-1.5 min-w-0">
+                <p
+                  className="truncate text-2xl font-bold leading-8 tracking-tight text-slate-900 tabular-nums cursor-help"
                   title={stat.fullValue || stat.value}
                 >
                   {stat.value}
-                </span>
-                {stat.change && (
-                  <span
-                    className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-full border border-slate-200/60 bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 shrink-0"
-                    title={stat.change}
-                  >
-                    {stat.change}
-                  </span>
-                )}
+                </p>
+                <div className="mt-1 flex h-5 items-center">
+                  {stat.change && (
+                    <span
+                      className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-full border border-slate-200/60 bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700"
+                      title={stat.change}
+                    >
+                      {stat.change}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Tier 3: Bottom Row Recessed Subtext Footer */}
@@ -320,10 +322,10 @@ export default function DashboardOverview() {
       </div>
 
       {/* ── 2. Row 2: Cash Flow Analysis (lg:col-span-8) & Requires Attention (lg:col-span-4) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch lg:h-[272px]">
 
         {/* Left Card: Cash Flow Analysis */}
-        <div className="lg:col-span-8 bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col justify-between">
+        <div className="lg:col-span-8 bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col overflow-hidden">
           <div className="flex items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
@@ -364,7 +366,7 @@ export default function DashboardOverview() {
               </p>
             </div>
           ) : (
-            <div className="h-56 sm:h-64 w-full relative">
+            <div className="relative min-h-[180px] w-full flex-1">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={cashFlowData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <defs>
@@ -417,8 +419,8 @@ export default function DashboardOverview() {
         </div>
 
         {/* Right Card: Requires Attention */}
-        <div className="lg:col-span-4 bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col justify-between">
-          <div>
+        <div className="lg:col-span-4 bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
             <div className="flex items-center gap-2 mb-3">
               <AlertCircle size={16} className="text-amber-500" />
               <h2 className="text-base font-bold text-slate-900">Requires Attention</h2>
@@ -475,11 +477,11 @@ export default function DashboardOverview() {
       </div>
 
       {/* ── 3. Row 3: Active Sprints (lg:col-span-8) & Activity Feed (lg:col-span-4) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch lg:h-[330px]">
 
         {/* Left Card: Active Sprints */}
-        <div className="lg:col-span-8 bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col justify-between">
-          <div>
+        <div className="lg:col-span-8 bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
             <div className="flex items-center justify-between mb-3.5">
               <div className="flex items-center gap-2">
                 <Rocket size={16} className="text-indigo-600" />
@@ -497,7 +499,7 @@ export default function DashboardOverview() {
             ) : sprintItems.filter(sprint => sprint.status === 'ACTIVE').length === 0 ? (
               <p className="text-xs text-slate-400">No active sprints found.</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {sprintItems
                   .filter(sprint => sprint.status === 'ACTIVE')
                   .slice()
@@ -506,7 +508,7 @@ export default function DashboardOverview() {
                     <Link
                       to="/dashboard/projects"
                       key={sprint.id}
-                      className="bg-slate-50/80 hover:bg-white border border-slate-200/70 rounded-xl p-3 flex flex-col justify-between gap-2 transition-all shadow-[0_1px_2px_rgba(0,0,0,0.02)] group cursor-pointer"
+                      className="bg-slate-50/80 hover:bg-white border border-slate-200/70 rounded-xl p-2.5 flex flex-col justify-between gap-1.5 transition-all shadow-[0_1px_2px_rgba(0,0,0,0.02)] group cursor-pointer"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
@@ -543,8 +545,8 @@ export default function DashboardOverview() {
         </div>
 
         {/* Right Card: Activity Feed */}
-        <div className="lg:col-span-4 bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col justify-between">
-          <div>
+        <div className="lg:col-span-4 bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
             <div className="flex items-center gap-2 mb-3.5">
               <Clock size={16} className="text-slate-500" />
               <h2 className="text-base font-bold text-slate-900">Activity Feed</h2>

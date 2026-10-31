@@ -1440,58 +1440,54 @@ html.dark select:-webkit-autofill {
 }
 
 html.dark .settings-glass-shell {
-  --color-surface: #06070c;
-  --color-surface-raised: rgba(20, 24, 38, 0.55);
-  --color-surface-muted: rgba(178, 190, 255, 0.045);
-  --color-surface-active: rgba(178, 190, 255, 0.08);
-  --color-surface-strong: rgba(178, 190, 255, 0.11);
-  --color-border-faint: rgba(178, 190, 255, 0.04);
-  --color-border-subtle: rgba(178, 190, 255, 0.06);
-  --color-border-default: rgba(178, 190, 255, 0.08);
-  --color-border-strong: rgba(178, 190, 255, 0.14);
-  --color-heading: #dbe2f0;
-  --color-body: #b7c0d2;
-  --color-body-light: #a1abc0;
-  --color-muted: #858fa3;
-  --color-caption: #6a7488;
-  --color-faint: #4c5568;
-  --color-primary: #c7d2fe;
-  --color-primary-hover: #e6ebff;
-  --color-primary-light: rgba(129, 140, 248, 0.12);
-  --color-primary-subtle: rgba(129, 140, 248, 0.22);
-  --color-accent: #b8c4ff;
-  --color-accent-hover: #d3dcff;
-  --color-accent-light: rgba(129, 140, 248, 0.12);
-  --color-accent-muted: #9aa7f8;
-  --color-accent-border: rgba(184, 196, 255, 0.28);
-  --shadow-card: 0 24px 55px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(178, 190, 255, 0.08);
-  --shadow-card-hover: 0 30px 70px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(178, 190, 255, 0.11);
-  --shadow-panel: inset 0 1px 0 rgba(178, 190, 255, 0.06);
+  --color-surface: #0e1114;
+  --color-surface-raised: #161a1f;
+  --color-surface-muted: rgba(255, 255, 255, 0.045);
+  --color-surface-active: rgba(255, 255, 255, 0.07);
+  --color-surface-strong: rgba(255, 255, 255, 0.1);
+  --color-border-faint: rgba(255, 255, 255, 0.05);
+  --color-border-subtle: rgba(255, 255, 255, 0.07);
+  --color-border-default: rgba(255, 255, 255, 0.1);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+  --color-heading: #e7eaee;
+  --color-body: #b4bbc6;
+  --color-body-light: #a3abb7;
+  --color-muted: #7c8592;
+  --color-caption: #6b7480;
+  --color-faint: #4f5762;
+  --color-primary: #8b95ff;
+  --color-primary-hover: #a7b0ff;
+  --color-primary-light: rgba(108, 121, 255, 0.14);
+  --color-primary-subtle: rgba(108, 121, 255, 0.24);
+  --color-accent: #8b95ff;
+  --color-accent-hover: #a7b0ff;
+  --color-accent-light: rgba(108, 121, 255, 0.14);
+  --color-accent-muted: #9aa3f5;
+  --color-accent-border: rgba(139, 149, 255, 0.3);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-panel: none;
 }
 
 html.dark .settings-glass-shell #dashboard-main-content {
-  background:
-    radial-gradient(ellipse 75% 48% at 12% -10%, rgba(99, 102, 241, 0.22), transparent 68%),
-    radial-gradient(ellipse 60% 52% at 94% 2%, rgba(120, 160, 255, 0.12), transparent 72%),
-    radial-gradient(ellipse 55% 38% at 50% 112%, rgba(167, 139, 250, 0.08), transparent 70%),
-    #06070c;
+  background: #0e1114;
 }
 
 html.dark .settings-glass-shell .glass-strong {
-  background: rgba(10, 14, 24, 0.62);
-  border-color: var(--color-border-glass);
+  background: #161a1f;
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 html.dark .settings-glass-shell .shadow-card {
-  border-color: var(--color-border-glass);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 html.dark .settings-glass-shell .bg-danger-light {
-  background: rgba(167, 139, 250, 0.12);
+  background: rgba(233, 138, 138, 0.12);
 }
 
 html.dark .settings-glass-shell .bg-warning-light {
-  background: rgba(129, 140, 248, 0.1);
+  background: rgba(232, 180, 101, 0.12);
 }
 
 /* ── AUTH / ONBOARDING DEEP-BLUE THEME ───────────────────────── */
@@ -1592,4 +1588,267 @@ html.dark .auth-deep-blue {
   .auth-showcase-reflection {
     opacity: 0.8;
   }
+}
+
+/*
+ * Dark mode v2 — Carbon/Primer-style neutral layering.
+ * Pure-neutral canvas, lighter elevated surfaces instead of tinted glass, hairline borders,
+ * off-white text (never #fff), one accent for selection/focus, and conventionally coloured
+ * (desaturated) success/warning/danger states. Light mode is untouched: every value here
+ * lives inside html.dark and overrides the earlier indigo-glass values by cascade order.
+ */
+html.dark {
+  --color-canvas: #0e1114;
+  --color-canvas-muted: #11151a;
+  --color-canvas-soft: #12161b;
+  --color-surface: #0e1114;
+  --color-surface-raised: #161a1f;
+  --color-surface-muted: rgba(255, 255, 255, 0.045);
+  --color-surface-active: rgba(255, 255, 255, 0.07);
+  --color-surface-strong: rgba(255, 255, 255, 0.1);
+  --color-surface-soft: rgba(255, 255, 255, 0.13);
+  --color-surface-faint: rgba(255, 255, 255, 0.16);
+  --color-surface-inverse: #1a1f25;
+  --color-surface-inverse-strong: #1f242b;
+  --color-surface-inverse-deep: #12161a;
+  --color-surface-row-selected: rgba(108, 121, 255, 0.16);
+  --color-surface-row-selected-hover: rgba(108, 121, 255, 0.22);
+  --color-surface-cloud: rgba(255, 255, 255, 0.1);
+  --color-surface-silver: rgba(255, 255, 255, 0.14);
+
+  --color-border-faint: rgba(255, 255, 255, 0.05);
+  --color-border-subtle: rgba(255, 255, 255, 0.07);
+  --color-border-default: rgba(255, 255, 255, 0.1);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+  --color-border-inverse-soft: rgba(255, 255, 255, 0.1);
+  --color-border-inverse-faint: rgba(255, 255, 255, 0.06);
+  --color-border-glass: rgba(255, 255, 255, 0.12);
+
+  --color-heading: #e7eaee;
+  --color-heading-strong: #f2f4f6;
+  --color-body: #b4bbc6;
+  --color-body-strong: #c8ced7;
+  --color-body-light: #a3abb7;
+  --color-muted: #7c8592;
+  --color-caption: #6b7480;
+  --color-faint: #4f5762;
+  --color-ink: #e7eaee;
+  --color-ink-strong: #e7eaee;
+  --color-ink-body: #b4bbc6;
+  --color-ink-secondary: #a3abb7;
+  --color-ink-muted: #7c8592;
+  --color-ink-muted-soft: #737c88;
+  --color-ink-muted-strong: #7c8592;
+  --color-ink-soft: #737c88;
+  --color-ink-subtle: #6b7480;
+  --color-ink-faint: #5c6470;
+  --color-ink-faint-soft: #6b7480;
+  --color-on-inverse: #e7eaee;
+  --color-on-primary: #f2f4f6;
+
+  --color-primary: #8b95ff;
+  --color-primary-hover: #a7b0ff;
+  --color-primary-solid: #4f46e5;
+  --color-primary-solid-hover: #6366f1;
+  --color-primary-light: rgba(108, 121, 255, 0.14);
+  --color-primary-subtle: rgba(108, 121, 255, 0.24);
+  --color-accent: #8b95ff;
+  --color-accent-hover: #a7b0ff;
+  --color-accent-solid: #4f46e5;
+  --color-accent-solid-hover: #6366f1;
+  --color-accent-light: rgba(108, 121, 255, 0.14);
+  --color-accent-muted: #9aa3f5;
+  --color-accent-border: rgba(139, 149, 255, 0.3);
+  --color-ink-indigo: #a7b0ff;
+
+  --color-action: #8fa6d8;
+  --color-action-hover: #b3c4ea;
+  --color-action-soft: rgba(143, 166, 216, 0.12);
+  --color-action-wash: rgba(143, 166, 216, 0.08);
+  --color-action-solid: #2563eb;
+  --color-action-solid-hover: #3b82f6;
+  --color-action-border: rgba(143, 166, 216, 0.3);
+  --color-action-text: #b3c4ea;
+  --color-action-soft-strong: rgba(143, 166, 216, 0.18);
+  --color-action-text-deep: #dbe3f5;
+
+  --color-success: #7fe0cb;
+  --color-success-light: rgba(84, 214, 190, 0.12);
+  --color-success-soft: rgba(84, 214, 190, 0.18);
+  --color-success-border: rgba(84, 214, 190, 0.28);
+  --color-success-border-strong: rgba(84, 214, 190, 0.4);
+  --color-success-text: #7fe0cb;
+  --color-success-text-light: #54d6be;
+  --color-success-text-deep: #c2f5ea;
+  --color-success-dot: #54d6be;
+  --color-success-bright: #7fe0cb;
+  --color-success-solid: #0d9488;
+  --color-success-solid-hover: #14b8a6;
+
+  --color-warning: #e8b465;
+  --color-warning-light: rgba(232, 180, 101, 0.12);
+  --color-warning-soft: rgba(232, 180, 101, 0.18);
+  --color-warning-border: rgba(232, 180, 101, 0.3);
+  --color-warning-border-strong: rgba(232, 180, 101, 0.42);
+  --color-warning-text: #e8b465;
+  --color-warning-text-light: #f0c88a;
+  --color-warning-text-deep: #f6dfb8;
+  --color-warning-solid: #b57e21;
+  --color-warning-solid-hover: #cf9130;
+
+  --color-danger: #e98a8a;
+  --color-danger-hover: #f2a6a6;
+  --color-danger-light: rgba(233, 138, 138, 0.12);
+  --color-danger-soft: rgba(233, 138, 138, 0.18);
+  --color-danger-border: rgba(233, 138, 138, 0.3);
+  --color-danger-border-strong: rgba(233, 138, 138, 0.42);
+  --color-danger-text: #e98a8a;
+  --color-danger-text-light: #f2a6a6;
+  --color-danger-text-deep: #f6c9c9;
+  --color-danger-solid: #b3372f;
+  --color-danger-solid-hover: #cf4a41;
+
+  --color-terminal-raised: #0b0d10;
+  --color-brand-ink: #161a1f;
+  --color-inverse-ink: #1a1f25;
+  --color-inverse-gray: #1f242b;
+}
+
+/* One opaque app chrome: the sidebar and the top bar share the same surface, so the tint they
+   pick up from the page behind them can no longer make them look like two different materials. */
+html.dark .glass-strong {
+  background: #161a1f;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/*
+ * Legacy light-utility bridge.
+ * 23 dashboard modules still carry Tailwind's light palette (slate/white). Instead of rewriting
+ * 677 occurrences by hand, map those utilities onto the dark tokens so every module inherits the
+ * same neutral surface, text and border scale. Dark only: light mode keeps its original classes.
+ */
+html.dark [class*="bg-white"]:not([class*="bg-white/0"]) {
+  background-color: #161a1f;
+}
+
+html.dark [class*="bg-slate-"] {
+  background-color: rgba(255, 255, 255, 0.045);
+}
+
+html.dark [class*="from-white"],
+html.dark [class*="via-white"],
+html.dark [class*="to-slate-"] {
+  --tw-gradient-from: #161a1f;
+  --tw-gradient-via: #161a1f;
+  --tw-gradient-to: #161a1f;
+  background-color: #161a1f;
+  background-image: none;
+}
+
+html.dark [class*="text-slate-9"],
+html.dark [class*="text-slate-8"],
+html.dark [class*="text-gray-9"],
+html.dark [class*="text-gray-8"] {
+  color: #e7eaee;
+}
+
+html.dark [class*="text-slate-7"],
+html.dark [class*="text-slate-6"],
+html.dark [class*="text-gray-7"],
+html.dark [class*="text-gray-6"] {
+  color: #b4bbc6;
+}
+
+html.dark [class*="text-slate-5"],
+html.dark [class*="text-slate-4"],
+html.dark [class*="text-gray-5"],
+html.dark [class*="text-gray-4"] {
+  color: #7c8592;
+}
+
+html.dark [class*="text-slate-3"],
+html.dark [class*="text-gray-3"] {
+  color: #5c6470;
+}
+
+html.dark [class*="border-slate-"],
+html.dark [class*="border-gray-"] {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+html.dark [class*="divide-slate-"] > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+html.dark [class*="ring-slate-"] {
+  --tw-ring-color: rgba(255, 255, 255, 0.12);
+}
+
+/* White inset highlights and white-tinted shadows are a light-mode elevation trick; on the new
+   neutral surfaces they read as glowing seams. Remove them everywhere in dark. */
+html.dark [class*="inset_0_1px_0"],
+html.dark [class*="inset_0_-1px_0"],
+html.dark [class*="rgba(255,255,255"],
+html.dark [class*="rgba(255, 255, 255"] {
+  box-shadow: none !important;
+}
+
+html.dark [class*="shadow-slate-"],
+html.dark [class*="shadow-white"] {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4) !important;
+}
+
+/*
+ * Final chrome pass: the dashboard still painted an indigo ambient gradient on the scroll
+ * container, and every glass card blurred it back through a semi-transparent surface. That is
+ * what kept the whole app tinted purple and made the sidebar, top bar and cards look like three
+ * different materials. Flatten the canvas, drop all blur, and give the chrome one background.
+ */
+html.dark #dashboard-main-content {
+  background: #161a1f !important;
+  background-image: none !important;
+}
+
+/* Canvas, sidebar and top bar are one value, so no utility class can reintroduce a seam. */
+html.dark {
+  --color-canvas: #161a1f;
+  --color-surface: #161a1f;
+  --color-canvas-muted: #161a1f;
+  --color-canvas-soft: #161a1f;
+}
+
+/*
+ * One platform background. Every module (dashboard, payroll, CRM, settings, console) paints its
+ * own root container; forcing the shell and the page root to the same colour removes the seams
+ * between modules without touching the cards that sit one level deeper.
+ */
+html.dark,
+html.dark body,
+html.dark #root {
+  background-color: #161a1f !important;
+}
+
+html.dark #dashboard-main-content > div {
+  background-color: #161a1f !important;
+  background-image: none !important;
+}
+
+html.dark [class*="backdrop-blur"] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.dark .glass-strong,
+html.dark aside.glass-strong,
+html.dark header.glass-strong {
+  background: #161a1f !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.dark [class*="from-surface-raised"] {
+  background-color: #161a1f !important;
+  background-image: none !important;
 }

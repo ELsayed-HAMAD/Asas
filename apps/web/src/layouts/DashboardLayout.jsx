@@ -1302,7 +1302,7 @@ export default function DashboardLayout() {
         </header>
 
         {/* Page content */}
-        <main id="dashboard-main-content" tabIndex={-1} className="relative flex-1 min-w-0 min-h-0 overflow-x-auto overflow-y-auto flex flex-col focus:outline-none">
+        <main id="dashboard-main-content" tabIndex={-1} className="relative flex-1 min-w-0 min-h-0 overflow-x-auto overflow-y-auto flex flex-col focus:outline-none [scrollbar-gutter:stable]">
           {session?.user && !session.user.emailVerified && (
             <div className="bg-warning-light border-b border-warning/20 px-6 py-2 flex items-center justify-between text-xs text-warning-text">
               <div className="flex items-center gap-2">

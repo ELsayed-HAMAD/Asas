@@ -326,3 +326,89 @@ test('dashboard attention and sprint links point at the affected module and the 
     await context.close()
   }
 })
+
+/** Width and height of every dashboard block, read from the rendered boxes rather than classes. */
+function dashboardBlockBoxes(page) {
+  return page.evaluate(() => {
+    const cardByHeading = text => {
+      const heading = [...document.querySelectorAll('h2')].find(element => element.textContent.trim() === text)
+      return heading?.closest('div.rounded-2xl') ?? null
+    }
+    const boxOf = element => {
+      if (!element) return null
+      const box = element.getBoundingClientRect()
+      return { w: Math.round(box.width), h: Math.round(box.height) }
+    }
+    return {
+      kpi: boxOf([...document.querySelectorAll('div.rounded-2xl')].find(element => element.textContent?.startsWith('Headcount'))),
+      cashFlow: boxOf(cardByHeading('Cash Flow Analysis')),
+      attention: boxOf(cardByHeading('Requires Attention')),
+      sprints: boxOf(cardByHeading('Active Sprints')),
+      activity: boxOf(cardByHeading('Activity Feed')),
+    }
+  })
+}
+
+// A long value, a chart, or a failed metric must not resize any block: the dashboard keeps one
+// geometry whether the workspace is empty or full of sample data.
+test('the dashboard keeps one geometry for short, long, unavailable, and populated data', async ({ browser }) => {
+  async function measure(busy, unavailable) {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' })
+    await mockDashboard(context, path => {
+      if (!busy) return emptyEndpointData(path)
+      if (path.endsWith('/hr/employees')) {
+        return {
+          items: [],
+          pagination: { page: 1, limit: 1, total: 0, pages: 0 },
+          summary: { totalHeadcount: 0, onLeaveCount: 0, hiredThisMonth: 0, hiredPreviousMonthToDate: 0 },
+        }
+      }
+      if (path.endsWith('/crm/overview')) {
+        return { pipeline: { openCount: 19, openTotal: { amount: 427000000, currency: 'USD' }, openCountComparison: { previousCount: null }, openTotalComparison: { previousTotal: null } } }
+      }
+      if (path.endsWith('/finance/overview')) {
+        return { payableOutstanding: { amount: 7410000, currency: 'USD' }, cashFlow: [{ month: '2026-09', net: { amount: 1250000, currency: 'USD' } }, { month: '2026-10', net: { amount: 2250000, currency: 'USD' } }] }
+      }
+      if (path.endsWith('/finance/receivables')) {
+        return { items: [], pagination: { page: 1, limit: 1, total: 0, pages: 0 }, summary: { overdueCount: 17, overdueTotal: { amount: 52710000, currency: 'USD' } } }
+      }
+      if (path.endsWith('/inventory/products')) {
+        return { items: [], pagination: { page: 1, limit: 1, total: 0, pages: 0 }, summary: { lowStockProducts: 1 } }
+      }
+      if (path.endsWith('/projects/sprints')) {
+        return { items: [{ id: 'sprint_1', name: 'Sprint A', status: 'ACTIVE', completionPct: 50, endsAt: '2026-11-05T00:00:00.000Z' }] }
+      }
+      if (path.endsWith('/audit-logs')) {
+        return { items: [1, 2, 3, 4, 5].map(index => ({ id: `audit_${index}`, action: `Audit event ${index}`, actorName: 'Avery Admin', createdAt: '2026-10-30T09:00:00.000Z' })) }
+      }
+      return emptyEndpointData(path)
+    })
+    if (unavailable) {
+      // Glob patterns match the query string too, so the filter needs a trailing wildcard.
+      await context.route('**/api/v1/hr/employees*', route => json(route, { error: { message: 'Simulated outage.' } }, 500))
+    }
+    try {
+      const page = await context.newPage()
+      await page.goto('/dashboard')
+      await expect(page.getByText('Headcount', { exact: true })).toBeVisible()
+      // React Query retries a failing metric, so wait for every KPI to leave its loading state.
+      await expect(page.getByText('…', { exact: true })).toHaveCount(0, { timeout: 20_000 })
+      await expect(page.getByText(unavailable ? 'Unavailable' : busy ? '$4.27M' : '$0', { exact: true }).first()).toBeVisible()
+      return await dashboardBlockBoxes(page)
+    } finally {
+      await context.close()
+    }
+  }
+
+  const empty = await measure(false, false)
+  const busy = await measure(true, false)
+  const failing = await measure(true, true)
+
+  for (const block of ['kpi', 'cashFlow', 'attention', 'sprints', 'activity']) {
+    const boxes = [empty[block], busy[block], failing[block]]
+    for (const dimension of ['w', 'h']) {
+      const values = boxes.map(box => box[dimension])
+      expect(values.every(value => value === values[0]), `${block} ${dimension} changed: ${values.join(', ')}`).toBe(true)
+    }
+  }
+})

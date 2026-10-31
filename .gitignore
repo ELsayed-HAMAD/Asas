@@ -275,3 +275,30 @@ sentry.properties
 
 .vercel
 .env*
+
+# Local runtime and build artefacts
+*.log
+.turbo/
+*.tsbuildinfo
+apps/api/prisma/dev.db
+apps/api/prisma/dev.db-journal
+apps/web/visual-check/
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Keys and certificates (never commit)
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local AI assistant state
+.claude/
+.cursor/
+.qoder/
+.agents/
+.cline/
+.windsurf/

@@ -640,7 +640,7 @@ export default function RecruitmentPipeline() {
   // in the previous tenant-local month.
   const summary = overallData?.summary ?? data?.summary
   const periodDelta = (current, previous, unit, digits = 0) => current == null || previous == null
-    ? 'No comparable period data'
+    ? 'First period tracked'
     : `${current - previous > 0 ? '+' : ''}${(current - previous).toFixed(digits)} ${unit} vs prior MTD`
   const hasCandidateFilters = Boolean(search.trim() || roleFilter !== 'ALL' || stageFilter !== 'ALL')
   const displayStats = [
@@ -651,7 +651,7 @@ export default function RecruitmentPipeline() {
       label: 'OFFER ACCEPTANCE (MTD)',
       value: summary?.offerAcceptanceRateThisPeriod == null ? EMPTY.data : `${summary.offerAcceptanceRateThisPeriod}%`,
       trend: 'neutral',
-      sub: `${summary?.offersDecidedThisPeriod ?? 0} decisions · ${summary?.offerAcceptanceRateThisPeriod == null || summary?.offerAcceptanceRatePreviousPeriod == null ? 'No prior data' : periodDelta(summary?.offerAcceptanceRateThisPeriod, summary?.offerAcceptanceRatePreviousPeriod, 'pts', 1)}`
+      sub: `${summary?.offersDecidedThisPeriod ?? 0} decisions · ${summary?.offerAcceptanceRateThisPeriod == null || summary?.offerAcceptanceRatePreviousPeriod == null ? 'First period tracked' : periodDelta(summary?.offerAcceptanceRateThisPeriod, summary?.offerAcceptanceRatePreviousPeriod, 'pts', 1)}`
     },
   ]
 

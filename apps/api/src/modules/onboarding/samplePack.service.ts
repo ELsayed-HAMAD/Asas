@@ -265,11 +265,32 @@ export async function applyEnterpriseSamplePack(
   const summary: Record<string, number> = {}
 
   await prisma.$transaction(async tx => {
+    // Force refresh: an unchanged sample can be rebuilt in place, which is how the fixture is
+    // upgraded without asking the operator to clear and re-onboard. Any edited record aborts with
+    // the same 409 the clearing endpoint uses, so real data can never be replaced by a reload.
+    const existing = await tx.tenant.findUnique({
+      where: { id: tenantId },
+      select: { onboardingStatus: true, sampleDataManifest: true },
+    })
+    if (existing?.onboardingStatus === 'SAMPLE_LOADED') {
+      const current = await captureSampleManifest(tx, tenantId)
+      if (!existing.sampleDataManifest
+        || JSON.stringify(canonicalJson(current)) !== JSON.stringify(canonicalJson(existing.sampleDataManifest))) {
+        throw new AppError(409, 'Business data has changed since the sample was loaded; automatic refresh would risk real records')
+      }
+      const sweep = tx as unknown as Record<TenantBusinessModel, {
+        deleteMany: (args: { where: { tenantId: string } }) => Promise<{ count: number }>
+      }>
+      for (const model of TENANT_BUSINESS_MODELS) {
+        await sweep[model].deleteMany({ where: { tenantId } })
+      }
+    }
+
     const claimed = await tx.tenant.updateMany({
-      where: { id: tenantId, onboardingStatus: 'PENDING' },
+      where: { id: tenantId, onboardingStatus: { in: ['PENDING', 'SAMPLE_LOADED'] } },
       data: { onboardingStatus: 'SAMPLE_LOADED' },
     })
-    if (claimed.count !== 1) throw new AppError(409, 'The sample pack can only be applied to a pending workspace')
+    if (claimed.count !== 1) throw new AppError(409, 'The sample pack can only be applied to a pending or unchanged sample workspace')
     // The claim owns the Tenant row lock; resolve the denomination after acquiring it.
     const currency = await getTenantCurrency(tx, tenantId)
     const before = await captureSampleManifest(tx, tenantId)
@@ -358,23 +379,126 @@ export async function applyEnterpriseSamplePack(
     }
     summary.companies = companyIds.size
 
+    // CRM conversion and win/loss trends are computed from DealStageHistory and Deal.closedAt, so
+    // the pack records the transition path each deal took instead of only its final stage.
+    type DealStageName = (typeof DEAL_STAGES)[number]
+    const OPEN_STAGE_CHAIN: DealStageName[] = ['LEADS', 'PROPOSAL', 'NEGOTIATION']
+    const dealHistory: Prisma.DealStageHistoryCreateManyInput[] = []
     for (const deal of pack.deals ?? []) {
-      await tx.deal.create({
+      const stage = asEnum(DEAL_STAGES, deal.stage, 'LEADS', 'deals')
+      const createdAt = parseDate(deal.createdAt) ?? new Date()
+      const closed = stage === 'CLOSED_WON' || stage === 'CLOSED_LOST'
+      const closedAt = closed ? (parseDate(deal.closeDate) ?? createdAt) : null
+      const ownerEmployeeId = deal.ownerEmployeeKey ? (employeeIds.get(deal.ownerEmployeeKey) ?? null) : null
+      const value = new Prisma.Decimal(Money.fromDecimal(String(deal.value), currency, 'HALF_UP').toDecimalString())
+      const created = await tx.deal.create({
         data: {
           tenantId,
           name: deal.name,
           companyId: deal.companyKey ? (companyIds.get(deal.companyKey) ?? null) : null,
-          ownerEmployeeId: deal.ownerEmployeeKey ? (employeeIds.get(deal.ownerEmployeeKey) ?? null) : null,
-          stage: asEnum(DEAL_STAGES, deal.stage, 'LEADS', 'deals'),
-          value: new Prisma.Decimal(Money.fromDecimal(String(deal.value), currency, 'HALF_UP').toDecimalString()),
+          ownerEmployeeId,
+          stage,
+          value,
           // This bundled pack explicitly uses fractional probabilities; real API writes use percent.
           winProbability: deal.winProbability == null ? null : deal.winProbability * 100,
           closeDate: parseDate(deal.closeDate),
-          createdAt: parseDate(deal.createdAt) ?? new Date(),
+          closedAt,
+          createdAt,
         },
       })
+      const path: DealStageName[] = closed
+        ? [...OPEN_STAGE_CHAIN, stage]
+        : OPEN_STAGE_CHAIN.slice(0, Math.max(1, OPEN_STAGE_CHAIN.indexOf(stage) + 1))
+      const end = closedAt ?? parseDate(deal.closeDate) ?? new Date()
+      const step = path.length > 1
+        ? Math.max(1, Math.floor((end.getTime() - createdAt.getTime()) / (path.length - 1)))
+        : 0
+      dealHistory.push({
+        tenantId,
+        dealId: created.id,
+        fromStage: null,
+        toStage: 'LEADS',
+        occurredAt: createdAt,
+        ownerEmployeeId,
+        value,
+        isBaseline: true,
+      })
+      for (let index = 1; index < path.length; index += 1) {
+        dealHistory.push({
+          tenantId,
+          dealId: created.id,
+          fromStage: path[index - 1] ?? null,
+          toStage: path[index] as DealStageName,
+          occurredAt: new Date(createdAt.getTime() + step * index),
+          ownerEmployeeId,
+          value,
+          isBaseline: false,
+        })
+      }
     }
+    if (dealHistory.length > 0) await tx.dealStageHistory.createMany({ data: dealHistory })
     summary.deals = (pack.deals ?? []).length
+
+    // ── Revenue reporting + settled cash ────────────────────────────────────────
+    // The forecast table, quota attainment and every cash-flow chart read these rows rather than
+    // the legacy snapshot fixtures, so seed them here from the same deals and invoice flow.
+    const repNames = new Map((pack.employees ?? []).map(employee => [employee.key, employee.name]))
+    const repTotals = new Map<string, { name: string; won: number; commit: number; best: number }>()
+    for (const deal of pack.deals ?? []) {
+      const key = deal.ownerEmployeeKey
+      const employeeId = key ? employeeIds.get(key) : null
+      if (!employeeId) continue
+      const total = repTotals.get(employeeId) ?? { name: repNames.get(key ?? '') ?? 'Sales rep', won: 0, commit: 0, best: 0 }
+      if (deal.stage === 'CLOSED_WON') total.won += deal.value
+      else if (deal.stage === 'NEGOTIATION') total.commit += deal.value
+      else if (deal.stage === 'PROPOSAL' || deal.stage === 'LEADS') total.best += deal.value
+      repTotals.set(employeeId, total)
+    }
+    const currentPeriod = new Date().toISOString().slice(0, 7)
+    const quota = new Prisma.Decimal(2_500_000)
+    for (const [employeeId, total] of [...repTotals.entries()].slice(0, 6)) {
+      await tx.salesQuota.create({ data: { tenantId, currency, employeeId, repName: total.name, period: currentPeriod, quota } })
+      await tx.forecastSnapshot.create({ data: {
+        tenantId, currency, repName: total.name, period: currentPeriod,
+        closed: new Prisma.Decimal(total.won), commit: new Prisma.Decimal(total.commit),
+        bestCase: new Prisma.Decimal(total.best), quotaPct: Number(((total.won / 2_500_000) * 100).toFixed(1)),
+      } })
+    }
+    summary.forecasts = Math.min(repTotals.size, 6)
+
+    // A minimal chart of accounts plus one settled AR collection and AP payment per month keeps
+    // the cash-flow chart, recent settlements and trial balance truthful and balanced.
+    const accountIds = new Map<string, string>()
+    for (const account of [
+      { code: 'CASH', name: 'Cash', kind: 'ASSET' },
+      { code: 'ACCOUNTS_RECEIVABLE', name: 'Accounts receivable', kind: 'ASSET' },
+      { code: 'ACCOUNTS_PAYABLE', name: 'Accounts payable', kind: 'LIABILITY' },
+    ]) {
+      const created = await tx.ledgerAccount.create({ data: { tenantId, currency, ...account } })
+      accountIds.set(account.code, created.id)
+    }
+    const today = new Date()
+    let ledgerEntries = 0
+    for (let offset = 11; offset >= 0; offset -= 1) {
+      const postedAt = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - offset, 12))
+      const settled = [
+        { sourceType: 'AR_COLLECTION', description: 'Customer collections', amount: 1_900_000 + (11 - offset) * 140_000, debit: 'CASH', credit: 'ACCOUNTS_RECEIVABLE' },
+        { sourceType: 'AP_PAYMENT', description: 'Vendor payments', amount: 1_250_000 + (11 - offset) * 90_000, debit: 'ACCOUNTS_PAYABLE', credit: 'CASH' },
+      ]
+      for (const movement of settled) {
+        const amount = new Prisma.Decimal(movement.amount)
+        const entry = await tx.journalEntry.create({ data: {
+          tenantId, currency, amount, baseCurrency: currency, baseAmount: amount, baseMinorUnitDigits: 2,
+          sourceType: movement.sourceType, currencyProvenance: 'DOCUMENT', description: movement.description, postedAt,
+        } })
+        await tx.journalLine.createMany({ data: [
+          { tenantId, entryId: entry.id, accountId: accountIds.get(movement.debit) ?? '', side: 'DEBIT', amount, baseAmount: amount },
+          { tenantId, entryId: entry.id, accountId: accountIds.get(movement.credit) ?? '', side: 'CREDIT', amount, baseAmount: amount },
+        ] })
+        ledgerEntries += 1
+      }
+    }
+    summary.ledgerEntries = ledgerEntries
 
     // ── Projects ────────────────────────────────────────────────────────────────
     for (const proj of pack.projects ?? []) {
@@ -425,7 +549,14 @@ export async function applyEnterpriseSamplePack(
         },
       })
       sprintIds.push(created.id)
-      for (const issue of sprint.issues ?? []) {
+      const sprintEnd = parseDate(sprint.endsAt) ?? new Date()
+      const sprintStart = new Date(sprintEnd.getTime() - 13 * 86_400_000)
+      for (const [issueIndex, issue] of (sprint.issues ?? []).entries()) {
+        const status = asEnum(ISSUE_STATUSES, issue.status, 'TODO', 'sprint issues')
+        const startedAt = new Date(sprintStart.getTime() + Math.floor(issueIndex * 86_400_000 / 4))
+        const finishedAt = status === 'DONE'
+          ? new Date(Math.min(sprintEnd.getTime(), startedAt.getTime() + 3 * 86_400_000 + issueIndex * 3_600_000))
+          : null
         await tx.issue.create({
           data: {
             tenantId,
@@ -434,7 +565,9 @@ export async function applyEnterpriseSamplePack(
             // The pack's `type` (STORY/BUG/TASK) has no Issue column; it rides in `tag`.
             tag: issue.type ?? null,
             priority: asEnum(ISSUE_PRIORITIES, issue.priority, 'MEDIUM', 'sprint issues'),
-            status: asEnum(ISSUE_STATUSES, issue.status, 'TODO', 'sprint issues'),
+            status,
+            createdAt: startedAt,
+            completedAt: finishedAt,
           },
         })
       }
@@ -572,6 +705,8 @@ export async function applyEnterpriseSamplePack(
     }
     summary.candidates = (pack.candidates ?? []).length
 
+    const now = new Date()
+    const currentWeekStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - ((now.getUTCDay() + 6) % 7)))
     for (const sheet of pack.timesheets ?? []) {
       const employeeId = employeeIds.get(sheet.employeeKey)
       if (!employeeId) continue
@@ -579,12 +714,15 @@ export async function applyEnterpriseSamplePack(
         data: {
           tenantId,
           employeeId,
-          weekStart: parseDate(sheet.weekStart) ?? new Date(),
+          // The fixture week is static; landing it on the current week keeps attendance current.
+          weekStart: currentWeekStart,
           regularHours: sheet.regularHours ?? 0,
           overtimeHours: sheet.overtimeHours ?? 0,
           totalHours: (sheet.regularHours ?? 0) + (sheet.overtimeHours ?? 0),
           days: {
-            create: (sheet.days ?? []).map(day => ({
+            create: (sheet.days ?? []).map((day, dayIndex) => ({
+              // The attendance grid keys punches by date, so each row must land on its real day.
+              date: new Date(currentWeekStart.getTime() + dayIndex * 86_400_000),
               dayLabel: day.dayLabel,
               clockIn: day.clockIn ?? null,
               clockOut: day.clockOut ?? null,
@@ -595,6 +733,18 @@ export async function applyEnterpriseSamplePack(
       })
     }
     summary.timesheets = (pack.timesheets ?? []).length
+
+    // Allowances make every balance row resolvable; without a policy the table can only say "Not set".
+    for (const policy of [
+      { type: 'VACATION', days: 21 },
+      { type: 'SICK', days: 10 },
+      { type: 'PERSONAL', days: 5 },
+    ] as const) {
+      await tx.leavePolicy.create({
+        data: { tenantId, type: policy.type, annualAllowanceDays: policy.days, weekdaysOnly: true },
+      })
+    }
+    summary.leavePolicies = 3
 
     for (const ex of pack.attendanceExceptions ?? []) {
       const employeeId = employeeIds.get(ex.employeeKey)
@@ -732,11 +882,15 @@ export async function applyEnterpriseSamplePack(
  * cascade covers the rest, so this list is the *minimal* set that clears a sample workspace.
  */
 type TenantBusinessModel =
+  | 'journalLine'
+  | 'journalEntry'
+  | 'ledgerAccount'
   | 'payrollLine'
   | 'payrollRun'
   | 'timesheet'
   | 'attendanceException'
   | 'leaveRequest'
+  | 'leavePolicy'
   | 'candidate'
   | 'employee'
   | 'department'
@@ -764,12 +918,17 @@ type TenantBusinessModel =
   | 'roadmapTask'
 
 const TENANT_BUSINESS_MODELS: readonly TenantBusinessModel[] = [
+  // Ledger (lines before entries; accounts last so their rows are unreferenced)
+  'journalLine',
+  'journalEntry',
+  'ledgerAccount',
   // HR (leaf-ish first)
   'payrollLine',
   'payrollRun',
   'timesheet',
   'attendanceException',
   'leaveRequest',
+  'leavePolicy',
   'candidate',
   'employee',
   'department',
@@ -813,6 +972,7 @@ function canonicalJson(value: unknown): unknown {
 
 /** Include cascading children: an added comment or an edited punch makes clearing unsafe too. */
 const SAMPLE_CHILDREN: Partial<Record<TenantBusinessModel, readonly string[]>> = {
+  journalEntry: ['lines'],
   payrollLine: ['taxLines'], timesheet: ['days'], candidate: ['activities'],
   payableInvoice: ['lineItems'], customer: ['activities'], deal: ['activities', 'stageHistory'],
   product: ['suppliers'], purchaseOrder: ['lines'],
