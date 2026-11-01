@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
+import { Trans, useTranslation } from 'react-i18next'
 import { MailCheck, Mail, ExternalLink, Loader2, CheckCircle2, ArrowRight, RefreshCw, AlertCircle } from 'lucide-react'
 import { authClient, useSession, signOut } from '../../lib/authClient'
 import { authErrorMessage } from '../../lib/authErrorMessage'
@@ -31,6 +32,7 @@ function getMailProvider(email = '') {
 export default function VerifyEmail() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { t } = useTranslation()
   const { data: session } = useSession()
 
   const searchParams = new URLSearchParams(location.search)
@@ -72,13 +74,13 @@ export default function VerifyEmail() {
       })
 
       if (result?.error) {
-        throw new Error(authErrorMessage(result.error, 'Unable to resend verification email.'))
+        throw new Error(authErrorMessage(result.error, t('auth.verify.errors.resendFailed')))
       }
 
-      setResendMessage(`A fresh verification link was sent to ${email}.`)
+      setResendMessage(t('auth.verify.resendSent', { email }))
       setCountdown(60)
     } catch (err) {
-      setResendError(authErrorMessage(err, 'Failed to resend verification email. Please try again.'))
+      setResendError(authErrorMessage(err, t('auth.verify.errors.resendError')))
     } finally {
       setIsResending(false)
     }
@@ -100,72 +102,72 @@ export default function VerifyEmail() {
       </div>
 
       {/* Header */}
-      <h1 className="text-2xl font-semibold text-heading mb-2">
-        {provider.name === 'Gmail' ? 'Confirm your Gmail' : 'Confirm your email'}
+      <h1 className="mb-2 text-2xl font-semibold text-heading">
+        {provider.name === 'Gmail' ? t('auth.verify.confirmGmail') : t('auth.verify.confirmEmail')}
       </h1>
-      <p className="text-sm text-muted mb-4">
-        A confirmation email has been sent to activate your account. Confirm your email, then Asas will return you to {isInvitationFlow ? 'the workspace invitation' : 'workspace setup'}.
+      <p className="mb-4 text-sm text-muted">
+        {isInvitationFlow ? t('auth.verify.bodyInvitation') : t('auth.verify.bodySetup')}
       </p>
 
       {/* Email pill */}
       {email ? (
         <div className="mb-6 self-center">
-          <Badge variant="outline" className="px-3.5 py-1 text-sm font-medium text-heading">
+          <Badge variant="outline" dir="ltr" className="px-3.5 py-1 text-sm font-medium text-heading">
             {email}
           </Badge>
         </div>
       ) : (
-        <p className="text-xs text-muted mb-6">
-          Please check the inbox associated with your account.
+        <p className="mb-6 text-xs text-muted">
+          {t('auth.verify.checkInbox')}
         </p>
       )}
 
       {/* Status Notifications */}
       {resendMessage && (
-        <Alert variant="success" className="mb-5 text-left">
+        <Alert variant="success" className="mb-5 text-start">
           <CheckCircle2 size={16} />
           <AlertDescription>{resendMessage}</AlertDescription>
         </Alert>
       )}
 
       {resendError && (
-        <Alert variant="destructive" className="mb-5 text-left">
+        <Alert variant="destructive" className="mb-5 text-start">
           <AlertCircle size={16} />
           <AlertDescription>{resendError}</AlertDescription>
         </Alert>
       )}
 
       {isAlreadyVerified && (
-        <Alert variant="info" className="mb-5 text-left">
+        <Alert variant="info" className="mb-5 text-start">
           <CheckCircle2 size={16} />
-          <AlertDescription>Your email is already verified!</AlertDescription>
+          <AlertDescription>{t('auth.verify.alreadyVerified')}</AlertDescription>
         </Alert>
       )}
 
       {/* Actions */}
-      <div className="space-y-3 mb-6">
+      <div className="mb-6 space-y-3">
         {provider.url ? (
-          <Button asChild className="w-full h-10 font-medium">
+          <Button asChild className="h-10 w-full font-medium">
             <a
               href={provider.url}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2"
             >
-              <span>Open {provider.name}</span>
+              <span>{t('auth.verify.openProvider', { provider: provider.name })}</span>
               <ExternalLink size={15} />
             </a>
           </Button>
         ) : (
-          <div className="rounded-button border border-border-subtle bg-surface-muted/50 px-4 py-3 text-left">
+          <div className="rounded-button border border-border-subtle bg-surface-muted/50 px-4 py-3 text-start">
             <div className="flex items-start gap-2.5">
-              <Mail size={16} className="mt-0.5 flex-shrink-0 text-muted" />
+              <Mail size={16} className="mt-0.5 shrink-0 text-muted" />
               <div>
-                <p className="text-xs font-medium text-body">Open your email app or webmail</p>
+                <p className="text-xs font-medium text-body">{t('auth.verify.manualTitle')}</p>
                 <p className="mt-0.5 text-xs leading-relaxed text-muted">
                   {email
-                    ? `We cannot detect the inbox provider for ${email}. Open that inbox to find the confirmation message.`
-                    : 'Open the inbox for the account you signed up with to find the confirmation message.'}
+                    ? t('auth.verify.manualBodyEmail', { email })
+                    : t('auth.verify.manualBody')}
                 </p>
               </div>
             </div>
@@ -177,69 +179,69 @@ export default function VerifyEmail() {
             type="button"
             variant="outline"
             onClick={() => navigate(callbackPath)}
-            className="w-full h-10 font-medium"
+            className="h-10 w-full font-medium"
           >
-            <span>{isInvitationFlow ? 'Continue to Invitation' : 'Continue to Workspace Setup'}</span>
-            <ArrowRight size={15} />
+            <span>{isInvitationFlow ? t('auth.verify.continueToInvitation') : t('auth.verify.continueToSetup')}</span>
+            <ArrowRight size={15} className="rtl:-scale-x-100" />
           </Button>
         ) : (
           <Button
             asChild
             variant="outline"
-            className="w-full h-10 font-medium"
+            className="h-10 w-full font-medium"
           >
             <Link to="/login" className="flex items-center justify-center gap-2">
-              <span>Already confirmed? Go to Login</span>
-              <ArrowRight size={15} />
+              <span>{t('auth.verify.alreadyConfirmed')}</span>
+              <ArrowRight size={15} className="rtl:-scale-x-100" />
             </Link>
           </Button>
         )}
       </div>
 
       {/* Instructions list */}
-      <div className="p-3.5 mb-6 rounded-button bg-surface-muted/50 border border-border-subtle text-left text-xs text-muted space-y-1.5">
-        <p className="font-medium text-body">Next steps:</p>
-        <p>1. Open the verification email from <strong>Asas</strong>. The sender address is set by this deployment.</p>
-        <p>2. Click the <strong>Verify Email</strong> button inside.</p>
-        <p>3. If you do not see it within a minute, check your Spam or Junk folder.</p>
+      <div className="mb-6 space-y-1.5 rounded-button border border-border-subtle bg-surface-muted/50 p-3.5 text-start text-xs text-muted">
+        <p className="font-medium text-body">{t('auth.verify.nextSteps')}</p>
+        <p><Trans i18nKey="auth.verify.step1" components={{ strong: <strong /> }} /></p>
+        <p><Trans i18nKey="auth.verify.step2" components={{ strong: <strong /> }} /></p>
+        <p>{t('auth.verify.step3')}</p>
       </div>
 
       {/* Resend Action */}
-      <div className="text-center text-xs text-muted mb-4">
-        Didn't receive the email?{' '}
+      <div className="mb-4 text-center text-xs text-muted">
+        {t('auth.verify.didntReceive')}{' '}
         <Button
           type="button"
           variant="link"
           disabled={isResending || countdown > 0 || !email}
           onClick={handleResend}
-          className="font-medium text-heading hover:underline disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1 text-xs"
+          className="inline-flex items-center gap-1 text-xs font-medium text-heading hover:underline disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isResending ? (
             <>
               <Loader2 size={12} className="animate-spin" />
-              <span>Sending...</span>
+              <span>{t('auth.verify.sending')}</span>
             </>
           ) : countdown > 0 ? (
-            <span>Resend in {countdown}s</span>
+            <span>{t('auth.verify.resendIn', { seconds: countdown })}</span>
           ) : (
             <>
               <RefreshCw size={12} />
-              <span>Resend verification email</span>
+              <span>{t('auth.verify.resend')}</span>
             </>
           )}
         </Button>
       </div>
 
       {/* Sign Out / Change Email */}
-      <div className="pt-2 border-t border-border-subtle text-center text-xs text-caption">
-        Wrong email address?{' '}
+      <div className="border-t border-border-subtle pt-2 text-center text-xs text-caption">
+        {t('auth.verify.wrongEmail')}{' '}
         <Button
           type="button"
           variant="link"
           onClick={handleSignOut}
-          className="font-medium text-body hover:underline text-xs"
+          className="text-xs font-medium text-body hover:underline"
         >
-          Sign out and switch account
+          {t('auth.verify.signOutSwitch')}
         </Button>
       </div>
     </div>

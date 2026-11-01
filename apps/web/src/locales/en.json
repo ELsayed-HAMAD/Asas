@@ -1,0 +1,679 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "hr": "Human Resources",
+    "employees": "Employees",
+    "payroll": "Payroll",
+    "timeAttendance": "Time & Attendance",
+    "timeOff": "Time Off & Leave",
+    "recruitment": "Recruitment",
+    "finance": "Finance",
+    "accountsPayable": "Accounts Payable",
+    "accountsReceivable": "Accounts Receivable",
+    "expenses": "Expenses",
+    "trialBalance": "Trial Balance",
+    "crm": "CRM",
+    "deals": "Deals Pipeline",
+    "salesPerformance": "Sales Performance",
+    "revenueForecast": "Revenue Forecast",
+    "inventory": "Inventory",
+    "productCatalog": "Product Catalog",
+    "stockMovements": "Stock Movements",
+    "inventoryValuation": "Valuation",
+    "projects": "Projects",
+    "portfolio": "Portfolio Overview",
+    "activeSprints": "Active Sprints",
+    "roadmap": "Roadmap",
+    "settings": "Settings",
+    "general": "General Settings",
+    "members": "Members & Roles",
+    "billing": "Billing & Plans",
+    "integrations": "Integrations",
+    "notifications": "Notifications",
+    "dataExport": "Data Export",
+    "support": "Support / Help"
+  },
+  "finance": {
+    "overview": "Overview",
+    "reconciliation": "Bank Reconciliation"
+  },
+  "crm": {
+    "overview": "Overview"
+  },
+  "common": {
+    "newEntry": "New Entry",
+    "search": "Search...",
+    "searchJump": "Search or jump to...",
+    "logout": "Log Out",
+    "toggleTheme": "Toggle Theme",
+    "downloadApp": "Download Desktop App",
+    "profilePreferences": "Profile & Preferences",
+    "createWorkspace": "Create New Workspace",
+    "sampleData": "Sample",
+    "save": "Save",
+    "saveChanges": "Save Changes",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "add": "Add",
+    "filter": "Filter",
+    "export": "Export",
+    "download": "Download",
+    "close": "Close",
+    "loading": "Loading...",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "submit": "Submit",
+    "status": "Status",
+    "name": "Name",
+    "date": "Date",
+    "amount": "Amount",
+    "actions": "Actions",
+    "total": "Total",
+    "all": "All",
+    "language": "Language",
+    "arabic": "العربية",
+    "english": "English",
+    "switchLanguage": "Switch Language",
+    "active": "Active",
+    "completed": "Completed",
+    "pending": "Pending",
+    "draft": "Draft",
+    "approved": "Approved",
+    "paid": "Paid",
+    "void": "Void",
+    "reimbursed": "Reimbursed",
+    "rejected": "Rejected",
+    "online": "Online",
+    "offline": "Offline",
+    "yes": "Yes",
+    "no": "No",
+    "error": "Error",
+    "success": "Success",
+    "open": "Open",
+    "review": "Review",
+    "year": "Year"
+  },
+  "cookies": {
+    "title": "Cookie preferences",
+    "body": "Essential cookies keep you signed in and secure. Optional diagnostics help us find and fix errors.",
+    "privacyPolicy": "Privacy policy",
+    "essential": "Essential",
+    "essentialBody": "Sign-in, security, and your saved consent choice.",
+    "alwaysOn": "Always on",
+    "analytics": "Analytics and diagnostics",
+    "analyticsBody": "Anonymous error and performance reports. Off by default.",
+    "allowAnalytics": "Allow analytics and diagnostics",
+    "manage": "Manage preferences",
+    "essentialOnly": "Essential only",
+    "save": "Save choices",
+    "acceptAll": "Accept all",
+    "storageError": "Your browser blocked saving this choice. Allow site storage and try again.",
+    "settings": "Cookie settings"
+  },
+  "auth": {
+    "login": "Sign In",
+    "register": "Create Account",
+    "email": "Email Address",
+    "password": "Password",
+    "terms": "Terms of Service",
+    "privacy": "Privacy Policy",
+    "shell": {
+      "tagline": "Business workspace",
+      "backHome": "Back home",
+      "privacy": "Privacy",
+      "terms": "Terms"
+    },
+    "passwordPolicy": {
+      "required": "Password is required.",
+      "tooShort": "Password must be at least 12 characters long.",
+      "tooLong": "Password cannot exceed 128 characters.",
+      "uppercase": "Password must contain at least one uppercase letter.",
+      "lowercase": "Password must contain at least one lowercase letter.",
+      "number": "Password must contain at least one number.",
+      "symbol": "Password must contain at least one symbol or special character.",
+      "description": "Must be at least 12 characters and include uppercase, lowercase, a number, and a symbol.",
+      "strength": {
+        "label": "Password strength",
+        "notStarted": "Not started",
+        "veryWeak": "Very Weak",
+        "weak": "Weak",
+        "fair": "Fair",
+        "good": "Good",
+        "strong": "Strong"
+      },
+      "checks": {
+        "minLength": "12 or more characters",
+        "uppercase": "Uppercase letter",
+        "lowercase": "Lowercase letter",
+        "number": "Number",
+        "symbol": "Symbol"
+      }
+    },
+    "signIn": {
+      "eyebrow": "Workspace access",
+      "title": "Welcome back",
+      "subtitle": "Sign in to continue to your Asas workspace.",
+      "orEmail": "or continue with work email",
+      "workEmail": "Work email",
+      "emailPlaceholder": "you@company.com",
+      "passwordPlaceholder": "••••••••",
+      "forgot": "Forgot password?",
+      "keepSignedIn": "Keep me signed in",
+      "submit": "Sign in",
+      "submitting": "Signing in...",
+      "noAccount": "Don't have an account?",
+      "createWorkspace": "Create workspace",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
+      "emailNotVerified": "Email not verified",
+      "emailNotVerifiedBody": "Your email address has not been confirmed yet. Please verify your account using the confirmation email we sent you before signing in.",
+      "goToVerification": "Go to verification page",
+      "resendEmail": "Resend email",
+      "resending": "Resending...",
+      "verificationSent": "Confirmation email sent to {{email}}. Please check your inbox.",
+      "errors": {
+        "enterEmail": "Please enter your email address.",
+        "fillAll": "Please fill in all fields.",
+        "signInFailed": "Unable to sign in. Please try again.",
+        "resetFailed": "Could not send reset link.",
+        "resendFailed": "Unable to resend confirmation email.",
+        "googleNotConfigured": "Google sign-in is not configured. Please use your work email.",
+        "googleSsoNotConfigured": "Google single sign-on is not configured for this deployment. Please sign in with your work email below.",
+        "googleUnavailable": "Google sign-in is currently unavailable in this environment."
+      },
+      "resetDialog": {
+        "title": "Reset your password",
+        "subtitle": "We will send you a link to reset your password.",
+        "confirm": "Send Reset Link",
+        "emailLabel": "Email address",
+        "sent": "If an account exists for this email, password reset instructions have been sent."
+      }
+    },
+    "registerPage": {
+      "sessionActive": "Session active",
+      "alreadySignedIn": "Already signed in",
+      "signedInAs": "You are currently signed in as {{email}}.",
+      "continueToWorkspace": "Continue to Workspace",
+      "signOutToCreate": "Sign out to create a new account",
+      "signupsPaused": "Signups paused",
+      "signupsPausedTitle": "New signups are paused",
+      "signupsPausedBody": "The platform is not accepting new workspaces right now. If you already have an account, sign in to continue.",
+      "signInInstead": "Sign in instead",
+      "newWorkspace": "New workspace",
+      "aboutTwoMinutes": "About 2 minutes",
+      "title": "Create your workspace",
+      "subtitle": "Set up a secure workspace for your company’s finance, people, and daily operations.",
+      "orEmail": "or register with work email",
+      "fullName": "Full Name",
+      "fullNamePlaceholder": "Jane Doe",
+      "workEmail": "Work Email",
+      "emailPlaceholder": "name@company.com",
+      "passwordPlaceholder": "Create a strong password",
+      "createAccount": "Create Account",
+      "creating": "Creating...",
+      "haveAccount": "Already have an account?",
+      "signIn": "Sign in",
+      "verifyThisEmail": "Verify this email",
+      "legal": "By creating an account, you agree to our <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",
+      "errors": {
+        "couldNotCreate": "Could not create your account.",
+        "unableToCreate": "Unable to create your account.",
+        "googleNotConfigured": "Google sign-up is not configured in this environment. Please sign up with your work email below.",
+        "googleSsoNotConfigured": "Google single sign-on is not configured for this deployment. Please register with your work email below.",
+        "googleUnavailable": "Google sign-up is currently unavailable in this environment."
+      }
+    },
+    "reset": {
+      "invalidTitle": "Invalid or Expired Link",
+      "invalidExpired": "This password reset link has expired. For your security, reset links are only valid for a limited time.",
+      "invalidUsed": "This password reset link is invalid or has already been used. Please request a new reset link to continue.",
+      "returnToInvitation": "Return to Invitation",
+      "returnToSignIn": "Return to Sign In",
+      "returnToSignInInstead": "Return to sign in instead",
+      "successTitle": "Password Reset Complete",
+      "successBodyUpdated": "Your password has been securely updated.",
+      "successBodyInvitation": "Returning you to your workspace invitation...",
+      "successBodySignIn": "Redirecting you to sign in...",
+      "continueToInvitation": "Continue to Invitation",
+      "signInNow": "Sign In Now",
+      "title": "Reset Your Password",
+      "subtitle": "Choose a secure new password for your Asas account.",
+      "failedTitle": "Password Reset Failed",
+      "newPassword": "New Password",
+      "newPasswordPlaceholder": "Enter at least 12 characters",
+      "confirmPassword": "Confirm Password",
+      "confirmPasswordPlaceholder": "Re-enter your new password",
+      "showNewPassword": "Show new password",
+      "hideNewPassword": "Hide new password",
+      "showConfirmPassword": "Show confirmed password",
+      "hideConfirmPassword": "Hide confirmed password",
+      "mismatch": "Passwords do not match.",
+      "requirementsTitle": "Password Requirements:",
+      "rules": {
+        "minLength": "At least 12 characters",
+        "uppercase": "One uppercase letter (A-Z)",
+        "lowercase": "One lowercase letter (a-z)",
+        "number": "One number (0-9)",
+        "symbol": "One symbol or special character"
+      },
+      "submit": "Set New Password",
+      "backToInvitation": "Back to invitation",
+      "backToSignIn": "Back to sign in",
+      "errors": {
+        "missingToken": "Password reset token is missing. Please request a new reset link.",
+        "resetFailed": "Unable to reset password. The link may have expired.",
+        "failedReset": "Failed to reset password. Please request a new link."
+      }
+    },
+    "verify": {
+      "confirmGmail": "Confirm your Gmail",
+      "confirmEmail": "Confirm your email",
+      "bodyInvitation": "A confirmation email has been sent to activate your account. Confirm your email, then Asas will return you to the workspace invitation.",
+      "bodySetup": "A confirmation email has been sent to activate your account. Confirm your email, then Asas will return you to workspace setup.",
+      "checkInbox": "Please check the inbox associated with your account.",
+      "openProvider": "Open {{provider}}",
+      "manualTitle": "Open your email app or webmail",
+      "manualBodyEmail": "We cannot detect the inbox provider for {{email}}. Open that inbox to find the confirmation message.",
+      "manualBody": "Open the inbox for the account you signed up with to find the confirmation message.",
+      "continueToInvitation": "Continue to Invitation",
+      "continueToSetup": "Continue to Workspace Setup",
+      "alreadyConfirmed": "Already confirmed? Go to Login",
+      "alreadyVerified": "Your email is already verified!",
+      "nextSteps": "Next steps:",
+      "step1": "1. Open the verification email from <strong>Asas</strong>. The sender address is set by this deployment.",
+      "step2": "2. Click the <strong>Verify Email</strong> button inside.",
+      "step3": "3. If you do not see it within a minute, check your Spam or Junk folder.",
+      "didntReceive": "Didn't receive the email?",
+      "sending": "Sending...",
+      "resendIn": "Resend in {{seconds}}s",
+      "resend": "Resend verification email",
+      "wrongEmail": "Wrong email address?",
+      "signOutSwitch": "Sign out and switch account",
+      "resendSent": "A fresh verification link was sent to {{email}}.",
+      "errors": {
+        "resendFailed": "Unable to resend verification email.",
+        "resendError": "Failed to resend verification email. Please try again."
+      }
+    },
+    "twoFactor": {
+      "title": "Two-factor verification",
+      "subtitle": "Enter a code to finish signing in to Asas.",
+      "recoveryCode": "Recovery code",
+      "authenticatorCode": "Authenticator code",
+      "recoveryPlaceholder": "Enter a recovery code",
+      "trustDevice": "Trust this device for 30 days",
+      "verify": "Verify and continue",
+      "useAuthenticator": "Use an authenticator code",
+      "useRecovery": "Use a recovery code",
+      "returnToSignIn": "Return to sign in",
+      "errors": {
+        "enterCode": "Enter the code from your authenticator app or a recovery code.",
+        "invalidCode": "That verification code could not be accepted."
+      }
+    }
+  },
+  "dashboard": {
+    "overview": "Dashboard overview",
+    "generateReport": "Generate Report",
+    "reportWaitingTitle": "Wait for dashboard data to finish loading before generating a report.",
+    "report": {
+      "title": "Dashboard report",
+      "calendarYear": "Calendar year {{year}}",
+      "metric": "Metric",
+      "value": "Value",
+      "cashFlowMonth": "Cash flow month",
+      "netAmountMinor": "Net amount (minor units)",
+      "currency": "Currency",
+      "activeSprint": "Active sprint",
+      "completionPct": "Completion (%)",
+      "endDate": "End date",
+      "requiresAttention": "Requires attention",
+      "detail": "Detail",
+      "amountAction": "Amount / action"
+    },
+    "stats": {
+      "headcount": "Headcount",
+      "hiredMtd": "{{count}} hired MTD",
+      "vsLastMonth": "{{delta}} vs same time last month",
+      "onLeave": "· {{count}} on leave",
+      "openPipelineValue": "Open Pipeline Value",
+      "openDeals": "{{count}} open deals",
+      "noHistoricalComparison": "No historical comparison yet",
+      "dealsVsPriorMonth": "{{delta}} deals vs prior month",
+      "payablesOutstanding": "Payables Outstanding",
+      "pastDue": "{{amount}} past due",
+      "dueIn7d": "{{amount}} due in 7d",
+      "dueIn7Days": "{{amount}} due in 7 days",
+      "paidMtd": "{{amount}} paid MTD (vs {{previous}})",
+      "noPastDueBills": "No past-due bills",
+      "pendingApproval": "{{count}} pending approval",
+      "acrossVendorAccounts": "Across all vendor accounts",
+      "activeSprints": "Active Sprints",
+      "activeCount": "{{count}} active",
+      "noActiveSprint": "No active sprint",
+      "completedAcrossPortfolio": "{{count}} completed across portfolio",
+      "noDetailsYet": "No details yet"
+    },
+    "cashFlow": {
+      "title": "Cash Flow Analysis",
+      "calendarYear": "Calendar year {{year}}",
+      "year": "Year",
+      "yearValue": "Year {{year}}",
+      "yearAria": "Cash flow calendar year",
+      "loading": "Loading cash flow…",
+      "error": "Cash flow could not be loaded.",
+      "empty": "No cash flow data is available for {{year}}.",
+      "net": "Net Cash Flow"
+    },
+    "attention": {
+      "title": "Requires Attention",
+      "loading": "Loading attention indicators…",
+      "error": "Attention indicators could not be loaded.",
+      "someError": "Some attention indicators could not be loaded.",
+      "empty": "Nothing needs attention right now.",
+      "overdueReceivables": "Overdue Receivables",
+      "overdueSubtitle_one": "Accounts receivable • {{count}} invoice past due",
+      "overdueSubtitle_other": "Accounts receivable • {{count}} invoices past due",
+      "lowStock": "Low-Stock Products",
+      "lowStockSubtitle_one": "Inventory • {{count}} product below threshold",
+      "lowStockSubtitle_other": "Inventory • {{count}} products below threshold",
+      "lowStockAmount_one": "{{count}} item",
+      "lowStockAmount_other": "{{count}} items",
+      "pendingPayroll": "Pending Payroll Runs",
+      "pendingPayrollSubtitle": "HR • awaiting payroll approval",
+      "payrollRunsAmount_one": "{{count}} run",
+      "payrollRunsAmount_other": "{{count}} runs",
+      "attendanceExceptions": "Attendance Exceptions",
+      "attendanceSubtitle": "HR • recorded this period",
+      "exceptionsAmount_one": "{{count}} exception",
+      "exceptionsAmount_other": "{{count}} exceptions",
+      "open": "Open",
+      "review": "Review"
+    },
+    "sprints": {
+      "title": "Active Sprints",
+      "viewBoard": "View Board",
+      "loading": "Loading sprints…",
+      "error": "Sprints could not be loaded.",
+      "empty": "No active sprints found.",
+      "complete": "{{pct}}% complete",
+      "noEndDate": "No end date • {{pct}}% complete",
+      "daysRemaining_one": "{{count}} day remaining • {{pct}}% complete",
+      "daysRemaining_other": "{{count}} days remaining • {{pct}}% complete",
+      "endsToday": "Ends today • {{pct}}% complete",
+      "pastEndDate": "Past end date • {{pct}}% complete"
+    },
+    "activity": {
+      "title": "Activity Feed",
+      "loading": "Loading activity...",
+      "error": "Could not load activity.",
+      "empty": "No recent activity",
+      "emptyBody": "Recorded audits will appear here after the page refreshes"
+    }
+  },
+  "shell": {
+    "loadingWorkspace": "Loading workspace…",
+    "defaultUser": "User",
+    "defaultWorkspace": "Enterprise ERP",
+    "skipToContent": "Skip to dashboard content",
+    "openNavigation": "Open navigation menu",
+    "closeNavigation": "Close navigation menu",
+    "mainNavigation": "Main navigation",
+    "userMenu": "User profile menu",
+    "breadcrumb": "Breadcrumb",
+    "expandSidebar": "Expand sidebar",
+    "collapseSidebar": "Collapse sidebar",
+    "search": "Search (⌘K or Ctrl+K)",
+    "globalSearch": "Global search (⌘K or Ctrl+K)",
+    "workspace": "WORKSPACE",
+    "switchWorkspace": "Switch or View All Workspaces",
+    "platformConsole": "Platform console",
+    "theme": {
+      "dark": "Dark",
+      "light": "Light"
+    },
+    "roles": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "member": "Member"
+    },
+    "language": {
+      "switchToEnglish": "Switch to English",
+      "switchToArabic": "التحويل إلى العربية"
+    },
+    "quickEntry": {
+      "title": "Quick Entry",
+      "description": "Select a record type to create or manage",
+      "newEmployee": "New Employee",
+      "newEmployeeDescription": "Add team member to HR directory",
+      "newPayable": "New Payable Bill",
+      "newPayableDescription": "Record a vendor invoice or bill",
+      "newExpense": "New Expense",
+      "newExpenseDescription": "Submit or log an expense receipt",
+      "newDeal": "New CRM Deal",
+      "newDealDescription": "Add sales opportunity to pipeline",
+      "newProduct": "New Product",
+      "newProductDescription": "Create product in catalog",
+      "sprints": "Sprints & Tasks",
+      "sprintsDescription": "View or create project issues"
+    },
+    "createWorkspace": {
+      "title": "Create New Workspace",
+      "subtitle": "Set up a new workspace for your organization or team.",
+      "confirm": "Create & Continue",
+      "nameLabel": "Workspace Name",
+      "namePlaceholder": "e.g. Acme Corporation"
+    },
+    "profile": {
+      "title": "Profile & Preferences",
+      "subtitle": "Manage your personal details and security credentials.",
+      "confirm": "Save Changes",
+      "emailLabel": "Email Address",
+      "emailHint": "Primary account email cannot be modified directly.",
+      "displayNameLabel": "Display Name",
+      "displayNamePlaceholder": "Your full name",
+      "changePassword": "Change Password (Optional)",
+      "currentPassword": "Current Password",
+      "currentPasswordPlaceholder": "Required to set new password",
+      "newPassword": "New Password",
+      "newPasswordPlaceholder": "At least 12 characters",
+      "confirmNewPassword": "Confirm New Password",
+      "confirmNewPasswordPlaceholder": "Re-type new password",
+      "updated": "Profile updated successfully."
+    },
+    "install": {
+      "title": "Download Desktop App",
+      "subtitle": "Install Asas ERP as a Progressive Web Application (PWA) for desktop.",
+      "confirm": "Got It",
+      "intro": "Asas ERP is a Progressive Web Application (PWA) designed to run natively on Windows, macOS, and Linux without needing a separate installer package.",
+      "stepsTitle": "To install on your computer:",
+      "step1": "In Google Chrome or Microsoft Edge, look for the <strong>Install</strong> icon (⊕ or computer icon) on the right side of the address bar.",
+      "step2": "Or click the browser menu (three dots <strong>⋮</strong>) and select <strong>Install Asas</strong>.",
+      "step3": "Asas will launch in its own dedicated, distraction-free desktop window with offline caching and taskbar shortcuts."
+    },
+    "errors": {
+      "switchWorkspace": "Could not switch workspace",
+      "createWorkspace": "Could not create workspace.",
+      "activateWorkspace": "Could not activate new workspace.",
+      "updateName": "Failed to update profile name",
+      "passwordMismatch": "New passwords do not match",
+      "currentPasswordRequired": "Current password is required to set a new password",
+      "changePassword": "Failed to change password",
+      "updateProfile": "Failed to update profile"
+    },
+    "emailBanner": {
+      "prompt": "Please confirm your email address (<strong>{{email}}</strong>) to complete verification.",
+      "action": "View instructions"
+    }
+  },
+  "commandPalette": {
+    "title": "Global search",
+    "description": "Search pages and quick actions, then press Enter to navigate.",
+    "placeholder": "Type a command, page, or search term...",
+    "close": "Close",
+    "emptyTitle": "No matching commands",
+    "emptyHint": "Try searching for pages like \"payroll\", \"invoices\", or actions like \"create deal\".",
+    "groups": {
+      "quickActions": "Quick Actions",
+      "navigation": "Navigation"
+    },
+    "footer": {
+      "navigate": "Navigate",
+      "select": "Select",
+      "close": "Close"
+    },
+    "commandCount_one": "{{count}} command",
+    "commandCount_other": "{{count}} commands",
+    "items": {
+      "nav-dashboard": {
+        "title": "Dashboard Overview",
+        "subtitle": "Platform metrics, cash flow and sprint summary"
+      },
+      "nav-employees": {
+        "title": "Employee Directory",
+        "subtitle": "HR employees, headcount and departments"
+      },
+      "nav-payroll": {
+        "title": "Payroll Runs",
+        "subtitle": "Salary runs, compensation and ledger posting"
+      },
+      "nav-attendance": {
+        "title": "Time & Attendance",
+        "subtitle": "Punches, timesheets and overtime"
+      },
+      "nav-time-off": {
+        "title": "Time Off & Leave",
+        "subtitle": "Leave requests, annual balances and policies"
+      },
+      "nav-recruitment": {
+        "title": "Recruitment Pipeline",
+        "subtitle": "Candidates, interviews and stage progression"
+      },
+      "nav-finance-overview": {
+        "title": "Finance Overview",
+        "subtitle": "Ledger cash flow, runway and expenses"
+      },
+      "nav-ap": {
+        "title": "Accounts Payable",
+        "subtitle": "Vendor bills, approvals and settlements"
+      },
+      "nav-ar": {
+        "title": "Accounts Receivable",
+        "subtitle": "Customer invoices, collections and aging"
+      },
+      "nav-expenses": {
+        "title": "Expense Reports",
+        "subtitle": "Reimbursements, receipts and approvals"
+      },
+      "nav-trial-balance": {
+        "title": "Trial Balance",
+        "subtitle": "General ledger account balances and verification"
+      },
+      "nav-crm-overview": {
+        "title": "CRM Overview",
+        "subtitle": "Win rates, quotas and deal conversions"
+      },
+      "nav-deals": {
+        "title": "Deals Pipeline",
+        "subtitle": "Kanban board of deals, stages and values"
+      },
+      "nav-forecast": {
+        "title": "Revenue Forecast",
+        "subtitle": "Weighted pipeline, commitments and quarterly goals"
+      },
+      "nav-inventory": {
+        "title": "Product Catalog",
+        "subtitle": "SKUs, stock thresholds and inventory valuation"
+      },
+      "nav-movements": {
+        "title": "Stock Movements",
+        "subtitle": "Ledger of all stock ins, outs and adjustments"
+      },
+      "nav-projects": {
+        "title": "Project Portfolio",
+        "subtitle": "Active projects, budget utilization and milestones"
+      },
+      "nav-sprints": {
+        "title": "Active Sprints",
+        "subtitle": "Sprint board, burndown and issue tracker"
+      },
+      "nav-roadmap": {
+        "title": "Project Roadmap",
+        "subtitle": "Gantt timeline, phases and work breakdown"
+      },
+      "nav-settings-general": {
+        "title": "Settings: General",
+        "subtitle": "Workspace profile, timezone, currency and danger zone"
+      },
+      "nav-settings-members": {
+        "title": "Settings: Members & Roles",
+        "subtitle": "Invite colleagues, manage roles and permissions"
+      },
+      "nav-settings-billing": {
+        "title": "Settings: Billing & Plans",
+        "subtitle": "Subscription tier, seats and invoice history"
+      },
+      "nav-support": {
+        "title": "Help Center & Support",
+        "subtitle": "Knowledge base and support ticket submission"
+      },
+      "action-new-payable": {
+        "title": "New Payable Bill",
+        "subtitle": "Record an inbound vendor bill for settlement"
+      },
+      "action-new-receivable": {
+        "title": "New Customer Invoice",
+        "subtitle": "Issue an outbound invoice for collection"
+      },
+      "action-log-expense": {
+        "title": "Log Expense",
+        "subtitle": "Submit a new operational or travel reimbursement"
+      },
+      "action-add-employee": {
+        "title": "Add New Employee",
+        "subtitle": "Onboard a staff member into the directory"
+      },
+      "action-create-deal": {
+        "title": "Create Deal",
+        "subtitle": "Add a new opportunity to the sales pipeline"
+      },
+      "action-create-task": {
+        "title": "Create Issue / Task",
+        "subtitle": "Add an item to the active sprint backlog"
+      },
+      "action-add-product": {
+        "title": "Add Product SKU",
+        "subtitle": "Register a new catalog item with reorder thresholds"
+      }
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "open": "Open notifications",
+    "badgeUnread_one": "{{count}} unread",
+    "badgeUnread_other": "{{count}} unread",
+    "markAllRead": "Mark all read",
+    "filterAll": "All ({{count}})",
+    "filterUnread": "Unread ({{count}})",
+    "loading": "Loading notifications…",
+    "loadError": "Notifications could not be loaded. Try again shortly.",
+    "allCaughtUp": "You're all caught up",
+    "noUnread": "No unread notifications at this time.",
+    "empty": "New operational alerts and invoices will appear here.",
+    "viewDetails": "View details",
+    "markAsRead": "Mark as read",
+    "delete": "Delete notification",
+    "refresh": "Refreshes every 20 seconds",
+    "preferences": "Preferences",
+    "justNow": "Just now",
+    "minutesAgo": "{{count}}m ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago",
+    "stateRead": "Read",
+    "stateUnread": "Unread"
+  }
+}

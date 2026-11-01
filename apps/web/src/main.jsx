@@ -99,7 +99,6 @@ function LiveSync() {
     if (!ready || !activeOrganization) return
     setFormatDefaults({
       currency: activeOrganization.currency,
-      locale: globalThis.navigator?.language || 'en-US',
       timezone: generalSettings?.timezone ?? 'UTC',
       dateFormat: generalSettings?.dateFormat ?? 'MMM d, yyyy',
     })

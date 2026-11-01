@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Eye, EyeOff, Loader2, MailCheck, ArrowRight, RefreshCw } from 'lucide-react'
 import { authClient, signIn } from '../../lib/authClient'
 import { authErrorMessage } from '../../lib/authErrorMessage'
@@ -15,6 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from '../../components/ui/alert'
 export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { t } = useTranslation()
 
   const [form, setForm]       = useState({ email: '', password: '' })
   const [rememberMe, setRememberMe] = useState(true)
@@ -34,7 +36,7 @@ export default function Login() {
 
   const submitForgotPassword = async () => {
     if (!forgotEmail.trim()) {
-      setForgotError('Please enter your email address.')
+      setForgotError(t('auth.signIn.errors.enterEmail'))
       return
     }
     setForgotLoading(true)
@@ -45,12 +47,12 @@ export default function Login() {
         redirectTo: window.location.origin + '/reset-password',
       })
       if (res?.error) {
-        setForgotError(authErrorMessage(res.error, 'Could not send reset link.'))
+        setForgotError(authErrorMessage(res.error, t('auth.signIn.errors.resetFailed')))
       } else {
-        setForgotSuccess('If an account exists for this email, password reset instructions have been sent.')
+        setForgotSuccess(t('auth.signIn.resetDialog.sent'))
       }
     } catch (err) {
-      setForgotError(authErrorMessage(err, 'Could not send reset link.'))
+      setForgotError(authErrorMessage(err, t('auth.signIn.errors.resetFailed')))
     } finally {
       setForgotLoading(false)
     }
@@ -66,7 +68,7 @@ export default function Login() {
     setResendVerificationNotice('')
 
     if (!form.email || !form.password) {
-      setError('Please fill in all fields.')
+      setError(t('auth.signIn.errors.fillAll'))
       return
     }
 
@@ -77,7 +79,7 @@ export default function Login() {
       const result = await signIn.email({ email: form.email, password: form.password, rememberMe })
       if (result?.error) {
         sessionStorage.removeItem('asas.auth.redirectAfterTwoFactor')
-        const msg = authErrorMessage(result.error, 'Unable to sign in. Please try again.')
+        const msg = authErrorMessage(result.error, t('auth.signIn.errors.signInFailed'))
         const isUnverified =
           result.error?.code === 'EMAIL_NOT_VERIFIED' ||
           /email.*not.*verified|not.*verified/i.test(msg) ||
@@ -93,7 +95,7 @@ export default function Login() {
       navigate(redirectTo, { replace: true })
     } catch (requestError) {
       sessionStorage.removeItem('asas.auth.redirectAfterTwoFactor')
-      const msg = authErrorMessage(requestError, 'Unable to sign in. Please try again.')
+      const msg = authErrorMessage(requestError, t('auth.signIn.errors.signInFailed'))
       if (/email.*not.*verified|not.*verified/i.test(msg)) {
         setUnverifiedEmail(form.email.trim())
       }
@@ -114,12 +116,12 @@ export default function Login() {
         callbackURL: `${window.location.origin}/dashboard`,
       })
       if (res?.error) {
-        setResendVerificationNotice(authErrorMessage(res.error, 'Unable to resend confirmation email.'))
+        setResendVerificationNotice(authErrorMessage(res.error, t('auth.signIn.errors.resendFailed')))
       } else {
-        setResendVerificationNotice(`Confirmation email sent to ${targetEmail}. Please check your inbox.`)
+        setResendVerificationNotice(t('auth.signIn.verificationSent', { email: targetEmail }))
       }
     } catch (err) {
-      setResendVerificationNotice(authErrorMessage(err, 'Unable to resend confirmation email.'))
+      setResendVerificationNotice(authErrorMessage(err, t('auth.signIn.errors.resendFailed')))
     } finally {
       setResendingVerification(false)
     }
@@ -139,16 +141,16 @@ export default function Login() {
           callbackURL: `${window.location.origin}${redirectTo}`,
         })
         if (res?.error) {
-          setError(res.error?.message || 'Google sign-in is not configured. Please use your work email.')
+          setError(res.error?.message || t('auth.signIn.errors.googleNotConfigured'))
         }
       } else if (providers.devAuthAllowed) {
         // Open local development SSO sandbox
         setDevModalOpen(true)
       } else {
-        setError('Google single sign-on is not configured for this deployment. Please sign in with your work email below.')
+        setError(t('auth.signIn.errors.googleSsoNotConfigured'))
       }
     } catch (socialErr) {
-      setError(authErrorMessage(socialErr, 'Google sign-in is currently unavailable in this environment.'))
+      setError(authErrorMessage(socialErr, t('auth.signIn.errors.googleUnavailable')))
     }
   }
 
@@ -156,9 +158,9 @@ export default function Login() {
     <div className="auth-form-stagger">
       {/* Header */}
       <div className="mb-5">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.17em] text-action">Workspace access</p>
-        <h1 className="text-2xl font-semibold tracking-[-0.04em] text-ink">Welcome back</h1>
-        <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">Sign in to continue to your Asas workspace.</p>
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.17em] text-action">{t('auth.signIn.eyebrow')}</p>
+        <h1 className="text-2xl font-semibold tracking-[-0.04em] text-ink">{t('auth.signIn.title')}</h1>
+        <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">{t('auth.signIn.subtitle')}</p>
       </div>
 
       {/* Social SSO Button */}
@@ -176,7 +178,7 @@ export default function Login() {
 
       <div className="mb-4 flex items-center gap-3">
         <span className="h-px flex-1 bg-black/[0.07]" />
-        <span className="text-[10px] text-ink-subtle">or continue with work email</span>
+        <span className="text-[10px] text-ink-subtle">{t('auth.signIn.orEmail')}</span>
         <span className="h-px flex-1 bg-black/[0.07]" />
       </div>
 
@@ -189,9 +191,9 @@ export default function Login() {
                 <MailCheck size={18} />
               </div>
               <div className="flex-1 min-w-0">
-                <AlertTitle className="text-sm font-semibold">Email not verified</AlertTitle>
+                <AlertTitle className="text-sm font-semibold">{t('auth.signIn.emailNotVerified')}</AlertTitle>
                 <AlertDescription className="text-xs mt-1 leading-relaxed text-danger-text">
-                  Your email address has not been confirmed yet. Please verify your account using the confirmation email we sent you before signing in.
+                  {t('auth.signIn.emailNotVerifiedBody')}
                 </AlertDescription>
 
                 {resendVerificationNotice && (
@@ -206,8 +208,8 @@ export default function Login() {
                     state={{ email: unverifiedEmail }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-button bg-primary text-on-primary hover:bg-primary-hover active:scale-[0.98] transition-all shadow-xs"
                   >
-                    <span>Go to verification page</span>
-                    <ArrowRight size={13} />
+                    <span>{t('auth.signIn.goToVerification')}</span>
+                    <ArrowRight size={13} className="rtl:-scale-x-100" />
                   </Link>
 
                   <Button
@@ -221,12 +223,12 @@ export default function Login() {
                     {resendingVerification ? (
                       <>
                         <Loader2 size={12} className="animate-spin" />
-                        <span>Resending...</span>
+                        <span>{t('auth.signIn.resending')}</span>
                       </>
                     ) : (
                       <>
                         <RefreshCw size={12} />
-                        <span>Resend email</span>
+                        <span>{t('auth.signIn.resendEmail')}</span>
                       </>
                     )}
                   </Button>
@@ -247,7 +249,7 @@ export default function Login() {
         {/* Email */}
         <div>
           <label htmlFor="login-email" className="mb-1.5 block text-[11px] font-medium text-ink-body">
-            Work email
+            {t('auth.signIn.workEmail')}
           </label>
           <Input
             id="login-email"
@@ -255,8 +257,9 @@ export default function Login() {
             name="email"
             value={form.email}
             onChange={handleChange}
-            placeholder="you@company.com"
+            placeholder={t('auth.signIn.emailPlaceholder')}
             autoComplete="email"
+            dir="ltr"
             className="h-10 rounded-xl border-black/10 bg-white/65 px-3 text-sm text-ink shadow-none placeholder:text-ink-faint focus-visible:bg-white focus-visible:ring-action"
           />
         </div>
@@ -264,7 +267,7 @@ export default function Login() {
         {/* Password */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label htmlFor="login-password" className="text-[11px] font-medium text-ink-body">Password</label>
+            <label htmlFor="login-password" className="text-[11px] font-medium text-ink-body">{t('auth.password')}</label>
             <Button
               type="button"
               variant="link"
@@ -276,7 +279,7 @@ export default function Login() {
               }}
               className="h-auto text-xs font-normal text-ink-muted no-underline hover:text-action hover:no-underline"
             >
-              Forgot password?
+              {t('auth.signIn.forgot')}
             </Button>
           </div>
           <div className="relative">
@@ -286,18 +289,19 @@ export default function Login() {
               name="password"
               value={form.password}
               onChange={handleChange}
-              placeholder="••••••••"
+              placeholder={t('auth.signIn.passwordPlaceholder')}
               autoComplete="current-password"
-              className="h-10 rounded-xl border-black/10 bg-white/65 px-3 pr-11 text-sm text-ink shadow-none placeholder:text-ink-faint focus-visible:bg-white focus-visible:ring-action"
+              dir="ltr"
+              className="h-10 rounded-xl border-black/10 bg-white/65 px-3 pe-11 text-sm text-ink shadow-none placeholder:text-ink-faint focus-visible:bg-white focus-visible:ring-action"
             />
             <Button
               type="button"
               variant="ghost"
               size="icon"
               onClick={() => setShowPass(p => !p)}
-              aria-label={showPass ? 'Hide password' : 'Show password'}
+              aria-label={showPass ? t('auth.signIn.hidePassword') : t('auth.signIn.showPassword')}
               aria-controls="login-password"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-caption hover:text-body transition-colors cursor-pointer"
+              className="absolute end-1 top-1/2 -translate-y-1/2 h-7 w-7 text-caption hover:text-body transition-colors cursor-pointer"
             >
               {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
             </Button>
@@ -313,7 +317,7 @@ export default function Login() {
             className="data-[state=checked]:border-action data-[state=checked]:bg-action"
           />
           <label htmlFor="remember" className="cursor-pointer select-none text-[11px] text-ink-muted">
-            Keep me signed in
+            {t('auth.signIn.keepSignedIn')}
           </label>
         </div>
 
@@ -326,10 +330,10 @@ export default function Login() {
           {loading ? (
             <>
               <Loader2 size={15} className="animate-spin" />
-              Signing in...
+              {t('auth.signIn.submitting')}
             </>
           ) : (
-            'Sign in'
+            t('auth.signIn.submit')
           )}
         </Button>
 
@@ -337,18 +341,18 @@ export default function Login() {
 
       {/* Register link */}
       <p className="mt-4 text-center text-xs text-ink-muted">
-        Don't have an account?{' '}
+        {t('auth.signIn.noAccount')}{' '}
         <Link to="/register" className="font-semibold text-action hover:underline">
-          Create workspace
+          {t('auth.signIn.createWorkspace')}
         </Link>
       </p>
 
       <FormDialog
         open={forgotOpen}
         onClose={() => setForgotOpen(false)}
-        title="Reset your password"
-        subtitle="We will send you a link to reset your password."
-        confirmLabel="Send Reset Link"
+        title={t('auth.signIn.resetDialog.title')}
+        subtitle={t('auth.signIn.resetDialog.subtitle')}
+        confirmLabel={t('auth.signIn.resetDialog.confirm')}
         busy={forgotLoading}
         onConfirm={submitForgotPassword}
       >
@@ -359,14 +363,15 @@ export default function Login() {
             </div>
           ) : (
             <div>
-              <label htmlFor="forgot-password-email" className="block text-xs font-medium text-body mb-1">Email address</label>
+              <label htmlFor="forgot-password-email" className="block text-xs font-medium text-body mb-1">{t('auth.signIn.resetDialog.emailLabel')}</label>
               <Input
                 id="forgot-password-email"
                 type="email"
                 value={forgotEmail}
                 onChange={(e) => setForgotEmail(e.target.value)}
-                placeholder="you@company.com"
+                placeholder={t('auth.signIn.emailPlaceholder')}
                 autoComplete="email"
+                dir="ltr"
                 className="bg-surface-raised"
               />
             </div>

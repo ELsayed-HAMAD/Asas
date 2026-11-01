@@ -1,0 +1,705 @@
+{
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "hr": "الموارد البشرية",
+    "employees": "دليل الموظفين",
+    "payroll": "مسيرات الرواتب",
+    "timeAttendance": "الدوام والحضور",
+    "timeOff": "الإجازات والمغادرات",
+    "recruitment": "التوظيف والترشيح",
+    "finance": "الإدارة المالية",
+    "accountsPayable": "حسابات الموردين (AP)",
+    "accountsReceivable": "حسابات العملاء (AR)",
+    "expenses": "المصروفات والنفقات",
+    "trialBalance": "ميزان المراجعة",
+    "crm": "إدارة العملاء (CRM)",
+    "deals": "مسار الصفقات",
+    "salesPerformance": "أداء المبيعات",
+    "revenueForecast": "توقعات الإيرادات",
+    "inventory": "المخزون والمستودعات",
+    "productCatalog": "دليل المنتجات",
+    "stockMovements": "حركات المخزون",
+    "inventoryValuation": "تقييم المخزون",
+    "projects": "إدارة المشاريع",
+    "portfolio": "نظرة عامة على المحفظة",
+    "activeSprints": "الدورات الحالية (Sprints)",
+    "roadmap": "خريطة الطريق",
+    "settings": "الإعدادات",
+    "general": "الإعدادات العامة",
+    "members": "الأعضاء والأدوار",
+    "billing": "الاشتراكات والفواتير",
+    "integrations": "التكاملات والربط",
+    "notifications": "إشعارات النظام",
+    "dataExport": "تصدير البيانات",
+    "support": "مركز المساعدة والدعم"
+  },
+  "finance": {
+    "overview": "نظرة عامة",
+    "reconciliation": "التسويات البنكية"
+  },
+  "crm": {
+    "overview": "نظرة عامة"
+  },
+  "common": {
+    "newEntry": "إدخال جديد",
+    "search": "بحث...",
+    "searchJump": "بحث أو انتقال سريع...",
+    "logout": "تسجيل الخروج",
+    "toggleTheme": "تبديل المظهر",
+    "downloadApp": "تنزيل تطبيق سطح المكتب",
+    "profilePreferences": "الملف الشخصي والتفضيلات",
+    "createWorkspace": "إنشاء مساحة عمل جديدة",
+    "sampleData": "بيانات تجريبية",
+    "save": "حفظ",
+    "saveChanges": "حفظ التغييرات",
+    "cancel": "إلغاء",
+    "confirm": "تأكيد",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "create": "إنشاء",
+    "add": "إضافة",
+    "filter": "تصفية",
+    "export": "تصدير",
+    "download": "تنزيل",
+    "close": "إغلاق",
+    "loading": "جاري التحميل...",
+    "back": "رجوع",
+    "next": "التالي",
+    "previous": "السابق",
+    "submit": "إرسال",
+    "status": "الحالة",
+    "name": "الاسم",
+    "date": "التاريخ",
+    "amount": "المبلغ",
+    "actions": "الإجراءات",
+    "total": "الإجمالي",
+    "all": "الكل",
+    "language": "اللغة",
+    "arabic": "العربية",
+    "english": "English",
+    "switchLanguage": "تغيير اللغة",
+    "active": "نشط",
+    "completed": "مكتمل",
+    "pending": "قيد الانتظار",
+    "draft": "مسودة",
+    "approved": "معتمد",
+    "paid": "مدفوع",
+    "void": "ملغى",
+    "reimbursed": "مسترد",
+    "rejected": "مرفوض",
+    "online": "متصل",
+    "offline": "غير متصل",
+    "yes": "نعم",
+    "no": "لا",
+    "error": "خطأ",
+    "success": "نجاح",
+    "open": "فتح",
+    "review": "مراجعة",
+    "year": "السنة"
+  },
+  "cookies": {
+    "title": "تفضيلات ملفات تعريف الارتباط",
+    "body": "ملفات تعريف الارتباط الأساسية تحافظ على تسجيل دخولك وأمان حسابك. تساعدنا التشخيصات الاختيارية على اكتشاف الأخطاء وإصلاحها.",
+    "privacyPolicy": "سياسة الخصوصية",
+    "essential": "أساسية",
+    "essentialBody": "تسجيل الدخول والأمان وخيار الموافقة المحفوظ.",
+    "alwaysOn": "مفعّلة دائمًا",
+    "analytics": "التحليلات والتشخيصات",
+    "analyticsBody": "تقارير مجهولة الهوية عن الأخطاء والأداء. معطّلة افتراضيًا.",
+    "allowAnalytics": "السماح بالتحليلات والتشخيصات",
+    "manage": "إدارة التفضيلات",
+    "essentialOnly": "الأساسية فقط",
+    "save": "حفظ الخيارات",
+    "acceptAll": "قبول الكل",
+    "storageError": "منع متصفحك حفظ هذا الخيار. اسمح بتخزين الموقع وحاول مرة أخرى.",
+    "settings": "إعدادات ملفات الارتباط"
+  },
+  "auth": {
+    "login": "تسجيل الدخول",
+    "register": "إنشاء حساب",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "terms": "شروط الخدمة",
+    "privacy": "سياسة الخصوصية",
+    "shell": {
+      "tagline": "مساحة عمل الأعمال",
+      "backHome": "العودة للرئيسية",
+      "privacy": "الخصوصية",
+      "terms": "الشروط"
+    },
+    "passwordPolicy": {
+      "required": "كلمة المرور مطلوبة.",
+      "tooShort": "يجب ألا تقل كلمة المرور عن 12 حرفًا.",
+      "tooLong": "يجب ألا تتجاوز كلمة المرور 128 حرفًا.",
+      "uppercase": "يجب أن تحتوي كلمة المرور على حرف كبير واحد على الأقل.",
+      "lowercase": "يجب أن تحتوي كلمة المرور على حرف صغير واحد على الأقل.",
+      "number": "يجب أن تحتوي كلمة المرور على رقم واحد على الأقل.",
+      "symbol": "يجب أن تحتوي كلمة المرور على رمز أو حرف خاص واحد على الأقل.",
+      "description": "يجب ألا تقل عن 12 حرفًا وأن تتضمن حرفًا كبيرًا وآخر صغيرًا ورقمًا ورمزًا.",
+      "strength": {
+        "label": "قوة كلمة المرور",
+        "notStarted": "لم تبدأ",
+        "veryWeak": "ضعيفة جدًا",
+        "weak": "ضعيفة",
+        "fair": "مقبولة",
+        "good": "جيدة",
+        "strong": "قوية"
+      },
+      "checks": {
+        "minLength": "12 حرفًا أو أكثر",
+        "uppercase": "حرف كبير",
+        "lowercase": "حرف صغير",
+        "number": "رقم",
+        "symbol": "رمز"
+      }
+    },
+    "signIn": {
+      "eyebrow": "الدخول إلى مساحة العمل",
+      "title": "مرحبًا بعودتك",
+      "subtitle": "سجّل الدخول للمتابعة إلى مساحة عمل Asas.",
+      "orEmail": "أو تابع بالبريد الإلكتروني للعمل",
+      "workEmail": "البريد الإلكتروني للعمل",
+      "emailPlaceholder": "you@company.com",
+      "passwordPlaceholder": "••••••••",
+      "forgot": "هل نسيت كلمة المرور؟",
+      "keepSignedIn": "إبقائي مسجّلًا للدخول",
+      "submit": "تسجيل الدخول",
+      "submitting": "جارٍ تسجيل الدخول...",
+      "noAccount": "ليس لديك حساب؟",
+      "createWorkspace": "أنشئ مساحة عمل",
+      "showPassword": "إظهار كلمة المرور",
+      "hidePassword": "إخفاء كلمة المرور",
+      "emailNotVerified": "البريد الإلكتروني غير مؤكد",
+      "emailNotVerifiedBody": "لم يتم تأكيد بريدك الإلكتروني بعد. يرجى تأكيد حسابك عبر رسالة التأكيد التي أرسلناها إليك قبل تسجيل الدخول.",
+      "goToVerification": "الانتقال إلى صفحة التأكيد",
+      "resendEmail": "إعادة إرسال الرسالة",
+      "resending": "جارٍ الإرسال...",
+      "verificationSent": "تم إرسال رسالة التأكيد إلى {{email}}. يرجى مراجعة صندوق الوارد.",
+      "errors": {
+        "enterEmail": "يرجى إدخال بريدك الإلكتروني.",
+        "fillAll": "يرجى تعبئة جميع الحقول.",
+        "signInFailed": "تعذّر تسجيل الدخول. يرجى المحاولة مرة أخرى.",
+        "resetFailed": "تعذّر إرسال رابط إعادة التعيين.",
+        "resendFailed": "تعذّر إعادة إرسال رسالة التأكيد.",
+        "googleNotConfigured": "تسجيل الدخول عبر Google غير مُهيأ. يرجى استخدام بريد العمل الإلكتروني.",
+        "googleSsoNotConfigured": "الدخول الموحد عبر Google غير مُهيأ لهذا النشر. يرجى تسجيل الدخول ببريد العمل أدناه.",
+        "googleUnavailable": "تسجيل الدخول عبر Google غير متاح حاليًا في هذه البيئة."
+      },
+      "resetDialog": {
+        "title": "إعادة تعيين كلمة المرور",
+        "subtitle": "سنرسل إليك رابطًا لإعادة تعيين كلمة المرور.",
+        "confirm": "إرسال رابط إعادة التعيين",
+        "emailLabel": "البريد الإلكتروني",
+        "sent": "إذا كان هناك حساب مرتبط بهذا البريد، فقد أُرسلت تعليمات إعادة تعيين كلمة المرور."
+      }
+    },
+    "registerPage": {
+      "sessionActive": "جلسة نشطة",
+      "alreadySignedIn": "أنت مسجّل الدخول بالفعل",
+      "signedInAs": "أنت مسجّل الدخول حاليًا باسم {{email}}.",
+      "continueToWorkspace": "المتابعة إلى مساحة العمل",
+      "signOutToCreate": "تسجيل الخروج لإنشاء حساب جديد",
+      "signupsPaused": "التسجيل متوقف",
+      "signupsPausedTitle": "التسجيل الجديد متوقف حاليًا",
+      "signupsPausedBody": "لا تقبل المنصة مساحات عمل جديدة في الوقت الحالي. إذا كان لديك حساب بالفعل، فسجّل الدخول للمتابعة.",
+      "signInInstead": "تسجيل الدخول بدلًا من ذلك",
+      "newWorkspace": "مساحة عمل جديدة",
+      "aboutTwoMinutes": "حوالي دقيقتين",
+      "title": "أنشئ مساحة عملك",
+      "subtitle": "جهّز مساحة عمل آمنة لمالية شركتك وموظفيها وعملياتها اليومية.",
+      "orEmail": "أو سجّل ببريد العمل الإلكتروني",
+      "fullName": "الاسم الكامل",
+      "fullNamePlaceholder": "محمد أحمد",
+      "workEmail": "بريد العمل الإلكتروني",
+      "emailPlaceholder": "name@company.com",
+      "passwordPlaceholder": "أنشئ كلمة مرور قوية",
+      "createAccount": "إنشاء الحساب",
+      "creating": "جارٍ الإنشاء...",
+      "haveAccount": "لديك حساب بالفعل؟",
+      "signIn": "تسجيل الدخول",
+      "verifyThisEmail": "تأكيد هذا البريد",
+      "legal": "بإنشاء حساب، فإنك توافق على <terms>شروط الخدمة</terms> و<privacy>سياسة الخصوصية</privacy>.",
+      "errors": {
+        "couldNotCreate": "تعذّر إنشاء حسابك.",
+        "unableToCreate": "لم نتمكن من إنشاء حسابك.",
+        "googleNotConfigured": "التسجيل عبر Google غير مُهيأ في هذه البيئة. يرجى التسجيل ببريد العمل أدناه.",
+        "googleSsoNotConfigured": "الدخول الموحد عبر Google غير مُهيأ لهذا النشر. يرجى التسجيل ببريد العمل أدناه.",
+        "googleUnavailable": "التسجيل عبر Google غير متاح حاليًا في هذه البيئة."
+      }
+    },
+    "reset": {
+      "invalidTitle": "رابط غير صالح أو منتهي الصلاحية",
+      "invalidExpired": "انتهت صلاحية رابط إعادة تعيين كلمة المرور. لحمايتك، تظل روابط إعادة التعيين صالحة لفترة محدودة فقط.",
+      "invalidUsed": "رابط إعادة تعيين كلمة المرور غير صالح أو استُخدم بالفعل. يرجى طلب رابط جديد للمتابعة.",
+      "returnToInvitation": "العودة إلى الدعوة",
+      "returnToSignIn": "العودة لتسجيل الدخول",
+      "returnToSignInInstead": "العودة لتسجيل الدخول بدلًا من ذلك",
+      "successTitle": "اكتملت إعادة تعيين كلمة المرور",
+      "successBodyUpdated": "تم تحديث كلمة المرور بأمان.",
+      "successBodyInvitation": "جارٍ إعادتك إلى دعوة مساحة العمل...",
+      "successBodySignIn": "جارٍ تحويلك إلى تسجيل الدخول...",
+      "continueToInvitation": "المتابعة إلى الدعوة",
+      "signInNow": "تسجيل الدخول الآن",
+      "title": "إعادة تعيين كلمة المرور",
+      "subtitle": "اختر كلمة مرور جديدة وآمنة لحسابك في Asas.",
+      "failedTitle": "تعذّرت إعادة تعيين كلمة المرور",
+      "newPassword": "كلمة المرور الجديدة",
+      "newPasswordPlaceholder": "أدخل 12 حرفًا على الأقل",
+      "confirmPassword": "تأكيد كلمة المرور",
+      "confirmPasswordPlaceholder": "أعد إدخال كلمة المرور الجديدة",
+      "showNewPassword": "إظهار كلمة المرور الجديدة",
+      "hideNewPassword": "إخفاء كلمة المرور الجديدة",
+      "showConfirmPassword": "إظهار كلمة المرور المؤكدة",
+      "hideConfirmPassword": "إخفاء كلمة المرور المؤكدة",
+      "mismatch": "كلمتا المرور غير متطابقتين.",
+      "requirementsTitle": "متطلبات كلمة المرور:",
+      "rules": {
+        "minLength": "12 حرفًا على الأقل",
+        "uppercase": "حرف كبير واحد (A-Z)",
+        "lowercase": "حرف صغير واحد (a-z)",
+        "number": "رقم واحد (0-9)",
+        "symbol": "رمز أو حرف خاص واحد"
+      },
+      "submit": "تعيين كلمة المرور الجديدة",
+      "backToInvitation": "العودة إلى الدعوة",
+      "backToSignIn": "العودة لتسجيل الدخول",
+      "errors": {
+        "missingToken": "رمز إعادة تعيين كلمة المرور مفقود. يرجى طلب رابط جديد.",
+        "resetFailed": "تعذّرت إعادة تعيين كلمة المرور. قد تكون صلاحية الرابط منتهية.",
+        "failedReset": "فشلت إعادة تعيين كلمة المرور. يرجى طلب رابط جديد."
+      }
+    },
+    "verify": {
+      "confirmGmail": "أكّد بريدك في Gmail",
+      "confirmEmail": "أكّد بريدك الإلكتروني",
+      "bodyInvitation": "أُرسلت رسالة تأكيد لتفعيل حسابك. أكّد بريدك الإلكتروني، ثم ستعيدك Asas إلى دعوة مساحة العمل.",
+      "bodySetup": "أُرسلت رسالة تأكيد لتفعيل حسابك. أكّد بريدك الإلكتروني، ثم ستعيدك Asas إلى إعداد مساحة العمل.",
+      "checkInbox": "يرجى مراجعة صندوق الوارد المرتبط بحسابك.",
+      "openProvider": "فتح {{provider}}",
+      "manualTitle": "افتح تطبيق البريد أو بريد الويب",
+      "manualBodyEmail": "تعذّر علينا تحديد مزوّد صندوق الوارد للبريد {{email}}. افتح ذلك الصندوق للعثور على رسالة التأكيد.",
+      "manualBody": "افتح صندوق الوارد الخاص بالحساب الذي سجّلت به للعثور على رسالة التأكيد.",
+      "continueToInvitation": "المتابعة إلى الدعوة",
+      "continueToSetup": "المتابعة إلى إعداد مساحة العمل",
+      "alreadyConfirmed": "أكّدت بريدك بالفعل؟ انتقل لتسجيل الدخول",
+      "alreadyVerified": "بريدك الإلكتروني مؤكد بالفعل!",
+      "nextSteps": "الخطوات التالية:",
+      "step1": "1. افتح رسالة التأكيد من <strong>Asas</strong>. عنوان المرسل تحدده جهة النشر.",
+      "step2": "2. اضغط زر <strong>تأكيد البريد الإلكتروني</strong> بداخلها.",
+      "step3": "3. إذا لم تجدها خلال دقيقة، فتحقق من مجلد البريد العشوائي أو غير المرغوب فيه.",
+      "didntReceive": "لم تستلم الرسالة؟",
+      "sending": "جارٍ الإرسال...",
+      "resendIn": "إعادة الإرسال خلال {{seconds}} ثانية",
+      "resend": "إعادة إرسال رسالة التأكيد",
+      "wrongEmail": "عنوان البريد غير صحيح؟",
+      "signOutSwitch": "تسجيل الخروج وتبديل الحساب",
+      "resendSent": "أُرسل رابط تأكيد جديد إلى {{email}}.",
+      "errors": {
+        "resendFailed": "تعذّر إعادة إرسال رسالة التأكيد.",
+        "resendError": "فشلت إعادة إرسال رسالة التأكيد. يرجى المحاولة مرة أخرى."
+      }
+    },
+    "twoFactor": {
+      "title": "التحقق بخطوتين",
+      "subtitle": "أدخل رمزًا لإكمال تسجيل الدخول إلى Asas.",
+      "recoveryCode": "رمز الاسترداد",
+      "authenticatorCode": "رمز تطبيق المصادقة",
+      "recoveryPlaceholder": "أدخل رمز الاسترداد",
+      "trustDevice": "الوثوق بهذا الجهاز لمدة 30 يومًا",
+      "verify": "تحقق وتابع",
+      "useAuthenticator": "استخدام رمز تطبيق المصادقة",
+      "useRecovery": "استخدام رمز الاسترداد",
+      "returnToSignIn": "العودة لتسجيل الدخول",
+      "errors": {
+        "enterCode": "أدخل الرمز من تطبيق المصادقة أو رمز الاسترداد.",
+        "invalidCode": "تعذّر قبول رمز التحقق هذا."
+      }
+    }
+  },
+  "dashboard": {
+    "overview": "نظرة عامة على لوحة التحكم",
+    "generateReport": "إنشاء تقرير",
+    "reportWaitingTitle": "انتظر حتى يكتمل تحميل بيانات لوحة التحكم قبل إنشاء التقرير.",
+    "report": {
+      "title": "تقرير لوحة التحكم",
+      "calendarYear": "السنة الميلادية {{year}}",
+      "metric": "المؤشر",
+      "value": "القيمة",
+      "cashFlowMonth": "شهر التدفق النقدي",
+      "netAmountMinor": "صافي المبلغ (بالوحدات الصغرى)",
+      "currency": "العملة",
+      "activeSprint": "الدورة النشطة",
+      "completionPct": "نسبة الإنجاز (%)",
+      "endDate": "تاريخ الانتهاء",
+      "requiresAttention": "يتطلب الانتباه",
+      "detail": "التفاصيل",
+      "amountAction": "المبلغ / الإجراء"
+    },
+    "stats": {
+      "headcount": "عدد الموظفين",
+      "hiredMtd": "تم توظيف {{count}} هذا الشهر",
+      "vsLastMonth": "{{delta}} مقارنة بالفترة المماثلة من الشهر الماضي",
+      "onLeave": "· {{count}} في إجازة",
+      "openPipelineValue": "قيمة الصفقات المفتوحة",
+      "openDeals": "{{count}} صفقة مفتوحة",
+      "noHistoricalComparison": "لا توجد مقارنة تاريخية بعد",
+      "dealsVsPriorMonth": "{{delta}} صفقة مقارنة بالشهر السابق",
+      "payablesOutstanding": "المستحقات للموردين",
+      "pastDue": "{{amount}} متأخرة",
+      "dueIn7d": "{{amount}} تستحق خلال 7 أيام",
+      "dueIn7Days": "{{amount}} تستحق خلال 7 أيام",
+      "paidMtd": "{{amount}} مدفوعة هذا الشهر (مقارنة بـ {{previous}})",
+      "noPastDueBills": "لا توجد فواتير متأخرة",
+      "pendingApproval": "{{count}} بانتظار الموافقة",
+      "acrossVendorAccounts": "عبر جميع حسابات الموردين",
+      "activeSprints": "الدورات النشطة",
+      "activeCount": "{{count}} نشطة",
+      "noActiveSprint": "لا توجد دورة نشطة",
+      "completedAcrossPortfolio": "{{count}} مكتملة عبر المحفظة",
+      "noDetailsYet": "لا توجد تفاصيل بعد"
+    },
+    "cashFlow": {
+      "title": "تحليل التدفقات النقدية",
+      "calendarYear": "السنة الميلادية {{year}}",
+      "year": "السنة",
+      "yearValue": "سنة {{year}}",
+      "yearAria": "السنة الميلادية للتدفق النقدي",
+      "loading": "جارٍ تحميل التدفقات النقدية…",
+      "error": "تعذّر تحميل التدفقات النقدية.",
+      "empty": "لا توجد بيانات تدفقات نقدية متاحة للسنة {{year}}.",
+      "net": "صافي التدفق النقدي"
+    },
+    "attention": {
+      "title": "يتطلب الانتباه",
+      "loading": "جارٍ تحميل مؤشرات الانتباه…",
+      "error": "تعذّر تحميل مؤشرات الانتباه.",
+      "someError": "تعذّر تحميل بعض مؤشرات الانتباه.",
+      "empty": "لا شيء يتطلب الانتباه الآن.",
+      "overdueReceivables": "مستحقات متأخرة",
+      "overdueSubtitle_one": "الحسابات المدينة • فاتورة واحدة متأخرة",
+      "overdueSubtitle_two": "الحسابات المدينة • فاتورتان متأخرتان",
+      "overdueSubtitle_few": "الحسابات المدينة • {{count}} فواتير متأخرة",
+      "overdueSubtitle_many": "الحسابات المدينة • {{count}} فاتورة متأخرة",
+      "overdueSubtitle_other": "الحسابات المدينة • {{count}} فاتورة متأخرة",
+      "lowStock": "منتجات منخفضة المخزون",
+      "lowStockSubtitle_one": "المخزون • منتج واحد تحت الحد الأدنى",
+      "lowStockSubtitle_two": "المخزون • منتجان تحت الحد الأدنى",
+      "lowStockSubtitle_few": "المخزون • {{count}} منتجات تحت الحد الأدنى",
+      "lowStockSubtitle_many": "المخزون • {{count}} منتجًا تحت الحد الأدنى",
+      "lowStockSubtitle_other": "المخزون • {{count}} منتج تحت الحد الأدنى",
+      "lowStockAmount_one": "عنصر واحد",
+      "lowStockAmount_two": "عنصران",
+      "lowStockAmount_few": "{{count}} عناصر",
+      "lowStockAmount_many": "{{count}} عنصرًا",
+      "lowStockAmount_other": "{{count}} عنصر",
+      "pendingPayroll": "مسيرات رواتب معلقة",
+      "pendingPayrollSubtitle": "الموارد البشرية • بانتظار اعتماد الرواتب",
+      "payrollRunsAmount_one": "مسير واحد",
+      "payrollRunsAmount_two": "مسيران",
+      "payrollRunsAmount_few": "{{count}} مسيرات",
+      "payrollRunsAmount_many": "{{count}} مسيرًا",
+      "payrollRunsAmount_other": "{{count}} مسير",
+      "attendanceExceptions": "استثناءات الحضور",
+      "attendanceSubtitle": "الموارد البشرية • مسجلة في هذه الفترة",
+      "exceptionsAmount_one": "استثناء واحد",
+      "exceptionsAmount_two": "استثناءان",
+      "exceptionsAmount_few": "{{count}} استثناءات",
+      "exceptionsAmount_many": "{{count}} استثناء",
+      "exceptionsAmount_other": "{{count}} استثناء",
+      "open": "فتح",
+      "review": "مراجعة"
+    },
+    "sprints": {
+      "title": "الدورات النشطة",
+      "viewBoard": "عرض اللوحة",
+      "loading": "جارٍ تحميل الدورات…",
+      "error": "تعذّر تحميل الدورات.",
+      "empty": "لا توجد دورات نشطة.",
+      "complete": "{{pct}}% مكتمل",
+      "noEndDate": "دون تاريخ انتهاء • {{pct}}% مكتمل",
+      "daysRemaining_one": "يوم واحد متبقٍ • {{pct}}% مكتمل",
+      "daysRemaining_two": "يومان متبقيان • {{pct}}% مكتمل",
+      "daysRemaining_few": "{{count}} أيام متبقية • {{pct}}% مكتمل",
+      "daysRemaining_many": "{{count}} يومًا متبقيًا • {{pct}}% مكتمل",
+      "daysRemaining_other": "{{count}} يوم متبقٍ • {{pct}}% مكتمل",
+      "endsToday": "ينتهي اليوم • {{pct}}% مكتمل",
+      "pastEndDate": "تجاوز تاريخ الانتهاء • {{pct}}% مكتمل"
+    },
+    "activity": {
+      "title": "سجل النشاط",
+      "loading": "جارٍ تحميل النشاط...",
+      "error": "تعذّر تحميل النشاط.",
+      "empty": "لا يوجد نشاط حديث",
+      "emptyBody": "ستظهر عمليات التدقيق المسجلة هنا بعد تحديث الصفحة"
+    }
+  },
+  "shell": {
+    "loadingWorkspace": "جارٍ تحميل مساحة العمل…",
+    "defaultUser": "مستخدم",
+    "defaultWorkspace": "مساحة العمل",
+    "skipToContent": "الانتقال إلى محتوى لوحة التحكم",
+    "openNavigation": "فتح قائمة التنقل",
+    "closeNavigation": "إغلاق قائمة التنقل",
+    "mainNavigation": "التنقل الرئيسي",
+    "userMenu": "قائمة ملف المستخدم",
+    "breadcrumb": "مسار التنقل",
+    "expandSidebar": "توسيع الشريط الجانبي",
+    "collapseSidebar": "طي الشريط الجانبي",
+    "search": "بحث (⌘K أو Ctrl+K)",
+    "globalSearch": "بحث شامل (⌘K أو Ctrl+K)",
+    "workspace": "مساحة العمل",
+    "switchWorkspace": "تبديل مساحة العمل أو عرض الكل",
+    "platformConsole": "لوحة تحكم المنصة",
+    "theme": {
+      "dark": "داكن",
+      "light": "فاتح"
+    },
+    "roles": {
+      "owner": "مالك",
+      "admin": "مسؤول",
+      "member": "عضو"
+    },
+    "language": {
+      "switchToEnglish": "Switch to English",
+      "switchToArabic": "التحويل إلى العربية"
+    },
+    "quickEntry": {
+      "title": "إدخال سريع",
+      "description": "اختر نوع السجل لإنشائه أو إدارته",
+      "newEmployee": "موظف جديد",
+      "newEmployeeDescription": "إضافة عضو فريق إلى دليل الموارد البشرية",
+      "newPayable": "فاتورة مورد جديدة",
+      "newPayableDescription": "تسجيل فاتورة أو مستحق لمورد",
+      "newExpense": "مصروف جديد",
+      "newExpenseDescription": "تقديم أو تسجيل إيصال مصروف",
+      "newDeal": "صفقة CRM جديدة",
+      "newDealDescription": "إضافة فرصة بيع إلى مسار الصفقات",
+      "newProduct": "منتج جديد",
+      "newProductDescription": "إنشاء منتج في الدليل",
+      "sprints": "الدورات والمهام",
+      "sprintsDescription": "عرض أو إنشاء مهام المشروع"
+    },
+    "createWorkspace": {
+      "title": "إنشاء مساحة عمل جديدة",
+      "subtitle": "أنشئ مساحة عمل جديدة لمؤسستك أو فريقك.",
+      "confirm": "إنشاء ومتابعة",
+      "nameLabel": "اسم مساحة العمل",
+      "namePlaceholder": "مثال: شركة أكمي"
+    },
+    "profile": {
+      "title": "الملف الشخصي والتفضيلات",
+      "subtitle": "أدر بياناتك الشخصية وبيانات الأمان.",
+      "confirm": "حفظ التغييرات",
+      "emailLabel": "البريد الإلكتروني",
+      "emailHint": "لا يمكن تعديل بريد الحساب الأساسي مباشرة.",
+      "displayNameLabel": "اسم العرض",
+      "displayNamePlaceholder": "اسمك الكامل",
+      "changePassword": "تغيير كلمة المرور (اختياري)",
+      "currentPassword": "كلمة المرور الحالية",
+      "currentPasswordPlaceholder": "مطلوبة لتعيين كلمة مرور جديدة",
+      "newPassword": "كلمة المرور الجديدة",
+      "newPasswordPlaceholder": "12 حرفًا على الأقل",
+      "confirmNewPassword": "تأكيد كلمة المرور الجديدة",
+      "confirmNewPasswordPlaceholder": "أعد كتابة كلمة المرور الجديدة",
+      "updated": "تم تحديث الملف الشخصي بنجاح."
+    },
+    "install": {
+      "title": "تنزيل تطبيق سطح المكتب",
+      "subtitle": "ثبّت Asas ERP كتطبيق ويب تقدمي (PWA) على سطح المكتب.",
+      "confirm": "فهمت",
+      "intro": "Asas ERP تطبيق ويب تقدمي (PWA) مصمم للعمل أصليًا على Windows وmacOS وLinux دون حاجة إلى حزمة تثبيت منفصلة.",
+      "stepsTitle": "للتثبيت على حاسوبك:",
+      "step1": "في Google Chrome أو Microsoft Edge، ابحث عن أيقونة <strong>التثبيت</strong> (⊕ أو أيقونة الحاسوب) على جانب شريط العناوين.",
+      "step2": "أو اضغط قائمة المتصفح (النقاط الثلاث <strong>⋮</strong>) واختر <strong>تثبيت Asas</strong>.",
+      "step3": "سيُشغّل Asas في نافذة سطح مكتب مخصصة وخالية من المشتتات مع تخزين مؤقت دون اتصال واختصارات في شريط المهام."
+    },
+    "errors": {
+      "switchWorkspace": "تعذّر تبديل مساحة العمل",
+      "createWorkspace": "تعذّر إنشاء مساحة العمل.",
+      "activateWorkspace": "تعذّر تفعيل مساحة العمل الجديدة.",
+      "updateName": "تعذّر تحديث اسم الملف الشخصي",
+      "passwordMismatch": "كلمتا المرور الجديدتان غير متطابقتين",
+      "currentPasswordRequired": "كلمة المرور الحالية مطلوبة لتعيين كلمة مرور جديدة",
+      "changePassword": "تعذّر تغيير كلمة المرور",
+      "updateProfile": "تعذّر تحديث الملف الشخصي"
+    },
+    "emailBanner": {
+      "prompt": "يرجى تأكيد بريدك الإلكتروني (<strong>{{email}}</strong>) لإكمال التحقق.",
+      "action": "عرض التعليمات"
+    }
+  },
+  "commandPalette": {
+    "title": "البحث الشامل",
+    "description": "ابحث في الصفحات والإجراءات السريعة، ثم اضغط Enter للانتقال.",
+    "placeholder": "اكتب أمرًا أو صفحة أو كلمة بحث...",
+    "close": "إغلاق",
+    "emptyTitle": "لا توجد أوامر مطابقة",
+    "emptyHint": "جرّب البحث عن صفحات مثل \"الرواتب\" أو \"الفواتير\"، أو إجراءات مثل \"إنشاء صفقة\".",
+    "groups": {
+      "quickActions": "إجراءات سريعة",
+      "navigation": "التنقل"
+    },
+    "footer": {
+      "navigate": "تنقّل",
+      "select": "اختيار",
+      "close": "إغلاق"
+    },
+    "commandCount_zero": "لا أوامر",
+    "commandCount_one": "أمر واحد",
+    "commandCount_two": "أمران",
+    "commandCount_few": "{{count}} أوامر",
+    "commandCount_many": "{{count}} أمرًا",
+    "commandCount_other": "{{count}} أمر",
+    "items": {
+      "nav-dashboard": {
+        "title": "نظرة عامة على لوحة التحكم",
+        "subtitle": "مؤشرات المنصة والتدفق النقدي وملخص الدورات"
+      },
+      "nav-employees": {
+        "title": "دليل الموظفين",
+        "subtitle": "موظفو الموارد البشرية والعدد والأقسام"
+      },
+      "nav-payroll": {
+        "title": "مسيرات الرواتب",
+        "subtitle": "مسيرات الرواتب والتعويضات وترحيل القيود"
+      },
+      "nav-attendance": {
+        "title": "الدوام والحضور",
+        "subtitle": "البصمات وسجلات الدوام والعمل الإضافي"
+      },
+      "nav-time-off": {
+        "title": "الإجازات والمغادرات",
+        "subtitle": "طلبات الإجازة والأرصدة السنوية والسياسات"
+      },
+      "nav-recruitment": {
+        "title": "مسار التوظيف",
+        "subtitle": "المرشحون والمقابلات وتقدم المراحل"
+      },
+      "nav-finance-overview": {
+        "title": "نظرة عامة على المالية",
+        "subtitle": "التدفق النقدي والاحتياطي والمصروفات"
+      },
+      "nav-ap": {
+        "title": "حسابات الموردين (AP)",
+        "subtitle": "فواتير الموردين والموافقات والتسويات"
+      },
+      "nav-ar": {
+        "title": "حسابات العملاء (AR)",
+        "subtitle": "فواتير العملاء والتحصيل وأعمار الديون"
+      },
+      "nav-expenses": {
+        "title": "تقارير المصروفات",
+        "subtitle": "المستردات والإيصالات والموافقات"
+      },
+      "nav-trial-balance": {
+        "title": "ميزان المراجعة",
+        "subtitle": "أرصدة حسابات دفتر الأستاذ والتحقق"
+      },
+      "nav-crm-overview": {
+        "title": "نظرة عامة على CRM",
+        "subtitle": "معدلات الفوز والحصص وتحويلات الصفقات"
+      },
+      "nav-deals": {
+        "title": "مسار الصفقات",
+        "subtitle": "لوحة كانبان للصفقات والمراحل والقيم"
+      },
+      "nav-forecast": {
+        "title": "توقعات الإيرادات",
+        "subtitle": "المسار المرجّح والالتزامات والأهداف الربعية"
+      },
+      "nav-inventory": {
+        "title": "دليل المنتجات",
+        "subtitle": "أكواد SKU وحدود المخزون وتقييم المخزون"
+      },
+      "nav-movements": {
+        "title": "حركات المخزون",
+        "subtitle": "سجل جميع إدخالات وإخراجات وتعديلات المخزون"
+      },
+      "nav-projects": {
+        "title": "محفظة المشاريع",
+        "subtitle": "المشاريع النشطة واستخدام الميزانية والمعالم"
+      },
+      "nav-sprints": {
+        "title": "الدورات النشطة",
+        "subtitle": "لوحة الدورات ومخطط الإنجاز ومتتبع المهام"
+      },
+      "nav-roadmap": {
+        "title": "خريطة طريق المشروع",
+        "subtitle": "الجدول الزمني والمراحل وتقسيم العمل"
+      },
+      "nav-settings-general": {
+        "title": "الإعدادات: عام",
+        "subtitle": "ملف مساحة العمل والمنطقة الزمنية والعملة ومنطقة الخطر"
+      },
+      "nav-settings-members": {
+        "title": "الإعدادات: الأعضاء والأدوار",
+        "subtitle": "دعوة الزملاء وإدارة الأدوار والصلاحيات"
+      },
+      "nav-settings-billing": {
+        "title": "الإعدادات: الاشتراكات والفواتير",
+        "subtitle": "فئة الاشتراك والمقاعد وسجل الفواتير"
+      },
+      "nav-support": {
+        "title": "مركز المساعدة والدعم",
+        "subtitle": "قاعدة المعرفة وإرسال تذاكر الدعم"
+      },
+      "action-new-payable": {
+        "title": "فاتورة مورد جديدة",
+        "subtitle": "تسجيل فاتورة مورد واردة للتسوية"
+      },
+      "action-new-receivable": {
+        "title": "فاتورة عميل جديدة",
+        "subtitle": "إصدار فاتورة صادرة للتحصيل"
+      },
+      "action-log-expense": {
+        "title": "تسجيل مصروف",
+        "subtitle": "تقديم استرداد تشغيلي أو سفر جديد"
+      },
+      "action-add-employee": {
+        "title": "إضافة موظف جديد",
+        "subtitle": "ضم عضو فريق إلى الدليل"
+      },
+      "action-create-deal": {
+        "title": "إنشاء صفقة",
+        "subtitle": "إضافة فرصة جديدة إلى مسار المبيعات"
+      },
+      "action-create-task": {
+        "title": "إنشاء مهمة / بلاغ",
+        "subtitle": "إضافة عنصر إلى قائمة مهام الدورة النشطة"
+      },
+      "action-add-product": {
+        "title": "إضافة منتج SKU",
+        "subtitle": "تسجيل عنصر جديد في الدليل مع حدود إعادة الطلب"
+      }
+    }
+  },
+  "notifications": {
+    "title": "الإشعارات",
+    "open": "فتح الإشعارات",
+    "badgeUnread_zero": "لا إشعارات غير مقروءة",
+    "badgeUnread_one": "إشعار واحد غير مقروء",
+    "badgeUnread_two": "إشعاران غير مقروءان",
+    "badgeUnread_few": "{{count}} إشعارات غير مقروءة",
+    "badgeUnread_many": "{{count}} إشعارًا غير مقروء",
+    "badgeUnread_other": "{{count}} إشعار غير مقروء",
+    "markAllRead": "تحديد الكل كمقروء",
+    "filterAll": "الكل ({{count}})",
+    "filterUnread": "غير المقروء ({{count}})",
+    "loading": "جارٍ تحميل الإشعارات…",
+    "loadError": "تعذّر تحميل الإشعارات. حاول مرة أخرى بعد قليل.",
+    "allCaughtUp": "لا يوجد جديد",
+    "noUnread": "لا توجد إشعارات غير مقروءة الآن.",
+    "empty": "ستظهر هنا التنبيهات التشغيلية والفواتير الجديدة.",
+    "viewDetails": "عرض التفاصيل",
+    "markAsRead": "تحديد كمقروء",
+    "delete": "حذف الإشعار",
+    "refresh": "يتحدّث كل 20 ثانية",
+    "preferences": "التفضيلات",
+    "justNow": "الآن",
+    "minutesAgo": "قبل {{count}} د",
+    "hoursAgo": "قبل {{count}} س",
+    "daysAgo": "قبل {{count}} ي",
+    "stateRead": "مقروء",
+    "stateUnread": "غير مقروء"
+  }
+}

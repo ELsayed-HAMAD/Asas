@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Eye, EyeOff, Loader2, CheckCircle2, AlertTriangle, ArrowRight, Check } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { Eye, EyeOff, Loader2, CheckCircle2, AlertTriangle, ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { authClient } from '../../lib/authClient'
 import { authErrorMessage } from '../../lib/authErrorMessage'
 import { getSafeAuthCallbackPath } from '../../lib/authRedirect'
@@ -11,6 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from '../../components/ui/alert'
 
 export default function ResetPassword() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token')
   const queryError = searchParams.get('error')
@@ -30,31 +32,31 @@ export default function ResetPassword() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
-  const strength = useMemo(() => getPasswordStrength(password), [password])
+  const strength = getPasswordStrength(password)
 
-  const rules = useMemo(() => [
-    { label: 'At least 12 characters', valid: password.length >= 12 },
-    { label: 'One uppercase letter (A-Z)', valid: /[A-Z]/.test(password) },
-    { label: 'One lowercase letter (a-z)', valid: /[a-z]/.test(password) },
-    { label: 'One number (0-9)', valid: /[0-9]/.test(password) },
-    { label: 'One symbol or special character', valid: /[^A-Za-z0-9]/.test(password) },
-  ], [password])
+  const rules = [
+    { label: t('auth.reset.rules.minLength'), valid: password.length >= 12 },
+    { label: t('auth.reset.rules.uppercase'), valid: /[A-Z]/.test(password) },
+    { label: t('auth.reset.rules.lowercase'), valid: /[a-z]/.test(password) },
+    { label: t('auth.reset.rules.number'), valid: /[0-9]/.test(password) },
+    { label: t('auth.reset.rules.symbol'), valid: /[^A-Za-z0-9]/.test(password) },
+  ]
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
 
     if (!token) {
-      setError('Password reset token is missing. Please request a new reset link.')
+      setError(t('auth.reset.errors.missingToken'))
       return
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match.')
+      setError(t('auth.reset.mismatch'))
       return
     }
 
-    const policyError = validatePasswordPolicy(password)
+    const policyError = validatePasswordPolicy(password, t)
     if (policyError) {
       setError(policyError)
       return
@@ -68,7 +70,7 @@ export default function ResetPassword() {
       })
 
       if (res?.error) {
-        throw new Error(authErrorMessage(res.error, 'Unable to reset password. The link may have expired.'))
+        throw new Error(authErrorMessage(res.error, t('auth.reset.errors.resetFailed')))
       }
 
       setSuccess(true)
@@ -76,7 +78,7 @@ export default function ResetPassword() {
         navigate(completionTarget, { replace: true })
       }, 2500)
     } catch (err) {
-      setError(authErrorMessage(err, 'Failed to reset password. Please request a new link.'))
+      setError(authErrorMessage(err, t('auth.reset.errors.failedReset')))
     } finally {
       setLoading(false)
     }
@@ -86,24 +88,25 @@ export default function ResetPassword() {
   if (!token || queryError) {
     return (
       <div className="flex flex-col text-center">
-        <div className="w-12 h-12 rounded-full bg-danger/10 text-danger flex items-center justify-center mx-auto mb-4">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-danger/10 text-danger">
           <AlertTriangle size={24} />
         </div>
-        <h1 className="text-2xl font-semibold text-heading mb-2">Invalid or Expired Link</h1>
-        <p className="text-sm text-muted mb-6 leading-relaxed">
+        <h1 className="mb-2 text-2xl font-semibold text-heading">{t('auth.reset.invalidTitle')}</h1>
+        <p className="mb-6 text-sm leading-relaxed text-muted">
           {queryError === 'EXPIRED_TOKEN'
-            ? 'This password reset link has expired. For your security, reset links are only valid for a limited time.'
-            : 'This password reset link is invalid or has already been used. Please request a new reset link to continue.'}
+            ? t('auth.reset.invalidExpired')
+            : t('auth.reset.invalidUsed')}
         </p>
 
-        <Button asChild className="w-full h-10">
+        <Button asChild className="h-10 w-full">
           <Link to={completionTarget} className="flex items-center justify-center gap-2">
-            {invitationReturnTo ? 'Return to Invitation' : 'Return to Sign In'} <ArrowRight size={16} />
+            {invitationReturnTo ? t('auth.reset.returnToInvitation') : t('auth.reset.returnToSignIn')}
+            <ArrowRight size={16} className="rtl:-scale-x-100" />
           </Link>
         </Button>
         {invitationReturnTo && (
           <Link to="/login" className="mt-4 text-xs text-muted hover:text-heading">
-            Return to sign in instead
+            {t('auth.reset.returnToSignInInstead')}
           </Link>
         )}
       </div>
@@ -113,19 +116,20 @@ export default function ResetPassword() {
   if (success) {
     return (
       <div className="flex flex-col text-center">
-        <div className="w-12 h-12 rounded-full bg-success-light text-success flex items-center justify-center mx-auto mb-4">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-success-light text-success">
           <CheckCircle2 size={24} />
         </div>
-        <h1 className="text-2xl font-semibold text-heading mb-2">Password Reset Complete</h1>
-        <p className="text-sm text-muted mb-6 leading-relaxed">
-          Your password has been securely updated.{' '}
+        <h1 className="mb-2 text-2xl font-semibold text-heading">{t('auth.reset.successTitle')}</h1>
+        <p className="mb-6 text-sm leading-relaxed text-muted">
+          {t('auth.reset.successBodyUpdated')}{' '}
           {invitationReturnTo
-            ? 'Returning you to your workspace invitation...'
-            : 'Redirecting you to sign in...'}
+            ? t('auth.reset.successBodyInvitation')
+            : t('auth.reset.successBodySignIn')}
         </p>
-        <Button asChild className="w-full h-10">
+        <Button asChild className="h-10 w-full">
           <Link to={completionTarget} className="flex items-center justify-center gap-2">
-            {invitationReturnTo ? 'Continue to Invitation' : 'Sign In Now'} <ArrowRight size={16} />
+            {invitationReturnTo ? t('auth.reset.continueToInvitation') : t('auth.reset.signInNow')}
+            <ArrowRight size={16} className="rtl:-scale-x-100" />
           </Link>
         </Button>
       </div>
@@ -135,24 +139,24 @@ export default function ResetPassword() {
   return (
     <div className="flex flex-col">
       <div className="mb-6 text-center">
-        <h1 className="text-2xl font-semibold text-heading mb-1.5">Reset Your Password</h1>
+        <h1 className="mb-1.5 text-2xl font-semibold text-heading">{t('auth.reset.title')}</h1>
         <p className="text-sm text-muted">
-          Choose a secure new password for your Asas account.
+          {t('auth.reset.subtitle')}
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <Alert variant="destructive">
-            <AlertTitle>Password Reset Failed</AlertTitle>
+            <AlertTitle>{t('auth.reset.failedTitle')}</AlertTitle>
             <AlertDescription className="text-xs">{error}</AlertDescription>
           </Alert>
         )}
 
         {/* New Password */}
         <div>
-          <label className="block text-sm font-medium text-body mb-1.5" htmlFor="password">
-            New Password
+          <label className="mb-1.5 block text-sm font-medium text-body" htmlFor="password">
+            {t('auth.reset.newPassword')}
           </label>
           <div className="relative">
             <Input
@@ -160,18 +164,19 @@ export default function ResetPassword() {
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter at least 12 characters"
+              placeholder={t('auth.reset.newPasswordPlaceholder')}
               autoComplete="new-password"
               aria-describedby="password-requirements"
               required
               autoFocus
-              className="pr-10"
+              dir="ltr"
+              className="pe-10"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute end-3 top-1/2 -translate-y-1/2 text-caption hover:text-body transition-colors"
-              aria-label={showPassword ? 'Hide new password' : 'Show new password'}
+              className="absolute end-3 top-1/2 -translate-y-1/2 text-caption transition-colors hover:text-body"
+              aria-label={showPassword ? t('auth.reset.hideNewPassword') : t('auth.reset.showNewPassword')}
               aria-controls="password"
             >
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -182,10 +187,10 @@ export default function ResetPassword() {
           {password && (
             <div className="mt-2.5 space-y-1.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-caption">Password strength</span>
-                <span className="font-medium text-body">{strength.label}</span>
+                <span className="text-caption">{t('auth.passwordPolicy.strength.label')}</span>
+                <span className="font-medium text-body">{t(`auth.passwordPolicy.strength.${strength.key}`)}</span>
               </div>
-              <div className="grid grid-cols-4 gap-1.5 h-1.5">
+              <div className="grid h-1.5 grid-cols-4 gap-1.5">
                 {[1, 2, 3, 4].map((step) => (
                   <div
                     key={step}
@@ -201,8 +206,8 @@ export default function ResetPassword() {
 
         {/* Confirm Password */}
         <div>
-          <label className="block text-sm font-medium text-body mb-1.5" htmlFor="confirmPassword">
-            Confirm Password
+          <label className="mb-1.5 block text-sm font-medium text-body" htmlFor="confirmPassword">
+            {t('auth.reset.confirmPassword')}
           </label>
           <div className="relative">
             <Input
@@ -210,38 +215,39 @@ export default function ResetPassword() {
               type={showConfirmPassword ? 'text' : 'password'}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Re-enter your new password"
+              placeholder={t('auth.reset.confirmPasswordPlaceholder')}
               autoComplete="new-password"
               aria-describedby="password-requirements"
               required
-              className="pr-10"
+              dir="ltr"
+              className="pe-10"
             />
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute end-3 top-1/2 -translate-y-1/2 text-caption hover:text-body transition-colors"
-              aria-label={showConfirmPassword ? 'Hide confirmed password' : 'Show confirmed password'}
+              className="absolute end-3 top-1/2 -translate-y-1/2 text-caption transition-colors hover:text-body"
+              aria-label={showConfirmPassword ? t('auth.reset.hideConfirmPassword') : t('auth.reset.showConfirmPassword')}
               aria-controls="confirmPassword"
             >
               {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
           {confirmPassword && password !== confirmPassword && (
-            <p className="text-[11px] text-danger mt-1">Passwords do not match.</p>
+            <p className="mt-1 text-[11px] text-danger">{t('auth.reset.mismatch')}</p>
           )}
         </div>
 
         {/* Requirements Checklist */}
-        <div className="bg-surface-muted/50 border border-border-subtle rounded-card-sm p-3 space-y-1.5 text-xs">
-          <p id="password-requirements" className="font-medium text-body mb-1">Password Requirements:</p>
+        <div className="space-y-1.5 rounded-card-sm border border-border-subtle bg-surface-muted/50 p-3 text-xs">
+          <p id="password-requirements" className="mb-1 font-medium text-body">{t('auth.reset.requirementsTitle')}</p>
           {rules.map((rule, idx) => (
             <div key={idx} className="flex items-center gap-2 text-caption">
               {rule.valid ? (
-                <Check size={13} className="text-success flex-shrink-0" />
+                <Check size={13} className="shrink-0 text-success" />
               ) : (
-                <span className="w-1.5 h-1.5 rounded-full bg-border-default ml-1 mr-0.5 flex-shrink-0" />
+                <span className="ms-1 me-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-border-default" />
               )}
-              <span className={rule.valid ? 'text-body font-medium' : ''}>
+              <span className={rule.valid ? 'font-medium text-body' : ''}>
                 {rule.label}
               </span>
             </div>
@@ -251,15 +257,16 @@ export default function ResetPassword() {
         <Button
           type="submit"
           disabled={loading || !password || !confirmPassword || password !== confirmPassword}
-          className="w-full h-10 mt-2 cursor-pointer"
+          className="mt-2 h-10 w-full cursor-pointer"
         >
-          {loading ? <Loader2 size={16} className="animate-spin" /> : 'Set New Password'}
+          {loading ? <Loader2 size={16} className="animate-spin" /> : t('auth.reset.submit')}
         </Button>
       </form>
 
       <div className="mt-6 text-center">
-        <Link to={completionTarget} className="text-sm font-medium text-muted hover:text-heading transition-colors">
-          &larr; {invitationReturnTo ? 'Back to invitation' : 'Back to sign in'}
+        <Link to={completionTarget} className="inline-flex items-center gap-1 text-sm font-medium text-muted transition-colors hover:text-heading">
+          <ArrowLeft size={14} className="rtl:-scale-x-100" />
+          {invitationReturnTo ? t('auth.reset.backToInvitation') : t('auth.reset.backToSignIn')}
         </Link>
       </div>
     </div>

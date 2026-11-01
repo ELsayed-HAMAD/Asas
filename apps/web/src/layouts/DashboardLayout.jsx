@@ -7,7 +7,7 @@ import {
   Check, User, Moon, Download, Search, Globe, Mail, Building2, ShieldCheck
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useTranslation } from 'react-i18next'
+import { useTranslation, Trans } from 'react-i18next'
 import { changeLanguage } from '../lib/i18n'
 import { validatePasswordPolicy } from '../lib/passwordPolicy'
 import { clearOnboardingDraft, onboardingDraftStorage } from '../lib/onboardingDraft'
@@ -373,11 +373,12 @@ function NavItem({ item, pathname, openSections, toggleSection, onNavigate, t, i
 }
 
 function DashboardPageLoading() {
+  const { t } = useTranslation()
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center p-8" role="status" aria-live="polite">
       <div className="flex items-center gap-3 rounded-2xl border border-border-default bg-surface-raised/65 px-5 py-3 text-sm text-muted shadow-card backdrop-blur-xl">
         <Loader2 size={16} className="animate-spin text-accent" />
-        Loading workspace…
+        {t('shell.loadingWorkspace', 'Loading workspace…')}
       </div>
     </div>
   )
@@ -429,12 +430,15 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
   const { data: organizations } = useListOrganizations()
   const queryClient = useQueryClient()
 
-  const displayName = session?.user?.name || 'User'
+  const displayName = session?.user?.name || t('shell.defaultUser', 'User')
   const platformRole = session?.user?.platformRole
   const isPlatformAdmin = Boolean(platformRole && platformRole !== 'NONE')
   const roleName = typeof activeMemberRole === 'string' ? activeMemberRole : activeMemberRole?.role
-  const roleLabel = roleName ? roleName.charAt(0) + roleName.slice(1).toLowerCase() : 'Member'
-  const tenantName = activeOrganization?.name || 'Enterprise ERP'
+  const roleKey = roleName ? String(roleName).toLowerCase() : 'member'
+  const roleLabel = t(`shell.roles.${roleKey}`, {
+    defaultValue: roleName ? roleName.charAt(0) + roleName.slice(1).toLowerCase() : 'Member',
+  })
+  const tenantName = activeOrganization?.name || t('shell.defaultWorkspace', 'Enterprise ERP')
   const email = session?.user?.email || ''
   const initials = displayName
     .split(' ')
@@ -465,7 +469,7 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
       // committing to the clear + hard reload.
       const res = await authClient.organization.setActive({ organizationId })
       if (res?.error) {
-        setOrgSwitchError(res.error?.message || 'Could not switch workspace')
+        setOrgSwitchError(res.error?.message || t('shell.errors.switchWorkspace', 'Could not switch workspace'))
         setSwitchingOrgId(null)
         return
       }
@@ -477,7 +481,7 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
       queryClient.clear()
       window.location.assign('/dashboard')
     } catch (err) {
-      setOrgSwitchError(err?.message || 'Could not switch workspace')
+      setOrgSwitchError(err?.message || t('shell.errors.switchWorkspace', 'Could not switch workspace'))
       setSwitchingOrgId(null)
     }
   }
@@ -494,20 +498,20 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
         slug,
       })
       if (createRes?.error) {
-        throw new Error(createRes.error?.message || 'Could not create workspace.')
+        throw new Error(createRes.error?.message || t('shell.errors.createWorkspace', 'Could not create workspace.'))
       }
       const setActiveRes = await authClient.organization.setActive({
         organizationId: createRes.data.id,
       })
       if (setActiveRes?.error) {
-        throw new Error(setActiveRes.error?.message || 'Could not activate new workspace.')
+        throw new Error(setActiveRes.error?.message || t('shell.errors.activateWorkspace', 'Could not activate new workspace.'))
       }
       queryClient.clear()
       // The new workspace starts from a clean wizard, never from a draft left by an earlier one.
       clearOnboardingDraft(onboardingDraftStorage())
       window.location.assign('/onboarding')
     } catch (err) {
-      setCreateWorkspaceError(err?.message || 'Could not create workspace.')
+      setCreateWorkspaceError(err?.message || t('shell.errors.createWorkspace', 'Could not create workspace.'))
       setIsCreatingWorkspace(false)
     }
   }
@@ -544,19 +548,19 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
       if (profileName.trim() && profileName.trim() !== displayName) {
         const updateRes = await authClient.updateUser({ name: profileName.trim() })
         if (updateRes?.error) {
-          throw new Error(updateRes.error.message || 'Failed to update profile name')
+          throw new Error(updateRes.error.message || t('shell.errors.updateName', 'Failed to update profile name'))
         }
       }
       if (newPassword) {
         if (newPassword !== confirmPassword) {
-          throw new Error('New passwords do not match')
+          throw new Error(t('shell.errors.passwordMismatch', 'New passwords do not match'))
         }
-        const policyErr = validatePasswordPolicy(newPassword)
+        const policyErr = validatePasswordPolicy(newPassword, t)
         if (policyErr) {
           throw new Error(policyErr)
         }
         if (!currentPassword) {
-          throw new Error('Current password is required to set a new password')
+          throw new Error(t('shell.errors.currentPasswordRequired', 'Current password is required to set a new password'))
         }
         const pwRes = await authClient.changePassword({
           currentPassword,
@@ -564,16 +568,16 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
           revokeOtherSessions: false,
         })
         if (pwRes?.error) {
-          throw new Error(pwRes.error.message || 'Failed to change password')
+          throw new Error(pwRes.error.message || t('shell.errors.changePassword', 'Failed to change password'))
         }
       }
-      setProfileSuccess('Profile updated successfully.')
+      setProfileSuccess(t('shell.profile.updated', 'Profile updated successfully.'))
       setTimeout(() => {
         setProfileOpen(false)
         window.location.reload()
       }, 1000)
     } catch (err) {
-      setProfileError(err?.message || 'Failed to update profile')
+      setProfileError(err?.message || t('shell.errors.updateProfile', 'Failed to update profile'))
     } finally {
       setIsUpdatingProfile(false)
     }
@@ -681,7 +685,7 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
             <button
               type="button"
               data-testid="user-menu-button"
-              aria-label="User profile menu"
+              aria-label={t('shell.userMenu', 'User profile menu')}
               aria-expanded={userMenuOpen}
               className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5'} hover:bg-surface-muted p-2 -mx-2 rounded-lg transition-colors text-left rtl:text-right cursor-pointer`}
             >
@@ -721,7 +725,7 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
               {/* Workspace Switcher Sub-Pod */}
               <div className="pt-2 border-t border-slate-200/60 space-y-1">
                 <p className="px-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  WORKSPACE
+                  {t('shell.workspace', 'WORKSPACE')}
                 </p>
                 {orgList.length > 1 ? (
                   <>
@@ -756,7 +760,7 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
                       className="w-full px-2 py-1 rounded-lg hover:bg-white/60 flex items-center gap-2 text-[11px] text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
                     >
                       <Building2 size={13} className="text-slate-400" />
-                      <span className="truncate">Switch or View All Workspaces</span>
+                      <span className="truncate">{t('shell.switchWorkspace', 'Switch or View All Workspaces')}</span>
                     </DropdownMenuItem>
                   </>
                 ) : (
@@ -815,7 +819,7 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
                   <span className="whitespace-nowrap">{t('common.toggleTheme', 'Toggle Theme')}</span>
                 </div>
                 <span className="px-1.5 py-0.5 rounded-md bg-slate-200/60 text-[10px] font-semibold text-slate-500 uppercase shrink-0">
-                  {isDarkTheme ? 'Dark' : 'Light'}
+                  {isDarkTheme ? t('shell.theme.dark', 'Dark') : t('shell.theme.light', 'Light')}
                 </span>
               </DropdownMenuItem>
 
@@ -823,7 +827,7 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
                 data-testid="language-toggle"
                 onClick={() => changeLanguage(i18n.language === 'ar' ? 'en' : 'ar')}
                 className="w-full px-2.5 py-1.5 rounded-xl hover:bg-slate-900/[0.05] active:bg-slate-900/[0.08] flex items-center justify-between text-xs font-medium text-slate-700 transition-all cursor-pointer"
-                title={i18n.language === 'ar' ? 'Switch to English' : 'التحويل إلى العربية'}
+                title={i18n.language === 'ar' ? t('shell.language.switchToEnglish', 'Switch to English') : t('shell.language.switchToArabic', 'التحويل إلى العربية')}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <Globe size={14} className="text-slate-400 shrink-0" />
@@ -851,7 +855,7 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
                   className="w-full px-2.5 py-1.5 rounded-xl hover:bg-indigo-50 flex items-center gap-2.5 text-xs font-semibold text-indigo-700 transition-all cursor-pointer"
                 >
                   <ShieldCheck size={14} />
-                  <span>Platform console</span>
+                  <span>{t('shell.platformConsole', 'Platform console')}</span>
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem
@@ -874,8 +878,8 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
                 <Plus size={18} />
               </div>
               <div>
-                <h3 className="text-base font-semibold text-heading">Quick Entry</h3>
-                <p className="text-xs text-caption">Select a record type to create or manage</p>
+                <h3 className="text-base font-semibold text-heading">{t('shell.quickEntry.title', 'Quick Entry')}</h3>
+                <p className="text-xs text-caption">{t('shell.quickEntry.description', 'Select a record type to create or manage')}</p>
               </div>
             </div>
           </div>
@@ -889,8 +893,8 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
                 <Users size={18} />
               </div>
               <div>
-                <h4 className="text-sm font-semibold text-heading">New Employee</h4>
-                <p className="text-xs text-caption">Add team member to HR directory</p>
+                <h4 className="text-sm font-semibold text-heading">{t('shell.quickEntry.newEmployee', 'New Employee')}</h4>
+                <p className="text-xs text-caption">{t('shell.quickEntry.newEmployeeDescription', 'Add team member to HR directory')}</p>
               </div>
             </button>
             <button
@@ -902,8 +906,8 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
                 <CreditCard size={18} />
               </div>
               <div>
-                <h4 className="text-sm font-semibold text-heading">New Payable Bill</h4>
-                <p className="text-xs text-caption">Record a vendor invoice or bill</p>
+                <h4 className="text-sm font-semibold text-heading">{t('shell.quickEntry.newPayable', 'New Payable Bill')}</h4>
+                <p className="text-xs text-caption">{t('shell.quickEntry.newPayableDescription', 'Record a vendor invoice or bill')}</p>
               </div>
             </button>
             <button
@@ -915,8 +919,8 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
                 <CreditCard size={18} />
               </div>
               <div>
-                <h4 className="text-sm font-semibold text-heading">New Expense</h4>
-                <p className="text-xs text-caption">Submit or log an expense receipt</p>
+                <h4 className="text-sm font-semibold text-heading">{t('shell.quickEntry.newExpense', 'New Expense')}</h4>
+                <p className="text-xs text-caption">{t('shell.quickEntry.newExpenseDescription', 'Submit or log an expense receipt')}</p>
               </div>
             </button>
             <button
@@ -928,8 +932,8 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
                 <Briefcase size={18} />
               </div>
               <div>
-                <h4 className="text-sm font-semibold text-heading">New CRM Deal</h4>
-                <p className="text-xs text-caption">Add sales opportunity to pipeline</p>
+                <h4 className="text-sm font-semibold text-heading">{t('shell.quickEntry.newDeal', 'New CRM Deal')}</h4>
+                <p className="text-xs text-caption">{t('shell.quickEntry.newDealDescription', 'Add sales opportunity to pipeline')}</p>
               </div>
             </button>
             <button
@@ -941,8 +945,8 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
                 <Package size={18} />
               </div>
               <div>
-                <h4 className="text-sm font-semibold text-heading">New Product</h4>
-                <p className="text-xs text-caption">Create product in catalog</p>
+                <h4 className="text-sm font-semibold text-heading">{t('shell.quickEntry.newProduct', 'New Product')}</h4>
+                <p className="text-xs text-caption">{t('shell.quickEntry.newProductDescription', 'Create product in catalog')}</p>
               </div>
             </button>
             <button
@@ -954,8 +958,8 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
                 <FolderKanban size={18} />
               </div>
               <div>
-                <h4 className="text-sm font-semibold text-heading">Sprints & Tasks</h4>
-                <p className="text-xs text-caption">View or create project issues</p>
+                <h4 className="text-sm font-semibold text-heading">{t('shell.quickEntry.sprints', 'Sprints & Tasks')}</h4>
+                <p className="text-xs text-caption">{t('shell.quickEntry.sprintsDescription', 'View or create project issues')}</p>
               </div>
             </button>
           </div>
@@ -966,22 +970,22 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
       <FormDialog
         open={createWorkspaceOpen}
         onClose={() => !isCreatingWorkspace && setCreateWorkspaceOpen(false)}
-        title="Create New Workspace"
-        subtitle="Set up a new workspace for your organization or team."
-        confirmLabel="Create & Continue"
+        title={t('shell.createWorkspace.title', 'Create New Workspace')}
+        subtitle={t('shell.createWorkspace.subtitle', 'Set up a new workspace for your organization or team.')}
+        confirmLabel={t('shell.createWorkspace.confirm', 'Create & Continue')}
         busy={isCreatingWorkspace}
         error={createWorkspaceError}
         onConfirm={handleCreateWorkspace}
         width="max-w-md"
       >
         <div>
-          <label className="block text-xs font-bold text-heading mb-1.5">Workspace Name</label>
+          <label className="block text-xs font-bold text-heading mb-1.5">{t('shell.createWorkspace.nameLabel', 'Workspace Name')}</label>
           <Input
             type="text"
             required
             value={newWorkspaceName}
             onChange={(e) => setNewWorkspaceName(e.target.value)}
-            placeholder="e.g. Acme Corporation"
+            placeholder={t('shell.createWorkspace.namePlaceholder', 'e.g. Acme Corporation')}
           />
         </div>
       </FormDialog>
@@ -990,9 +994,9 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
       <FormDialog
         open={profileOpen}
         onClose={() => !isUpdatingProfile && setProfileOpen(false)}
-        title="Profile & Preferences"
-        subtitle="Manage your personal details and security credentials."
-        confirmLabel="Save Changes"
+        title={t('shell.profile.title', 'Profile & Preferences')}
+        subtitle={t('shell.profile.subtitle', 'Manage your personal details and security credentials.')}
+        confirmLabel={t('shell.profile.confirm', 'Save Changes')}
         busy={isUpdatingProfile}
         error={profileError}
         onConfirm={handleUpdateProfile}
@@ -1005,55 +1009,55 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
             </div>
           )}
           <div>
-            <label className="block text-xs font-bold text-heading mb-1.5">Email Address</label>
+            <label className="block text-xs font-bold text-heading mb-1.5">{t('shell.profile.emailLabel', 'Email Address')}</label>
             <Input
               type="email"
               disabled
               value={session?.user?.email || ''}
               className="cursor-not-allowed bg-surface-muted text-muted"
             />
-            <p className="text-[11px] text-caption mt-1">Primary account email cannot be modified directly.</p>
+            <p className="text-[11px] text-caption mt-1">{t('shell.profile.emailHint', 'Primary account email cannot be modified directly.')}</p>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-heading mb-1.5">Display Name</label>
+            <label className="block text-xs font-bold text-heading mb-1.5">{t('shell.profile.displayNameLabel', 'Display Name')}</label>
             <Input
               type="text"
               required
               value={profileName}
               onChange={(e) => setProfileName(e.target.value)}
-              placeholder="Your full name"
+              placeholder={t('shell.profile.displayNamePlaceholder', 'Your full name')}
             />
           </div>
 
           <div className="pt-3 border-t border-border-subtle">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-caption mb-3">Change Password (Optional)</h4>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-caption mb-3">{t('shell.profile.changePassword', 'Change Password (Optional)')}</h4>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-heading mb-1">Current Password</label>
+                <label className="block text-xs font-medium text-heading mb-1">{t('shell.profile.currentPassword', 'Current Password')}</label>
                 <Input
                   type="password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="Required to set new password"
+                  placeholder={t('shell.profile.currentPasswordPlaceholder', 'Required to set new password')}
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-heading mb-1">New Password</label>
+                <label className="block text-xs font-medium text-heading mb-1">{t('shell.profile.newPassword', 'New Password')}</label>
                 <Input
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="At least 8 characters"
+                  placeholder={t('shell.profile.newPasswordPlaceholder', 'At least 12 characters')}
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-heading mb-1">Confirm New Password</label>
+                <label className="block text-xs font-medium text-heading mb-1">{t('shell.profile.confirmNewPassword', 'Confirm New Password')}</label>
                 <Input
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Re-type new password"
+                  placeholder={t('shell.profile.confirmNewPasswordPlaceholder', 'Re-type new password')}
                 />
               </div>
             </div>
@@ -1065,22 +1069,22 @@ function SidebarContent({ navProps, navigate, isCollapsed = false }) {
       <FormDialog
         open={installInfoOpen}
         onClose={() => setInstallInfoOpen(false)}
-        title="Download Desktop App"
-        subtitle="Install Asas ERP as a Progressive Web Application (PWA) for desktop."
-        confirmLabel="Got It"
+        title={t('shell.install.title', 'Download Desktop App')}
+        subtitle={t('shell.install.subtitle', 'Install Asas ERP as a Progressive Web Application (PWA) for desktop.')}
+        confirmLabel={t('shell.install.confirm', 'Got It')}
         onConfirm={() => setInstallInfoOpen(false)}
         width="max-w-md"
       >
         <div className="space-y-3 text-sm text-body">
           <p>
-            Asas ERP is a Progressive Web Application (PWA) designed to run natively on Windows, macOS, and Linux without needing a separate installer package.
+            {t('shell.install.intro', 'Asas ERP is a Progressive Web Application (PWA) designed to run natively on Windows, macOS, and Linux without needing a separate installer package.')}
           </p>
           <div className="p-3 rounded-card-sm bg-surface-muted border border-border-subtle space-y-2 text-xs">
-            <p className="font-semibold text-heading">To install on your computer:</p>
+            <p className="font-semibold text-heading">{t('shell.install.stepsTitle', 'To install on your computer:')}</p>
             <ol className="list-decimal list-inside space-y-1 text-muted">
-              <li>In Google Chrome or Microsoft Edge, look for the <strong className="text-heading">Install</strong> icon (⊕ or computer icon) in the right side of the address bar.</li>
-              <li>Or click the browser menu (three dots <strong className="text-heading">⋮</strong>) and select <strong className="text-heading">Install Asas</strong>.</li>
-              <li>Asas will launch in its own dedicated, distraction-free desktop window with offline caching and taskbar shortcuts.</li>
+              <li><Trans i18nKey="shell.install.step1" components={{ strong: <strong className="text-heading" /> }} /></li>
+              <li><Trans i18nKey="shell.install.step2" components={{ strong: <strong className="text-heading" /> }} /></li>
+              <li>{t('shell.install.step3', 'Asas will launch in its own dedicated, distraction-free desktop window with offline caching and taskbar shortcuts.')}</li>
             </ol>
           </div>
         </div>
@@ -1187,7 +1191,7 @@ export default function DashboardLayout() {
         href="#dashboard-main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-on-primary focus:shadow-card"
       >
-        Skip to dashboard content
+        {t('shell.skipToContent', 'Skip to dashboard content')}
       </a>
 
       {/* ── Desktop sidebar ── */}
@@ -1203,12 +1207,12 @@ export default function DashboardLayout() {
           {/* Backdrop */}
           <button
             type="button"
-            aria-label="Close navigation menu"
+            aria-label={t('shell.closeNavigation', 'Close navigation menu')}
             className="absolute inset-0 border-0 p-0 bg-overlay backdrop-blur-sm"
             onClick={() => setMobileSidebarOpen(false)}
           />
           {/* Drawer */}
-          <aside id="mobile-navigation-drawer" aria-label="Main navigation" className="relative z-10 w-55 h-full max-h-screen glass-strong border-e border-border-subtle/60 flex flex-col animate-slide-in-right">
+          <aside id="mobile-navigation-drawer" aria-label={t('shell.mainNavigation', 'Main navigation')} className="relative z-10 w-55 h-full max-h-screen glass-strong border-e border-border-subtle/60 flex flex-col animate-slide-in-right">
             <SidebarContent navProps={{ ...navProps, isCollapsed: false }} navigate={navigate} isCollapsed={false} />
           </aside>
         </div>
@@ -1227,7 +1231,7 @@ export default function DashboardLayout() {
               type="button"
               className="lg:hidden text-muted hover:text-heading flex-shrink-0"
               onClick={() => setMobileSidebarOpen(true)}
-              aria-label="Open navigation menu"
+              aria-label={t('shell.openNavigation', 'Open navigation menu')}
               aria-expanded={mobileSidebarOpen}
               aria-controls="mobile-navigation-drawer"
             >
@@ -1238,15 +1242,15 @@ export default function DashboardLayout() {
               type="button"
               onClick={toggleCollapse}
               className="hidden lg:flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-heading"
-              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={sidebarCollapsed ? t('shell.expandSidebar', 'Expand sidebar') : t('shell.collapseSidebar', 'Collapse sidebar')}
+              aria-label={sidebarCollapsed ? t('shell.expandSidebar', 'Expand sidebar') : t('shell.collapseSidebar', 'Collapse sidebar')}
               aria-pressed={sidebarCollapsed}
             >
               {sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
             </button>
 
             {/* Breadcrumb */}
-            <Breadcrumb aria-label="Breadcrumb" className="min-w-0 whitespace-nowrap text-xs sm:text-sm">
+            <Breadcrumb aria-label={t('shell.breadcrumb', 'Breadcrumb')} className="min-w-0 whitespace-nowrap text-xs sm:text-sm">
               <BreadcrumbList className="flex-nowrap gap-1 sm:gap-1.5 text-xs sm:text-sm">
                 {breadcrumbs.map((crumb, i) => {
                   const isLast = i === breadcrumbs.length - 1
@@ -1284,8 +1288,8 @@ export default function DashboardLayout() {
               type="button"
               onClick={() => setCommandPaletteOpen(true)}
               className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full border-border-default/80 bg-surface-muted/70 text-muted shadow-none backdrop-blur-md hover:bg-surface-raised hover:text-body lg:flex xl:hidden"
-              title="Search (⌘K or Ctrl+K)"
-              aria-label="Search or jump to..."
+              title={t('shell.search', 'Search (⌘K or Ctrl+K)')}
+              aria-label={t('common.searchJump', 'Search or jump to...')}
             >
               <Search size={15} />
             </Button>
@@ -1295,8 +1299,8 @@ export default function DashboardLayout() {
               type="button"
               onClick={() => setCommandPaletteOpen(true)}
               className="hidden h-9 w-[clamp(220px,24vw,340px)] shrink-0 justify-between rounded-full border-border-default/80 bg-surface-muted/70 px-4 text-xs font-normal text-muted shadow-none backdrop-blur-md hover:bg-surface-raised hover:text-body xl:flex"
-              title="Global search (⌘K or Ctrl+K)"
-              aria-label="Search or jump to..."
+              title={t('shell.globalSearch', 'Global search (⌘K or Ctrl+K)')}
+              aria-label={t('common.searchJump', 'Search or jump to...')}
             >
               <div className="flex min-w-0 items-center gap-2.5">
                 <Search size={15} className="flex-shrink-0 text-caption" />
@@ -1318,11 +1322,16 @@ export default function DashboardLayout() {
               <div className="flex items-center gap-2">
                 <Mail size={14} className="text-warning flex-shrink-0" />
                 <span>
-                  Please confirm your email address (<strong>{session.user.email}</strong>) to complete verification.
+                  <Trans
+                    i18nKey="shell.emailBanner.prompt"
+                    values={{ email: session.user.email }}
+                    components={{ strong: <strong /> }}
+                  />
                 </span>
               </div>
-              <Link to="/verify-email" state={{ email: session.user.email }} className="font-medium underline hover:text-heading ml-4 flex-shrink-0">
-                View instructions →
+              <Link to="/verify-email" state={{ email: session.user.email }} className="font-medium underline hover:text-heading ms-4 flex-shrink-0">
+                {t('shell.emailBanner.action', 'View instructions')}{' '}
+                <span aria-hidden="true" className="inline-block rtl:-scale-x-100">→</span>
               </Link>
             </div>
           )}

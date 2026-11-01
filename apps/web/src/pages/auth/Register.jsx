@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Check, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
+import { ArrowRight, Check, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { signUp, useSession, signOut, authClient } from '../../lib/authClient'
 import { usePlatformPublicConfig } from '../../lib/platformConfig'
 import { authErrorMessage } from '../../lib/authErrorMessage'
@@ -15,6 +16,7 @@ import { Alert, AlertDescription } from '../../components/ui/alert'
 export default function Register() {
   const navigate = useNavigate()
   const { data: session } = useSession()
+  const { t } = useTranslation()
   const platformConfig = usePlatformPublicConfig()
   const [signingOut, setSigningOut] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -24,11 +26,11 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false)
 
   const passwordChecks = [
-    { label: '12 or more characters', met: form.password.length >= 12 },
-    { label: 'Uppercase letter', met: /[A-Z]/.test(form.password) },
-    { label: 'Lowercase letter', met: /[a-z]/.test(form.password) },
-    { label: 'Number', met: /[0-9]/.test(form.password) },
-    { label: 'Symbol', met: /[^A-Za-z0-9]/.test(form.password) },
+    { label: t('auth.passwordPolicy.checks.minLength'), met: form.password.length >= 12 },
+    { label: t('auth.passwordPolicy.checks.uppercase'), met: /[A-Z]/.test(form.password) },
+    { label: t('auth.passwordPolicy.checks.lowercase'), met: /[a-z]/.test(form.password) },
+    { label: t('auth.passwordPolicy.checks.number'), met: /[0-9]/.test(form.password) },
+    { label: t('auth.passwordPolicy.checks.symbol'), met: /[^A-Za-z0-9]/.test(form.password) },
   ]
   const passwordStrength = getPasswordStrength(form.password)
 
@@ -47,10 +49,10 @@ export default function Register() {
     return (
       <div className="auth-form-stagger flex flex-col text-center">
         <div className="mb-5">
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.17em] text-action">Session active</p>
-          <h1 className="text-2xl font-semibold tracking-[-0.04em] text-ink">Already signed in</h1>
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.17em] text-action">{t('auth.registerPage.sessionActive')}</p>
+          <h1 className="text-2xl font-semibold tracking-[-0.04em] text-ink">{t('auth.registerPage.alreadySignedIn')}</h1>
           <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">
-            You are currently signed in as <strong className="font-medium text-ink">{session.user.email}</strong>.
+            {t('auth.registerPage.signedInAs', { email: session.user.email })}
           </p>
         </div>
 
@@ -59,7 +61,7 @@ export default function Register() {
             to="/onboarding"
             className="flex h-10 w-full items-center justify-center gap-2 rounded-full bg-action text-[13px] font-medium text-white shadow-[0_10px_30px_rgba(0,113,227,0.22)] transition-all hover:bg-action-hover"
           >
-            Continue to Workspace
+            {t('auth.registerPage.continueToWorkspace')}
           </Link>
           <Button
             type="button"
@@ -68,7 +70,7 @@ export default function Register() {
             onClick={handleSignOut}
             className="h-10 w-full rounded-full border-black/10 bg-white/65 text-[13px] text-ink shadow-none hover:bg-white"
           >
-            {signingOut ? <Loader2 size={16} className="animate-spin" /> : 'Sign out to create a new account'}
+            {signingOut ? <Loader2 size={16} className="animate-spin" /> : t('auth.registerPage.signOutToCreate')}
           </Button>
         </div>
       </div>
@@ -79,17 +81,17 @@ export default function Register() {
     return (
       <div className="auth-form-stagger flex flex-col text-center">
         <div className="mb-4">
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.17em] text-action">Signups paused</p>
-          <h1 className="text-2xl font-semibold tracking-[-0.04em] text-ink">New signups are paused</h1>
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.17em] text-action">{t('auth.registerPage.signupsPaused')}</p>
+          <h1 className="text-2xl font-semibold tracking-[-0.04em] text-ink">{t('auth.registerPage.signupsPausedTitle')}</h1>
           <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">
-            The platform is not accepting new workspaces right now. If you already have an account, sign in to continue.
+            {t('auth.registerPage.signupsPausedBody')}
           </p>
         </div>
         <Link
           to="/login"
           className="flex h-10 w-full items-center justify-center rounded-full bg-action text-[13px] font-medium text-white shadow-[0_10px_30px_rgba(0,113,227,0.22)] transition-all hover:bg-action-hover"
         >
-          Sign in instead
+          {t('auth.registerPage.signInInstead')}
         </Link>
       </div>
     )
@@ -99,7 +101,7 @@ export default function Register() {
     e.preventDefault()
     setError('')
 
-    const policyErr = validatePasswordPolicy(form.password)
+    const policyErr = validatePasswordPolicy(form.password, t)
     if (policyErr) {
       setError(policyErr)
       return
@@ -116,12 +118,12 @@ export default function Register() {
         callbackURL: `${window.location.origin}/onboarding`,
       })
       if (signUpResult?.error) {
-        throw new Error(authErrorMessage(signUpResult.error, 'Could not create your account.'))
+        throw new Error(authErrorMessage(signUpResult.error, t('auth.registerPage.errors.couldNotCreate')))
       }
 
       navigate('/verify-email', { state: { email, name } })
     } catch (requestError) {
-      setError(authErrorMessage(requestError, 'Unable to create your account.'))
+      setError(authErrorMessage(requestError, t('auth.registerPage.errors.unableToCreate')))
     } finally {
       setIsLoading(false)
     }
@@ -140,16 +142,16 @@ export default function Register() {
           callbackURL: `${window.location.origin}/onboarding`,
         })
         if (res?.error) {
-          setError(res.error?.message || 'Google sign-up is not configured in this environment. Please sign up with your work email below.')
+          setError(res.error?.message || t('auth.registerPage.errors.googleNotConfigured'))
         }
       } else if (providers.devAuthAllowed) {
         // Open local development SSO sandbox
         setDevModalOpen(true)
       } else {
-        setError('Google single sign-on is not configured for this deployment. Please register with your work email below.')
+        setError(t('auth.registerPage.errors.googleSsoNotConfigured'))
       }
     } catch (socialErr) {
-      setError(authErrorMessage(socialErr, 'Google sign-up is currently unavailable in this environment.'))
+      setError(authErrorMessage(socialErr, t('auth.registerPage.errors.googleUnavailable')))
     }
   }
 
@@ -158,14 +160,14 @@ export default function Register() {
       {/* Header */}
       <div className="auth-register-intro mb-4">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-action">New workspace</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-action">{t('auth.registerPage.newWorkspace')}</p>
           <span className="inline-flex items-center gap-1 rounded-full border border-action/15 bg-action/[0.07] px-2 py-0.5 text-[9px] font-medium text-action-text">
             <Check size={10} />
-            About 2 minutes
+            {t('auth.registerPage.aboutTwoMinutes')}
           </span>
         </div>
-        <h1 className="text-2xl font-semibold tracking-[-0.04em] text-ink">Create your workspace</h1>
-        <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">Set up a secure workspace for your company’s finance, people, and daily operations.</p>
+        <h1 className="text-2xl font-semibold tracking-[-0.04em] text-ink">{t('auth.registerPage.title')}</h1>
+        <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">{t('auth.registerPage.subtitle')}</p>
       </div>
 
       {/* Social SSO Button */}
@@ -183,7 +185,7 @@ export default function Register() {
 
       <div className="auth-register-divider mb-4 flex items-center gap-3">
         <span className="h-px flex-1 bg-black/[0.07]" />
-        <span className="text-[10px] text-ink-subtle">or register with work email</span>
+        <span className="text-[10px] text-ink-subtle">{t('auth.registerPage.orEmail')}</span>
         <span className="h-px flex-1 bg-black/[0.07]" />
       </div>
 
@@ -194,17 +196,19 @@ export default function Register() {
             <AlertDescription className="flex flex-col gap-1.5">
               <span>{error}</span>
               {/user already exists|already registered/i.test(error) && (
-                <div className="text-xs pt-1 flex items-center gap-2">
-                  <Link to="/login" className="underline font-semibold hover:text-danger-hover">
-                    Sign in instead &rarr;
+                <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                  <Link to="/login" className="inline-flex items-center gap-1 font-semibold underline hover:text-danger-hover">
+                    {t('auth.registerPage.signInInstead')}
+                    <ArrowRight size={11} className="rtl:-scale-x-100" />
                   </Link>
                   <span>&bull;</span>
                   <Link
                     to={`/verify-email?email=${encodeURIComponent(form.email.trim())}`}
                     state={{ email: form.email.trim() }}
-                    className="underline font-semibold hover:text-danger-hover"
+                    className="inline-flex items-center gap-1 font-semibold underline hover:text-danger-hover"
                   >
-                    Verify this email &rarr;
+                    {t('auth.registerPage.verifyThisEmail')}
+                    <ArrowRight size={11} className="rtl:-scale-x-100" />
                   </Link>
                 </div>
               )}
@@ -213,7 +217,7 @@ export default function Register() {
         )}
         <div>
           <label className="mb-1 block text-[11px] font-medium text-ink-body" htmlFor="name">
-            Full Name
+            {t('auth.registerPage.fullName')}
           </label>
           <Input
             id="name"
@@ -221,7 +225,7 @@ export default function Register() {
             type="text"
             value={form.name}
             onChange={handleChange}
-            placeholder="Jane Doe"
+            placeholder={t('auth.registerPage.fullNamePlaceholder')}
             autoComplete="name"
             className="h-10 rounded-xl border-black/10 bg-white/65 px-3 text-sm text-ink shadow-none placeholder:text-ink-faint focus-visible:bg-white focus-visible:ring-action"
             required
@@ -230,7 +234,7 @@ export default function Register() {
 
         <div>
           <label className="mb-1 block text-[11px] font-medium text-ink-body" htmlFor="email">
-            Work Email
+            {t('auth.registerPage.workEmail')}
           </label>
           <Input
             id="email"
@@ -238,8 +242,9 @@ export default function Register() {
             type="email"
             value={form.email}
             onChange={handleChange}
-            placeholder="name@company.com"
+            placeholder={t('auth.registerPage.emailPlaceholder')}
             autoComplete="email"
+            dir="ltr"
             className="h-10 rounded-xl border-black/10 bg-white/65 px-3 text-sm text-ink shadow-none placeholder:text-ink-faint focus-visible:bg-white focus-visible:ring-action"
             required
           />
@@ -247,7 +252,7 @@ export default function Register() {
 
         <div>
           <label className="mb-1 block text-[11px] font-medium text-ink-body" htmlFor="password">
-            Password
+            {t('auth.password')}
           </label>
           <div className="relative">
             <Input
@@ -256,10 +261,11 @@ export default function Register() {
               type={showPassword ? 'text' : 'password'}
               value={form.password}
               onChange={handleChange}
-              placeholder="Create a strong password"
+              placeholder={t('auth.registerPage.passwordPlaceholder')}
               autoComplete="new-password"
               aria-describedby="password-policy"
-              className="h-10 rounded-xl border-black/10 bg-white/65 px-3 pr-11 text-sm text-ink shadow-none placeholder:text-ink-faint focus-visible:bg-white focus-visible:ring-action"
+              dir="ltr"
+              className="h-10 rounded-xl border-black/10 bg-white/65 px-3 pe-11 text-sm text-ink shadow-none placeholder:text-ink-faint focus-visible:bg-white focus-visible:ring-action"
               required
             />
             <Button
@@ -267,9 +273,9 @@ export default function Register() {
               variant="ghost"
               size="icon"
               onClick={() => setShowPassword(current => !current)}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-label={showPassword ? t('auth.signIn.hidePassword') : t('auth.signIn.showPassword')}
               aria-controls="password"
-              className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-caption transition-colors hover:text-body"
+              className="absolute end-1 top-1/2 h-7 w-7 -translate-y-1/2 text-caption transition-colors hover:text-body"
             >
               {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
             </Button>
@@ -277,9 +283,11 @@ export default function Register() {
 
           <div id="password-policy" className="mt-2 space-y-1.5" aria-live="polite">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-[10px] font-medium text-ink-muted">Password strength</span>
+              <span className="text-[10px] font-medium text-ink-muted">{t('auth.passwordPolicy.strength.label')}</span>
               <span className={`text-[10px] font-semibold ${form.password ? 'text-ink-body' : 'text-ink-faint'}`}>
-                {passwordStrength.label || 'Not started'}
+                {form.password
+                  ? t(`auth.passwordPolicy.strength.${passwordStrength.key}`)
+                  : t('auth.passwordPolicy.strength.notStarted')}
               </span>
             </div>
             <div className="h-1 overflow-hidden rounded-full bg-black/[0.06]">
@@ -306,22 +314,26 @@ export default function Register() {
           disabled={isLoading}
           className="auth-register-submit mt-4 h-10 w-full rounded-full bg-action text-[13px] font-medium text-white shadow-[0_10px_30px_rgba(0,113,227,0.22)] transition-all hover:bg-action-hover hover:shadow-[0_14px_36px_rgba(0,113,227,0.28)]"
         >
-          {isLoading ? <Loader2 size={16} className="animate-spin" /> : 'Create Account'}
+          {isLoading ? <Loader2 size={16} className="animate-spin" /> : t('auth.registerPage.createAccount')}
         </Button>
       </form>
 
       {/* TOS Disclaimer */}
       <p className="auth-register-legal mt-3 text-center text-[10px] leading-4 text-ink-subtle">
-        By creating an account, you agree to our{' '}
-        <Link to="/terms" className="underline hover:text-action">Terms of Service</Link> and{' '}
-        <Link to="/privacy" className="underline hover:text-action">Privacy Policy</Link>.
+        <Trans
+          i18nKey="auth.registerPage.legal"
+          components={{
+            terms: <Link to="/terms" className="underline hover:text-action" />,
+            privacy: <Link to="/privacy" className="underline hover:text-action" />,
+          }}
+        />
       </p>
 
       {/* Footer Link */}
       <p className="auth-register-switch mt-3 text-center text-xs text-ink-muted">
-        Already have an account?{' '}
+        {t('auth.registerPage.haveAccount')}{' '}
         <Link to="/login" className="font-semibold text-action hover:underline">
-          Sign in
+          {t('auth.registerPage.signIn')}
         </Link>
       </p>
 

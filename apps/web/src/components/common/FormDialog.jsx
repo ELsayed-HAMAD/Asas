@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import {
   Dialog,
@@ -23,8 +24,8 @@ export default function FormDialog({
   title,
   subtitle,
   children,
-  confirmLabel = 'Save',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   busy = false,
   error,
   onConfirm,
@@ -35,6 +36,7 @@ export default function FormDialog({
 }) {
   const isDialogOpen = Boolean(open ?? isOpen)
   const returnFocusTo = useRef(null)
+  const { t } = useTranslation()
 
   // Native form submit: Enter in a field and the submit button both land here. We prevent the
   // browser's default navigation and delegate to the page's handler, but never while busy.
@@ -88,7 +90,7 @@ export default function FormDialog({
               onClick={onClose}
               disabled={busy}
             >
-              {cancelLabel}
+              {cancelLabel ?? t('common.cancel', 'Cancel')}
             </Button>
             <Button
               type="submit"
@@ -96,7 +98,7 @@ export default function FormDialog({
               disabled={busy || disabled || isConfirmDisabled}
             >
               {busy && <Loader2 size={14} className="animate-spin" />}
-              {confirmLabel}
+              {confirmLabel ?? t('common.save', 'Save')}
             </Button>
           </DialogFooter>
         </form>

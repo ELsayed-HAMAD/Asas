@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSession } from '../lib/authClient'
 import { queryKeys } from '../lib/queryKeys'
+import { formatLocaleFor } from '../lib/i18n'
 import {
   Bell,
   Check,
@@ -24,20 +26,20 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu'
 
-function formatRelativeTime(dateString) {
+function formatRelativeTime(dateString, t, locale) {
   if (!dateString) return ''
   const date = new Date(dateString)
   const now = new Date()
   const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000)
 
-  if (diffSec < 60) return 'Just now'
+  if (diffSec < 60) return t('notifications.justNow', 'Just now')
   const diffMin = Math.floor(diffSec / 60)
-  if (diffMin < 60) return `${diffMin}m ago`
+  if (diffMin < 60) return t('notifications.minutesAgo', { count: diffMin, defaultValue: `${diffMin}m ago` })
   const diffHours = Math.floor(diffMin / 60)
-  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffHours < 24) return t('notifications.hoursAgo', { count: diffHours, defaultValue: `${diffHours}h ago` })
   const diffDays = Math.floor(diffHours / 24)
-  if (diffDays < 7) return `${diffDays}d ago`
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  if (diffDays < 7) return t('notifications.daysAgo', { count: diffDays, defaultValue: `${diffDays}d ago` })
+  return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
 }
 
 function getCategoryIcon(category) {
@@ -65,6 +67,8 @@ function getCategoryIcon(category) {
 export default function NotificationPopover() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { t, i18n } = useTranslation()
+  const locale = formatLocaleFor(i18n.language)
   const { data: session } = useSession()
   const userId = session?.user?.id
   const [filter, setFilter] = useState('all') // 'all' | 'unread'
@@ -121,8 +125,8 @@ export default function NotificationPopover() {
         <button
           type="button"
           className="relative flex h-9 w-9 items-center justify-center rounded-full border border-border-default/70 bg-surface-raised/45 text-muted shadow-none backdrop-blur-md transition-colors hover:bg-surface-raised hover:text-heading focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          title="Notifications"
-          aria-label="Open notifications"
+          title={t('notifications.title', 'Notifications')}
+          aria-label={t('notifications.open', 'Open notifications')}
         >
           <Bell className="w-4 h-4" />
           {unreadCount > 0 && (
@@ -141,10 +145,10 @@ export default function NotificationPopover() {
         {/* Header */}
         <div className="p-4 border-b border-border-subtle flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-bold tracking-tight text-heading">Notifications</h3>
+            <h3 className="text-sm font-bold tracking-tight text-heading">{t('notifications.title', 'Notifications')}</h3>
             {unreadCount > 0 && (
               <Badge className="bg-danger-light text-danger-text border-danger-border text-[10px] px-1.5 py-0 font-semibold">
-                {unreadCount} unread
+                {t('notifications.badgeUnread', { count: unreadCount })}
               </Badge>
             )}
           </div>
@@ -158,7 +162,7 @@ export default function NotificationPopover() {
               className="h-7 text-[11px] font-medium text-accent hover:text-accent-hover px-2 flex items-center gap-1 cursor-pointer"
             >
               <CheckCheck className="w-3.5 h-3.5" />
-              <span>Mark all read</span>
+              <span>{t('notifications.markAllRead', 'Mark all read')}</span>
             </Button>
           )}
         </div>
@@ -174,7 +178,7 @@ export default function NotificationPopover() {
                 : 'text-caption hover:text-heading'
             }`}
           >
-            All ({notifications.length})
+            {t('notifications.filterAll', { count: notifications.length, defaultValue: `All (${notifications.length})` })}
           </button>
           <button
             type="button"
@@ -185,26 +189,26 @@ export default function NotificationPopover() {
                 : 'text-caption hover:text-heading'
             }`}
           >
-            Unread ({unreadCount})
+            {t('notifications.filterUnread', { count: unreadCount, defaultValue: `Unread (${unreadCount})` })}
           </button>
         </div>
 
         {/* List Body */}
         <div className="max-h-80 overflow-y-auto divide-y divide-border-subtle">
           {isLoading ? (
-            <div className="px-5 py-8 text-center text-xs text-caption" role="status">Loading notifications…</div>
+            <div className="px-5 py-8 text-center text-xs text-caption" role="status">{t('notifications.loading', 'Loading notifications…')}</div>
           ) : isError ? (
-            <div className="px-5 py-8 text-center text-xs text-danger-text" role="alert">Notifications could not be loaded. Try again shortly.</div>
+            <div className="px-5 py-8 text-center text-xs text-danger-text" role="alert">{t('notifications.loadError', 'Notifications could not be loaded. Try again shortly.')}</div>
           ) : filteredItems.length === 0 ? (
             <div className="py-12 px-6 text-center">
               <div className="w-10 h-10 rounded-full bg-surface-muted flex items-center justify-center mx-auto mb-3 text-muted">
                 <CheckCircle2 className="w-5 h-5 text-success" />
               </div>
-              <p className="text-xs font-bold text-heading">You're all caught up</p>
+              <p className="text-xs font-bold text-heading">{t('notifications.allCaughtUp', "You're all caught up")}</p>
               <p className="text-[11px] text-caption mt-1 max-w-[200px] mx-auto leading-relaxed">
                 {filter === 'unread'
-                  ? 'No unread notifications at this time.'
-                  : 'New operational alerts and invoices will appear here.'}
+                  ? t('notifications.noUnread', 'No unread notifications at this time.')
+                  : t('notifications.empty', 'New operational alerts and invoices will appear here.')}
               </p>
             </div>
           ) : (
@@ -223,7 +227,7 @@ export default function NotificationPopover() {
                   }}
                   role="button"
                   tabIndex={0}
-                  aria-label={`${n.title}. ${n.read ? 'Read' : 'Unread'}`}
+                  aria-label={`${n.title}. ${n.read ? t('notifications.stateRead', 'Read') : t('notifications.stateUnread', 'Unread')}`}
                   className={`p-3.5 flex items-start gap-3 transition-colors cursor-pointer group ${
                     n.read
                       ? 'bg-surface-raised hover:bg-surface-muted'
@@ -248,7 +252,7 @@ export default function NotificationPopover() {
                         {n.title}
                       </p>
                       <span className="text-[10px] text-caption flex-shrink-0">
-                        {formatRelativeTime(n.createdAt)}
+                        {formatRelativeTime(n.createdAt, t, locale)}
                       </span>
                     </div>
 
@@ -258,7 +262,8 @@ export default function NotificationPopover() {
 
                     {n.link && (
                       <span className="inline-block mt-1.5 text-[11px] font-semibold text-accent hover:underline">
-                        View details &rarr;
+                        {t('notifications.viewDetails', 'View details')}{' '}
+                        <span aria-hidden="true" className="inline-block rtl:-scale-x-100">&rarr;</span>
                       </span>
                     )}
                   </div>
@@ -272,7 +277,7 @@ export default function NotificationPopover() {
                           e.stopPropagation()
                           markReadMutation.mutate(n.id)
                         }}
-                        title="Mark as read"
+                        title={t('notifications.markAsRead', 'Mark as read')}
                         className="p-1 rounded text-caption hover:text-heading hover:bg-surface-active"
                       >
                         <Check className="w-3.5 h-3.5" />
@@ -284,7 +289,7 @@ export default function NotificationPopover() {
                         e.stopPropagation()
                         deleteMutation.mutate(n.id)
                       }}
-                      title="Delete notification"
+                      title={t('notifications.delete', 'Delete notification')}
                       className="p-1 rounded text-caption hover:text-danger hover:bg-danger-light"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -298,7 +303,7 @@ export default function NotificationPopover() {
 
         {/* Footer */}
         <div className="p-3 bg-surface-muted border-t border-border-subtle flex items-center justify-between text-xs text-caption">
-          <span className="text-[11px]">Refreshes every 20 seconds</span>
+          <span className="text-[11px]">{t('notifications.refresh', 'Refreshes every 20 seconds')}</span>
           <button
             type="button"
             onClick={() => {
@@ -308,7 +313,7 @@ export default function NotificationPopover() {
             className="flex items-center gap-1 text-[11px] text-accent hover:underline font-medium cursor-pointer"
           >
             <Settings className="w-3 h-3" />
-            <span>Preferences</span>
+            <span>{t('notifications.preferences', 'Preferences')}</span>
           </button>
         </div>
       </DropdownMenuContent>

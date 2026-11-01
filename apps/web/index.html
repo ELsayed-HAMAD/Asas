@@ -4,6 +4,18 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Apply the saved language before first paint so RTL layout never flashes LTR.
+      (function () {
+        try {
+          var lang = localStorage.getItem('asas_lang') === 'ar' ? 'ar' : 'en'
+          document.documentElement.lang = lang
+          document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'
+        } catch (error) {
+          /* localStorage can be unavailable in privacy modes; defaults stay LTR. */
+        }
+      })()
+    </script>
     <meta name="description" content="Asas Enterprise ERP: Unify projects, financials, and workforce in one platform." />
     <title>Asas | Enterprise ERP</title>
     <!-- Google Fonts: Inter & Cairo -->

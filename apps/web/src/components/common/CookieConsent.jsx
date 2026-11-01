@@ -1,5 +1,6 @@
 import { Activity, Cookie, LockKeyhole } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
@@ -15,6 +16,7 @@ const HIDDEN_PREFIXES = ['/dashboard', '/onboarding', '/choose-workspace', '/adm
 
 export default function CookieConsent() {
   const { pathname } = useLocation()
+  const { t } = useTranslation()
   const savedConsent = readCookieConsent()
   const [visible, setVisible] = useState(() => !savedConsent)
   const [expanded, setExpanded] = useState(false)
@@ -46,7 +48,7 @@ export default function CookieConsent() {
   function persist(nextAnalytics) {
     const saved = saveCookieConsent({ analytics: nextAnalytics })
     if (!saved) {
-      setError('Your browser blocked saving this choice. Allow site storage and try again.')
+      setError(t('cookies.storageError'))
       return
     }
     setAnalytics(nextAnalytics)
@@ -73,12 +75,12 @@ export default function CookieConsent() {
               tabIndex={-1}
               className="text-sm font-semibold tracking-[-0.01em] text-heading focus:outline-none sm:text-base"
             >
-              Cookie preferences
+              {t('cookies.title')}
             </h2>
             <p className="mt-0.5 text-xs leading-5 text-muted sm:text-[13px]">
-              Essential cookies keep you signed in and secure. Optional diagnostics help us find and fix errors.{' '}
+              {t('cookies.body')}{' '}
               <Link to="/privacy" className="font-semibold text-primary underline decoration-primary/30 underline-offset-2 hover:decoration-primary">
-                Privacy policy
+                {t('cookies.privacyPolicy')}
               </Link>
             </p>
 
@@ -87,23 +89,23 @@ export default function CookieConsent() {
                 <div className="flex items-start gap-3 border-b border-border-subtle pb-3">
                   <LockKeyhole size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-primary" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-heading">Essential</p>
-                    <p className="mt-0.5 text-[11px] leading-4 text-muted">Sign-in, security, and your saved consent choice.</p>
+                    <p className="text-xs font-semibold text-heading">{t('cookies.essential')}</p>
+                    <p className="mt-0.5 text-[11px] leading-4 text-muted">{t('cookies.essentialBody')}</p>
                   </div>
-                  <Badge variant="secondary" className="shrink-0">Always on</Badge>
+                  <Badge variant="secondary" className="shrink-0">{t('cookies.alwaysOn')}</Badge>
                 </div>
                 <div className="flex items-start gap-3 pt-3">
                   <Activity size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-primary" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-heading">Analytics and diagnostics</p>
-                    <p className="mt-0.5 text-[11px] leading-4 text-muted">Anonymous error and performance reports. Off by default.</p>
+                    <p className="text-xs font-semibold text-heading">{t('cookies.analytics')}</p>
+                    <p className="mt-0.5 text-[11px] leading-4 text-muted">{t('cookies.analyticsBody')}</p>
                   </div>
                   <Switch
                     id="cookie-analytics"
                     color="primary"
                     checked={analytics}
                     onCheckedChange={setAnalytics}
-                    aria-label="Allow analytics and diagnostics"
+                    aria-label={t('cookies.allowAnalytics')}
                     className="mt-0.5 shrink-0"
                   />
                 </div>
@@ -119,9 +121,9 @@ export default function CookieConsent() {
                 <button
                   type="button"
                   onClick={expandPreferences}
-                  className="h-9 px-3 text-xs font-semibold text-body transition-colors hover:text-heading focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:mr-auto"
+                  className="h-9 px-3 text-xs font-semibold text-body transition-colors hover:text-heading focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:me-auto"
                 >
-                  Manage preferences
+                  {t('cookies.manage')}
                 </button>
               )}
               <Button
@@ -130,7 +132,7 @@ export default function CookieConsent() {
                 onClick={() => persist(false)}
                 className="h-9 px-4 text-xs"
               >
-                Essential only
+                {t('cookies.essentialOnly')}
               </Button>
               {expanded ? (
                 <Button
@@ -138,7 +140,7 @@ export default function CookieConsent() {
                   onClick={() => persist(analytics)}
                   className="h-9 px-5 text-xs"
                 >
-                  Save choices
+                  {t('cookies.save')}
                 </Button>
               ) : (
                 <Button
@@ -146,7 +148,7 @@ export default function CookieConsent() {
                   onClick={() => persist(true)}
                   className="h-9 px-5 text-xs"
                 >
-                  Accept all
+                  {t('cookies.acceptAll')}
                 </Button>
               )}
             </div>

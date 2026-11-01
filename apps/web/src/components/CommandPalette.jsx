@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Search,
   LayoutDashboard,
@@ -325,23 +326,37 @@ const substringFilter = (value, search, keywords) => {
 
 export default function CommandPalette({ isOpen, onClose }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
 
   useEffect(() => {
     if (isOpen) setQuery('')
   }, [isOpen])
 
+  const items = useMemo(
+    () =>
+      COMMAND_ITEMS.map((item) => ({
+        ...item,
+        title: t(`commandPalette.items.${item.id}.title`, item.title),
+        subtitle: t(`commandPalette.items.${item.id}.subtitle`, item.subtitle),
+        categoryLabel: t(
+          `commandPalette.groups.${item.category === 'Navigation' ? 'navigation' : 'quickActions'}`,
+        ),
+      })),
+    [t],
+  )
+
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return COMMAND_ITEMS
-    return COMMAND_ITEMS.filter((item) => {
+    if (!q) return items
+    return items.filter((item) => {
       const matchTitle = item.title.toLowerCase().includes(q)
       const matchSubtitle = item.subtitle.toLowerCase().includes(q)
-      const matchCategory = item.category.toLowerCase().includes(q)
+      const matchCategory = item.categoryLabel.toLowerCase().includes(q)
       const matchKeywords = item.keywords.some((k) => k.toLowerCase().includes(q))
       return matchTitle || matchSubtitle || matchCategory || matchKeywords
     })
-  }, [query])
+  }, [items, query])
 
   const executeItem = (item) => {
     if (!item) return
@@ -354,6 +369,7 @@ export default function CommandPalette({ isOpen, onClose }) {
   const grouped = categories
     .map((cat) => ({
       category: cat,
+      label: t(`commandPalette.groups.${cat === 'Navigation' ? 'navigation' : 'quickActions'}`),
       items: filteredItems.filter((item) => item.category === cat),
     }))
     .filter((g) => g.items.length > 0)
@@ -364,9 +380,9 @@ export default function CommandPalette({ isOpen, onClose }) {
         hideCloseButton
         className="overflow-hidden p-0 gap-0 max-w-xl max-h-[75vh] border-border-default bg-surface-raised shadow-2xl"
       >
-        <DialogTitle className="sr-only">Global search</DialogTitle>
+        <DialogTitle className="sr-only">{t('commandPalette.title', 'Global search')}</DialogTitle>
         <DialogDescription className="sr-only">
-          Search pages and quick actions, then press Enter to navigate.
+          {t('commandPalette.description', 'Search pages and quick actions, then press Enter to navigate.')}
         </DialogDescription>
 
         <Command
@@ -376,11 +392,11 @@ export default function CommandPalette({ isOpen, onClose }) {
           <CommandInput
             value={query}
             onValueChange={setQuery}
-            placeholder="Type a command, page, or search term..."
+            placeholder={t('commandPalette.placeholder', 'Type a command, page, or search term...')}
           >
             <Kbd
               onClick={onClose}
-              title="Close"
+              title={t('commandPalette.close', 'Close')}
               className="cursor-pointer px-2 rounded bg-surface-muted hover:bg-surface-strong transition-colors"
             >
               ESC
@@ -390,22 +406,22 @@ export default function CommandPalette({ isOpen, onClose }) {
           <CommandList className="max-h-[60vh]">
             <CommandEmpty>
               <Search size={24} className="mx-auto mb-2 opacity-40" />
-              <p className="text-sm font-medium text-heading">No matching commands</p>
+              <p className="text-sm font-medium text-heading">{t('commandPalette.emptyTitle', 'No matching commands')}</p>
               <p className="text-xs text-body-light mt-1">
-                Try searching for pages like "payroll", "invoices", or actions like "create deal".
+                {t('commandPalette.emptyHint', 'Try searching for pages like "payroll", "invoices", or actions like "create deal".')}
               </p>
             </CommandEmpty>
             {grouped.map((group, idx) => (
               <Fragment key={group.category}>
                 {idx > 0 && <CommandSeparator />}
-                <CommandGroup heading={group.category}>
+                <CommandGroup heading={group.label}>
                   {group.items.map((item) => {
                     const Icon = item.icon
                     return (
                       <CommandItem
                         key={item.id}
                         value={item.title}
-                        keywords={[item.subtitle, group.category, ...item.keywords]}
+                        keywords={[item.subtitle, group.label, ...item.keywords]}
                         onSelect={() => executeItem(item)}
                         className="group justify-between gap-3"
                       >
@@ -435,20 +451,20 @@ export default function CommandPalette({ isOpen, onClose }) {
         <div className="px-4 py-2 border-t border-border-subtle bg-surface-muted flex items-center justify-between text-[11px] text-caption">
           <div className="flex items-center gap-3">
             <span>
-              <Kbd className="bg-surface px-1 py-0.5 rounded mr-1">↑↓</Kbd>
-              Navigate
+              <Kbd className="bg-surface px-1 py-0.5 rounded me-1">↑↓</Kbd>
+              {t('commandPalette.footer.navigate', 'Navigate')}
             </span>
             <span>
-              <Kbd className="bg-surface px-1 py-0.5 rounded mr-1">↵</Kbd>
-              Select
+              <Kbd className="bg-surface px-1 py-0.5 rounded me-1">↵</Kbd>
+              {t('commandPalette.footer.select', 'Select')}
             </span>
             <span>
-              <Kbd className="bg-surface px-1 py-0.5 rounded mr-1">ESC</Kbd>
-              Close
+              <Kbd className="bg-surface px-1 py-0.5 rounded me-1">ESC</Kbd>
+              {t('commandPalette.footer.close', 'Close')}
             </span>
           </div>
           <span className="font-medium">
-            {filteredItems.length} {filteredItems.length === 1 ? 'command' : 'commands'}
+            {t('commandPalette.commandCount', { count: filteredItems.length })}
           </span>
         </div>
       </DialogContent>

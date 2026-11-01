@@ -1,7 +1,9 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ArrowUpRight } from 'lucide-react'
 import { AsasLogo } from '../components/common/AsasLogo'
 import CookieSettingsButton from '../components/common/CookieSettingsButton'
+import LanguageSwitcher from '../components/common/LanguageSwitcher'
 import AuthShowcase from '../components/auth/AuthShowcase'
 
 function showcaseVariant(pathname) {
@@ -12,6 +14,7 @@ function showcaseVariant(pathname) {
 
 export default function AuthLayout() {
   const { pathname } = useLocation()
+  const { t } = useTranslation()
 
   return (
     <div className="auth-shell auth-deep-blue relative isolate min-h-screen overflow-clip bg-canvas p-3 text-ink selection:bg-action-soft-strong selection:text-selection-ink sm:p-4">
@@ -30,13 +33,16 @@ export default function AuthLayout() {
               </span>
               <span>
                 <span className="block text-[13px] font-semibold leading-tight tracking-[-0.02em]">Asas</span>
-                <span className="mt-0.5 block text-[8px] font-medium uppercase tracking-[0.13em] text-ink-subtle">Business workspace</span>
+                <span className="mt-0.5 block text-[8px] font-medium uppercase tracking-[0.13em] text-ink-subtle">{t('auth.shell.tagline')}</span>
               </span>
             </Link>
-            <Link to="/" className="inline-flex items-center gap-1 text-[10px] font-medium text-ink-muted transition-colors hover:text-action">
-              Back home
-              <ArrowUpRight size={12} />
-            </Link>
+            <div className="flex items-center gap-2">
+              <LanguageSwitcher />
+              <Link to="/" className="inline-flex items-center gap-1 text-[10px] font-medium text-ink-muted transition-colors hover:text-action">
+                {t('auth.shell.backHome')}
+                <ArrowUpRight size={12} className="rtl:-scale-x-100" />
+              </Link>
+            </div>
           </header>
 
           <main className="auth-form-main relative z-10 flex flex-1 items-center justify-center py-2 sm:py-3">
@@ -47,9 +53,9 @@ export default function AuthLayout() {
 
           <footer className="auth-form-footer relative z-10 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 border-t border-black/[0.06] pt-4 text-[10px] text-ink-subtle">
             <span>© {new Date().getFullYear()} Asas</span>
-            <Link to="/privacy" className="transition-colors hover:text-action">Privacy</Link>
+            <Link to="/privacy" className="transition-colors hover:text-action">{t('auth.shell.privacy')}</Link>
             <CookieSettingsButton className="transition-colors hover:text-action" />
-            <Link to="/terms" className="transition-colors hover:text-action">Terms</Link>
+            <Link to="/terms" className="transition-colors hover:text-action">{t('auth.shell.terms')}</Link>
           </footer>
         </section>
 

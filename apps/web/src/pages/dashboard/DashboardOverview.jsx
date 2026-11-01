@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Users,
   AlertCircle,
@@ -8,6 +9,7 @@ import {
   CreditCard,
   Rocket,
   BarChart3,
+  ArrowRight,
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useQuery } from '@tanstack/react-query'
@@ -23,32 +25,39 @@ import {
 import { dashboardApi } from '../../lib/api/dashboard'
 import { auditLogApi } from '../../lib/api/auditLog'
 import { queryKeys } from '../../lib/queryKeys'
-import { formatMoney, formatCompactMoney, moneyToMajor, formatCompactCurrency, formatFullCurrency } from '../../lib/format'
+import { formatMoney, formatCompactMoney, moneyToMajor, formatCompactCurrency, formatFullCurrency, formatDate } from '../../lib/format'
 import { EMPTY } from '../../lib/emptyText'
 import { countActiveSprints } from '../../lib/projectSprint'
 import { downloadCsv } from '../../lib/csv'
+import { formatLocaleFor } from '../../lib/i18n'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-/** `YYYY-MM` (the cash-flow snapshot key) → the same short label the old mock used ('Jan'…). */
-function shortMonth(ym) {
-  const idx = Number(String(ym).slice(5, 7)) - 1
-  return MONTHS[idx] ?? ym
+/** `YYYY-MM` (the cash-flow snapshot key) → a localized short month label ('Jan'…). */
+function monthLabel(ym, locale) {
+  const [year, month] = String(ym).split('-').map(Number)
+  if (!year || !month) return ym
+  try {
+    return new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' })
+      .format(new Date(Date.UTC(year, month - 1, 1)))
+  } catch {
+    return ym
+  }
 }
 
 /** The old mock row read "3 Days Remaining • 68% Complete" — build the same line from real fields. */
-function sprintSubtitle(sprint) {
-  const pct = `${sprint.completionPct}% Complete`
-  if (!sprint.endsAt) return `No end date • ${pct}`
+function sprintSubtitle(sprint, t) {
+  const pct = sprint.completionPct
+  if (!sprint.endsAt) return t('dashboard.sprints.noEndDate', { pct })
   const days = Math.ceil((new Date(sprint.endsAt).getTime() - Date.now()) / 86400000)
-  if (days > 0) return `${days} ${days === 1 ? 'Day' : 'Days'} Remaining • ${pct}`
-  if (days === 0) return `Ends today • ${pct}`
-  return `Past end date • ${pct}`
+  if (days > 0) return t('dashboard.sprints.daysRemaining', { count: days, pct })
+  if (days === 0) return t('dashboard.sprints.endsToday', { pct })
+  return t('dashboard.sprints.pastEndDate', { pct })
 }
 
 export default function DashboardOverview() {
+  const { t, i18n } = useTranslation()
+  const locale = formatLocaleFor(i18n.language)
   const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()))
   // The old page pulled one composed `/dashboard/overview`; the new API exposes no such route, so
   // the page composes the real module aggregates directly — one distinct query (and cache key)
@@ -116,15 +125,18 @@ export default function DashboardOverview() {
 
   const payablesChangeText = (() => {
     if (pastDuePayables?.amount > 0) {
-      return `${formatCompactCurrency(pastDuePayables)} past due${dueIn7DaysPayables?.amount > 0 ? ` · ${formatCompactCurrency(dueIn7DaysPayables)} due in 7d` : ''}`
+      return `${t('dashboard.stats.pastDue', { amount: formatCompactCurrency(pastDuePayables) })}${dueIn7DaysPayables?.amount > 0 ? ` · ${t('dashboard.stats.dueIn7d', { amount: formatCompactCurrency(dueIn7DaysPayables) })}` : ''}`
     }
     if (dueIn7DaysPayables?.amount > 0) {
-      return `${formatCompactCurrency(dueIn7DaysPayables)} due in 7 days`
+      return t('dashboard.stats.dueIn7Days', { amount: formatCompactCurrency(dueIn7DaysPayables) })
     }
     if (paidThisMonthTotal && paidThisMonthComparison?.previousTotal) {
-      return `${formatCompactCurrency(paidThisMonthTotal)} paid MTD (vs ${formatCompactCurrency(paidThisMonthComparison.previousTotal)})`
+      return t('dashboard.stats.paidMtd', {
+        amount: formatCompactCurrency(paidThisMonthTotal),
+        previous: formatCompactCurrency(paidThisMonthComparison.previousTotal),
+      })
     }
-    return 'No past-due bills'
+    return t('dashboard.stats.noPastDueBills')
   })()
 
   const sprintItems = sprints.data?.items ?? []
@@ -134,40 +146,42 @@ export default function DashboardOverview() {
 
   const stats = [
     {
-      label: 'Headcount',
+      label: t('dashboard.stats.headcount'),
       value: headcount.toString(),
-      change: `${hiredThisMonth} hired MTD`,
-      subtitle: `${hiresDelta > 0 ? `+${hiresDelta}` : hiresDelta < 0 ? `${hiresDelta}` : '0'} vs same time last month${onLeaveCount > 0 ? ` · ${onLeaveCount} on leave` : ''}`,
+      change: t('dashboard.stats.hiredMtd', { count: hiredThisMonth }),
+      subtitle: `${t('dashboard.stats.vsLastMonth', { delta: hiresDelta > 0 ? `+${hiresDelta}` : `${hiresDelta}` })}${onLeaveCount > 0 ? ` ${t('dashboard.stats.onLeave', { count: onLeaveCount })}` : ''}`,
       trend: hiresDelta > 0 ? 'up' : hiresDelta < 0 ? 'down' : 'neutral',
       icon: Users,
     },
     {
-      label: 'Open Pipeline Value',
+      label: t('dashboard.stats.openPipelineValue'),
       value: crm.isLoading ? '…' : crm.isError ? EMPTY.unavailable : formatCompactCurrency(openTotal),
       fullValue: crm.isLoading || crm.isError || !openTotal ? undefined : formatFullCurrency(openTotal),
-      change: `${openCount} open deals`,
+      change: t('dashboard.stats.openDeals', { count: openCount }),
       subtitle: openCountDelta == null
-        ? 'No historical comparison yet'
-        : `${openCountDelta > 0 ? `+${openCountDelta}` : `${openCountDelta}`} deals vs prior month${openValueDelta == null ? '' : ` · ${formatMoney(openValueDelta)}`}`,
+        ? t('dashboard.stats.noHistoricalComparison')
+        : `${t('dashboard.stats.dealsVsPriorMonth', { delta: openCountDelta > 0 ? `+${openCountDelta}` : `${openCountDelta}` })}${openValueDelta == null ? '' : ` · ${formatMoney(openValueDelta)}`}`,
       trend: openCountDelta > 0 ? 'up' : openCountDelta < 0 ? 'down' : 'neutral',
       icon: TrendingUp,
     },
     {
-      label: 'Payables Outstanding',
+      label: t('dashboard.stats.payablesOutstanding'),
       value: finance.isLoading ? '…' : finance.isError ? EMPTY.unavailable : formatCompactCurrency(payableOutstanding),
       fullValue: finance.isLoading || finance.isError || !payableOutstanding ? undefined : formatFullCurrency(payableOutstanding),
       change: payablesChangeText,
       subtitle: payables.data?.summary?.pendingApprovalCount > 0
-        ? `${payables.data.summary.pendingApprovalCount} pending approval`
-        : 'Across all vendor accounts',
+        ? t('dashboard.stats.pendingApproval', { count: payables.data.summary.pendingApprovalCount })
+        : t('dashboard.stats.acrossVendorAccounts'),
       trend: 'neutral',
       icon: CreditCard,
     },
     {
-      label: 'Active Sprints',
+      label: t('dashboard.stats.activeSprints'),
       value: sprints.isLoading ? '…' : sprints.isError ? EMPTY.unavailable : activeSprintCount.toString(),
-      change: activeSprintCount > 0 ? `${activeSprintCount} active` : 'No active sprint',
-      subtitle: `${completedSprintCount} completed across portfolio`,
+      change: activeSprintCount > 0
+        ? t('dashboard.stats.activeCount', { count: activeSprintCount })
+        : t('dashboard.stats.noActiveSprint'),
+      subtitle: t('dashboard.stats.completedAcrossPortfolio', { count: completedSprintCount }),
       trend: 'neutral',
       icon: Rocket,
     },
@@ -177,7 +191,7 @@ export default function DashboardOverview() {
   const availableYears = [...new Set([selectedYear, ...(finance.data?.cashFlow ?? []).map(point => point.month.slice(0, 4))])].sort((a, b) => b.localeCompare(a))
   const cashFlowData = (finance.data?.cashFlow ?? []).filter(point => point.month.startsWith(`${selectedYear}-`)).map((point) => ({
     monthKey: point.month,
-    month: shortMonth(point.month),
+    month: monthLabel(point.month, locale),
     value: moneyToMajor(point.net),
   }))
 
@@ -192,69 +206,69 @@ export default function DashboardOverview() {
   if (overdueCount > 0) {
     attentionItems.push({
       id: 'overdue-receivables',
-      title: 'Overdue Receivables',
-      subtitle: `Accounts receivable • ${overdueCount} ${overdueCount === 1 ? 'invoice' : 'invoices'} past due`,
+      title: t('dashboard.attention.overdueReceivables'),
+      subtitle: t('dashboard.attention.overdueSubtitle', { count: overdueCount }),
       amount: formatCompactCurrency(overdueTotal),
       fullAmount: formatFullCurrency(overdueTotal),
-      actionLabel: 'Open',
+      actionLabel: t('dashboard.attention.open'),
       to: '/dashboard/finance/accounts-receivable',
     })
   }
   if (lowStockProducts > 0) {
     attentionItems.push({
       id: 'low-stock',
-      title: 'Low-Stock Products',
-      subtitle: `Inventory • ${lowStockProducts} ${lowStockProducts === 1 ? 'product' : 'products'} below threshold`,
-      amount: `${lowStockProducts} item${lowStockProducts === 1 ? '' : 's'}`,
-      actionLabel: 'Open',
+      title: t('dashboard.attention.lowStock'),
+      subtitle: t('dashboard.attention.lowStockSubtitle', { count: lowStockProducts }),
+      amount: t('dashboard.attention.lowStockAmount', { count: lowStockProducts }),
+      actionLabel: t('dashboard.attention.open'),
       to: '/dashboard/inventory',
     })
   }
   if (pendingPayrollRuns > 0) {
     attentionItems.push({
       id: 'pending-payroll',
-      title: 'Pending Payroll Runs',
-      subtitle: 'HR • awaiting payroll approval',
-      amount: `${pendingPayrollRuns} ${pendingPayrollRuns === 1 ? 'run' : 'runs'}`,
-      actionLabel: 'Review',
+      title: t('dashboard.attention.pendingPayroll'),
+      subtitle: t('dashboard.attention.pendingPayrollSubtitle'),
+      amount: t('dashboard.attention.payrollRunsAmount', { count: pendingPayrollRuns }),
+      actionLabel: t('dashboard.attention.review'),
       to: '/dashboard/hr/payroll',
     })
   }
   if (attendanceExceptions > 0) {
     attentionItems.push({
       id: 'attendance-exceptions',
-      title: 'Attendance Exceptions',
-      subtitle: 'HR • recorded this period',
-      amount: `${attendanceExceptions} ${attendanceExceptions === 1 ? 'exception' : 'exceptions'}`,
-      actionLabel: 'Review',
+      title: t('dashboard.attention.attendanceExceptions'),
+      subtitle: t('dashboard.attention.attendanceSubtitle'),
+      amount: t('dashboard.attention.exceptionsAmount', { count: attendanceExceptions }),
+      actionLabel: t('dashboard.attention.review'),
       to: '/dashboard/hr/time-attendance',
     })
   }
 
   function downloadReport() {
     const rows = [
-      ['Dashboard report', `Calendar year ${selectedYear}`],
-      ['Metric', 'Value'],
+      [t('dashboard.report.title'), t('dashboard.report.calendarYear', { year: selectedYear })],
+      [t('dashboard.report.metric'), t('dashboard.report.value')],
       ...stats.map(stat => [stat.label, stat.value]),
       [],
-      ['Cash flow month', 'Net amount (minor units)', 'Currency'],
+      [t('dashboard.report.cashFlowMonth'), t('dashboard.report.netAmountMinor'), t('dashboard.report.currency')],
       ...cashFlowData.map(point => {
         const money = finance.data?.cashFlow?.find(row => row.month === point.monthKey)?.net
         return [point.monthKey, money?.amount ?? '', money?.currency ?? '']
       }),
       [],
-      ['Active sprint', 'Completion (%)', 'End date'],
+      [t('dashboard.report.activeSprint'), t('dashboard.report.completionPct'), t('dashboard.report.endDate')],
       ...sprintItems.filter(sprint => sprint.status === 'ACTIVE').map(sprint => [sprint.name, sprint.completionPct, sprint.endsAt ?? '']),
       [],
-      ['Requires attention', 'Detail', 'Amount / action'],
+      [t('dashboard.report.requiresAttention'), t('dashboard.report.detail'), t('dashboard.report.amountAction')],
       ...attentionItems.map(item => [item.title, item.subtitle, item.amount]),
     ]
     downloadCsv(rows, `dashboard-${new Date().toISOString().slice(0, 10)}.csv`)
   }
 
   return (
-    <div className="w-full p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
-      <h1 className="sr-only">Dashboard overview</h1>
+    <div className="mx-auto w-full max-w-7xl space-y-4 p-4 sm:p-6">
+      <h1 className="sr-only">{t('dashboard.overview')}</h1>
 
       <TopBarActions>
         <div className="flex items-center gap-3">
@@ -265,29 +279,29 @@ export default function DashboardOverview() {
             onClick={downloadReport}
             disabled={reportDataLoading}
             aria-busy={reportDataLoading}
-            title={reportDataLoading ? 'Wait for dashboard data to finish loading before generating a report.' : undefined}
-            className={`h-9 px-3.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/80 text-xs sm:text-sm font-semibold text-slate-800 shadow-sm transition-all ${reportDataLoading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+            title={reportDataLoading ? t('dashboard.reportWaitingTitle') : undefined}
+            className={`h-9 rounded-xl border border-slate-200/80 bg-white px-3.5 text-xs font-semibold text-slate-800 shadow-sm transition-all hover:bg-slate-50 sm:text-sm ${reportDataLoading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
           >
-            Generate Report
+            {t('dashboard.generateReport')}
           </Button>
         </div>
       </TopBarActions>
 
       {/* ── 1. Row 1: Compact 3-Tier Apple-Glass KPI Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
             <div
               key={stat.label}
-              className="bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col justify-between min-h-[150px]"
+              className="flex min-h-[150px] flex-col justify-between rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white/95 to-slate-50/60 p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] backdrop-blur-xl"
             >
               {/* Tier 1: Top Row */}
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                   {stat.label}
                 </span>
-                <div className="w-8 h-8 rounded-xl bg-slate-100/90 border border-slate-200/70 flex items-center justify-center text-slate-700 shrink-0">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200/70 bg-slate-100/90 text-slate-700">
                   {Icon && <Icon size={16} />}
                 </div>
               </div>
@@ -295,7 +309,7 @@ export default function DashboardOverview() {
               {/* Tier 2: Value and chip keep a fixed rhythm so a long value never resizes the row */}
               <div className="my-1.5 min-w-0">
                 <p
-                  className="truncate text-2xl font-bold leading-8 tracking-tight text-slate-900 tabular-nums cursor-help"
+                  className="cursor-help truncate text-2xl font-bold leading-8 tracking-tight text-slate-900 tabular-nums"
                   title={stat.fullValue || stat.value}
                 >
                   {stat.value}
@@ -313,8 +327,8 @@ export default function DashboardOverview() {
               </div>
 
               {/* Tier 3: Bottom Row Recessed Subtext Footer */}
-              <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500 truncate">
-                {stat.subtitle || 'No details yet'}
+              <div className="truncate border-t border-slate-100 pt-2 text-[11px] text-slate-500">
+                {stat.subtitle || t('dashboard.stats.noDetailsYet')}
               </div>
             </div>
           );
@@ -322,30 +336,30 @@ export default function DashboardOverview() {
       </div>
 
       {/* ── 2. Row 2: Cash Flow Analysis (lg:col-span-8) & Requires Attention (lg:col-span-4) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch lg:h-[272px]">
+      <div className="grid grid-cols-1 items-stretch gap-4 lg:h-[272px] lg:grid-cols-12">
 
         {/* Left Card: Cash Flow Analysis */}
-        <div className="lg:col-span-8 bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white/95 to-slate-50/60 p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] backdrop-blur-xl lg:col-span-8">
+          <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600">
                 <TrendingUp size={16} />
               </div>
               <div>
-                <h2 className="text-base font-bold text-slate-900">Cash Flow Analysis</h2>
-                <p className="text-xs text-slate-500">Calendar year {selectedYear}</p>
+                <h2 className="text-base font-bold text-slate-900">{t('dashboard.cashFlow.title')}</h2>
+                <p className="text-xs text-slate-500">{t('dashboard.cashFlow.calendarYear', { year: selectedYear })}</p>
               </div>
             </div>
             <Select value={selectedYear} onValueChange={setSelectedYear}>
               <SelectTrigger
-                aria-label="Cash flow calendar year"
-                className="h-8.5 px-3 rounded-xl bg-slate-100/80 hover:bg-slate-100 border border-slate-200/70 text-xs font-semibold text-slate-700 w-auto gap-1.5 shadow-none cursor-pointer"
+                aria-label={t('dashboard.cashFlow.yearAria')}
+                className="h-8.5 w-auto cursor-pointer gap-1.5 rounded-xl border border-slate-200/70 bg-slate-100/80 px-3 text-xs font-semibold text-slate-700 shadow-none hover:bg-slate-100"
               >
-                <SelectValue placeholder="Year" />
+                <SelectValue placeholder={t('dashboard.cashFlow.year')} />
               </SelectTrigger>
               <SelectContent>
                 {availableYears.map(year => (
-                  <SelectItem key={year} value={year}>Year {year}</SelectItem>
+                  <SelectItem key={year} value={year}>{t('dashboard.cashFlow.yearValue', { year })}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -353,16 +367,16 @@ export default function DashboardOverview() {
 
           {/* Chart or Compact Structured Empty State */}
           {finance.isLoading || finance.isError ? (
-            <div className="flex-1 min-h-[180px] flex items-center justify-center text-xs font-medium text-slate-500">
-              {finance.isLoading ? 'Loading cash flow…' : 'Cash flow could not be loaded.'}
+            <div className="flex min-h-[180px] flex-1 items-center justify-center text-xs font-medium text-slate-500">
+              {finance.isLoading ? t('dashboard.cashFlow.loading') : t('dashboard.cashFlow.error')}
             </div>
           ) : cashFlowData.length === 0 ? (
-            <div className="flex-1 min-h-[180px] bg-slate-50/70 border border-dashed border-slate-200/80 rounded-xl p-6 flex flex-col items-center justify-center text-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/70 shadow-sm flex items-center justify-center text-slate-400">
+            <div className="flex min-h-[180px] flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200/80 bg-slate-50/70 p-6 text-center">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/70 bg-white text-slate-400 shadow-sm">
                 <BarChart3 size={18} />
               </div>
               <p className="text-xs font-medium text-slate-500">
-                No cash flow data is available for {selectedYear}.
+                {t('dashboard.cashFlow.empty', { year: selectedYear })}
               </p>
             </div>
           ) : (
@@ -399,7 +413,7 @@ export default function DashboardOverview() {
                       backgroundColor: 'var(--color-chart-tooltip-bg)',
                       backdropFilter: 'blur(8px)',
                     }}
-                    formatter={(value) => [formatCompactMoney(value, finance.data?.cashFlow?.[0]?.net?.currency || 'USD'), 'Net Cash Flow']}
+                    formatter={(value) => [formatCompactMoney(value, finance.data?.cashFlow?.[0]?.net?.currency || 'USD'), t('dashboard.cashFlow.net')]}
                     labelStyle={{ fontWeight: 600, color: 'var(--color-chart-label)' }}
                   />
                   <Area
@@ -419,50 +433,50 @@ export default function DashboardOverview() {
         </div>
 
         {/* Right Card: Requires Attention */}
-        <div className="lg:col-span-4 bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col overflow-hidden">
-          <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
-            <div className="flex items-center gap-2 mb-3">
+        <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white/95 to-slate-50/60 p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] backdrop-blur-xl sm:p-5 lg:col-span-4">
+          <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
+            <div className="mb-3 flex items-center gap-2">
               <AlertCircle size={16} className="text-amber-500" />
-              <h2 className="text-base font-bold text-slate-900">Requires Attention</h2>
+              <h2 className="text-base font-bold text-slate-900">{t('dashboard.attention.title')}</h2>
             </div>
 
             {[receivables, products, payroll, attendance].some(query => query.isLoading) && attentionItems.length === 0 ? (
-              <p className="text-xs text-slate-400">Loading attention indicators…</p>
+              <p className="text-xs text-slate-400">{t('dashboard.attention.loading')}</p>
             ) : [receivables, products, payroll, attendance].some(query => query.isError) && attentionItems.length === 0 ? (
-              <p className="text-xs text-amber-600">Attention indicators could not be loaded.</p>
+              <p className="text-xs text-amber-600">{t('dashboard.attention.error')}</p>
             ) : attentionItems.length === 0 ? (
               <div className="py-6 text-center">
-                <p className="text-xs font-medium text-slate-400">Nothing needs attention right now.</p>
+                <p className="text-xs font-medium text-slate-400">{t('dashboard.attention.empty')}</p>
               </div>
             ) : (
               <div className="space-y-2.5">
                 {[receivables, products, payroll, attendance].some(query => query.isError) && (
-                  <p role="status" className="text-xs text-amber-600">Some attention indicators could not be loaded.</p>
+                  <p role="status" className="text-xs text-amber-600">{t('dashboard.attention.someError')}</p>
                 )}
                 {attentionItems.map((item) => (
                   <div
                     key={item.id}
-                    className="bg-slate-50/80 hover:bg-slate-50 border border-slate-200/70 rounded-xl p-3 space-y-1.5 transition-all"
+                    className="space-y-1.5 rounded-xl border border-slate-200/70 bg-slate-50/80 p-3 transition-all hover:bg-slate-50"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-xs sm:text-sm font-semibold text-slate-900 leading-snug">
+                      <p className="text-xs font-semibold leading-snug text-slate-900 sm:text-sm">
                         {item.title}
                       </p>
                       <span
-                        className="text-xs sm:text-sm font-bold text-slate-900 shrink-0 tabular-nums cursor-help"
+                        className="shrink-0 cursor-help text-xs font-bold text-slate-900 tabular-nums sm:text-sm"
                         title={item.fullAmount || item.amount}
                       >
                         {item.amount}
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-[11px] text-slate-500 leading-tight">
+                      <p className="text-[11px] leading-tight text-slate-500">
                         {item.subtitle}
                       </p>
                       <Link
                         to={item.to}
-                        aria-label={`${item.actionLabel} ${item.title.toLowerCase()}`}
-                        className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-[11px] font-semibold shrink-0 transition-colors"
+                        aria-label={`${item.actionLabel} ${item.title}`}
+                        className="shrink-0 rounded-lg bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-600 transition-colors hover:bg-indigo-100"
                       >
                         {item.actionLabel}
                       </Link>
@@ -477,29 +491,30 @@ export default function DashboardOverview() {
       </div>
 
       {/* ── 3. Row 3: Active Sprints (lg:col-span-8) & Activity Feed (lg:col-span-4) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch lg:h-[330px]">
+      <div className="grid grid-cols-1 items-stretch gap-4 lg:h-[330px] lg:grid-cols-12">
 
         {/* Left Card: Active Sprints */}
-        <div className="lg:col-span-8 bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col overflow-hidden">
-          <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
-            <div className="flex items-center justify-between mb-3.5">
+        <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white/95 to-slate-50/60 p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] backdrop-blur-xl lg:col-span-8">
+          <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
+            <div className="mb-3.5 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Rocket size={16} className="text-indigo-600" />
-                <h2 className="text-base font-bold text-slate-900">Active Sprints</h2>
+                <h2 className="text-base font-bold text-slate-900">{t('dashboard.sprints.title')}</h2>
               </div>
-              <Link to="/dashboard/projects" className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">
-                View Board &rarr;
+              <Link to="/dashboard/projects" className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700">
+                {t('dashboard.sprints.viewBoard')}
+                <ArrowRight size={13} className="rtl:-scale-x-100" />
               </Link>
             </div>
 
             {sprints.isLoading ? (
-              <p className="text-xs text-slate-400">Loading sprints…</p>
+              <p className="text-xs text-slate-400">{t('dashboard.sprints.loading')}</p>
             ) : sprints.isError ? (
-              <p className="text-xs text-slate-400">Sprints could not be loaded.</p>
+              <p className="text-xs text-slate-400">{t('dashboard.sprints.error')}</p>
             ) : sprintItems.filter(sprint => sprint.status === 'ACTIVE').length === 0 ? (
-              <p className="text-xs text-slate-400">No active sprints found.</p>
+              <p className="text-xs text-slate-400">{t('dashboard.sprints.empty')}</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 {sprintItems
                   .filter(sprint => sprint.status === 'ACTIVE')
                   .slice()
@@ -508,33 +523,33 @@ export default function DashboardOverview() {
                     <Link
                       to="/dashboard/projects"
                       key={sprint.id}
-                      className="bg-slate-50/80 hover:bg-white border border-slate-200/70 rounded-xl p-2.5 flex flex-col justify-between gap-1.5 transition-all shadow-[0_1px_2px_rgba(0,0,0,0.02)] group cursor-pointer"
+                      className="group flex cursor-pointer flex-col justify-between gap-1.5 rounded-xl border border-slate-200/70 bg-slate-50/80 p-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-all hover:bg-white"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex min-w-0 items-center gap-2">
                           <div
-                            className={`w-2 h-2 rounded-full shrink-0 ${
+                            className={`h-2 w-2 shrink-0 rounded-full ${
                               sprint.completionPct === 100 ? 'bg-emerald-500' : 'bg-indigo-600'
                             }`}
                           />
-                          <p className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">
+                          <p className="truncate text-xs font-bold text-slate-900 transition-colors group-hover:text-indigo-600 sm:text-sm">
                             {sprint.name}
                           </p>
                         </div>
-                        <span className="text-xs font-bold text-slate-800 tabular-nums shrink-0">
+                        <span className="shrink-0 text-xs font-bold text-slate-800 tabular-nums">
                           {sprint.completionPct}%
                         </span>
                       </div>
 
                       <div className="space-y-1.5">
-                        <div className="h-1.5 w-full rounded-full bg-slate-200/80 overflow-hidden">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80">
                           <div
-                            className="bg-indigo-600 h-full rounded-full transition-all duration-300"
+                            className="h-full rounded-full bg-indigo-600 transition-all duration-300"
                             style={{ width: `${Math.min(100, Math.max(0, sprint.completionPct))}%` }}
                           />
                         </div>
-                        <p className="text-[11px] text-slate-500 truncate">
-                          {sprintSubtitle(sprint)}
+                        <p className="truncate text-[11px] text-slate-500">
+                          {sprintSubtitle(sprint, t)}
                         </p>
                       </div>
                     </Link>
@@ -545,40 +560,40 @@ export default function DashboardOverview() {
         </div>
 
         {/* Right Card: Activity Feed */}
-        <div className="lg:col-span-4 bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] flex flex-col overflow-hidden">
-          <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
-            <div className="flex items-center gap-2 mb-3.5">
+        <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white/95 to-slate-50/60 p-5 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] backdrop-blur-xl lg:col-span-4">
+          <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
+            <div className="mb-3.5 flex items-center gap-2">
               <Clock size={16} className="text-slate-500" />
-              <h2 className="text-base font-bold text-slate-900">Activity Feed</h2>
+              <h2 className="text-base font-bold text-slate-900">{t('dashboard.activity.title')}</h2>
             </div>
 
             {auditLogs.isLoading ? (
               <div className="py-4">
-                <p className="text-xs text-slate-400">Loading activity...</p>
+                <p className="text-xs text-slate-400">{t('dashboard.activity.loading')}</p>
               </div>
             ) : auditLogs.isError ? (
               <div className="py-4">
-                <p className="text-xs text-amber-600">Could not load activity.</p>
+                <p className="text-xs text-amber-600">{t('dashboard.activity.error')}</p>
               </div>
             ) : auditLogs.data?.items?.length > 0 ? (
-              <div className="border-l-2 border-slate-200/80 ml-2 pl-3.5 space-y-3">
+              <div className="ms-2 space-y-3 border-s-2 border-slate-200/80 ps-3.5">
                 {auditLogs.data.items.map((log) => (
-                  <div key={log.id} className="relative group">
-                    <div className="absolute w-2 h-2 rounded-full bg-indigo-600 -left-[19px] top-1.5 ring-4 ring-white" />
-                    <p className="text-xs sm:text-sm font-semibold text-slate-900">
+                  <div key={log.id} className="group relative">
+                    <div className="absolute -start-[19px] top-1.5 h-2 w-2 rounded-full bg-indigo-600 ring-4 ring-white" />
+                    <p className="text-xs font-semibold text-slate-900 sm:text-sm">
                       {log.action}
                     </p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      {log.actorName} • {new Date(log.createdAt).toLocaleDateString()}
+                    <p className="mt-0.5 text-[11px] text-slate-500">
+                      {log.actorName} • {formatDate(log.createdAt)}
                     </p>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="py-6 flex flex-col items-center justify-center text-center">
-                <Clock size={20} className="text-slate-300 mb-1.5" />
-                <p className="text-xs font-semibold text-slate-600">No recent activity</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">Recorded audits will appear here after the page refreshes</p>
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <Clock size={20} className="mb-1.5 text-slate-300" />
+                <p className="text-xs font-semibold text-slate-600">{t('dashboard.activity.empty')}</p>
+                <p className="mt-0.5 text-[11px] text-slate-400">{t('dashboard.activity.emptyBody')}</p>
               </div>
             )}
           </div>
