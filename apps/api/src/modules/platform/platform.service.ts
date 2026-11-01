@@ -630,7 +630,7 @@ export async function getPlatformHealth(prisma: PrismaClient, env: AsasEnv) {
       timestamp: new Date().toISOString(),
       nodeEnv: env.nodeEnv,
       storageDriver: env.objectStorageDriver,
-      emailDelivery: env.resendApiKey ? 'configured' as const : 'disabled' as const,
+      emailDelivery: (env.resendApiKey || env.smtpHost) ? 'configured' as const : 'disabled' as const,
       queueMode: env.queueUrl ? 'pg-boss' as const : 'inline' as const,
       redisConfigured: Boolean(env.redisUrl),
       exportJobs: { queued: 0, running: 0, failed: 0, done: 0 },

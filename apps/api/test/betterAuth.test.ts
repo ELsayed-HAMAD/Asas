@@ -118,6 +118,29 @@ describe('better-auth route safeguards', () => {
     await app.close()
   })
 
+  it('allows email delivery endpoints when only SMTP is configured', async () => {
+    const app = Fastify({ logger: false })
+    await app.register(rateLimit, { global: false, max: 300, timeWindow: '1 minute' })
+    app.decorate('environment', loadEnv({
+      NODE_ENV: 'test',
+      DATABASE_URL: 'postgresql://mock:mock@localhost:5432/db',
+      RESEND_API_KEY: '',
+      SMTP_HOST: 'smtp-relay.brevo.com',
+    }))
+    let dispatches = 0
+    await betterAuthPlugin(app, {
+      handler: async () => {
+        dispatches += 1
+        return new Response('{}')
+      },
+    } as any)
+
+    const response = await app.inject({ method: 'POST', url: '/api/auth/request-password-reset', payload: { email: 'owner@example.com' } })
+    expect(response.statusCode).toBe(200)
+    expect(dispatches).toBe(1)
+    await app.close()
+  })
+
   it('rate-limits the actual password reset endpoint', async () => {
     const app = Fastify({ logger: false, trustProxy: true })
     await app.register(rateLimit, { global: false, max: 300, timeWindow: '1 minute' })
