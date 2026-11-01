@@ -475,7 +475,7 @@ export default function DashboardOverview() {
                       </p>
                       <Link
                         to={item.to}
-                        aria-label={`${item.actionLabel} ${item.title}`}
+                        aria-label={`${item.actionLabel} ${item.title.toLowerCase()}`}
                         className="shrink-0 rounded-lg bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-600 transition-colors hover:bg-indigo-100"
                       >
                         {item.actionLabel}
