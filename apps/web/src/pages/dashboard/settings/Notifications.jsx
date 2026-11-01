@@ -187,10 +187,10 @@ export default function SettingsNotifications() {
               {/* Quiet Hours */}
               <div className="bg-surface-muted border border-border-default rounded-button p-5 flex items-start gap-4">
                 <Clock size={20} className="text-body shrink-0 mt-0.5" />
-                <div>
+                <div className="min-w-0 flex-1">
                   <h3 className="text-sm font-bold text-heading mb-1">Quiet Hours</h3>
-                  <div className="flex items-center gap-3 text-sm text-body-light">
-                    Pause all non-critical alerts between
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-body-light sm:gap-3">
+                    <span>Pause all non-critical alerts between</span>
                     <Input
                       type="time"
                       value={quietHours.start}
@@ -198,7 +198,7 @@ export default function SettingsNotifications() {
                       disabled={!canManageSettings}
                       className="w-28 bg-surface-raised font-medium"
                     />
-                    and
+                    <span>and</span>
                     <Input
                       type="time"
                       value={quietHours.end}

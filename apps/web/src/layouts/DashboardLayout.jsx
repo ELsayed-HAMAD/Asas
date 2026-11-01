@@ -1192,14 +1192,14 @@ export default function DashboardLayout() {
 
       {/* ── Desktop sidebar ── */}
       <TooltipProvider delayDuration={150}>
-        <aside className={`hidden md:flex ${sidebarCollapsed ? 'w-16 min-w-16' : 'w-55 min-w-55'} h-screen max-h-screen glass-strong border-e border-border-subtle/60 flex-col relative z-30 transition-all duration-300 ease-out`}>
+        <aside className={`hidden lg:flex ${sidebarCollapsed ? 'w-16 min-w-16' : 'w-55 min-w-55'} h-screen max-h-screen glass-strong border-e border-border-subtle/60 flex-col relative z-30 transition-all duration-300 ease-out`}>
           <SidebarContent navProps={navProps} navigate={navigate} isCollapsed={sidebarCollapsed} />
         </aside>
       </TooltipProvider>
 
       {/* ── Mobile sidebar overlay ── */}
       {mobileSidebarOpen && (
-        <div className="md:hidden fixed inset-0 z-50 flex">
+        <div className="lg:hidden fixed inset-0 z-50 flex">
           {/* Backdrop */}
           <button
             type="button"
@@ -1218,14 +1218,14 @@ export default function DashboardLayout() {
       <div className={`flex-1 flex flex-col overflow-hidden min-w-0 ${isSettingsRoute ? 'settings-glass-shell' : ''}`}>
 
         {/* Topbar (64px, one row, restrained global controls) */}
-        <header className="glass-strong flex h-16 min-h-16 flex-shrink-0 items-center justify-between gap-4 border-b border-border-subtle/60 px-4 md:px-6 min-w-0">
+        <header className="glass-strong flex h-16 min-h-16 flex-shrink-0 items-center justify-between gap-2 border-b border-border-subtle/60 px-4 sm:gap-4 sm:px-5 lg:px-6 min-w-0">
 
           {/* Left: hamburger (mobile only) + breadcrumb */}
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <button
               ref={mobileMenuButtonRef}
               type="button"
-              className="md:hidden text-muted hover:text-heading flex-shrink-0"
+              className="lg:hidden text-muted hover:text-heading flex-shrink-0"
               onClick={() => setMobileSidebarOpen(true)}
               aria-label="Open navigation menu"
               aria-expanded={mobileSidebarOpen}
@@ -1237,7 +1237,7 @@ export default function DashboardLayout() {
             <button
               type="button"
               onClick={toggleCollapse}
-              className="hidden md:flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-heading"
+              className="hidden lg:flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-heading"
               title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               aria-pressed={sidebarCollapsed}
@@ -1246,19 +1246,21 @@ export default function DashboardLayout() {
             </button>
 
             {/* Breadcrumb */}
-            <Breadcrumb aria-label="Breadcrumb" className="min-w-0 whitespace-nowrap flex-1 text-xs sm:text-sm">
+            <Breadcrumb aria-label="Breadcrumb" className="min-w-0 whitespace-nowrap text-xs sm:text-sm">
               <BreadcrumbList className="flex-nowrap gap-1 sm:gap-1.5 text-xs sm:text-sm">
                 {breadcrumbs.map((crumb, i) => {
                   const isLast = i === breadcrumbs.length - 1
                   const crumbPath = '/' + pathname.split('/').filter(Boolean).slice(0, i + 1).join('/')
+                  const hideOnMobile = i < breadcrumbs.length - 1
+                  const hideSeparatorOnMobile = i === breadcrumbs.length - 1 && breadcrumbs.length > 1
                   return (
-                    <BreadcrumbItem key={i} className="min-w-0 whitespace-nowrap gap-1 sm:gap-1.5 shrink-0">
+                    <BreadcrumbItem key={i} className={`${hideOnMobile ? 'hidden sm:inline-flex' : 'inline-flex'} min-w-0 whitespace-nowrap gap-1 sm:gap-1.5 ${isLast ? 'flex-1 sm:flex-initial' : 'shrink-0'}`}>
                       {i > 0 && (
-                        <BreadcrumbSeparator className="text-faint [&>svg]:size-[13px] [&>svg]:flex-shrink-0" />
+                        <BreadcrumbSeparator className={`${hideSeparatorOnMobile ? 'hidden sm:inline-flex' : 'inline-flex'} text-faint [&>svg]:size-[13px] [&>svg]:flex-shrink-0`} />
                       )}
                       {isLast ? (
                         <BreadcrumbPage
-                          className="font-semibold whitespace-nowrap text-xs sm:text-sm"
+                          className="block truncate font-semibold whitespace-nowrap text-xs sm:text-sm"
                           title={typeof crumb === 'string' ? crumb : undefined}
                         >
                           {crumb}
@@ -1275,16 +1277,24 @@ export default function DashboardLayout() {
             </Breadcrumb>
           </div>
 
-          {/* Spacer: flex: 1 so the left and right groups never touch */}
-          <div className="flex-1" />
-
           {/* Right group: global command search, notifications, page actions */}
           <div className="ml-auto flex min-w-0 flex-nowrap items-center justify-end gap-2.5">
             <Button
               variant="outline"
               type="button"
               onClick={() => setCommandPaletteOpen(true)}
-              className="hidden h-9 w-[clamp(220px,24vw,340px)] shrink-0 justify-between rounded-full border-border-default/80 bg-surface-muted/70 px-4 text-xs font-normal text-muted shadow-none backdrop-blur-md hover:bg-surface-raised hover:text-body lg:flex"
+              className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full border-border-default/80 bg-surface-muted/70 text-muted shadow-none backdrop-blur-md hover:bg-surface-raised hover:text-body lg:flex xl:hidden"
+              title="Search (⌘K or Ctrl+K)"
+              aria-label="Search or jump to..."
+            >
+              <Search size={15} />
+            </Button>
+
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => setCommandPaletteOpen(true)}
+              className="hidden h-9 w-[clamp(220px,24vw,340px)] shrink-0 justify-between rounded-full border-border-default/80 bg-surface-muted/70 px-4 text-xs font-normal text-muted shadow-none backdrop-blur-md hover:bg-surface-raised hover:text-body xl:flex"
               title="Global search (⌘K or Ctrl+K)"
               aria-label="Search or jump to..."
             >

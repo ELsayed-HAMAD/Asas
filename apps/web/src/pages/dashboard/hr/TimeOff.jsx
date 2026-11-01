@@ -194,10 +194,10 @@ export default function TimeOff() {
     <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-y-auto min-w-0 px-6 py-5">
       <h1 className="sr-only">Time Off & Leave</h1>
       {/* ── Toolbar: Filters & Primary Actions (Apple-Glass Unified Bar) ── */}
-      <div className="bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-2.5 shadow-xs flex flex-wrap items-center justify-between gap-2.5 mb-5 shrink-0">
+      <div className="mb-5 flex shrink-0 flex-col gap-2.5 rounded-2xl border border-border-default bg-surface-raised/85 p-2.5 shadow-xs backdrop-blur-xl xl:flex-row xl:flex-nowrap xl:items-center xl:justify-between">
         {/* Left Filter Cluster: Employee Search + Dept + Type */}
-        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
-          <div className="relative w-full sm:w-60 min-w-0">
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 xl:flex-1 xl:flex-nowrap">
+          <div className="relative w-full shrink-0 sm:w-60">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
             <Input
               type="search"
@@ -238,7 +238,7 @@ export default function TimeOff() {
         </div>
 
         {/* Right Action Cluster: Export + Request Time Off */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:flex-nowrap xl:shrink-0">
           <Button
             variant="outline"
             size="sm"
@@ -345,7 +345,7 @@ export default function TimeOff() {
                 </div>
 
                 {/* Status Segmented Filter Pills */}
-                <div className="flex items-center p-1 rounded-xl bg-surface-muted border border-border-default/60 shrink-0 gap-1">
+                <div className="flex w-full flex-wrap items-center gap-1 rounded-xl border border-border-default/60 bg-surface-muted p-1 sm:w-auto sm:flex-nowrap sm:shrink-0">
                   <button
                     type="button"
                     onClick={() => setStatusFilter('ALL')}

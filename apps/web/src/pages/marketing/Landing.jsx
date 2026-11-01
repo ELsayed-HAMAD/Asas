@@ -488,8 +488,8 @@ export default function Landing() {
               </div>
 
               <div className="p-5 sm:p-8 lg:p-10">
-                <div className="flex justify-center overflow-x-auto pb-1" role="group" aria-label="Choose a product workflow">
-                  <div className="inline-flex min-w-max rounded-full border border-black/[0.05] bg-canvas-muted/80 p-1">
+                <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Choose a product workflow">
+                  <div className="mx-auto flex w-max rounded-full border border-black/[0.05] bg-canvas-muted/80 p-1">
                     {WORKFLOWS.map((workflow, index) => {
                       const active = index === activeWorkflowIndex
                       return (
@@ -498,7 +498,7 @@ export default function Landing() {
                           type="button"
                           aria-pressed={active}
                           onClick={() => setActiveWorkflowIndex(index)}
-                          className={`rounded-full px-4 py-2 text-xs font-medium transition-all sm:px-5 ${active ? 'bg-white text-ink shadow-[0_2px_10px_rgba(0,0,0,0.08)]' : 'text-ink-muted hover:text-ink'}`}
+                          className={`whitespace-nowrap rounded-full px-2.5 py-2 text-[11px] font-medium transition-all sm:px-5 sm:text-xs ${active ? 'bg-white text-ink shadow-[0_2px_10px_rgba(0,0,0,0.08)]' : 'text-ink-muted hover:text-ink'}`}
                         >
                           {workflow.label}
                         </button>
@@ -572,8 +572,8 @@ export default function Landing() {
               ))}
             </div>
 
-            <div data-reveal className="mt-14 flex items-center gap-3 border-t border-black/[0.06] pt-6 text-xs text-ink-muted">
-              <ShieldCheck className="h-4 w-4 text-action" />
+            <div data-reveal className="mt-14 flex flex-wrap items-center gap-3 border-t border-black/[0.06] pt-6 text-xs text-ink-muted">
+              <ShieldCheck className="h-4 w-4 shrink-0 text-action" />
               <span>Server-side access controls and tenant-scoped data access.</span>
               <Link to="/documentation#security" className="ml-auto shrink-0 font-medium text-action hover:underline">Security details</Link>
             </div>
@@ -676,14 +676,14 @@ export default function Landing() {
       </main>
 
       <footer className="border-t border-black/[0.07] px-4 py-12 sm:px-6">
-        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-10 md:grid-cols-5">
-          <div className="col-span-2">
+        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-6 gap-y-10 sm:gap-10 md:grid-cols-5">
+          <div className="col-span-2 md:col-span-1">
             <Link to="/" className="flex w-fit items-center gap-2.5">
               <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-inverse-ink text-white"><AsasLogo className="h-4 w-4" /></span>
               <span className="text-base font-semibold tracking-tight">Asas</span>
             </Link>
             <p className="mt-4 max-w-xs text-xs leading-6 text-ink-soft">One thoughtful workspace for finance, people, customers, projects, and inventory.</p>
-            <p className="mt-6 text-[10px] text-ink-faint-soft">© {new Date().getFullYear()} Asas Technologies Inc. All rights reserved.</p>
+            <p className="mt-6 text-[11px] text-ink-faint-soft">© {new Date().getFullYear()} Asas Technologies Inc. All rights reserved.</p>
           </div>
           <div>
             <h3 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-secondary">Product</h3>
@@ -701,9 +701,9 @@ export default function Landing() {
               <li><Link to="/documentation#security" className="transition-colors hover:text-action">Access & data handling</Link></li>
             </ul>
           </div>
-          <div>
+          <div className="col-span-2 md:col-span-1">
             <h3 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-secondary">Legal & trust</h3>
-            <ul className="space-y-3 text-xs text-ink-soft">
+            <ul className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs text-ink-soft md:block md:space-y-3">
               <li><Link to="/privacy" className="transition-colors hover:text-action">Privacy policy</Link></li>
               <li><CookieSettingsButton className="transition-colors hover:text-action" /></li>
               <li><Link to="/terms" className="transition-colors hover:text-action">Terms of service</Link></li>

@@ -216,14 +216,14 @@ export default function FinanceOverview() {
       <h1 className="sr-only">Finance overview</h1>
 
       {/* ── 1. Unified Single-Row Apple-Glass Command Toolbar ── */}
-      <div className="relative z-30 bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-2.5 shadow-xs flex flex-wrap xl:flex-nowrap items-center justify-between gap-2.5 flex-shrink-0">
+      <div className="relative z-30 flex flex-shrink-0 flex-col gap-2.5 rounded-2xl border border-border-default bg-surface-raised/85 p-2.5 shadow-xs backdrop-blur-xl xl:flex-row xl:flex-nowrap xl:items-center xl:justify-between">
         {/* Left Cluster: Search transactions + Year select */}
-        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2.5 xl:flex-1 xl:flex-nowrap">
           <SearchInput
             placeholder="Search transactions..."
             value={transactionSearch}
             onChange={event => setTransactionSearch(event.target.value)}
-            wrapperClassName="w-full sm:w-80 md:w-96 lg:w-[460px] shrink-0"
+            wrapperClassName="w-full sm:w-80 md:w-96 lg:w-[460px] xl:w-auto xl:max-w-[460px] xl:flex-1 shrink-0"
             className="h-9 pl-9 pr-3 text-xs sm:text-sm"
           />
 
@@ -249,7 +249,7 @@ export default function FinanceOverview() {
         </div>
 
         {/* Right Cluster: Export + Create Invoice */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:flex-nowrap xl:shrink-0">
           <Button
             type="button"
             variant="outline"

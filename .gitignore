@@ -302,3 +302,11 @@ desktop.ini
 .agents/
 .cline/
 .windsurf/
+
+# Frontend tooling caches and local-only overrides
+.vite/
+.oxlintcache
+.eslintcache
+*.local
+blob-report/
+.vercel-tmp/

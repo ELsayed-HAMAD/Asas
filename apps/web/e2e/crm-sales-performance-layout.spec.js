@@ -204,8 +204,10 @@ test('crm sales performance page strictly satisfies all layout rules at 1280px, 
     expect(yearRect.width).toBe(112);
 
     // Month select button: 36px high, min-width 168px, shows full month text without ellipsis
-    const monthBtn = page.getByRole('button', { name: /October 2026|All Dates/i });
+    // The page defaults to the current UTC month, so derive the label instead of hardcoding a month.
+    const monthBtn = page.getByRole('button', { name: /^[A-Z][a-z]+ 2026$|^All Dates$/ });
     await expect(monthBtn).toBeVisible();
+    const monthLabel = (await monthBtn.innerText()).trim();
     const monthRect = await monthBtn.evaluate(el => ({
       y: Math.round(el.getBoundingClientRect().y),
       width: Math.round(el.getBoundingClientRect().width),
@@ -388,7 +390,7 @@ test('crm sales performance page strictly satisfies all layout rules at 1280px, 
     // TEST 5: Bottom Row (Grid 3fr 2fr, items-start, min-height 200px)
     // ──────────────────────────────────────────────────────────────────────────
     const winLossCard = page.locator('div:has(> div > h2:text-is("Win/Loss Analysis"))').first();
-    const topDealsCard = page.locator('div:has(> div > h2:text-is("Top Deals · October 2026"))').first();
+    const topDealsCard = page.locator(`div:has(> div > h2:text-is("Top Deals · ${monthLabel}"))`).first();
 
     await expect(winLossCard).toBeVisible();
     await expect(topDealsCard).toBeVisible();

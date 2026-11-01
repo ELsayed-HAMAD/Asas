@@ -204,7 +204,7 @@ export default function CRMOverview() {
         </div>
 
         {/* ── Row 1: 3-Tier Apple-Glass KPI Cards ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch [&>*]:min-w-0">
           {/* Card 1: Total Pipeline */}
           <div className="relative overflow-hidden bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] grid grid-rows-[auto_1fr_auto] min-h-[124px]">
             {/* Background Subtle Sparkline */}
@@ -314,26 +314,24 @@ export default function CRMOverview() {
           {/* Card 4: Closed Won */}
           <div className="bg-gradient-to-b from-white/95 to-slate-50/60 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.05),inset_0_1px_0_0_rgba(255,255,255,0.9)] grid grid-rows-[auto_1fr_auto] min-h-[124px]">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 truncate">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 truncate min-w-0">
                 Closed Won ({perf?.year ?? currentYear})
               </p>
-              <div className="flex items-center gap-1.5">
-                <span className="inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold leading-none bg-slate-100 text-slate-600 border border-slate-200/60 whitespace-nowrap">
-                  {perf ? `${perf.summary.totalWonCount} deals` : '0 deals'}
-                </span>
-                <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200/70 text-slate-600 flex items-center justify-center shrink-0">
-                  <Trophy size={16} />
-                </div>
+              <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200/70 text-slate-600 flex items-center justify-center shrink-0">
+                <Trophy size={16} />
               </div>
             </div>
 
-            <div className="my-1 flex items-baseline">
+            <div className="my-1 flex flex-wrap items-baseline gap-2">
               <p
                 className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums cursor-help"
                 title={closedWonValueLabel}
               >
                 {closedWonCompactValue}
               </p>
+              <span className="inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold leading-none bg-slate-100 text-slate-600 border border-slate-200/60 whitespace-nowrap shrink-0">
+                {perf ? `${perf.summary.totalWonCount} deals` : '0 deals'}
+              </span>
             </div>
 
             <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">

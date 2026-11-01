@@ -181,10 +181,10 @@ export default function Solutions() {
       title="Business workflows in one workspace"
       description="Explore the current Asas product areas, the records they manage, and the practical limits to confirm before using them in production."
     >
-      <div className="grid gap-8 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="h-fit rounded-[24px] border border-white/80 bg-white/50 p-2.5 shadow-[0_16px_50px_rgba(0,0,0,0.05)] backdrop-blur-xl lg:sticky lg:top-28">
+      <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <aside className="h-fit min-w-0 rounded-[24px] border border-white/80 bg-white/50 p-2.5 shadow-[0_16px_50px_rgba(0,0,0,0.05)] backdrop-blur-xl lg:sticky lg:top-28">
           <p className="px-3 pb-2 pt-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-subtle">Product areas</p>
-          <nav aria-label="Solution areas" className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
+          <nav aria-label="Solution areas" className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:flex lg:flex-col lg:gap-1">
             {SOLUTIONS.map((solution) => {
               const TabIcon = solution.icon
               const active = solution.id === activeSolutionId
@@ -195,17 +195,17 @@ export default function Solutions() {
                   onClick={() => selectSolution(solution.id)}
                   aria-pressed={active}
                   aria-controls="solution-detail"
-                  className={`flex min-w-max items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-xs font-medium transition-colors lg:w-full ${active ? 'bg-white text-ink shadow-[0_4px_16px_rgba(0,0,0,0.07)]' : 'text-ink-muted hover:bg-white/50 hover:text-ink'}`}
+                  className={`flex min-w-0 items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-[11px] font-medium leading-tight transition-colors sm:px-3.5 sm:py-3 sm:text-xs lg:w-full ${active ? 'bg-white text-ink shadow-[0_4px_16px_rgba(0,0,0,0.07)]' : 'text-ink-muted hover:bg-white/50 hover:text-ink'}`}
                 >
-                  <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${active ? 'bg-action-soft text-action' : 'bg-black/[0.035] text-ink-soft'}`}><TabIcon className="h-4 w-4" /></span>
-                  <span>{solution.badge}</span>
+                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${active ? 'bg-action-soft text-action' : 'bg-black/[0.035] text-ink-soft'}`}><TabIcon className="h-4 w-4" /></span>
+                  <span className="min-w-0">{solution.badge}</span>
                 </button>
               )
             })}
           </nav>
         </aside>
 
-        <section id="solution-detail" className="scroll-mt-28 overflow-hidden rounded-[28px] border border-white/80 bg-white/60 shadow-[0_24px_70px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl">
+        <section id="solution-detail" className="min-w-0 scroll-mt-28 overflow-hidden rounded-[28px] border border-white/80 bg-white/60 shadow-[0_24px_70px_rgba(0,0,0,0.07),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl">
           <p className="sr-only" role="status">Showing {currentSolution.title}. {currentSolution.subtitle}</p>
           <div key={currentSolution.id} className="animate-fade-in p-6 sm:p-9 lg:p-11">
             <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-start">

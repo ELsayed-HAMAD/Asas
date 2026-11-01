@@ -265,9 +265,9 @@ export default function PortfolioOverview() {
           {/* Left Column (lg:col-span-8 space-y-3) */}
           <div className="lg:col-span-8 space-y-3">
             {/* Standalone Filter Toolbar */}
-            <div className="bg-white/80 backdrop-blur-xl border border-slate-200/70 rounded-2xl p-2.5 sm:p-3 shadow-[0_2px_10px_-3px_rgba(15,23,42,0.04)] flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5">
+            <div className="bg-white/80 backdrop-blur-xl border border-slate-200/70 rounded-2xl p-2.5 sm:p-3 shadow-[0_2px_10px_-3px_rgba(15,23,42,0.04)] flex flex-col gap-2.5 xl:flex-row xl:flex-nowrap xl:items-center xl:justify-between">
               {/* Left Cluster inside this toolbar */}
-              <div className="flex flex-1 flex-wrap sm:flex-nowrap items-center gap-2.5 min-w-0">
+              <div className="flex w-full min-w-0 flex-wrap items-center gap-2.5 xl:flex-1 xl:flex-nowrap">
                 <SearchInput
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -297,7 +297,7 @@ export default function PortfolioOverview() {
               </div>
 
               {/* Right Cluster inside this toolbar */}
-              <div className="shrink-0">
+              <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:flex-nowrap xl:shrink-0">
                 <Button
                   onClick={() => setProjectOpen(true)}
                   className="h-9 px-3.5 rounded-xl text-xs sm:text-sm font-medium inline-flex items-center justify-center whitespace-nowrap shadow-sm"
@@ -309,8 +309,8 @@ export default function PortfolioOverview() {
 
             {/* Projects Table Card */}
             <div data-testid="project-table-card" className="bg-white/80 backdrop-blur-xl border border-slate-200/70 rounded-2xl shadow-[0_2px_10px_-3px_rgba(15,23,42,0.04)] overflow-hidden">
-              <div className="max-h-[386px] xl:max-h-[440px] overflow-y-auto overflow-x-hidden">
-                <Table wrapperClassName="overflow-x-hidden" className="w-full table-fixed border-collapse">
+              <div className="max-h-[386px] overflow-x-auto overflow-y-auto xl:max-h-[440px]">
+                <Table wrapperClassName="overflow-x-auto" className="w-full min-w-[560px] table-fixed border-collapse">
                   <colgroup>
                     <col className="min-w-[180px]" />
                     <col style={{ width: '110px' }} />

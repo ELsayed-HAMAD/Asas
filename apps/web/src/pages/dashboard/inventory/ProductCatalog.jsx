@@ -695,7 +695,7 @@ export default function Inventory() {
           <div data-testid="product-table-card" className="flex-1 min-h-0 bg-surface-raised border border-border-default rounded-card shadow-card flex flex-col overflow-hidden">
             {/* Rows area: flex: 1; min-height: 0; overflow-y: auto */}
             <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-width:thin]">
-              <Table className="w-full table-fixed border-collapse">
+              <Table wrapperClassName="overflow-x-auto" className="w-full min-w-[560px] table-fixed border-collapse">
                 <colgroup>
                   <col className="min-w-[220px]" />
                   <col style={{ width: '120px' }} />
@@ -773,7 +773,7 @@ export default function Inventory() {
 
             {/* Pagination Footer (Pinned at bottom of card, 44px, 1px top border) */}
             {data?.pagination && (
-              <div className="h-11 shrink-0 border-t border-border-default px-4 flex items-center justify-between text-[13px] text-muted bg-surface-raised">
+              <div className="h-11 max-sm:h-auto max-sm:min-h-11 shrink-0 border-t border-border-default px-4 max-sm:py-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[13px] text-muted bg-surface-raised">
                 <span className="whitespace-nowrap">
                   Showing {data.pagination.total === 0 ? 0 : (productPage - 1) * data.pagination.limit + 1}–{Math.min(productPage * data.pagination.limit, data.pagination.total)} of {data.pagination.total} products
                 </span>

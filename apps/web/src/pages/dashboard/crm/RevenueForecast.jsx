@@ -191,7 +191,7 @@ export default function RevenueForecast() {
       <h1 className="sr-only">Revenue Forecast</h1>
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
         {/* ── 1. Top Filter & Action Toolbar (Standard Apple-Glass Bar) ── */}
-        <div className="bg-white/85 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-2.5 shadow-[0_2px_10px_-3px_rgba(15,23,42,0.04)] flex flex-wrap items-center justify-between gap-2.5">
+        <div className="bg-white/85 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-2.5 shadow-[0_2px_10px_-3px_rgba(15,23,42,0.04)] flex flex-col gap-2.5 xl:flex-row xl:flex-nowrap xl:items-center xl:justify-between">
           {/* Left: Search reps */}
           <SearchInput
             value={search}
@@ -203,7 +203,7 @@ export default function RevenueForecast() {
           />
 
           {/* Right: Year, Download, Manage Quotas, Share Forecast */}
-          <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+          <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:flex-nowrap xl:shrink-0">
             <Select value={String(selectedYear)} onValueChange={val => setSelectedYear(val)}>
               <SelectTrigger
                 aria-label="Forecast calendar year"

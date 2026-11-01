@@ -232,9 +232,9 @@ export default function SettingsGeneral() {
             <h2 className="text-lg font-bold text-heading mb-1">Organization Profile</h2>
             <p className="text-sm text-muted mb-6">Manage your workspace identity and basic contact information.</p>
 
-            <div className="flex items-start gap-6">
+            <div className="flex flex-col items-start gap-6 sm:flex-row">
               {/* Logo Upload */}
-              <div className="flex flex-col items-center gap-2 shrink-0">
+              <div className="flex flex-col items-center gap-2 shrink-0 self-center sm:self-auto">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -286,7 +286,7 @@ export default function SettingsGeneral() {
               </div>
 
               {/* Form Fields */}
-              <div className="flex-1 space-y-4 pt-1">
+              <div className="w-full flex-1 space-y-4 pt-1 sm:w-auto">
                 <div>
                   <label className="block text-xs font-bold text-heading mb-1.5">Workspace Name</label>
                   <Input

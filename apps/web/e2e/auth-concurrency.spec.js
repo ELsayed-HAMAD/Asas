@@ -304,7 +304,8 @@ test('workspace members see Settings write controls disabled across notification
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/dashboard/settings/notifications')
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
-    await expect.poll(() => page.locator('nav[aria-label="Settings navigation"]').evaluate(nav => nav.scrollWidth > nav.clientWidth)).toBe(true)
+    // Tabs may wrap or scroll at phone width; either way none of them may be clipped.
+    await expect.poll(() => page.locator('nav[aria-label="Settings navigation"]').evaluate(nav => nav.scrollWidth <= nav.clientWidth + 1)).toBe(true)
     await expect(page.getByRole('tab', { name: 'Data Export' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Save Preferences' })).toBeDisabled()
     await expect(page.getByRole('switch').first()).toBeDisabled()

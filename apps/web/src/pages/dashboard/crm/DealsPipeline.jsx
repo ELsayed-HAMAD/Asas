@@ -165,13 +165,12 @@ function ListDealRow({ deal, selected, onSelect, disabled }) {
       }}
       style={{
         transform: CSS.Translate.toString(transform),
-        gridTemplateColumns: 'minmax(220px, 1fr) 115px 125px',
         paddingInline: '16px',
       }}
       {...listeners}
       {...attributes}
       onClick={() => onSelect(deal.id)}
-      className={`relative grid items-center gap-x-3 h-11 min-h-[44px] cursor-pointer transition-colors border-b border-border-subtle focus:outline-none focus:ring-2 focus:ring-inset focus:ring-accent ${
+      className={`relative grid grid-cols-[minmax(0,1fr)_84px_80px] items-center gap-x-2 sm:grid-cols-[minmax(160px,1fr)_105px_105px] sm:gap-x-3 min-[1100px]:grid-cols-[minmax(220px,1fr)_115px_125px] h-11 min-h-[44px] cursor-pointer transition-colors border-b border-border-subtle focus:outline-none focus:ring-2 focus:ring-inset focus:ring-accent ${
         selected ? 'bg-surface-muted/90' : 'bg-surface-raised hover:bg-surface-muted/50'
       } ${isDragging || disabled ? 'opacity-60' : ''}`}
     >
@@ -837,10 +836,7 @@ export default function DealsPipeline() {
             >
               {/* Column Header (outside scroll area, fixed height) */}
               <div
-                className="grid items-center border-b border-border-default bg-surface-muted/90 backdrop-blur-xs text-[10px] font-semibold uppercase text-muted tracking-[0.06em] shrink-0 h-9 min-h-[36px] px-4 gap-x-3"
-                style={{
-                  gridTemplateColumns: 'minmax(220px, 1fr) 115px 125px',
-                }}
+                className="grid grid-cols-[minmax(0,1fr)_84px_80px] sm:grid-cols-[minmax(160px,1fr)_105px_105px] min-[1100px]:grid-cols-[minmax(220px,1fr)_115px_125px] items-center border-b border-border-default bg-surface-muted/90 backdrop-blur-xs text-[10px] font-semibold uppercase text-muted tracking-[0.06em] shrink-0 h-9 min-h-[36px] px-4 gap-x-2 sm:gap-x-3"
               >
                 <div className="text-start">DEAL NAME</div>
                 <div className="text-start">STAGE</div>
@@ -849,10 +845,7 @@ export default function DealsPipeline() {
 
               {/* Group header bar */}
               <div
-                className="grid items-center bg-surface-muted/60 backdrop-blur-xs border-b border-border-default h-9 min-h-[36px] px-4 gap-x-3 text-[11px] font-semibold text-muted uppercase tracking-[0.06em] shrink-0"
-                style={{
-                  gridTemplateColumns: 'minmax(220px, 1fr) 115px 125px',
-                }}
+                className="grid grid-cols-[minmax(0,1fr)_84px_80px] sm:grid-cols-[minmax(160px,1fr)_105px_105px] min-[1100px]:grid-cols-[minmax(220px,1fr)_115px_125px] items-center bg-surface-muted/60 backdrop-blur-xs border-b border-border-default h-9 min-h-[36px] px-4 gap-x-2 sm:gap-x-3 text-[11px] font-semibold text-muted uppercase tracking-[0.06em] shrink-0"
               >
                 <div className="col-span-2 flex items-center gap-2 min-w-0">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${getStageDotColor(activeGroup.stage)}`} aria-hidden="true" />

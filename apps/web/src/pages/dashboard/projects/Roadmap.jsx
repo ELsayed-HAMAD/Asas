@@ -676,16 +676,16 @@ export default function Roadmap() {
       </div>
 
       {/* ── 2. Full-Width Filter, Quarter Jump-Bar & View Switcher Toolbar ── */}
-      <div className="w-full bg-white/85 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-2.5 shadow-sm flex flex-wrap xl:flex-nowrap items-center justify-between gap-2.5">
+      <div className="flex w-full flex-col gap-2.5 rounded-2xl border border-slate-200/80 bg-white/85 p-2.5 shadow-sm backdrop-blur-xl xl:flex-row xl:flex-nowrap xl:items-center xl:justify-between">
         {/* Left Cluster: Search & Timeline Dropdown */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 xl:w-auto xl:flex-nowrap">
           <SearchInput
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search..."
             aria-label="Search roadmap"
             title="Search roadmap"
-            wrapperClassName="w-48 sm:w-56 shrink-0"
+            wrapperClassName="w-full sm:w-56 shrink-0"
             className="h-8.5 text-xs"
           />
 
@@ -716,9 +716,9 @@ export default function Roadmap() {
         </div>
 
         {/* Center/Right Cluster: Quarter Jump-Bar & View Switcher */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar min-w-0">
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 xl:w-auto xl:flex-nowrap">
           {/* Quick-Filter Pills (Practical Quarter Controller) */}
-          <div className="flex items-center gap-1 bg-slate-100/80 p-0.5 rounded-xl border border-slate-200/60 shrink-0">
+          <div className="flex flex-wrap items-center gap-1 rounded-xl border border-slate-200/60 bg-slate-100/80 p-0.5">
             <button
               type="button"
               onClick={() => setPhaseFilter('all')}

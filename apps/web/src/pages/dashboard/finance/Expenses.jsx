@@ -310,9 +310,9 @@ export default function Expenses() {
       <h1 className="sr-only">Expenses</h1>
 
       {/* ── 1. Full-Width Single-Row Apple-Glass Command Toolbar ── */}
-      <div className="relative z-30 bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-2.5 shadow-xs flex flex-wrap xl:flex-nowrap items-center justify-between gap-2.5 flex-shrink-0">
+      <div className="relative z-30 flex flex-shrink-0 flex-col gap-2.5 rounded-2xl border border-border-default bg-surface-raised/85 p-2.5 shadow-xs backdrop-blur-xl xl:flex-row xl:flex-nowrap xl:items-center xl:justify-between">
         {/* Left Cluster: Search + Dept Select + Sort Select */}
-        <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap sm:flex-nowrap">
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 xl:flex-1 xl:flex-nowrap">
           <SearchInput
             value={searchInput}
             onChange={event => setSearchInput(event.target.value)}
@@ -356,7 +356,7 @@ export default function Expenses() {
         </div>
 
         {/* Right Cluster: Export CSV + + New Expense */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:flex-nowrap xl:shrink-0">
           <Button
             type="button"
             variant="outline"
@@ -486,7 +486,7 @@ export default function Expenses() {
               </div>
 
               {/* Status Segmented Filter Tabs */}
-              <div role="tablist" aria-label="Filter expenses by status" className="flex items-center p-1 rounded-xl bg-surface-muted border border-border-default/60 shrink-0 gap-1 overflow-x-auto no-scrollbar">
+              <div role="tablist" aria-label="Filter expenses by status" className="flex w-full flex-wrap items-center gap-1 rounded-xl border border-border-default/60 bg-surface-muted p-1 sm:w-auto sm:flex-nowrap sm:shrink-0">
                 {STATUS_TABS.map(tab => {
                   const isActive = statusTab === tab.key;
                   return (
@@ -510,8 +510,8 @@ export default function Expenses() {
             </div>
 
             {/* Scrollable Table Viewport */}
-            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-surface-raised">
-              <Table className="w-full table-fixed text-left border-collapse">
+            <div className="flex-1 min-h-0 overflow-auto bg-surface-raised">
+              <Table className="w-full min-w-[600px] table-fixed text-left border-collapse">
                 <colgroup>
                   <col className="min-w-[170px]" />
                   <col className="w-[20%] min-w-[110px]" />

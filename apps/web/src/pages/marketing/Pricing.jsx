@@ -69,7 +69,7 @@ export default function Pricing() {
         </div>
       )}
 
-      <div className="mb-6 flex items-center justify-between gap-4 text-xs text-ink-soft">
+      <div className="mb-6 flex flex-col gap-1.5 text-xs text-ink-soft sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <span>Prices shown are monthly.</span>
         <span>Annual checkout is not currently available.</span>
       </div>
@@ -111,24 +111,45 @@ export default function Pricing() {
           <h2 className="mt-4 text-3xl font-semibold tracking-[-0.035em] text-ink sm:text-4xl">Compare plan limits across tiers</h2>
           <p className="mt-4 text-sm leading-6 text-ink-muted">Product modules are shared across tiers; plans currently differ by seat and storage allowances.</p>
         </div>
-        <div className="mt-8 overflow-hidden rounded-[24px] border border-black/[0.07] bg-white/65 shadow-[0_16px_50px_rgba(0,0,0,0.04)] backdrop-blur-xl">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-xs">
-              <thead className="border-b border-black/[0.07] text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-soft">
-                <tr>
-                  <th className="px-5 py-4">Plan limit</th>
-                  {tiers.map(plan => <th key={plan.tier} className={`px-5 py-4 text-center ${plan.highlight ? 'bg-action-wash text-action' : ''}`}>{plan.name}</th>)}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/[0.06] text-ink-secondary">
-                {COMPARISON_ROWS.map((row) => (
-                  <tr key={row.feature}>
-                    <td className="px-5 py-4 font-medium text-ink">{row.feature}</td>
-                    {tiers.map(plan => <td key={plan.tier} className={`px-5 py-4 text-center ${plan.highlight ? 'bg-action-wash/60' : ''}`}>{row.value(plan)}</td>)}
+        <div className="mt-8">
+          <div className="space-y-3 md:hidden">
+            {tiers.map((plan) => (
+              <article key={plan.tier} className={`rounded-2xl border p-4 shadow-[0_10px_30px_rgba(0,0,0,0.04)] ${plan.highlight ? 'border-action-border bg-action-wash' : 'border-black/[0.07] bg-white/80'}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-ink">{plan.name}</h3>
+                  {plan.highlight && <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-action">Most popular</span>}
+                  {plan.tier === 'free' && <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">Default</span>}
+                </div>
+                <dl className="mt-3 border-t border-black/[0.06]">
+                  {COMPARISON_ROWS.map((row) => (
+                    <div key={row.feature} className="flex items-baseline justify-between gap-4 border-b border-black/[0.06] py-2.5 last:border-b-0">
+                      <dt className="text-xs text-ink-soft">{row.feature}</dt>
+                      <dd className="text-xs font-semibold text-ink">{row.value(plan)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-hidden rounded-[24px] border border-black/[0.07] bg-white/65 shadow-[0_16px_50px_rgba(0,0,0,0.04)] backdrop-blur-xl md:block">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[680px] text-left text-xs">
+                <thead className="border-b border-black/[0.07] text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-soft">
+                  <tr>
+                    <th className="px-5 py-4">Plan limit</th>
+                    {tiers.map(plan => <th key={plan.tier} className={`whitespace-nowrap px-5 py-4 text-center ${plan.highlight ? 'bg-action-wash text-action' : ''}`}>{plan.name}</th>)}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-black/[0.06] text-ink-secondary">
+                  {COMPARISON_ROWS.map((row) => (
+                    <tr key={row.feature}>
+                      <td className="px-5 py-4 font-medium text-ink">{row.feature}</td>
+                      {tiers.map(plan => <td key={plan.tier} className={`whitespace-nowrap px-5 py-4 text-center ${plan.highlight ? 'bg-action-wash/60' : ''}`}>{row.value(plan)}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>

@@ -591,10 +591,10 @@ export default function Payroll() {
       <h1 className="sr-only">Payroll</h1>
       {/* ── Unified Apple-Glass Top Command Toolbar + Run Metadata Strip ── */}
       <div className="relative z-30 bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-3 shadow-xs space-y-2.5 flex-shrink-0">
-        {/* Row 1 — Interactive Controls (one row from lg up so the run status cannot resize it) */}
-        <div className="flex flex-wrap items-center justify-between gap-2 min-w-0 lg:flex-nowrap">
+        {/* Row 1 — Interactive Controls (one row from xl up so the run status cannot resize it) */}
+        <div className="flex min-w-0 flex-col gap-2 xl:flex-row xl:flex-nowrap xl:items-center xl:justify-between">
           {/* Left Cluster: Dept + Run Select */}
-          <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap lg:flex-nowrap">
+          <div className="flex w-full min-w-0 flex-wrap items-center gap-2 xl:flex-1 xl:flex-nowrap">
             <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
               <SelectTrigger aria-label="Department" className="h-8.5 px-3 rounded-xl text-xs font-medium shrink-0 w-auto min-w-[100px] bg-surface-muted hover:bg-surface-muted/80 border border-border-default shadow-xs">
                 <SelectValue placeholder="All Depts" />
@@ -674,7 +674,7 @@ export default function Payroll() {
           </div>
 
           {/* Right Cluster: Calculators + Export + Void run + + New Payroll Run */}
-          <div className="flex items-center gap-1.5 shrink-0 flex-wrap sm:flex-nowrap ml-auto">
+          <div className="flex w-full flex-wrap items-center gap-1.5 xl:ml-auto xl:w-auto xl:flex-nowrap xl:shrink-0">
             {/* Calculators dropdown */}
             <DropdownMenu open={toolsMenuOpen} onOpenChange={setToolsMenuOpen}>
               <DropdownMenuTrigger asChild>
@@ -918,7 +918,7 @@ export default function Payroll() {
             <div className="flex min-w-0 items-center gap-1.5 truncate">
               <span className="shrink-0 font-medium text-heading">Pay date {activeRun?.payDate ? formatDate(activeRun.payDate) : 'not scheduled'}</span>
               <span>·</span>
-              <span className="truncate">Earning period {run?.periodStart && run?.periodEnd ? `${run.periodStart} – ${run.periodEnd}` : 'not recorded (legacy run)'}</span>
+              <span className="truncate" title={run?.periodStart && run?.periodEnd ? `${run.periodStart} – ${run.periodEnd}` : 'Earning period not recorded (legacy run)'}>Earning period {run?.periodStart && run?.periodEnd ? `${run.periodStart} – ${run.periodEnd}` : 'not recorded (legacy run)'}</span>
               {run?.createdById && (
                 <>
                   <span>·</span>
@@ -1120,7 +1120,7 @@ export default function Payroll() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-0 items-start">
         {/* Left Column — Payroll Register Table (lg:col-span-8) */}
         <div className="col-span-12 lg:col-span-8 min-w-0 bg-surface-raised rounded-2xl border border-border-default shadow-xs flex flex-col overflow-hidden h-[560px] min-h-[560px]">
-          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-surface-raised">
+          <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto bg-surface-raised">
             {isLoading && (
               <div className="flex items-center justify-center gap-2 py-16 text-muted text-sm">
                 <Loader2 size={16} className="animate-spin" /> Loading payroll…
@@ -1132,7 +1132,7 @@ export default function Payroll() {
               </div>
             )}
             {!isLoading && !isError && (
-              <Table wrapperClassName="overflow-visible" className="w-full table-fixed text-left border-collapse">
+              <Table wrapperClassName="overflow-x-auto" className="w-full min-w-[560px] table-fixed text-left border-collapse">
                 <colgroup>
                   <col className="w-[38%]" />
                   <col className="w-[15%]" />

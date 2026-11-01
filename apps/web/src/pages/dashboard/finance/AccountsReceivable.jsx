@@ -499,15 +499,15 @@ export default function AccountsReceivable() {
       <h1 className="sr-only">Accounts Receivable</h1>
 
       {/* ── Top Page Toolbar ── */}
-      <div className="relative z-30 bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-2.5 shadow-xs flex flex-wrap xl:flex-nowrap items-center justify-between gap-2.5 flex-shrink-0 mb-5">
+      <div className="relative z-30 mb-5 flex flex-shrink-0 flex-col gap-2.5 rounded-2xl border border-border-default bg-surface-raised/85 p-2.5 shadow-xs backdrop-blur-xl xl:flex-row xl:flex-nowrap xl:items-center xl:justify-between">
         {/* Left group */}
-        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap flex-1 min-w-0">
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2.5 xl:flex-1 xl:flex-nowrap">
           <SearchInput
             type="text"
             value={search}
             onChange={event => { setSearch(event.target.value); setCustomerPage(1); }}
             placeholder="Search customers..."
-            wrapperClassName="w-72 max-w-full shrink-0"
+            wrapperClassName="w-full sm:w-64 xl:w-72 shrink-0"
             className="h-9 pl-9 pr-3 text-xs sm:text-sm"
           />
           <Select
@@ -541,7 +541,7 @@ export default function AccountsReceivable() {
         </div>
 
         {/* Right group */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:flex-nowrap xl:shrink-0">
           <Button
             type="button"
             variant="outline"
@@ -597,7 +597,7 @@ export default function AccountsReceivable() {
           className={`border border-border-default rounded-card p-4 bg-surface-raised shadow-card flex flex-col cursor-pointer hover:border-slate-300 transition-colors ${ageFilter === 'all' ? 'ring-2 ring-accent/30' : ''}`}
           style={{ containerType: 'inline-size' }}
         >
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">Total Outstanding</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted leading-tight">Total Outstanding</p>
           <p className="min-w-0 text-2xl font-bold text-heading tracking-tight mt-1.5 leading-tight tabular-nums" style={{ fontSize: metricFontSize(totalOutstanding) }}>
             {money(totalOutstanding)}
           </p>
@@ -724,20 +724,19 @@ export default function AccountsReceivable() {
                 );
               })}
 
-              {paginatedCustomers.length === 0 && (
-                <TableRow className="hover:bg-transparent border-0">
-                   <TableCell colSpan={3} className="px-6 py-8 text-center text-muted text-xs">
-                     {customers.length === 0
-                       ? 'No customers yet. Use Customers to add one before creating an invoice.'
-                       : search.trim() || ageFilter !== 'all'
-                       ? 'No customers match the current search and aging filter. Clear the filters to see all open balances.'
-                       : 'No outstanding balances. Paid invoices are excluded from this list; use New Invoice to bill a customer.'}
-                   </TableCell>
-                </TableRow>
-              )}
             </TableBody>
           </Table>
         </div>
+
+        {paginatedCustomers.length === 0 && (
+          <div className="px-6 py-8 text-center text-xs text-muted">
+            {customers.length === 0
+              ? 'No customers yet. Use Customers to add one before creating an invoice.'
+              : search.trim() || ageFilter !== 'all'
+              ? 'No customers match the current search and aging filter. Clear the filters to see all open balances.'
+              : 'No outstanding balances. Paid invoices are excluded from this list; use New Invoice to bill a customer.'}
+          </div>
+        )}
 
         {/* Pagination Footer */}
         <div className="flex items-center justify-between border-t border-border-default px-4 py-2.5 text-xs text-muted bg-surface-raised mt-auto">

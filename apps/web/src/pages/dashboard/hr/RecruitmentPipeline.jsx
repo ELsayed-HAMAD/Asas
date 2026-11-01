@@ -659,9 +659,9 @@ export default function RecruitmentPipeline() {
     <div className="flex-1 min-h-0 flex flex-col bg-surface-raised overflow-y-auto min-w-0 px-6 py-5 space-y-4">
       <h1 className="sr-only">Recruitment</h1>
       {/* ── Row 1: Spacious Single-Row Command Toolbar ── */}
-      <div className="relative z-20 bg-surface-raised/85 backdrop-blur-xl border border-border-default rounded-2xl p-2.5 shadow-xs flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 shrink-0">
+      <div className="relative z-20 flex shrink-0 flex-col gap-2.5 rounded-2xl border border-border-default bg-surface-raised/85 p-2.5 shadow-xs backdrop-blur-xl xl:flex-row xl:flex-nowrap xl:items-center xl:justify-between">
         {/* Left Cluster: Search + Role Select */}
-        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2.5 xl:flex-1 xl:flex-nowrap">
           <SearchInput
             value={search}
             onChange={event => { setSearch(event.target.value); setPage(1) }}
@@ -690,7 +690,7 @@ export default function RecruitmentPipeline() {
         </div>
 
         {/* Right Cluster: Export + Add Candidate Actions */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:flex-nowrap xl:shrink-0">
           <Button
             variant="outline"
             size="sm"

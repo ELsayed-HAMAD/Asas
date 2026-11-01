@@ -457,8 +457,8 @@ export default function TimeAttendance() {
                 )}
               </div>
 
-              <div className="max-h-[540px] overflow-y-auto overflow-x-hidden">
-                <Table className="w-full table-fixed text-left border-collapse">
+              <div className="max-h-[540px] overflow-auto">
+                <Table className="w-full min-w-[520px] table-fixed text-left border-collapse">
                   <colgroup>
                     <col className="w-[36%]" />
                     <col className="w-[24%]" />

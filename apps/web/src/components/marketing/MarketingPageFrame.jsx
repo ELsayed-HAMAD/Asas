@@ -30,11 +30,11 @@ export default function MarketingPageFrame({ eyebrow, title, description, childr
       </div>
 
       <footer className="relative border-t border-black/[0.07] px-4 py-10 sm:px-6">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-6">
-          <div className="flex items-center gap-2.5">
+        <div className="mx-auto flex max-w-6xl flex-col gap-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-6">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-inverse-ink text-white"><AsasLogo className="h-3.5 w-3.5" /></span>
             <span className="text-sm font-semibold">Asas</span>
-            <span className="ml-2 text-[11px] text-ink-subtle">© {new Date().getFullYear()} All rights reserved.</span>
+            <span className="text-[11px] text-ink-subtle sm:ml-2">© {new Date().getFullYear()} All rights reserved.</span>
           </div>
           <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-5 gap-y-3 text-xs text-ink-soft">
             <Link to="/solutions" className="transition-colors hover:text-action">Solutions</Link>

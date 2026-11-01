@@ -1,4 +1,5 @@
-import { BookOpenCheck, ShieldCheck } from 'lucide-react'
+import { useState } from 'react'
+import { BookOpenCheck, ChevronDown, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import MarketingPageFrame from '../../components/marketing/MarketingPageFrame'
 import { Badge } from '../../components/ui/badge'
@@ -88,34 +89,50 @@ const DASHBOARD_GUIDE = [
 ]
 
 export default function Documentation() {
+  const [guideOpen, setGuideOpen] = useState(false)
+
   return (
     <MarketingPageFrame
       eyebrow="Product guide"
       title="Get started with Asas"
       description="A practical guide to every dashboard area: what each page shows, the actions available there, and the boundaries to understand before relying on business data or external services."
     >
-      <div className="grid gap-10 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="h-fit rounded-[24px] border border-white/80 bg-white/55 p-4 shadow-[0_16px_50px_rgba(0,0,0,0.05)] backdrop-blur-xl lg:sticky lg:top-28">
-          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-black/[0.06]">
-            <BookOpenCheck className="w-5 h-5 text-action" />
-            <h2 className="text-sm font-bold text-ink">Guide index</h2>
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10">
+        <aside className="h-fit min-w-0 rounded-[24px] border border-white/80 bg-white/55 p-4 shadow-[0_16px_50px_rgba(0,0,0,0.05)] backdrop-blur-xl lg:sticky lg:top-28">
+          <div className="flex items-center justify-between gap-3 border-b border-black/[0.06] pb-3">
+            <div className="flex items-center gap-2">
+              <BookOpenCheck className="h-5 w-5 shrink-0 text-action" />
+              <h2 className="text-sm font-bold text-ink">Guide index</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setGuideOpen(open => !open)}
+              aria-expanded={guideOpen}
+              aria-controls="guide-index"
+              className="inline-flex items-center gap-1 rounded-full border border-black/[0.08] bg-white/70 px-3 py-1.5 text-[11px] font-medium text-ink-secondary transition-colors hover:bg-white lg:hidden"
+            >
+              {guideOpen ? 'Hide' : 'Show'}
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${guideOpen ? 'rotate-180' : ''}`} />
+            </button>
           </div>
-          <nav aria-label="Documentation sections" className="flex flex-col gap-1">
-            {SECTIONS.map(section => (
-              <a key={section.id} href={`#${section.id}`} className="rounded-xl px-3 py-2.5 text-xs font-medium text-ink-secondary transition-colors hover:bg-black/[0.04] hover:text-ink">
-                {section.label}
-              </a>
-            ))}
-          </nav>
-          <div className="mt-6 pt-4 border-t border-black/[0.06]">
-            <p className="text-[11px] text-ink-subtle mb-2">Compare workspace plans</p>
-            <Button asChild variant="outline" size="sm" className="h-9 w-full rounded-full border-black/10 bg-white/60 text-xs text-ink shadow-none hover:bg-white">
-              <Link to="/pricing">View pricing</Link>
-            </Button>
+          <div id="guide-index" className={guideOpen ? 'mt-4' : 'mt-4 hidden lg:block'}>
+            <nav aria-label="Documentation sections" className="flex flex-col gap-1">
+              {SECTIONS.map(section => (
+                <a key={section.id} href={`#${section.id}`} className="rounded-xl px-3 py-2.5 text-xs font-medium text-ink-secondary transition-colors hover:bg-black/[0.04] hover:text-ink">
+                  {section.label}
+                </a>
+              ))}
+            </nav>
+            <div className="mt-6 border-t border-black/[0.06] pt-4">
+              <p className="mb-2 text-[11px] text-ink-subtle">Compare workspace plans</p>
+              <Button asChild variant="outline" size="sm" className="h-9 w-full rounded-full border-black/10 bg-white/60 text-xs text-ink shadow-none hover:bg-white">
+                <Link to="/pricing">View pricing</Link>
+              </Button>
+            </div>
           </div>
         </aside>
 
-        <div className="space-y-10">
+        <div className="min-w-0 space-y-10">
           <section id="getting-started" className="scroll-mt-28 border-b border-black/10 pb-10">
             <div className="flex items-center gap-2 mb-3">
               <Badge variant="outline" className="text-xs text-action border-action-border bg-action-soft">Setup</Badge>
