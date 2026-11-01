@@ -47,15 +47,16 @@ describe('Finding 5: Enterprise Credential Encryption Service (AES-256-GCM)', ()
     const rawSecret = 'slack_webhook_secret_value'
     const encrypted = encryptCredential(rawSecret, tenantId, secretKey)
     const parts = encrypted.split(':')
+    const flipLastHexDigit = (value: string) => value.slice(0, -1) + (value.endsWith('0') ? '1' : '0')
 
     // Tamper with ciphertext
-    const tamperedCipher = parts[0] + ':' + parts[1] + ':' + parts[2] + ':' + (parts[3].slice(0, -2) + '00')
+    const tamperedCipher = parts[0] + ':' + parts[1] + ':' + parts[2] + ':' + flipLastHexDigit(parts[3])
     expect(() => {
       decryptCredential(tamperedCipher, tenantId, secretKey)
     }).toThrowError(/Unsupported state or unable to authenticate data/)
 
     // Tamper with tag
-    const tamperedTag = parts[0] + ':' + parts[1] + ':' + (parts[2].slice(0, -2) + '00') + ':' + parts[3]
+    const tamperedTag = parts[0] + ':' + parts[1] + ':' + flipLastHexDigit(parts[2]) + ':' + parts[3]
     expect(() => {
       decryptCredential(tamperedTag, tenantId, secretKey)
     }).toThrowError(/Unsupported state or unable to authenticate data/)

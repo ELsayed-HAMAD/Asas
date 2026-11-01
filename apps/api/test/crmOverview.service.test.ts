@@ -96,7 +96,7 @@ describe('CRM overview stage conversion cohorts', () => {
           ('tenant_1', 'CLOSED_LOST', '${result.winRateComparison.current.startDate}T18:00:00Z'),
           ('tenant_1', 'CLOSED_WON', '${result.winRateComparison.previous.startDate}T16:00:00Z'),
           ('tenant_1', 'CLOSED_LOST', '${result.winRateComparison.previous.startDate}T17:00:00Z'),
-          ('tenant_1', 'CLOSED_WON', '${result.winRateComparison.current.endDateExclusive}T04:00:00Z'),
+          ('tenant_1', 'CLOSED_WON', (('${result.winRateComparison.current.endDateExclusive}'::date::timestamp AT TIME ZONE 'America/New_York'))),
           ('tenant_2', 'CLOSED_WON', '${result.winRateComparison.current.startDate}T16:00:00Z');`)
       const [periodTemplate, ...periodValues] = raw.mock.calls[1] as [TemplateStringsArray, ...unknown[]]
       const periodSql = periodTemplate.reduce((query, segment, index) => query + segment + (index < periodValues.length ? `$${index + 1}` : ''), '')
