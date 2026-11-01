@@ -63,6 +63,7 @@ export async function betterAuthPlugin(app: FastifyInstance, auth: Auth): Promis
         request.method === 'POST'
         && EMAIL_DELIVERY_PATHS.has(authPath)
         && !request.server.environment.resendApiKey
+        && !request.server.environment.smtpHost
       ) {
         await reply.code(503).send({ error: { message: 'Email delivery is not configured. Contact your workspace administrator.' } })
         return
