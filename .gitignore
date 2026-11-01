@@ -162,6 +162,11 @@ apps/web/.screens/
 apps/web/.tmp/
 apps/web/.turbo/
 
+# Browser-automation session state can contain live authentication cookies.
+.auth/
+storageState.json
+*.storageState.json
+
 # Runtime data. Never commit uploads, generated exports, resumes, or local
 # database files. See the deployment notes for the S3 migration path.
 /storage/
@@ -178,6 +183,16 @@ apps/web/.turbo/
 .tmp-shims/
 *.pid
 *.seed
+
+# Generated data exports and archives can contain customer data. Use
+# `git add -f` for intentional test fixtures.
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.zip
+*.7z
+*.rar
 
 # Local databases and dumps
 *.db
@@ -274,7 +289,6 @@ sentry.properties
 .mcp/
 
 .vercel
-.env*
 
 # Local runtime and build artefacts
 *.log
@@ -310,3 +324,7 @@ desktop.ini
 *.local
 blob-report/
 .vercel-tmp/
+
+# Environment templates stay trackable even if new env rules are added above.
+!**/.env.example
+!*.env.example
