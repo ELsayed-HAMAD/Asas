@@ -19,9 +19,9 @@
     "lint": "turbo run lint"
   },
   "devDependencies": {
-    "@types/node": "^26.4.0",
+    "@types/node": "^26.6.6",
     "prisma": "6.19.3",
-    "turbo": "^2.10.12",
+    "turbo": "^2.11.10",
     "typescript": "^7.0.2"
   }
 }
