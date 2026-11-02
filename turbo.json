@@ -3,7 +3,8 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**"],
+      "env": ["NODE_ENV", "VITE_API_URL", "VITE_SENTRY_DSN", "VITE_DISABLE_SSE", "VITE_DISABLE_SAMPLE_DATA"]
     },
     "typecheck": {
       "dependsOn": ["^build"]

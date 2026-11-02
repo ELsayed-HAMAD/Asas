@@ -169,7 +169,10 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
   if (rlsEnforcement !== 'enforce' && rlsEnforcement !== 'off') {
     throw new Error('RLS_ENFORCEMENT must be either "enforce" or "off"')
   }
-  const frontendOrigin = source.FRONTEND_ORIGIN || (nodeEnv === 'production' ? 'https://app.asas.local' : 'http://localhost:5173,http://127.0.0.1:5173')
+  // No placeholder origin in production: a fabricated default silently produces a CORS
+  // allow-list that matches no real browser origin. An empty value rejects every cross-origin
+  // request, which is the safe default for a same-origin deployment.
+  const frontendOrigin = source.FRONTEND_ORIGIN?.trim() || (nodeEnv === 'production' ? '' : 'http://localhost:5173,http://127.0.0.1:5173')
   const objectStorageDriver = source.OBJECT_STORAGE_DRIVER ?? 'local'
   if (objectStorageDriver !== 'local' && objectStorageDriver !== 's3') {
     throw new Error('OBJECT_STORAGE_DRIVER must be either local or s3')
@@ -250,7 +253,10 @@ export function assertEnv(environment: AsasEnv = loadEnv()): AsasEnv {
     throw new Error('BETTER_AUTH_URL must use HTTPS in production so session cookies are Secure and OAuth callbacks are correct')
   }
   if (environment.isProduction) {
-    const origins = environment.frontendOrigin.split(',').map(o => o.trim())
+    const origins = environment.frontendOrigin.split(',').map(o => o.trim()).filter(Boolean)
+    if (origins.length === 0) {
+      throw new Error('Missing required environment variable: FRONTEND_ORIGIN (required in production)')
+    }
     if (origins.some(o => !o.startsWith('https://'))) {
       throw new Error('FRONTEND_ORIGIN must use HTTPS in production to prevent cookie leakage over plaintext')
     }

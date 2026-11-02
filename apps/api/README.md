@@ -22,8 +22,8 @@ The API refuses to boot in production unless the following are configured:
 - `AUTH_SECRET` with at least 32 characters and not reused as an encryption key.
 - `ENCRYPTION_KEY` with at least 32 characters, independent of `AUTH_SECRET`, for integration credentials.
 - `BANK_DATA_ENCRYPTION_KEY` with at least 32 characters, independent of the other keys, for employee bank details.
-- `BETTER_AUTH_URL` and every `FRONTEND_ORIGIN` entry using HTTPS.
-- `TRUSTED_PROXY_CIDRS` listing the exact reverse-proxy IPs or CIDRs. Trust-all values (`*`, `0.0.0.0/0`, `::/0`, `true`) are rejected.
+- `BETTER_AUTH_URL` and every `FRONTEND_ORIGIN` entry using HTTPS. `FRONTEND_ORIGIN` has no production default and must be set explicitly.
+- `TRUSTED_PROXY_CIDRS` listing the exact reverse-proxy IPs or CIDRs. Trust-all values (`*`, `0.0.0.0/0`, `::/0`, `true`) are rejected. Leaving it empty is accepted but logs a warning: every request then reports the platform's own socket address, which collapses rate limiting into one shared bucket and loses the real client IP in audit rows.
 - `RLS_ENFORCEMENT=enforce`; disabling the application-level tenant guard is rejected in production.
 - `OBJECT_STORAGE_DRIVER=s3` with `S3_BUCKET` and the required region or endpoint credentials.
 - Stripe keys and webhook secret configured together, with an allow-list of recurring Price IDs when billing is enabled.
@@ -51,7 +51,7 @@ Operations that genuinely span tenants, such as maintenance sweeps and platform 
 
 Application code must still scope its own queries. The guard is a safety net, not a replacement for authorization or correct data modeling. The `RLS_ENFORCEMENT=off` setting exists only for local diagnostics and is rejected in production.
 
-For email delivery, configure `RESEND_API_KEY` and a verified `MAIL_FROM` address. When `QUEUE_URL` is set, email is dispatched through the pg-boss `emails` queue with retries; otherwise it is delivered inline. Without a Resend key, email sends fail explicitly rather than being recorded as successful. Keep provider credentials in the deployment secret store, not in source control.
+For email delivery, configure either SMTP (`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`) or `RESEND_API_KEY`, plus a sender address on a verified domain in `MAIL_FROM`. Brevo's free SMTP relay is the recommended $0 option; a Resend key takes precedence when both are set. When `QUEUE_URL` is set, email is dispatched through the pg-boss `emails` queue with retries; otherwise it is delivered inline. With neither provider configured, endpoints that send mail return `503` and `/ready` reports `emailDelivery: "disabled"` rather than recording a message as sent. Keep provider credentials in the deployment secret store, not in source control.
 
 ### Integration credential encryption
 
@@ -63,13 +63,14 @@ Employee routing/account numbers, IBANs, and BICs are encrypted with AES-256-GCM
 
 After every API instance has been upgraded to write encrypted values, backfill legacy plaintext rows from the repository root with `pnpm --filter @asas/api data:encrypt-employee-bank-details`. The operation is idempotent, processes records in batches, and uses compare-and-set writes so a concurrent employee edit is reported instead of overwritten; rerun after resolving the reported row. Legacy reads remain compatible during this rollout. New employee imports and sample-data setup also encrypt bank fields. Full workspace JSON archives omit bank identifiers and state that exclusion in the archive metadata and Settings UI.
 
-### Resend deployment and acceptance
+### Email deployment and acceptance
 
-1. Verify the sending domain in Resend and create an API key with email send access.
-2. Set `RESEND_API_KEY` and `MAIL_FROM` in the API deployment's secret/environment settings. `MAIL_FROM` must use the verified domain (for example, `Asas <notifications@example.com>`). Do not commit either value. For local Compose, put them in `apps/api/.env`, which the API container loads.
-3. For queued delivery, set `QUEUE_URL` to a PostgreSQL connection available to the API (typically the same Neon database as `DATABASE_URL`). Without it, messages are sent inline and provider latency/failures affect the originating request.
-4. Restart/redeploy the API and check `/ready`: `emailDelivery: "configured"` confirms the key is present. It does not prove the key, sender, domain, or recipient are accepted by Resend.
-5. In a staging workspace, trigger a password reset for a controlled test account and confirm receipt, sender, link destination, and provider delivery status. If using pg-boss, confirm the queued job completes and that a deliberate provider failure is retried. Do not test with a real customer's address.
+1. Create a free Brevo account and verify a sender domain or sender address. Brevo's free plan allows 300 messages per day, which is enough for transactional sign-up, verification, and reset mail.
+2. Set `SMTP_HOST="smtp-relay.brevo.com"`, `SMTP_PORT=587`, `SMTP_SECURE=false`, `SMTP_USER`, and `SMTP_PASS` (the SMTP key from Brevo -> SMTP & API -> SMTP) in the API deployment's secret/environment settings. Alternatively, verify the domain in Resend, create a sending key, and set `RESEND_API_KEY` instead; a Resend key takes precedence over SMTP.
+3. Set `MAIL_FROM` to an address on the verified domain (for example, `Asas <notifications@example.com>`). Do not commit provider credentials or the sender address. For local Compose, put them in `apps/api/.env`, which the API container loads.
+4. For queued delivery, set `QUEUE_URL` to a PostgreSQL connection available to the API (typically the same Neon database as `DATABASE_URL`). Without it, messages are sent inline and provider latency/failures affect the originating request.
+5. Restart/redeploy the API and check `/ready`: `emailDelivery: "configured"` confirms a transport is present. It does not prove the credentials, sender, domain, or recipient are accepted by the provider.
+6. In a staging workspace, trigger a password reset for a controlled test account and confirm receipt, sender, link destination, and provider delivery status. If using pg-boss, confirm the queued job completes and that a deliberate provider failure is retried. Do not test with a real customer's address.
 
 Email delivery is intentionally not part of the database readiness gate. If email is disabled, `/ready` reports `emailDelivery: "disabled"` while the API can still serve non-email features.
 
@@ -108,7 +109,7 @@ pnpm --filter @asas/api storage:migrate-local-to-s3 -- --apply
 
 The first command is a read-only dry run; the second copies CVs and completed exports and verifies each uploaded object's size. It never deletes local files. Investigate any nonzero `*MissingLocally` count before switching `OBJECT_STORAGE_DRIVER=s3` and deploying the new API. No database migration is required.
 
-The API listens on `http://127.0.0.1:4000` by default. OpenAPI is available at `/docs`.
+The API listens on `http://127.0.0.1:4000` by default. The OpenAPI UI is mounted at `/docs` outside production, and in production only when `ENABLE_API_DOCS=true`.
 
 ## Checks
 

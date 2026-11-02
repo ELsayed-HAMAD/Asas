@@ -326,7 +326,7 @@
       "experience": "7 years",
       "source": "LinkedIn",
       "location": "Austin, TX",
-      "email": "alex.rivera@email.com",
+      "email": "alex.rivera@example.com",
       "education": "B.S. Computer Science",
       "activities": [
         { "action": "Moved to Tech Interview", "description": "Passed screening with Elena", "createdAt": "2026-03-12T15:00:00.000Z" },
@@ -344,7 +344,7 @@
       "experience": "5 years",
       "source": "Referral",
       "location": "Remote",
-      "email": "priya.shah@email.com",
+      "email": "priya.shah@example.com",
       "education": "M.S. Software Engineering",
       "activities": [
         { "action": "Application received", "description": "Referred by Thomas Wright", "createdAt": "2026-03-15T09:00:00.000Z" }
@@ -361,7 +361,7 @@
       "experience": "4 years",
       "source": "Careers page",
       "location": "New York, NY",
-      "email": "jordan.blake@email.com",
+      "email": "jordan.blake@example.com",
       "education": "B.F.A. Interaction Design",
       "activities": []
     },
@@ -376,7 +376,7 @@
       "experience": "8 years",
       "source": "Agency",
       "location": "Seattle, WA",
-      "email": "sam.okonkwo@email.com",
+      "email": "sam.okonkwo@example.com",
       "education": "B.S. Information Systems",
       "activities": [
         { "action": "Final interview scheduled", "description": "Panel with Elena and Marcus", "createdAt": "2026-03-10T14:00:00.000Z" }
@@ -393,7 +393,7 @@
       "experience": "6 years",
       "source": "LinkedIn",
       "location": "Chicago, IL",
-      "email": "maya.chen@email.com",
+      "email": "maya.chen@example.com",
       "education": "B.A. Business",
       "activities": [
         { "action": "Offer sent", "description": "Base + OTE package emailed", "createdAt": "2026-03-17T16:00:00.000Z" }

@@ -1,6 +1,6 @@
 # Asas
 
-[![CI](https://github.com/ELsayed-HAMAD/asas/actions/workflows/ci.yml/badge.svg)](https://github.com/ELsayed-HAMAD/asas/actions/workflows/ci.yml)
+[![CI](https://github.com/ELsayed-HAMAD/Asas/actions/workflows/ci.yml/badge.svg)](https://github.com/ELsayed-HAMAD/Asas/actions/workflows/ci.yml)
 ![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
 ![Fastify](https://img.shields.io/badge/Fastify-5-000000?logo=fastify&logoColor=white)
@@ -20,6 +20,8 @@ The source is proprietary and all rights are reserved. See [LICENSE](LICENSE) fo
 - **Inventory:** Product catalog, suppliers and purchase orders, warehouse stock movements, and stock integrity controls.
 - **Workspace services:** Role-based access, audit logs, exports, email notifications, integrations, subscription billing, two-factor authentication, and English/Arabic UI with RTL support.
 
+Arabic support ships in phases. Phase 1 covers the application shell, the sign-in, sign-up, password reset, two-factor, and email-verification screens, and the dashboard overview. Workspace onboarding, the workspace chooser, and the invitation screens, along with every other module, are still English-only and are translated one module at a time.
+
 Some integrations require provider configuration. Email, Stripe, and S3-compatible storage are optional in development; see [API setup](apps/api/README.md) before enabling them in a deployment.
 
 ## Technology
@@ -36,7 +38,7 @@ Some integrations require provider configuration. Email, Stripe, and S3-compatib
 
 ## Prerequisites
 
-- Node.js 22 or later
+- Node.js 22 (the version CI and the container images use; `.nvmrc` pins it)
 - pnpm 11.9.0 (the repository's pinned package manager)
 - PostgreSQL 17 for API development and migrations
 - Docker Compose is optional for local PostgreSQL and Redis
@@ -84,7 +86,7 @@ The web app is served at `http://localhost:5173` and the API at `http://127.0.0.
 
 ### Optional services
 
-- **Email:** Configure `RESEND_API_KEY` and a verified `MAIL_FROM` sender. Set `QUEUE_URL` to use pg-boss retries; without it, email sends inline.
+- **Email:** Brevo's free plan (300 messages per day) over SMTP keeps delivery at $0 and is the recommended provider. Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, and a verified `MAIL_FROM`. A Resend API key is also supported and takes precedence when set. Set `QUEUE_URL` to use pg-boss retries; without it, email sends inline.
 - **Object storage:** Local disk is the development default. Production requires S3-compatible storage; follow the private-bucket, CORS, and migration instructions in [apps/api/README.md](apps/api/README.md).
 - **Stripe:** Billing stays disabled until Stripe keys, webhook secret, and allow-listed recurring monthly Price IDs are configured. Validate in test mode first.
 - **Redis:** Local Compose starts Redis. The API can fall back to in-process behavior when Redis is not configured; multi-instance rate limiting and SSE fan-out require Redis.
@@ -97,7 +99,7 @@ Keep real credentials in local environment files or deployment secret stores. Ne
 - The API applies a Prisma tenant guard: once a request is authenticated, every operation on a tenant-owned model is constrained to the active tenant, and an explicit reference to another tenant is rejected. Cross-tenant maintenance code must use the reviewed `withCrossTenantAccess` escape hatch.
 - Authentication is handled by Better Auth with server-side session validation, RBAC pre-handlers, rate limiting, audit logging, and secure cookie settings in production.
 - Sensitive credentials and employee bank details use AES-256-GCM with independent, mandatory production keys. The API refuses to start in production without strong `AUTH_SECRET`, `ENCRYPTION_KEY`, and `BANK_DATA_ENCRYPTION_KEY` values.
-- Production requires an explicit `TRUSTED_PROXY_CIDRS` boundary, HTTPS origins, S3-compatible object storage, and `RLS_ENFORCEMENT=enforce`.
+- Production requires an explicit `FRONTEND_ORIGIN`, HTTPS origins, S3-compatible object storage, and `RLS_ENFORCEMENT=enforce`. Set `TRUSTED_PROXY_CIDRS` to the proxy hops in front of the API; without it every request reports the platform's own socket address, so rate limits collapse into one shared bucket and audit rows lose the real client IP. The API logs a warning when it is empty in production.
 - The web container serves the SPA and proxies `/api` through the same origin, with CSP, HSTS, frame denial, Permissions-Policy, COOP, and CORP headers.
 
 Report vulnerabilities privately through [GitHub Security Advisories](https://github.com/ELsayed-HAMAD/Asas/security/advisories/new), not in a public issue. See [SECURITY.md](SECURITY.md) for scope and expectations.

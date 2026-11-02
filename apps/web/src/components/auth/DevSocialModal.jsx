@@ -13,7 +13,7 @@ const PRESET_PROFILES = [
   },
   {
     name: 'Alex Morgan',
-    email: 'alex.morgan@techcorp.io',
+    email: 'alex.morgan@techcorp.example.com',
     role: 'Finance Director',
   },
 ]
@@ -189,7 +189,7 @@ export default function DevSocialModal({ isOpen, onClose, onSuccess }) {
                 type="email"
                 value={customEmail}
                 onChange={(e) => setCustomEmail(e.target.value)}
-                placeholder="e.g. dana@enterprise.corp"
+                placeholder="e.g. dana@enterprise.example.com"
                 className="h-8 text-xs bg-surface-raised"
               />
             </div>

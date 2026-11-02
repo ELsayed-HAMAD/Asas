@@ -32,6 +32,7 @@ yarn.lock
 !*.env.example
 *.env.local
 *.env.*.local
+*.local
 .envrc
 *.envrc
 
@@ -121,6 +122,7 @@ out/
 .stylelintcache
 .parcel-cache/
 .vercel/
+.vercel-tmp/
 .netlify/
 .wrangler/
 .serverless/
@@ -152,6 +154,7 @@ cypress/videos/
 cypress/screenshots/
 .screens/
 apps/web/.screens/
+apps/web/visual-check/
 .playwright/
 **/trace.zip
 *.har
@@ -287,44 +290,3 @@ sentry.properties
 .stripe/
 .mcp.json
 .mcp/
-
-.vercel
-
-# Local runtime and build artefacts
-*.log
-.turbo/
-*.tsbuildinfo
-apps/api/prisma/dev.db
-apps/api/prisma/dev.db-journal
-apps/web/visual-check/
-
-# OS and editor noise
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Keys and certificates (never commit)
-*.pem
-*.key
-*.p12
-*.pfx
-
-# Local AI assistant state
-.claude/
-.cursor/
-.qoder/
-.agents/
-.cline/
-.windsurf/
-
-# Frontend tooling caches and local-only overrides
-.vite/
-.oxlintcache
-.eslintcache
-*.local
-blob-report/
-.vercel-tmp/
-
-# Environment templates stay trackable even if new env rules are added above.
-!**/.env.example
-!*.env.example

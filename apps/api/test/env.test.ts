@@ -13,6 +13,7 @@ function productionEnv(overrides: NodeJS.ProcessEnv = {}) {
     AUTH_SECRET: productionAuthSecret,
     ENCRYPTION_KEY: productionEncryptionKey,
     BETTER_AUTH_URL: productionUrl,
+    FRONTEND_ORIGIN: 'https://app.asas.test',
     ...overrides,
   })
 }
@@ -51,6 +52,16 @@ describe('email environment', () => {
       S3_BUCKET: 'asas-files',
       FRONTEND_ORIGIN: 'https://app.asas.com',
     }))).not.toThrow()
+  })
+
+  it('requires an explicit production origin instead of a fabricated placeholder', () => {
+    expect(loadEnv({ NODE_ENV: 'production', DATABASE_URL: 'postgres://db' }).frontendOrigin).toBe('')
+    expect(() => assertEnv(productionEnv({
+      FRONTEND_ORIGIN: '',
+      BANK_DATA_ENCRYPTION_KEY: bankKey,
+      OBJECT_STORAGE_DRIVER: 's3',
+      S3_BUCKET: 'asas-files',
+    }))).toThrow('Missing required environment variable: FRONTEND_ORIGIN')
   })
 })
 

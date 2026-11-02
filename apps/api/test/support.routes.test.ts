@@ -41,7 +41,7 @@ async function setup(options: { role?: string; unauthenticated?: boolean } = {})
       findUnique: vi.fn().mockResolvedValue({
         id: 'tenant_1',
         name: 'Acme Corp',
-        supportEmail: 'help@acme.com',
+        supportEmail: 'help@acme.example.com',
       }),
     },
     supportTicket: {
@@ -162,7 +162,7 @@ describe('Support Routes', () => {
     )
     expect(mockMailer.enqueue).toHaveBeenCalledWith(
       expect.objectContaining({
-        to: 'help@acme.com',
+        to: 'help@acme.example.com',
         subject: expect.stringContaining('Bug in expenses report'),
       }),
     )

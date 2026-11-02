@@ -279,9 +279,15 @@ export async function buildApp(
   if (environment.isProduction && !emailTransport) {
     app.log.warn('Email delivery is disabled: configure RESEND_API_KEY or SMTP_HOST with MAIL_FROM')
   }
+  if (environment.isProduction && environment.trustedProxyCidrs.length === 0) {
+    // Every request then reports the platform's own socket address as its IP, so the global and
+    // credential rate limits become one bucket shared by all users and audit rows lose the real
+    // client address. Set TRUSTED_PROXY_CIDRS to the proxy hops in front of this API.
+    app.log.warn('TRUSTED_PROXY_CIDRS is empty in production: client IPs, rate limiting, and audit attribution are unreliable')
+  }
 
   await app.register(cors, {
-    origin: environment.frontendOrigin.split(',').map(value => value.trim()),
+    origin: environment.frontendOrigin.split(',').map(value => value.trim()).filter(Boolean),
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
   })

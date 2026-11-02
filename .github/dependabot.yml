@@ -1,0 +1,54 @@
+# Reviewed Dependabot configuration for a public repository.
+#
+# Goals: keep the weekly PR count reviewable, keep major upgrades out of the
+# automated stream (they need planned migrations for React, Prisma, Vite, and
+# pg-boss), and still open security updates for any severity.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
+    labels:
+      - dependencies
+    groups:
+      # One PR for routine patch/minor bumps keeps the weekly review small.
+      routine:
+        applies-to: version-updates
+        update-types:
+          - patch
+          - minor
+    ignore:
+      # Major upgrades are planned migrations, not automated PRs. Security
+      # updates are exempt so a critical advisory is never suppressed.
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
+        applies-to: version-updates
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    labels:
+      - dependencies
+      - ci
+    groups:
+      actions:
+        patterns:
+          - "*"

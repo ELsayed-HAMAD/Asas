@@ -40,7 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   critical advisories and resolve peer dependency conflicts.
 - README and API documentation now describe the current security model and no
   longer claim unverified production deployments.
-- Dependabot automation is disabled; the CI production audit and manual
+- Dependabot is limited to weekly grouped patch and minor updates plus security
+  fixes; major upgrades stay manual. The CI production audit and manual
   `pnpm audit` remain the dependency update signal.
 
 ### Removed

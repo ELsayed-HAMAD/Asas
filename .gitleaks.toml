@@ -11,7 +11,7 @@
 useDefault = true
 
 [allowlist]
-description = "Generated lockfiles and exact synthetic/placeholder test values"
+description = "Generated lockfiles and exact synthetic test fixtures"
 
 # Environment templates are intentionally not path-allowlisted: a real secret
 # accidentally pasted into a tracked .env.example must still fail the scan.
@@ -19,9 +19,15 @@ paths = [
   '''(^|/)pnpm-lock\.yaml$''',
 ]
 
+# Allowlist entries match the detected secret value, so they are anchored to
+# fixtures that cannot be mistaken for a real credential. Never allowlist a bare
+# word such as "localhost" or "redacted": that suppresses every finding whose
+# value happens to contain it, including genuine leaked DSNs and passwords.
 regexes = [
-  '''(?i)(example\.com|example\.test|localhost|127\.0\.0\.1)''',
-  '''(?i)(synthetic|placeholder|changeme|not-a-real|redacted)''',
-  '''abcdefghijklmnopqrstuvwxyz012345''',
-  '''cc35b4e1-07ec-4656-a3d3-8b4e71c67251''',
+  # Test fixtures deliberately shaped like provider credentials.
+  '''(?i)^(?:synthetic|not-a-real|test-only|example-test)''',
+  # Fixed idempotency keys and example UUIDs used across the test suites.
+  '''^cc35b4e1-07ec-4656-a3d3-8b4e71c67251$''',
+  '''^550e8400-e29b-41d4-a716-446655440000$''',
+  '''^abcdefghijklmnopqrstuvwxyz012345$''',
 ]

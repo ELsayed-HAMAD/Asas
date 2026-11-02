@@ -42,7 +42,7 @@
       "band": "E9",
       "location": "Remote",
       "employeeNumber": "EMP-9258",
-      "email": "susan.robinson@asas-enterprise.com",
+      "email": "susan.robinson@asas-enterprise.example.com",
       "managerKey": null
     },
     {
@@ -57,7 +57,7 @@
       "band": "E8",
       "location": "Austin, TX",
       "employeeNumber": "EMP-8734",
-      "email": "robert.williams@asas-enterprise.com",
+      "email": "robert.williams@asas-enterprise.example.com",
       "managerKey": "ceo"
     },
     {
@@ -72,7 +72,7 @@
       "band": "E8",
       "location": "Austin, TX",
       "employeeNumber": "EMP-4978",
-      "email": "anthony.hernandez@asas-enterprise.com",
+      "email": "anthony.hernandez@asas-enterprise.example.com",
       "managerKey": "ceo"
     },
     {
@@ -87,7 +87,7 @@
       "band": "E8",
       "location": "London, UK",
       "employeeNumber": "EMP-3917",
-      "email": "thomas.williams@asas-enterprise.com",
+      "email": "thomas.williams@asas-enterprise.example.com",
       "managerKey": "ceo"
     },
     {
@@ -102,7 +102,7 @@
       "band": "E4",
       "location": "Austin, TX",
       "employeeNumber": "EMP-5045",
-      "email": "jessica.smith@asas-enterprise.com",
+      "email": "jessica.smith@asas-enterprise.example.com",
       "managerKey": "cto"
     },
     {
@@ -117,7 +117,7 @@
       "band": "E4",
       "location": "San Francisco, CA",
       "employeeNumber": "EMP-1856",
-      "email": "john.smith@asas-enterprise.com",
+      "email": "john.smith@asas-enterprise.example.com",
       "managerKey": "cto"
     },
     {
@@ -132,7 +132,7 @@
       "band": "E4",
       "location": "London, UK",
       "employeeNumber": "EMP-3764",
-      "email": "john.harris@asas-enterprise.com",
+      "email": "john.harris@asas-enterprise.example.com",
       "managerKey": "cto"
     },
     {
@@ -147,7 +147,7 @@
       "band": "E4",
       "location": "London, UK",
       "employeeNumber": "EMP-7579",
-      "email": "thomas.anderson@asas-enterprise.com",
+      "email": "thomas.anderson@asas-enterprise.example.com",
       "managerKey": "cto"
     },
     {
@@ -162,7 +162,7 @@
       "band": "E4",
       "location": "Austin, TX",
       "employeeNumber": "EMP-1767",
-      "email": "richard.brown@asas-enterprise.com",
+      "email": "richard.brown@asas-enterprise.example.com",
       "managerKey": "cto"
     },
     {
@@ -177,7 +177,7 @@
       "band": "E4",
       "location": "Remote",
       "employeeNumber": "EMP-3542",
-      "email": "elizabeth.harris@asas-enterprise.com",
+      "email": "elizabeth.harris@asas-enterprise.example.com",
       "managerKey": "cto"
     },
     {
@@ -192,7 +192,7 @@
       "band": "E4",
       "location": "Remote",
       "employeeNumber": "EMP-9404",
-      "email": "susan.moore@asas-enterprise.com",
+      "email": "susan.moore@asas-enterprise.example.com",
       "managerKey": "cto"
     },
     {
@@ -207,7 +207,7 @@
       "band": "E4",
       "location": "Remote",
       "employeeNumber": "EMP-6669",
-      "email": "william.garcia@asas-enterprise.com",
+      "email": "william.garcia@asas-enterprise.example.com",
       "managerKey": "cto"
     },
     {
@@ -222,7 +222,7 @@
       "band": "E4",
       "location": "San Francisco, CA",
       "employeeNumber": "EMP-2040",
-      "email": "michael.jones@asas-enterprise.com",
+      "email": "michael.jones@asas-enterprise.example.com",
       "managerKey": "cto"
     },
     {
@@ -237,7 +237,7 @@
       "band": "E4",
       "location": "Austin, TX",
       "employeeNumber": "EMP-9129",
-      "email": "john.martinez@asas-enterprise.com",
+      "email": "john.martinez@asas-enterprise.example.com",
       "managerKey": "cto"
     },
     {
@@ -252,7 +252,7 @@
       "band": "E4",
       "location": "New York, NY",
       "employeeNumber": "EMP-3128",
-      "email": "sarah.davis@asas-enterprise.com",
+      "email": "sarah.davis@asas-enterprise.example.com",
       "managerKey": "cto"
     },
     {
@@ -267,7 +267,7 @@
       "band": "E4",
       "location": "San Francisco, CA",
       "employeeNumber": "EMP-1345",
-      "email": "lisa.white@asas-enterprise.com",
+      "email": "lisa.white@asas-enterprise.example.com",
       "managerKey": "cto"
     },
     {
@@ -282,7 +282,7 @@
       "band": "E4",
       "location": "Remote",
       "employeeNumber": "EMP-1946",
-      "email": "betty.perez@asas-enterprise.com",
+      "email": "betty.perez@asas-enterprise.example.com",
       "managerKey": "cto"
     },
     {
@@ -297,7 +297,7 @@
       "band": "E4",
       "location": "New York, NY",
       "employeeNumber": "EMP-3712",
-      "email": "christopher.martin@asas-enterprise.com",
+      "email": "christopher.martin@asas-enterprise.example.com",
       "managerKey": "cto"
     },
     {
@@ -312,7 +312,7 @@
       "band": "E4",
       "location": "New York, NY",
       "employeeNumber": "EMP-7164",
-      "email": "michael.perez@asas-enterprise.com",
+      "email": "michael.perez@asas-enterprise.example.com",
       "managerKey": "cto"
     },
     {
@@ -327,7 +327,7 @@
       "band": "S4",
       "location": "New York, NY",
       "employeeNumber": "EMP-5884",
-      "email": "richard.martin@asas-enterprise.com",
+      "email": "richard.martin@asas-enterprise.example.com",
       "managerKey": "cro"
     },
     {
@@ -342,7 +342,7 @@
       "band": "S4",
       "location": "London, UK",
       "employeeNumber": "EMP-2321",
-      "email": "daniel.thompson@asas-enterprise.com",
+      "email": "daniel.thompson@asas-enterprise.example.com",
       "managerKey": "cro"
     },
     {
@@ -357,7 +357,7 @@
       "band": "S4",
       "location": "New York, NY",
       "employeeNumber": "EMP-7862",
-      "email": "james.smith@asas-enterprise.com",
+      "email": "james.smith@asas-enterprise.example.com",
       "managerKey": "cro"
     },
     {
@@ -372,7 +372,7 @@
       "band": "S4",
       "location": "Austin, TX",
       "employeeNumber": "EMP-8903",
-      "email": "james.robinson@asas-enterprise.com",
+      "email": "james.robinson@asas-enterprise.example.com",
       "managerKey": "cro"
     },
     {
@@ -387,7 +387,7 @@
       "band": "S4",
       "location": "Remote",
       "employeeNumber": "EMP-6776",
-      "email": "susan.martinez@asas-enterprise.com",
+      "email": "susan.martinez@asas-enterprise.example.com",
       "managerKey": "cro"
     },
     {
@@ -402,7 +402,7 @@
       "band": "S4",
       "location": "San Francisco, CA",
       "employeeNumber": "EMP-7647",
-      "email": "richard.lopez@asas-enterprise.com",
+      "email": "richard.lopez@asas-enterprise.example.com",
       "managerKey": "cro"
     },
     {
@@ -417,7 +417,7 @@
       "band": "S4",
       "location": "Remote",
       "employeeNumber": "EMP-7852",
-      "email": "linda.lopez@asas-enterprise.com",
+      "email": "linda.lopez@asas-enterprise.example.com",
       "managerKey": "cro"
     },
     {
@@ -432,7 +432,7 @@
       "band": "S4",
       "location": "Remote",
       "employeeNumber": "EMP-4684",
-      "email": "matthew.martinez@asas-enterprise.com",
+      "email": "matthew.martinez@asas-enterprise.example.com",
       "managerKey": "cro"
     },
     {
@@ -447,7 +447,7 @@
       "band": "F3",
       "location": "Austin, TX",
       "employeeNumber": "EMP-2654",
-      "email": "christopher.rodriguez@asas-enterprise.com",
+      "email": "christopher.rodriguez@asas-enterprise.example.com",
       "managerKey": "cfo"
     },
     {
@@ -462,7 +462,7 @@
       "band": "F3",
       "location": "Remote",
       "employeeNumber": "EMP-9569",
-      "email": "robert.martinez@asas-enterprise.com",
+      "email": "robert.martinez@asas-enterprise.example.com",
       "managerKey": "cfo"
     },
     {
@@ -477,7 +477,7 @@
       "band": "F3",
       "location": "Austin, TX",
       "employeeNumber": "EMP-4674",
-      "email": "sandra.smith@asas-enterprise.com",
+      "email": "sandra.smith@asas-enterprise.example.com",
       "managerKey": "cfo"
     },
     {
@@ -492,7 +492,7 @@
       "band": "F3",
       "location": "Austin, TX",
       "employeeNumber": "EMP-5440",
-      "email": "patricia.garcia@asas-enterprise.com",
+      "email": "patricia.garcia@asas-enterprise.example.com",
       "managerKey": "cfo"
     },
     {
@@ -507,7 +507,7 @@
       "band": "F3",
       "location": "Remote",
       "employeeNumber": "EMP-3840",
-      "email": "sarah.clark@asas-enterprise.com",
+      "email": "sarah.clark@asas-enterprise.example.com",
       "managerKey": "cfo"
     }
   ],
@@ -516,206 +516,206 @@
       "key": "comp_0",
       "name": "Acme Corp",
       "industry": "Technology",
-      "website": "www.acmecorp.com"
+      "website": "www.acmecorp.example.com"
     },
     {
       "key": "comp_1",
       "name": "Globex",
       "industry": "Manufacturing",
-      "website": "www.globex.com"
+      "website": "www.globex.example.com"
     },
     {
       "key": "comp_2",
       "name": "Soylent Corp",
       "industry": "Technology",
-      "website": "www.soylentcorp.com"
+      "website": "www.soylentcorp.example.com"
     },
     {
       "key": "comp_3",
       "name": "Initech",
       "industry": "Healthcare",
-      "website": "www.initech.com"
+      "website": "www.initech.example.com"
     },
     {
       "key": "comp_4",
       "name": "Umbrella Corp",
       "industry": "Manufacturing",
-      "website": "www.umbrellacorp.com"
+      "website": "www.umbrellacorp.example.com"
     },
     {
       "key": "comp_5",
       "name": "Stark Industries",
       "industry": "Manufacturing",
-      "website": "www.starkindustries.com"
+      "website": "www.starkindustries.example.com"
     },
     {
       "key": "comp_6",
       "name": "Wayne Enterprises",
       "industry": "Manufacturing",
-      "website": "www.wayneenterprises.com"
+      "website": "www.wayneenterprises.example.com"
     },
     {
       "key": "comp_7",
       "name": "Cyberdyne",
       "industry": "Technology",
-      "website": "www.cyberdyne.com"
+      "website": "www.cyberdyne.example.com"
     },
     {
       "key": "comp_8",
       "name": "Massive Dynamic",
       "industry": "Manufacturing",
-      "website": "www.massivedynamic.com"
+      "website": "www.massivedynamic.example.com"
     },
     {
       "key": "comp_9",
       "name": "Hooli",
       "industry": "Finance",
-      "website": "www.hooli.com"
+      "website": "www.hooli.example.com"
     },
     {
       "key": "comp_10",
       "name": "Pied Piper",
       "industry": "Finance",
-      "website": "www.piedpiper.com"
+      "website": "www.piedpiper.example.com"
     },
     {
       "key": "comp_11",
       "name": "Aviato",
       "industry": "Technology",
-      "website": "www.aviato.com"
+      "website": "www.aviato.example.com"
     },
     {
       "key": "comp_12",
       "name": "Endframe",
       "industry": "Manufacturing",
-      "website": "www.endframe.com"
+      "website": "www.endframe.example.com"
     },
     {
       "key": "comp_13",
       "name": "Raviga",
       "industry": "Technology",
-      "website": "www.raviga.com"
+      "website": "www.raviga.example.com"
     },
     {
       "key": "comp_14",
       "name": "Belson",
       "industry": "Manufacturing",
-      "website": "www.belson.com"
+      "website": "www.belson.example.com"
     },
     {
       "key": "comp_15",
       "name": "Aperture Science",
       "industry": "Retail",
-      "website": "www.aperturescience.com"
+      "website": "www.aperturescience.example.com"
     },
     {
       "key": "comp_16",
       "name": "Black Mesa",
       "industry": "Retail",
-      "website": "www.blackmesa.com"
+      "website": "www.blackmesa.example.com"
     }
   ],
   "customers": [
     {
       "key": "cust_0",
       "name": "Sandra Williams",
-      "email": "contact@acmecorp.com",
+      "email": "contact@acmecorp.example.com",
       "companyKey": "comp_0"
     },
     {
       "key": "cust_1",
       "name": "Daniel Perez",
-      "email": "contact@globex.com",
+      "email": "contact@globex.example.com",
       "companyKey": "comp_1"
     },
     {
       "key": "cust_2",
       "name": "Nancy Anderson",
-      "email": "contact@soylentcorp.com",
+      "email": "contact@soylentcorp.example.com",
       "companyKey": "comp_2"
     },
     {
       "key": "cust_3",
       "name": "Joseph Martin",
-      "email": "contact@initech.com",
+      "email": "contact@initech.example.com",
       "companyKey": "comp_3"
     },
     {
       "key": "cust_4",
       "name": "Charles Johnson",
-      "email": "contact@umbrellacorp.com",
+      "email": "contact@umbrellacorp.example.com",
       "companyKey": "comp_4"
     },
     {
       "key": "cust_5",
       "name": "Joseph Miller",
-      "email": "contact@starkindustries.com",
+      "email": "contact@starkindustries.example.com",
       "companyKey": "comp_5"
     },
     {
       "key": "cust_6",
       "name": "Anthony Smith",
-      "email": "contact@wayneenterprises.com",
+      "email": "contact@wayneenterprises.example.com",
       "companyKey": "comp_6"
     },
     {
       "key": "cust_7",
       "name": "Lisa Lopez",
-      "email": "contact@cyberdyne.com",
+      "email": "contact@cyberdyne.example.com",
       "companyKey": "comp_7"
     },
     {
       "key": "cust_8",
       "name": "Barbara Hernandez",
-      "email": "contact@massivedynamic.com",
+      "email": "contact@massivedynamic.example.com",
       "companyKey": "comp_8"
     },
     {
       "key": "cust_9",
       "name": "Daniel Hernandez",
-      "email": "contact@hooli.com",
+      "email": "contact@hooli.example.com",
       "companyKey": "comp_9"
     },
     {
       "key": "cust_10",
       "name": "Margaret Moore",
-      "email": "contact@piedpiper.com",
+      "email": "contact@piedpiper.example.com",
       "companyKey": "comp_10"
     },
     {
       "key": "cust_11",
       "name": "Daniel Ramirez",
-      "email": "contact@aviato.com",
+      "email": "contact@aviato.example.com",
       "companyKey": "comp_11"
     },
     {
       "key": "cust_12",
       "name": "Charles Martin",
-      "email": "contact@endframe.com",
+      "email": "contact@endframe.example.com",
       "companyKey": "comp_12"
     },
     {
       "key": "cust_13",
       "name": "Matthew Taylor",
-      "email": "contact@raviga.com",
+      "email": "contact@raviga.example.com",
       "companyKey": "comp_13"
     },
     {
       "key": "cust_14",
       "name": "Mary Johnson",
-      "email": "contact@belson.com",
+      "email": "contact@belson.example.com",
       "companyKey": "comp_14"
     },
     {
       "key": "cust_15",
       "name": "Barbara Sanchez",
-      "email": "contact@aperturescience.com",
+      "email": "contact@aperturescience.example.com",
       "companyKey": "comp_15"
     },
     {
       "key": "cust_16",
       "name": "Michael Rodriguez",
-      "email": "contact@blackmesa.com",
+      "email": "contact@blackmesa.example.com",
       "companyKey": "comp_16"
     }
   ],
