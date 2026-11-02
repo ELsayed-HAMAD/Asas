@@ -63,6 +63,25 @@ describe('email environment', () => {
       S3_BUCKET: 'asas-files',
     }))).toThrow('Missing required environment variable: FRONTEND_ORIGIN')
   })
+
+  it('derives the production origin from the Vercel platform domain', () => {
+    expect(loadEnv({
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgres://db',
+      VERCEL_PROJECT_PRODUCTION_URL: 'asas-sigma-wheat.vercel.app',
+    }).frontendOrigin).toBe('https://asas-sigma-wheat.vercel.app')
+    expect(loadEnv({
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgres://db',
+      VERCEL_URL: 'https://asas-preview.vercel.app/',
+    }).frontendOrigin).toBe('https://asas-preview.vercel.app')
+    expect(loadEnv({
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgres://db',
+      FRONTEND_ORIGIN: 'https://app.example.com',
+      VERCEL_PROJECT_PRODUCTION_URL: 'ignored.vercel.app',
+    }).frontendOrigin).toBe('https://app.example.com')
+  })
 })
 
 describe('Better Auth public URL environment', () => {

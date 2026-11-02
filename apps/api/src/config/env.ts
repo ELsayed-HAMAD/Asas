@@ -138,6 +138,23 @@ export function resolveTrustedProxyCidrs(source: NodeJS.ProcessEnv = process.env
   return values
 }
 
+/**
+ * Resolve the browser origins allowed to call this API.
+ *
+ * Development keeps the loopback pair. Production has no placeholder default: an unrecognized
+ * origin would silently become the whole CORS allow-list. On Vercel the platform supplies the
+ * production domain in `VERCEL_PROJECT_PRODUCTION_URL`, so a deployment that forgot to set
+ * `FRONTEND_ORIGIN` still resolves to the real origin instead of refusing to boot.
+ */
+function resolveFrontendOrigin(source: NodeJS.ProcessEnv, nodeEnv: string): string {
+  const configured = source.FRONTEND_ORIGIN?.trim()
+  if (configured) return configured
+  if (nodeEnv !== 'production') return 'http://localhost:5173,http://127.0.0.1:5173'
+  const platformHost = source.VERCEL_PROJECT_PRODUCTION_URL?.trim() || source.VERCEL_URL?.trim()
+  if (!platformHost) return ''
+  return `https://${platformHost.replace(/^https?:\/\//, '').replace(/\/+$/, '')}`
+}
+
 function resolveBetterAuthUrl(value: string | undefined, nodeEnv: string, port: number): string {
   const configured = value?.trim()
   const raw = configured || (nodeEnv === 'production' ? '' : `http://127.0.0.1:${port}`)
@@ -172,7 +189,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AsasEnv {
   // No placeholder origin in production: a fabricated default silently produces a CORS
   // allow-list that matches no real browser origin. An empty value rejects every cross-origin
   // request, which is the safe default for a same-origin deployment.
-  const frontendOrigin = source.FRONTEND_ORIGIN?.trim() || (nodeEnv === 'production' ? '' : 'http://localhost:5173,http://127.0.0.1:5173')
+  const frontendOrigin = resolveFrontendOrigin(source, nodeEnv)
   const objectStorageDriver = source.OBJECT_STORAGE_DRIVER ?? 'local'
   if (objectStorageDriver !== 'local' && objectStorageDriver !== 's3') {
     throw new Error('OBJECT_STORAGE_DRIVER must be either local or s3')
