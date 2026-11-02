@@ -11,6 +11,30 @@ Asas is a multi-tenant business operations platform for HR, payroll, finance, CR
 
 The source is proprietary and all rights are reserved. See [LICENSE](LICENSE) for the terms that apply to this repository.
 
+**Live:** https://asas-sigma-wheat.vercel.app
+
+## Project at a glance
+
+| | |
+|---|---|
+| Domain | Multi-tenant ERP: HR and payroll, finance and ledger, CRM, projects, inventory, platform console |
+| Scale | 94 Prisma models, 38 enums, 81 migrations, 67 screens |
+| Tests | ~680 API tests (Vitest, in-process PostgreSQL), ~98 Playwright browser tests |
+| Tenancy | Shared schema with `tenantId`, PostgreSQL RLS, a Prisma tenant guard, and a CI guard against unscoped SQL |
+| Deployment | Single Vercel project: React SPA plus a Fastify serverless function |
+
+## Screenshots
+
+<!-- Replace these placeholders with real captures: 1440px, light and dark, no browser chrome. -->
+
+| Dashboard (dark) | Payroll |
+|---|---|
+| _add `docs/screenshots/dashboard-dark.png`_ | _add `docs/screenshots/payroll.png`_ |
+
+| Inventory valuation | CRM pipeline |
+|---|---|
+| _add `docs/screenshots/valuation.png`_ | _add `docs/screenshots/crm.png`_ |
+
 ## Features
 
 - **HR and payroll:** Employee directory, payroll runs and payslips, attendance punches, overtime thresholds, leave requests and balances, recruitment stages, interviews, and candidate exports.
@@ -161,6 +185,13 @@ The repository includes API and web Dockerfiles, an Nginx configuration, and a l
 - [API configuration, email, billing, reconciliation, storage, and tenant isolation](apps/api/README.md)
 - [Security policy](SECURITY.md)
 - [Contributing](CONTRIBUTING.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
 - [Changelog](CHANGELOG.md)
 - [CI workflow](.github/workflows/ci.yml)
 - [Security workflow](.github/workflows/security.yml)
+
+## License
+
+Proprietary. Copyright (c) 2026 ELsayed-HAMAD. All rights reserved.
+
+No part of this repository may be copied, modified, distributed, sublicensed, or used to operate a service without prior written permission. Reading the source for evaluation and review is permitted. See [LICENSE](LICENSE) for the full terms.
