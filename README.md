@@ -35,6 +35,28 @@ The source is proprietary and all rights are reserved. See [LICENSE](LICENSE) fo
 |---|---|
 | _add `docs/screenshots/valuation.png`_ | _add `docs/screenshots/crm.png`_ |
 
+## Architecture
+
+```text
+Browser
+  ├── public marketing routes
+  └── authenticated workspace (React 19 SPA, route-level code splitting)
+                    │
+                    ▼
+          Vercel edge (static assets + /api rewrite)
+                    │
+                    ▼
+  Fastify 5 serverless function (Node 22, 300s budget)
+  Zod-validated routes · Better Auth sessions · RBAC · Prisma tenant guard
+        │                                   │
+        ▼                                   ▼
+  PostgreSQL 17 (Neon)              S3-compatible storage (presigned URLs)
+  shared schema + tenantId          Resend / SMTP transactional email
+  Row Level Security                Stripe billing webhooks
+```
+
+Request lifecycle: the SPA calls `/api/*` on the same origin, the API resolves the session and active organisation, the Prisma guard injects the tenant into every query, and business rules run in the API or the pure `@asas/domain` package. Postgres RLS re-checks the tenant at the database, so a guard bypass fails closed instead of leaking rows.
+
 ## Features
 
 - **HR and payroll:** Employee directory, payroll runs and payslips, attendance punches, overtime thresholds, leave requests and balances, recruitment stages, interviews, and candidate exports.
