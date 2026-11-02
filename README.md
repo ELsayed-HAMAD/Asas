@@ -23,18 +23,6 @@ The source is proprietary and all rights are reserved. See [LICENSE](LICENSE) fo
 | Tenancy | Shared schema with `tenantId`, PostgreSQL RLS, a Prisma tenant guard, and a CI guard against unscoped SQL |
 | Deployment | Single Vercel project: React SPA plus a Fastify serverless function |
 
-## Screenshots
-
-<!-- Replace these placeholders with real captures: 1440px, light and dark, no browser chrome. -->
-
-| Dashboard (dark) | Payroll |
-|---|---|
-| _add `docs/screenshots/dashboard-dark.png`_ | _add `docs/screenshots/payroll.png`_ |
-
-| Inventory valuation | CRM pipeline |
-|---|---|
-| _add `docs/screenshots/valuation.png`_ | _add `docs/screenshots/crm.png`_ |
-
 ## Architecture
 
 ```text
