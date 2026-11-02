@@ -1,8 +1,12 @@
 # Reviewed Dependabot configuration for a public repository.
 #
-# Goals: keep the weekly PR count reviewable, keep major upgrades out of the
-# automated stream (they need planned migrations for React, Prisma, Vite, and
-# pg-boss), and still open security updates for any severity.
+# Goals: keep the weekly PR count reviewable and keep routine patch/minor bumps
+# in one grouped PR. Major upgrades arrive as individual PRs so each one gets a
+# planned migration window (React, Prisma, Vite, and pg-boss all need one).
+#
+# There are deliberately no `ignore` rules. Dependabot applies them to security
+# updates too, so ignoring `version-update:semver-major` would silently suppress
+# a major-version security fix. Noise is bounded by open-pull-requests-limit.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -21,19 +25,10 @@ updates:
     labels:
       - dependencies
     groups:
-      # One PR for routine patch/minor bumps keeps the weekly review small.
       routine:
-        applies-to: version-updates
         update-types:
           - patch
           - minor
-    ignore:
-      # Major upgrades are planned migrations, not automated PRs. Security
-      # updates are exempt so a critical advisory is never suppressed.
-      - dependency-name: "*"
-        update-types:
-          - version-update:semver-major
-        applies-to: version-updates
 
   - package-ecosystem: github-actions
     directory: "/"
