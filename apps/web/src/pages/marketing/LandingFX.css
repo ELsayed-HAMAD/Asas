@@ -1,0 +1,51 @@
+.landing-fx-glow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  width: 760px;
+  height: 760px;
+  margin: -380px 0 0 -380px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.18), rgba(124, 58, 237, 0.08) 42%, transparent 68%);
+  filter: blur(10px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 600ms ease;
+  will-change: transform;
+}
+
+.landing-fx-glow[data-active='true'] {
+  opacity: 1;
+}
+
+.landing-fx-progress {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 60;
+  height: 2px;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, #2563eb, #7c3aed 55%, #06b6d4);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.landing-fx-magnetic {
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-fx-glow,
+  .landing-fx-progress {
+    display: none;
+  }
+
+  .landing-fx-magnetic {
+    transition: none;
+    transform: none !important;
+  }
+}

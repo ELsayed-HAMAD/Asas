@@ -19,6 +19,7 @@ import { Button } from '../../components/ui/button'
 import { AsasLogo } from '../../components/common/AsasLogo'
 import CookieSettingsButton from '../../components/common/CookieSettingsButton'
 import MarketingNavbar from '../../components/marketing/MarketingNavbar'
+import LandingFX from './LandingFX'
 
 const GLASS_PANEL = 'border border-white/80 bg-white/55 shadow-[0_24px_80px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-2xl'
 
@@ -422,6 +423,7 @@ export default function Landing() {
 
   return (
     <div ref={pageRef} className="min-h-screen overflow-clip bg-canvas font-sans text-ink selection:bg-info-soft selection:text-action-text-deep">
+        <LandingFX />
       <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-70 focus:rounded-full focus:bg-white focus:px-5 focus:py-3 focus:text-sm focus:font-semibold focus:text-slate-950 focus:shadow-lg">
         Skip to content
       </a>
