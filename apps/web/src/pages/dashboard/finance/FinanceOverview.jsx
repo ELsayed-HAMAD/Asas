@@ -7,15 +7,14 @@ import {
   FileText,
   Flame,
   MoreHorizontal,
+  TrendingDown,
   TrendingUp,
   Loader2,
   Plus,
 } from 'lucide-react';
 import {
-  AreaChart,
-  Area,
-  ComposedChart,
   Bar,
+  ComposedChart,
   Line,
   XAxis,
   YAxis,
@@ -174,11 +173,14 @@ export default function FinanceOverview() {
     downloadCsv(rows, `cash-flow-${selectedYear}.csv`);
   }
 
-  // Net cash-flow sparkline for the second KPI card
-  const netSeries = cashFlowData.map((p, i) => ({ v: p.net, id: i }));
+  // Net cash-flow delta for the second KPI card badge.
   const cashFlowDeltaMinor = data.cashFlowComparison.current.net.amount - data.cashFlowComparison.previous.net.amount;
   const fullYearSelected = data.cashFlowComparison.current.endDateExclusive === `${Number(selectedYear) + 1}-01-01`;
   const cashFlowChangeText = `${selectedYear}${fullYearSelected ? ' full year' : ' year-to-date'} vs ${Number(selectedYear) - 1} matching period: ${formatMoney(data.cashFlowComparison.previous.net)} prior, ${cashFlowDeltaMinor > 0 ? '+' : ''}${formatMoney({ amount: cashFlowDeltaMinor, currency: data.cashFlowComparison.current.net.currency })}`;
+  // The card shows the same pill shape as its siblings; the full comparison stays in the tooltip.
+  const cashFlowDeltaBadge = cashFlowDeltaMinor === 0
+    ? `No change vs ${Number(selectedYear) - 1}`
+    : `${cashFlowDeltaMinor > 0 ? '+' : '-'}${formatCompactCurrency({ amount: Math.abs(cashFlowDeltaMinor), currency: data.cashFlowComparison.current.net.currency })} vs ${Number(selectedYear) - 1}`;
 
   // Real month-to-date settlement badges; the static label stays when ledger coverage does
   // not yet include the current month (the totals are null then, never guessed).
@@ -279,7 +281,7 @@ export default function FinanceOverview() {
         {/* Card 1: Outstanding Receivables */}
         <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[124px]">
           <div className="flex items-start justify-between gap-2">
-            <span className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-snug">
+            <span className="text-[10px] font-semibold text-muted uppercase tracking-wider leading-snug">
               Outstanding Receivables
             </span>
             <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 flex items-center justify-center shrink-0">
@@ -295,18 +297,18 @@ export default function FinanceOverview() {
             </span>
           </div>
           <div className="pt-1.5 border-t border-border-subtle flex items-center">
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 w-fit">
-              <TrendingUp size={12} strokeWidth={2.5} className="shrink-0" />
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 w-fit">
+              <TrendingUp size={11} strokeWidth={2.5} className="shrink-0" />
               <span>{receivablesBadgeText}</span>
             </span>
           </div>
         </div>
 
         {/* Card 2: Selected Period Net Cash (Fixed Header & Subtext Truncation) */}
-        <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs relative overflow-hidden flex flex-col justify-between min-h-[124px]">
+        <div className="min-w-0 bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs relative overflow-hidden flex flex-col justify-between min-h-[124px]">
           <div className="flex items-start justify-between gap-2 relative z-10">
             <span
-              className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-snug break-words"
+              className="text-[10px] font-semibold text-muted uppercase tracking-wider leading-snug break-words"
               title="Selected Period Net Cash Flow"
             >
               Selected Period Net Cash
@@ -323,37 +325,30 @@ export default function FinanceOverview() {
               {formatCompactCurrency(data.cashFlowComparison.current.net)}
             </span>
           </div>
-          <div className="pt-1.5 border-t border-border-subtle relative z-10">
-            <p
-              className={cn(
-                'font-medium text-[11px] leading-snug',
-                cashFlowDeltaMinor > 0 ? 'text-emerald-600 dark:text-emerald-400' : cashFlowDeltaMinor < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-muted',
-              )}
+          <div className="pt-1.5 border-t border-border-subtle relative z-10 min-w-0">
+            <span
+              data-testid="net-cash-delta"
               title={cashFlowChangeText}
+              className={cn(
+                'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border w-fit max-w-full',
+                cashFlowDeltaMinor > 0
+                  ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                  : cashFlowDeltaMinor < 0
+                    ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                    : 'bg-surface-muted text-muted border-border-default',
+              )}
             >
-              {cashFlowChangeText}
-            </p>
-          </div>
-          {/* Subtle sparkline in background */}
-          <div className="absolute bottom-0 left-0 w-full h-5 overflow-hidden pointer-events-none opacity-30">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={netSeries} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="netCashGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--color-chart-primary, var(--color-chart-indigo))" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="var(--color-chart-primary, var(--color-chart-indigo))" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <Area type="monotone" dataKey="v" stroke="var(--color-chart-primary, var(--color-chart-indigo))" strokeWidth={2} fill="url(#netCashGrad)" dot={false} animationDuration={800} />
-              </AreaChart>
-            </ResponsiveContainer>
+              {cashFlowDeltaMinor > 0 && <TrendingUp size={11} strokeWidth={2.5} className="shrink-0" />}
+              {cashFlowDeltaMinor < 0 && <TrendingDown size={11} strokeWidth={2.5} className="shrink-0" />}
+              <span className="truncate">{cashFlowDeltaBadge}</span>
+            </span>
           </div>
         </div>
 
         {/* Card 3: Outstanding Payables */}
         <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[124px]">
           <div className="flex items-start justify-between gap-2">
-            <span className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-snug">
+            <span className="text-[10px] font-semibold text-muted uppercase tracking-wider leading-snug">
               Outstanding Payables
             </span>
             <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 flex items-center justify-center shrink-0">
@@ -369,8 +364,8 @@ export default function FinanceOverview() {
             </span>
           </div>
           <div className="pt-1.5 border-t border-border-subtle flex items-center">
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-500/10 text-rose-600 border border-rose-500/20 w-fit">
-              <TrendingUp size={12} strokeWidth={2.5} className="rotate-180 shrink-0" />
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/10 text-rose-600 border border-rose-500/20 w-fit">
+              <TrendingUp size={11} strokeWidth={2.5} className="rotate-180 shrink-0" />
               <span>{payablesBadgeText}</span>
             </span>
           </div>
@@ -379,7 +374,7 @@ export default function FinanceOverview() {
         {/* Card 4: Expenses Total */}
         <div className="bg-gradient-to-b from-surface-raised to-surface-raised/60 backdrop-blur-xl border border-border-default rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[124px]">
           <div className="flex items-start justify-between gap-2">
-            <span className="text-[11px] font-semibold text-muted uppercase tracking-wider leading-snug">
+            <span className="text-[10px] font-semibold text-muted uppercase tracking-wider leading-snug">
               Expenses Total
             </span>
             <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 flex items-center justify-center shrink-0">
@@ -395,7 +390,7 @@ export default function FinanceOverview() {
             </span>
           </div>
           <div className="pt-1.5 border-t border-border-subtle flex items-center">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-600 border border-amber-500/20 w-fit">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-600 border border-amber-500/20 w-fit">
               <span>{data.expensesPendingCount} pending approval</span>
             </span>
           </div>
@@ -461,7 +456,7 @@ export default function FinanceOverview() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch flex-shrink-0">
 
         {/* Recent Transactions (col-span-8) */}
-        <div className="col-span-12 lg:col-span-8 min-w-0 bg-gradient-to-b from-surface-raised to-surface-raised/80 backdrop-blur-xl border border-border-default rounded-2xl shadow-card overflow-hidden flex flex-col p-5">
+        <div data-testid="recent-transactions" className="col-span-12 lg:col-span-8 min-w-0 bg-gradient-to-b from-surface-raised to-surface-raised/80 backdrop-blur-xl border border-border-default rounded-2xl shadow-card overflow-hidden flex flex-col p-5">
           <div className="flex items-center justify-between mb-3 pb-1">
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-heading">Recent Transactions</h2>
@@ -484,9 +479,10 @@ export default function FinanceOverview() {
             </button>
           </div>
 
-          <div className="flex-1 overflow-auto">
-            <Table className="w-full text-left border-collapse">
-              <TableHeader className="bg-surface-muted/60 sticky top-0 z-10 text-[11px] font-semibold uppercase tracking-wider border-y border-border-default text-muted">
+          <div className="min-h-0 flex-1">
+            <Table className="w-full text-left border-collapse" wrapperClassName="max-h-[430px] min-h-0 overflow-auto">
+              {/* Sticky lives on the cells: `border-collapse` stops a sticky thead from pinning. */}
+              <TableHeader className="text-[11px] font-semibold uppercase tracking-wider border-y border-border-default text-muted [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-surface-muted">
                 <TableRow className="hover:bg-transparent border-0">
                   <TableHead className="px-4 py-2.5 text-[11px] font-semibold text-muted uppercase tracking-wider rtl:text-right">DATE</TableHead>
                   <TableHead className="px-4 py-2.5 text-[11px] font-semibold text-muted uppercase tracking-wider rtl:text-right">DESCRIPTION</TableHead>

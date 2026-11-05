@@ -784,7 +784,14 @@ test('finance overview keeps populated currency KPIs and charts inside phone, ta
         return { month, inflow, outflow, net: money(inflow.amount - outflow.amount) }
       }),
       cashFlowComparison: { current: period(year, 7500000000), previous: period(year - 1, 6900000000) },
-      recentTransactions: [{ id: 'tx-long-description', date: `${year}-10-05`, description: 'International enterprise services annual settlement', amount: money(12500000000), type: 'credit', status: 'CLEARED' }],
+      recentTransactions: Array.from({ length: 14 }, (_, index) => ({
+        id: `tx-${index}`,
+        date: `${year}-${String(12 - Math.floor(index / 2)).padStart(2, '0')}-12`,
+        description: index === 0 ? 'International enterprise services annual settlement' : (index % 2 === 0 ? 'Vendor payments' : 'Customer collections'),
+        amount: money(index % 2 === 0 ? -(1400000 + index * 40000) : 2200000 + index * 60000),
+        type: index % 2 === 0 ? 'debit' : 'credit',
+        status: 'RECORDED',
+      })),
     } })
     if (path.endsWith('/finance/customers')) return json(route, { data: { items: [] } })
     if (path.endsWith('/finance/receivables')) return json(route, { data: { items: [], pagination: { page: 1, limit: 1, total: 0, pages: 0 }, summary: { collectedThisMonthTotal: money(3200000000), collectedThisMonthComparison: { previousTotal: money(2900000000) } } } })
@@ -814,6 +821,45 @@ test('finance overview keeps populated currency KPIs and charts inside phone, ta
         expect(dimensions.scrollWidth, `${compact} (${full}) should fit at ${width}px (${JSON.stringify(dimensions)})`).toBeLessThanOrEqual(dimensions.clientWidth)
       }
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
+
+      // The net-cash comparison is a short pill like its sibling cards, not a sentence.
+      const delta = page.getByTestId('net-cash-delta')
+      await expect(delta).toBeVisible()
+      const deltaBox = await delta.evaluate(node => ({
+        text: node.textContent.trim(),
+        height: Math.round(node.getBoundingClientRect().height),
+        cardBottom: Math.round(node.closest('div[class*="rounded-2xl"]').getBoundingClientRect().bottom),
+        bottom: Math.round(node.getBoundingClientRect().bottom),
+        scrollWidth: node.scrollWidth,
+        clientWidth: node.clientWidth,
+      }))
+      expect(deltaBox.text.length, `delta badge should stay short at ${width}px ("${deltaBox.text}")`).toBeLessThanOrEqual(24)
+      expect(deltaBox.height).toBeLessThanOrEqual(24)
+      expect(deltaBox.bottom).toBeLessThanOrEqual(deltaBox.cardBottom)
+      expect(deltaBox.scrollWidth).toBeLessThanOrEqual(deltaBox.clientWidth)
+
+      // Recent transactions keep a bounded height, scroll internally, and pin their header.
+      const transactions = page.getByTestId('recent-transactions')
+      const scroller = transactions.locator('div[class*="max-h-"]').first()
+      const scrollMetrics = await scroller.evaluate(node => ({
+        clientHeight: node.clientHeight,
+        scrollHeight: node.scrollHeight,
+        overflowY: getComputedStyle(node).overflowY,
+      }))
+      expect(scrollMetrics.overflowY).toBe('auto')
+      expect(scrollMetrics.clientHeight, `table should stay bounded at ${width}px`).toBeLessThanOrEqual(431)
+      expect(scrollMetrics.scrollHeight).toBeGreaterThan(scrollMetrics.clientHeight)
+
+      await scroller.evaluate(node => { node.scrollTop = 150 })
+      const pinned = await transactions.evaluate(card => {
+        const region = [...card.querySelectorAll('div')].find(node => node.scrollHeight > node.clientHeight + 4)
+        const header = card.querySelector('thead th')
+        return {
+          headerTop: Math.round(header.getBoundingClientRect().top),
+          regionTop: Math.round(region.getBoundingClientRect().top),
+        }
+      })
+      expect(Math.abs(pinned.headerTop - pinned.regionTop), `header should stay pinned at ${width}px`).toBeLessThanOrEqual(1)
     }
   } finally {
     await context.close()
