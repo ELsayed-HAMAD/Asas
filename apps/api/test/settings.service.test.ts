@@ -1,6 +1,14 @@
 import type { PrismaClient } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
 import { getIntegrationWebhookLogs } from '../src/modules/settings/settings.service.js'
+import { TENANT_PURGE_MODELS } from '../src/services/tenantPurge.js'
+
+/** Every tenant-scoped model the purge sweeps, so each tx mock only names the ones it asserts. */
+function purgeDelegates(count = 0) {
+  return Object.fromEntries(
+    TENANT_PURGE_MODELS.map(model => [model, { deleteMany: vi.fn().mockResolvedValue({ count }) }]),
+  )
+}
 
 describe('getIntegrationWebhookLogs', () => {
   it('returns recent logs only after tenant-scoped integration lookup', async () => {
@@ -147,6 +155,7 @@ describe('deleteWorkspace', () => {
   it('performs two-stage archival and compliant purge in transaction', async () => {
     const tx = {
       $executeRawUnsafe: vi.fn().mockResolvedValue(1),
+      ...purgeDelegates(),
       journalLine: { deleteMany: vi.fn().mockResolvedValue({ count: 10 }) },
       journalEntry: { deleteMany: vi.fn().mockResolvedValue({ count: 5 }) },
       ledgerAccount: { deleteMany: vi.fn().mockResolvedValue({ count: 4 }) },
@@ -189,7 +198,7 @@ describe('deleteWorkspace', () => {
       data: { status: 'CANCELED' },
     })
     expect(tx.$executeRawUnsafe).toHaveBeenCalledWith("SET LOCAL asas.allow_tenant_purge = 'on'")
-    expect(tx.journalLine.deleteMany).toHaveBeenCalledWith({ where: { entry: { tenantId: 'tenant_1' } } })
+    expect(tx.journalLine.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 'tenant_1' } })
     expect(tx.journalEntry.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 'tenant_1' } })
     expect(tx.ledgerAccount.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 'tenant_1' } })
     expect(tx.exchangeRate.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 'tenant_1' } })
@@ -245,6 +254,7 @@ describe('deleteWorkspace', () => {
     const cancelSubscription = vi.fn().mockResolvedValue({ status: 'canceled' })
     const tx = {
       $executeRawUnsafe: vi.fn().mockResolvedValue(1),
+      ...purgeDelegates(),
       journalLine: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       journalEntry: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       ledgerAccount: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
@@ -281,6 +291,7 @@ describe('deleteWorkspace', () => {
     let transactionCount = 0
     const tx = {
       $executeRawUnsafe: vi.fn().mockResolvedValue(1),
+      ...purgeDelegates(),
       journalLine: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       journalEntry: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       ledgerAccount: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
