@@ -7,7 +7,9 @@ import type { ImportEmployeesRequest } from '@asas/contracts'
 import { computePayrollLine, Money, type TaxRate } from '@asas/domain'
 import { recordAuditLog } from '../../services/auditLog.js'
 import { decryptBankDetail, encryptBankDetail } from '../../services/crypto.js'
+import { TENANT_PURGE_MODELS, type TenantPurgeModel } from '../../services/tenantPurge.js'
 import { AppError } from '../../utils/errors.js'
+import { recordCashSettlement, recordInvoiceRecognition } from '../finance/ledger.service.js'
 import { writeStockMovement } from '../inventory/stockMovementWriter.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -466,36 +468,99 @@ export async function applyEnterpriseSamplePack(
     }
     summary.forecasts = Math.min(repTotals.size, 6)
 
-    // A minimal chart of accounts plus one settled AR collection and AP payment per month keeps
-    // the cash-flow chart, recent settlements and trial balance truthful and balanced.
-    const accountIds = new Map<string, string>()
-    for (const account of [
-      { code: 'CASH', name: 'Cash', kind: 'ASSET' },
-      { code: 'ACCOUNTS_RECEIVABLE', name: 'Accounts receivable', kind: 'ASSET' },
-      { code: 'ACCOUNTS_PAYABLE', name: 'Accounts payable', kind: 'LIABILITY' },
-    ]) {
-      const created = await tx.ledgerAccount.create({ data: { tenantId, currency, ...account } })
-      accountIds.set(account.code, created.id)
-    }
+    // The cash-flow chart, recent settlements and trial balance read real journals, and the
+    // database validates every settlement against a paid invoice plus its recognition entry.
+    // The pack therefore seeds the full document chain for one collection and one payment per
+    // month instead of writing journal rows directly.
+    const settlementCustomers = [...customerIds.values()]
+    const settlementVendors = [...vendorIds.values()]
     const today = new Date()
     let ledgerEntries = 0
-    for (let offset = 11; offset >= 0; offset -= 1) {
-      const postedAt = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - offset, 12))
-      const settled = [
-        { sourceType: 'AR_COLLECTION', description: 'Customer collections', amount: 1_900_000 + (11 - offset) * 140_000, debit: 'CASH', credit: 'ACCOUNTS_RECEIVABLE' },
-        { sourceType: 'AP_PAYMENT', description: 'Vendor payments', amount: 1_250_000 + (11 - offset) * 90_000, debit: 'ACCOUNTS_PAYABLE', credit: 'CASH' },
-      ]
-      for (const movement of settled) {
-        const amount = new Prisma.Decimal(movement.amount)
-        const entry = await tx.journalEntry.create({ data: {
-          tenantId, currency, amount, baseCurrency: currency, baseAmount: amount, baseMinorUnitDigits: 2,
-          sourceType: movement.sourceType, currencyProvenance: 'DOCUMENT', description: movement.description, postedAt,
-        } })
-        await tx.journalLine.createMany({ data: [
-          { tenantId, entryId: entry.id, accountId: accountIds.get(movement.debit) ?? '', side: 'DEBIT', amount, baseAmount: amount },
-          { tenantId, entryId: entry.id, accountId: accountIds.get(movement.credit) ?? '', side: 'CREDIT', amount, baseAmount: amount },
-        ] })
-        ledgerEntries += 1
+    if (settlementCustomers.length > 0 && settlementVendors.length > 0) {
+      for (let offset = 11; offset >= 0; offset -= 1) {
+        const postedAt = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - offset, 12))
+        const issuedAt = new Date(postedAt.getTime() - 21 * 86_400_000)
+        const monthLabel = `${postedAt.getUTCFullYear()}-${String(postedAt.getUTCMonth() + 1).padStart(2, '0')}`
+        const customerId = settlementCustomers[offset % settlementCustomers.length]
+        const vendorId = settlementVendors[offset % settlementVendors.length]
+        if (!customerId || !vendorId) continue
+
+        const receivableAmount = new Prisma.Decimal(1_900_000 + (11 - offset) * 140_000).toFixed(2)
+        const receivable = await tx.receivableInvoice.create({
+          data: {
+            tenantId,
+            customerId,
+            currency,
+            number: `SAMPLE-AR-${monthLabel}`,
+            date: issuedAt,
+            dueDate: new Date(postedAt.getTime() - 7 * 86_400_000),
+            amount: receivableAmount,
+            status: 'PAID',
+            paidAt: postedAt,
+          },
+        })
+        await recordInvoiceRecognition(tx, {
+          tenantId,
+          sourceId: receivable.id,
+          sourceType: 'AR_RECOGNITION',
+          amount: receivableAmount,
+          currency,
+          workspaceCurrency: currency,
+          postedAt: issuedAt,
+          actorId: null,
+          description: `Sample receivable ${monthLabel}`,
+        })
+        await recordCashSettlement(tx, {
+          tenantId,
+          sourceId: receivable.id,
+          sourceType: 'AR_COLLECTION',
+          amount: receivableAmount,
+          documentCurrency: currency,
+          workspaceCurrency: currency,
+          postedAt,
+          actorId: null,
+          description: 'Customer collections',
+        })
+        ledgerEntries += 2
+
+        const payableAmount = new Prisma.Decimal(1_250_000 + (11 - offset) * 90_000).toFixed(2)
+        const payable = await tx.payableInvoice.create({
+          data: {
+            tenantId,
+            vendorId,
+            currency,
+            invoiceNumber: `SAMPLE-AP-${monthLabel}`,
+            date: issuedAt,
+            dueDate: new Date(postedAt.getTime() - 7 * 86_400_000),
+            amount: payableAmount,
+            status: 'PAID',
+            paidAt: postedAt,
+            approvedAt: issuedAt,
+          },
+        })
+        await recordInvoiceRecognition(tx, {
+          tenantId,
+          sourceId: payable.id,
+          sourceType: 'AP_RECOGNITION',
+          amount: payableAmount,
+          currency,
+          workspaceCurrency: currency,
+          postedAt: issuedAt,
+          actorId: null,
+          description: `Sample payable ${monthLabel}`,
+        })
+        await recordCashSettlement(tx, {
+          tenantId,
+          sourceId: payable.id,
+          sourceType: 'AP_PAYMENT',
+          amount: payableAmount,
+          documentCurrency: currency,
+          workspaceCurrency: currency,
+          postedAt,
+          actorId: null,
+          description: 'Vendor payments',
+        })
+        ledgerEntries += 2
       }
     }
     summary.ledgerEntries = ledgerEntries
@@ -881,84 +946,9 @@ export async function applyEnterpriseSamplePack(
  * tenant-scoped model (e.g. `StockMovement` → `Product`, `PayrollLine` → `Employee`). The
  * cascade covers the rest, so this list is the *minimal* set that clears a sample workspace.
  */
-type TenantBusinessModel =
-  | 'journalLine'
-  | 'journalEntry'
-  | 'ledgerAccount'
-  | 'payrollLine'
-  | 'payrollRun'
-  | 'timesheet'
-  | 'attendanceException'
-  | 'leaveRequest'
-  | 'leavePolicy'
-  | 'candidate'
-  | 'employee'
-  | 'department'
-  | 'activityEvent'
-  | 'payableInvoice'
-  | 'receivableInvoice'
-  | 'expense'
-  | 'ledgerTransaction'
-  | 'cashFlowSnapshot'
-  | 'vendor'
-  | 'customer'
-  | 'deal'
-  | 'company'
-  | 'agendaItem'
-  | 'salesQuota'
-  | 'forecastSnapshot'
-  | 'purchaseOrder'
-  | 'stockMovement'
-  | 'product'
-  | 'supplier'
-  | 'issue'
-  | 'sprint'
-  | 'project'
-  | 'roadmapPhase'
-  | 'roadmapTask'
+type TenantBusinessModel = TenantPurgeModel
 
-const TENANT_BUSINESS_MODELS: readonly TenantBusinessModel[] = [
-  // Ledger (lines before entries; accounts last so their rows are unreferenced)
-  'journalLine',
-  'journalEntry',
-  'ledgerAccount',
-  // HR (leaf-ish first)
-  'payrollLine',
-  'payrollRun',
-  'timesheet',
-  'attendanceException',
-  'leaveRequest',
-  'leavePolicy',
-  'candidate',
-  'employee',
-  'department',
-  'activityEvent',
-  // Finance
-  'payableInvoice',
-  'receivableInvoice',
-  'expense',
-  'ledgerTransaction',
-  'cashFlowSnapshot',
-  'vendor',
-  'customer',
-  // CRM
-  'deal',
-  'company',
-  'agendaItem',
-  'salesQuota',
-  'forecastSnapshot',
-  // Inventory (purchase orders before products: their lines cascade off both)
-  'purchaseOrder',
-  'stockMovement',
-  'product',
-  'supplier',
-  // Projects
-  'issue',
-  'sprint',
-  'project',
-  'roadmapPhase',
-  'roadmapTask',
-]
+const TENANT_BUSINESS_MODELS = TENANT_PURGE_MODELS
 
 type SampleManifest = Record<TenantBusinessModel, { ids: string[]; hash: string }>
 

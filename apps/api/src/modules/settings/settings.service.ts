@@ -31,6 +31,7 @@ import { invalidateAuthCacheForTenant } from '../../middlewares/rbac.js'
 import { closeStreamsForTenant } from '../../plugins/sse.js'
 import { decryptCredential, encryptCredential, maskCredential } from '../../services/crypto.js'
 import type { StripeBillingProvider } from '../../services/stripeBilling.js'
+import { TENANT_PURGE_MODELS, type TenantPurgeModel } from '../../services/tenantPurge.js'
 import { getPastDueGraceEndsOn, resolveEffectivePlanLimits, resolveEffectivePlanSubscription } from '../../services/entitlements.js'
 import { AppError } from '../../utils/errors.js'
 import { probePublicHttpsEndpoint } from './integrationProbe.js'
@@ -589,10 +590,15 @@ export async function deleteWorkspace(
       // Elevate session setting to permit compliant administrative deletion of append-only ledgers
       await tx.$executeRawUnsafe("SET LOCAL asas.allow_tenant_purge = 'on'")
 
-      // 1. Clean up restricted financial models
-      await tx.journalLine.deleteMany({ where: { entry: { tenantId } } })
-      await tx.journalEntry.deleteMany({ where: { tenantId } })
-      await tx.ledgerAccount.deleteMany({ where: { tenantId } })
+      // 1. Sweep tenant-scoped business rows in FK-safe order. RESTRICT/NO ACTION relations
+      // (payroll lines and timesheets to employees, inventory lines to invoices/products,
+      // invoices and expenses to projects) make a bare tenant cascade fail.
+      const sweep = tx as unknown as Record<TenantPurgeModel, {
+        deleteMany: (args: { where: { tenantId: string } }) => Promise<{ count: number }>
+      }>
+      for (const model of TENANT_PURGE_MODELS) {
+        await sweep[model].deleteMany({ where: { tenantId } })
+      }
       await tx.exchangeRate.deleteMany({ where: { tenantId } })
 
       // 2. Clean up invitations and memberships
@@ -601,6 +607,11 @@ export async function deleteWorkspace(
 
       // 3. Delete the tenant itself (cascading deletes will handle all remaining tables)
       await tx.tenant.delete({ where: { id: tenantId } })
+    }, {
+      // A populated workspace sweeps tens of thousands of rows; the 5s Prisma default aborts it
+      // even when every statement succeeds.
+      maxWait: 15_000,
+      timeout: 300_000,
     })
   } catch {
     throw new AppError(503, 'Workspace deletion could not finish. Local data and access were retained; retry when the service is available. Any Stripe cancellations are safe to retry.')
