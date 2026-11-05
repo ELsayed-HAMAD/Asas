@@ -2,6 +2,14 @@ import { readFileSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { PrismaClient } from '@prisma/client'
+import { TENANT_PURGE_MODELS } from '../src/services/tenantPurge.js'
+
+/** Models the purge sweeps that this fixture does not create; they must still resolve. */
+function emptyPurgeDelegates() {
+  return Object.fromEntries(
+    TENANT_PURGE_MODELS.map(model => [model, { deleteMany: async () => ({ count: 0 }) }]),
+  )
+}
 
 let db: PGlite
 
@@ -157,6 +165,7 @@ describe('Finding 16: End-to-End Journal Integrity vs Compliant Tenant Purge', (
             $executeRawUnsafe: async (sql: string) => {
               await db.exec(sql)
             },
+            ...emptyPurgeDelegates(),
             tenant: {
               update: async ({ where, data }: any) => {
                 await db.query('UPDATE "Tenant" SET "status" = $1, "archivedAt" = NOW() WHERE "id" = $2', [data.status, where.id])

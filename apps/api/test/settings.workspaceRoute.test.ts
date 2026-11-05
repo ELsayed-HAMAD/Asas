@@ -5,6 +5,14 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Auth } from '../src/auth.js'
 import { errorHandler } from '../src/middlewares/errorHandler.js'
 import { settingsRoutes } from '../src/modules/settings/settings.routes.js'
+import { TENANT_PURGE_MODELS } from '../src/services/tenantPurge.js'
+
+/** Every tenant-scoped model the purge sweeps, so the tx mock only names the ones it asserts. */
+function purgeDelegates(count = 0) {
+  return Object.fromEntries(
+    TENANT_PURGE_MODELS.map(model => [model, { deleteMany: vi.fn().mockResolvedValue({ count }) }]),
+  )
+}
 
 async function setup(options: { role?: string; unauthenticated?: boolean; stripeBilling?: unknown; activeStripeSubscription?: string; quietHours?: { start: string; end: string } | null } = {}) {
   const app = Fastify()
@@ -25,6 +33,7 @@ async function setup(options: { role?: string; unauthenticated?: boolean; stripe
 
   const tx = {
     $executeRawUnsafe: vi.fn().mockResolvedValue(1),
+    ...purgeDelegates(),
     journalLine: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     journalEntry: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     ledgerAccount: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
