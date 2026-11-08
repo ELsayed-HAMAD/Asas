@@ -9,10 +9,12 @@ import { setFormatDefaults } from './lib/format'
 import { setQueryScope, queryKeys } from './lib/queryKeys'
 import { http } from './lib/api/http'
 import { initSentry } from './lib/sentry'
+import { initVercelAnalytics } from './lib/vercelAnalytics'
 import './lib/i18n'
 import './index.css'
 
 initSentry()
+initVercelAnalytics()
 
 // Initialize theme: always default to the original Light mode unless explicitly toggled
 const savedTheme = localStorage.getItem('theme')

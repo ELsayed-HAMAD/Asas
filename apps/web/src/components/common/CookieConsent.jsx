@@ -11,6 +11,7 @@ import {
   saveCookieConsent,
 } from '../../lib/cookieConsent'
 import { syncSentryConsent } from '../../lib/sentry'
+import { initVercelAnalytics } from '../../lib/vercelAnalytics'
 
 const HIDDEN_PREFIXES = ['/dashboard', '/onboarding', '/choose-workspace', '/admin']
 
@@ -53,6 +54,8 @@ export default function CookieConsent() {
     }
     setAnalytics(nextAnalytics)
     syncSentryConsent()
+    // Web Analytics has no teardown step; `beforeSend` stops events if consent is withdrawn.
+    initVercelAnalytics()
     setVisible(false)
   }
 

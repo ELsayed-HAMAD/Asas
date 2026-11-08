@@ -16,7 +16,7 @@
     { "source": "/docs", "destination": "/api" },
     { "source": "/docs/:path*", "destination": "/api" },
     { "source": "/api/:path*", "destination": "/api" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/((?!api/|_vercel/).*)", "destination": "/index.html" }
   ],
   "headers": [
     {

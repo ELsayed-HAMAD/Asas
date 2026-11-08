@@ -51,8 +51,9 @@ export default function Privacy() {
           <h2 className="text-lg font-bold text-heading">6. Cookies and privacy choices</h2>
           <p>
             Essential cookies keep you signed in, protect your account, and remember your cookie choice. Optional
-            analytics and diagnostics are off until you allow them, and they are limited to error and performance
-            reports used to improve reliability. Your choice is stored in this browser and can be changed at any time.
+            analytics and diagnostics are off until you allow them, and they are limited to anonymous page views,
+            error, and performance reports used to improve reliability. Your choice is stored in this browser and
+            can be changed at any time.
           </p>
           <CookieSettingsButton className="text-sm font-semibold text-primary underline decoration-primary/30 underline-offset-2 hover:decoration-primary">
             Manage cookie preferences
