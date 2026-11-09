@@ -28,7 +28,7 @@
     "@fastify/rate-limit": "^11.2.1",
     "@fastify/swagger": "^9.9.2",
     "@fastify/swagger-ui": "^6.1.2",
-    "@prisma/client": "6.19.3",
+    "@prisma/client": "7.10.1",
     "@sentry/node": "^11.10.0",
     "better-auth": "^1.7.14",
     "dotenv": "18.0.9",
